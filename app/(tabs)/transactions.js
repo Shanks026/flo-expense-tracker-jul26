@@ -1,0 +1,256 @@
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { addMonths, subMonths, format, isToday, isYesterday } from 'date-fns';
+import Screen from '../../components/Screen';
+import Card from '../../components/Card';
+import IconTile from '../../components/IconTile';
+import AmountText from '../../components/AmountText';
+import Pill from '../../components/Pill';
+import CategoryIcon from '../../components/CategoryIcon';
+import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import useTransactions from '../../hooks/useTransactions';
+import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
+
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'expense', label: 'Expense' },
+  { key: 'income', label: 'Income' },
+];
+
+function dayLabel(dateStr) {
+  const date = new Date(dateStr);
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'd MMMM');
+}
+
+function groupByDay(transactions) {
+  const groups = [];
+  const byLabel = new Map();
+  for (const tx of transactions) {
+    const label = dayLabel(tx.occurred_at);
+    if (!byLabel.has(label)) {
+      const group = { label, items: [] };
+      byLabel.set(label, group);
+      groups.push(group);
+    }
+    byLabel.get(label).items.push(tx);
+  }
+  return groups;
+}
+
+export default function Transactions() {
+  const [month, setMonth] = useState(new Date());
+  const [typeFilter, setTypeFilter] = useState('all');
+  const { transactions } = useTransactions({ month, type: typeFilter });
+  const { openAdd } = useAddTransactionSheet();
+
+  const groups = useMemo(() => groupByDay(transactions), [transactions]);
+
+  const totals = useMemo(() => {
+    return transactions.reduce(
+      (acc, tx) => {
+        if (tx.type === 'income') acc.received += tx.amount;
+        else acc.spent += tx.amount;
+        return acc;
+      },
+      { spent: 0, received: 0 }
+    );
+  }, [transactions]);
+
+  return (
+    <Screen>
+      <View style={styles.header}>
+        <Text style={styles.title}>Transactions</Text>
+        <View style={styles.monthSelector}>
+          <Pressable onPress={() => setMonth((m) => subMonths(m, 1))}>
+            <ChevronLeft size={18} color={colors.ink} strokeWidth={2.4} />
+          </Pressable>
+          <Text style={styles.monthText}>{format(month, 'MMMM yyyy')}</Text>
+          <Pressable onPress={() => setMonth((m) => addMonths(m, 1))}>
+            <ChevronRight size={18} color={colors.ink} strokeWidth={2.4} />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.filterRow}>
+        {FILTERS.map((f) => (
+          <Pressable key={f.key} onPress={() => setTypeFilter(f.key)}>
+            <Pill label={f.label} tone={typeFilter === f.key ? 'dark' : 'neutral'} />
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryDark}>
+          <Text style={styles.summaryLabelDark}>Spent</Text>
+          <AmountText value={totals.spent} type="neutral" dark size={fontSize.xxl} />
+        </View>
+        <View style={styles.summaryLight}>
+          <Text style={styles.summaryLabelLight}>Received</Text>
+          <AmountText value={totals.received} type="income" size={fontSize.xxl} />
+        </View>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {groups.length === 0 ? (
+          <Card style={{ marginTop: spacing.lg }}>
+            <Text style={styles.emptyText}>No transactions this month.</Text>
+          </Card>
+        ) : (
+          groups.map((group) => (
+            <View key={group.label}>
+              <Text style={styles.dayLabel}>{group.label}</Text>
+              <Card style={styles.dayCard}>
+                {group.items.map((tx, idx) => (
+                  <Pressable
+                    key={tx.id}
+                    style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
+                    onPress={() => openAdd(tx)}
+                  >
+                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
+                      <CategoryIcon
+                        icon={tx.category?.icon}
+                        size={19}
+                        color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
+                      />
+                    </IconTile>
+                    <View style={styles.rowMid}>
+                      <View style={styles.rowTitleWrap}>
+                        <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
+                        {tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                      </View>
+                      <Text style={styles.rowSub}>{tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}</Text>
+                    </View>
+                    <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
+                  </Pressable>
+                ))}
+              </Card>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  title: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.display,
+    letterSpacing: -0.3,
+    color: colors.ink,
+    marginBottom: spacing.md,
+  },
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignSelf: 'flex-start',
+  },
+  monthText: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.base,
+    color: colors.ink,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  summaryDark: {
+    flex: 1,
+    backgroundColor: colors.ink,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+  summaryLight: {
+    flex: 1,
+    backgroundColor: colors.incomeBg,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+  summaryLabelDark: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.mutedMid,
+    marginBottom: 2,
+  },
+  summaryLabelLight: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.incomeAccent,
+    marginBottom: 2,
+  },
+  scroll: {
+    paddingTop: spacing.md,
+    paddingBottom: 120,
+  },
+  dayLabel: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.base,
+    color: colors.mutedMid,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    marginLeft: 4,
+  },
+  dayCard: {
+    padding: 0,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.md,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 12,
+  },
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  rowMid: {
+    flex: 1,
+  },
+  rowTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  rowTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    color: colors.ink,
+  },
+  planPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  rowSub: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.mutedMid,
+    marginTop: 1,
+  },
+});
