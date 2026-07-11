@@ -11,6 +11,7 @@ import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import { markBillPaid, skipBillCycle } from '../lib/bills';
 import { budgetToastForSave } from '../lib/alerts';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const PayBillSheetContext = createContext(null);
 
@@ -34,6 +35,7 @@ export function usePayBillSheet() {
 
 const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { accounts, activeAccountId } = useAccount();
   const { showToast } = useToast();
@@ -112,6 +114,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['68%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

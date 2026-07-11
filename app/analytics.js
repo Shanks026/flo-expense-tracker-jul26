@@ -12,7 +12,7 @@ import Pill from '../components/Pill';
 import ProgressBar from '../components/ProgressBar';
 import AnalyticsFilterBar from '../components/AnalyticsFilterBar';
 import AnalyticsSegmentTabs from '../components/AnalyticsSegmentTabs';
-import TrendChart from '../components/TrendChart';
+import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import DayOfWeekChart from '../components/DayOfWeekChart';
 import DonutChart from '../components/DonutChart';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
@@ -94,6 +94,14 @@ export default function Analytics() {
 
   const granularity = differenceInCalendarDays(to, from) + 1 <= 31 ? 'day' : 'week';
   const trendData = useMemo(() => computeTrend(current, from, to), [current, from, to, granularity]);
+  // IncomeExpenseChart expects { date, income, expense }; computeTrend
+  // returns { bucketStart, income, expense } — mapped here rather than
+  // renaming computeTrend's own field, since lib/analytics.js is a shared
+  // utility this screen isn't necessarily the only consumer of.
+  const chartData = useMemo(
+    () => trendData.map((b) => ({ date: b.bucketStart, income: b.income, expense: b.expense })),
+    [trendData]
+  );
 
   const dayOfWeekData = useMemo(() => computeDayOfWeek(current), [current]);
   const expenseCount = useMemo(() => current.filter((tx) => tx.type === 'expense').length, [current]);
@@ -170,7 +178,12 @@ export default function Analytics() {
             </Card>
 
             <Card style={styles.chartCard}>
-              <TrendChart data={trendData} granularity={granularity} />
+              <IncomeExpenseChart
+                data={chartData}
+                granularity={granularity}
+                showPeriodLabel
+                emptyMessage="No transactions in this period."
+              />
             </Card>
 
             {biggest && (
@@ -198,7 +211,12 @@ export default function Analytics() {
         {segment === 'transactions' && (
           <>
             <Card style={styles.chartCard}>
-              <TrendChart data={trendData} granularity={granularity} />
+              <IncomeExpenseChart
+                data={chartData}
+                granularity={granularity}
+                showPeriodLabel
+                emptyMessage="No transactions in this period."
+              />
             </Card>
             <Card style={styles.chartCard}>
               <DayOfWeekChart data={dayOfWeekData} />

@@ -9,6 +9,7 @@ import { useAccount } from '../lib/AccountContext';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import { useAddAccountSheet } from './AddAccountSheet';
 import { useToast } from './Toast';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AccountSwitcherSheetContext = createContext(null);
 
@@ -35,7 +36,14 @@ function formatAmount(value) {
   return `${value < 0 ? '−' : ''}₹${rounded.toLocaleString('en-IN')}`;
 }
 
+function formatBalance(value) {
+  const rounded = Math.round(Math.abs(value));
+  return { sign: value < 0 ? '−' : '', number: rounded.toLocaleString('en-IN') };
+}
+
 function AccountCard({ account, summary, active, onSelect, onEdit }) {
+  const balance = formatBalance(summary?.in_hand_balance ?? 0);
+
   return (
     <Pressable style={styles.card} onPress={onSelect}>
       <View style={styles.cardTopRow}>
@@ -56,7 +64,11 @@ function AccountCard({ account, summary, active, onSelect, onEdit }) {
       </View>
 
       <Text style={styles.cardLabel}>In Hand</Text>
-      <Text style={styles.cardBalance}>{formatAmount(summary?.in_hand_balance ?? 0)}</Text>
+      <Text style={styles.cardBalance}>
+        {balance.sign}
+        <Text style={styles.cardBalanceCurrency}>₹</Text>
+        {balance.number}
+      </Text>
 
       <View style={styles.cardStatsRow}>
         <View style={styles.statLine}>
@@ -76,6 +88,7 @@ function AccountCard({ account, summary, active, onSelect, onEdit }) {
 
 const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const insets = useSafeAreaInsets();
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
   const { summaries } = useAllAccountSummaries();
@@ -119,6 +132,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['85%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
@@ -235,7 +249,10 @@ const styles = StyleSheet.create({
     fontSize: fontSize.hero,
     letterSpacing: -0.4,
     color: colors.surface,
-    marginTop: 4,
+    marginTop: 0,
+  },
+  cardBalanceCurrency: {
+    color: colors.mutedDarker,
   },
   cardStatsRow: {
     flexDirection: 'row',

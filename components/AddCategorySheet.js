@@ -8,6 +8,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddCategorySheetContext = createContext(null);
 
@@ -31,6 +32,7 @@ export function useAddCategorySheet() {
 
 const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
 
@@ -86,6 +88,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['75%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

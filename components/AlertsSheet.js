@@ -5,6 +5,7 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import { X, Receipt, Wallet, Flag, ChevronRight, CircleCheck } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import useAlerts from '../hooks/useAlerts';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AlertsSheetContext = createContext(null);
 
@@ -30,6 +31,7 @@ const KIND_ICON = { bill: Receipt, budget: Wallet, plan: Flag };
 
 const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
   const { alerts } = useAlerts();
 
@@ -52,6 +54,7 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['55%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

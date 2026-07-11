@@ -1,12 +1,19 @@
 import { Text, StyleSheet } from 'react-native';
 import { colors, fontFamily, fontSize } from '../theme/tokens';
 
-function formatAmount(value) {
-  const rounded = Math.round(Math.abs(value));
-  return `₹${rounded.toLocaleString('en-IN')}`;
+function formatNumber(value) {
+  return Math.round(Math.abs(value)).toLocaleString('en-IN');
 }
 
-export default function AmountText({ value, type = 'neutral', signed = false, size = fontSize.lg, dark = false, style }) {
+export default function AmountText({
+  value,
+  type = 'neutral',
+  signed = false,
+  size = fontSize.lg,
+  dark = false,
+  muteCurrency = false,
+  style,
+}) {
   const isNegative = value < 0;
 
   const color = isNegative
@@ -24,10 +31,13 @@ export default function AmountText({ value, type = 'neutral', signed = false, si
   if (isNegative) prefix = '−';
   else if (signed) prefix = type === 'income' ? '+' : type === 'danger' ? '−' : '−';
 
+  const currencyColor = dark ? colors.mutedDarker : colors.mutedLight;
+
   return (
     <Text style={[styles.text, { color, fontSize: size }, style]}>
       {prefix}
-      {formatAmount(value)}
+      <Text style={muteCurrency ? { color: currencyColor } : null}>₹</Text>
+      {formatNumber(value)}
     </Text>
   );
 }

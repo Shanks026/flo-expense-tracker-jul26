@@ -5,6 +5,7 @@ import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/
 import { ChartColumn, Flag, Settings, LogOut, X } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const MenuSheetContext = createContext(null);
 
@@ -34,6 +35,7 @@ const ITEMS = [
 
 const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
   const { signOut } = useAuth();
 
@@ -61,6 +63,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['50%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

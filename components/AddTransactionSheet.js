@@ -16,6 +16,7 @@ import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -45,6 +46,7 @@ function formatDateLabel(date) {
 
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId, activeAccount } = useAccount();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
@@ -162,6 +164,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

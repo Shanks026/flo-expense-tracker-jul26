@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
 import { useToast } from './Toast';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const EditProfileSheetContext = createContext(null);
 
@@ -32,6 +33,7 @@ export function useEditProfileSheet() {
 
 const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { session } = useAuth();
   const { profile, avatarUrl, updateProfile } = useProfile();
   const { showToast } = useToast();
@@ -116,6 +118,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['55%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

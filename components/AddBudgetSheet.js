@@ -11,6 +11,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddBudgetSheetContext = createContext(null);
 
@@ -50,6 +51,7 @@ function periodRangeLabel(period) {
 
 const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId } = useAccount();
   const { showToast } = useToast();
@@ -135,6 +137,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['70%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
@@ -12,7 +13,7 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens
 import { useAuth } from '../../lib/AuthContext';
 import useGlobalSummary from '../../hooks/useGlobalSummary';
 import useTransactions from '../../hooks/useTransactions';
-import useDailyTotals from '../../hooks/useDailyTotals';
+import useSpendingTrend from '../../hooks/useSpendingTrend';
 import useProfile from '../../hooks/useProfile';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useMenuSheet } from '../../components/MenuSheet';
@@ -38,7 +39,8 @@ export default function Home() {
   const router = useRouter();
   const { summary } = useGlobalSummary();
   const { transactions } = useTransactions({ limit: 4 });
-  const { data: dailyTotals } = useDailyTotals(7);
+  const [trendRange, setTrendRange] = useState('7d');
+  const { data: trendData } = useSpendingTrend(trendRange);
   const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
@@ -94,7 +96,14 @@ export default function Home() {
             </Pressable>
           </View>
           <Text style={styles.heroLabel}>In Hand</Text>
-          <AmountText value={summary.in_hand_balance} type="neutral" dark size={fontSize.amountLg} style={styles.heroBalance} />
+          <AmountText
+            value={summary.in_hand_balance}
+            type="neutral"
+            dark
+            muteCurrency
+            size={fontSize.amountLg}
+            style={styles.heroBalance}
+          />
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStat}>
               <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
@@ -109,12 +118,8 @@ export default function Home() {
           </View>
         </Card>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Last 7 Days</Text>
-        </View>
-
-        <Card>
-          <IncomeExpenseChart data={dailyTotals} />
+        <Card style={styles.chartCard}>
+          <IncomeExpenseChart data={trendData} range={trendRange} onRangeChange={setTrendRange} />
         </Card>
 
         <View style={styles.sectionHeaderRow}>
@@ -290,7 +295,10 @@ const styles = StyleSheet.create({
     color: colors.brand,
   },
   heroBalance: {
-    marginTop: 6,
+    marginTop: 0,
+  },
+  chartCard: {
+    marginTop: spacing.xxl,
   },
   heroStatsRow: {
     flexDirection: 'row',

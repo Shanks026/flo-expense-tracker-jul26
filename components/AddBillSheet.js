@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddBillSheetContext = createContext(null);
 
@@ -40,6 +41,7 @@ const CADENCES = [
 
 const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { expenseCategories } = useCategories();
@@ -155,6 +157,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['85%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

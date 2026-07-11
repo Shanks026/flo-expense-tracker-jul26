@@ -391,3 +391,57 @@ Bill/Daily reminder feature. If a future audit sees these, this is why.
   **Standing rule**: every new sheet must wire this hook — it's not
   optional/cosmetic, it's the only thing standing between a back-press and an
   unwanted app exit.
+
+---
+
+## Phase 1 Release (2026-07-11)
+
+Everything built through this point — the v1 core (`FEATURE_PLAN.md`),
+Analytics, Accounts, SMS Share Import, and Notifications & Recurring Bills
+(`01`–`04` above), plus the Home/Analytics chart rework and the Bills↔Plans
+tab swap — ships together in one EAS build as **Phase 1** of the
+application. This section records the final pre-build audit and polish pass
+that preceded it.
+
+**Pre-build audit** (full codebase check, not just the pending diff, per
+explicit request before starting the EAS build):
+- Re-verified every hook against the session-dependency bug class (see the
+  standing rule above) — `useAlerts` and `useSpendingTrend` (both new this
+  pass) confirmed safe by composition / `activeAccountId` scoping.
+- No dangling references to deleted `TrendChart.js`/`useDailyTotals.js`.
+- No `console.log`/`debugger`/TODO left in app code; no hardcoded secrets
+  (Supabase keys come from `.env`, gitignored; session storage still uses
+  `LargeSecureStore`).
+- All 11 sheets confirmed still wired to `useSheetBackHandler`.
+- Bills↔Plans tab swap confirmed consistent across `_layout.js`, `TabBar.js`,
+  and every `router.push` destination (`/plans`, `/bills`, `/analytics`,
+  `/plan/[id]`).
+- Supabase advisors re-run: `delete_current_user()`'s `SECURITY DEFINER` flag
+  confirmed safe (scoped to `auth.uid()` only, with a null-session check);
+  leaked-password-protection still open (Dashboard-only toggle, not fixable
+  via MCP — recommend enabling manually).
+- **Fixed**: `app.json` declares `userInterfaceStyle: "light"`, but
+  `expo-system-ui` (required for Expo to actually enforce it natively) had
+  never been installed — `expo prebuild` warned on every run. Installed
+  `expo-system-ui`; prebuild now completes with no warnings.
+- `npx expo prebuild --platform android` and `npx expo export --platform
+  android` both verified clean (3965 modules, no errors) as the final gate
+  before this build.
+
+**UI polish** (Home hero card + account selector cards — `AmountText.js`,
+`app/(tabs)/index.js`, `AccountSwitcherSheet.js`):
+- Currency symbol (₹) now renders in a muted tone instead of the same bright
+  color as the balance number, matching `AddTransactionSheet`'s existing
+  amount-input treatment (where the ₹ is already de-emphasized against the
+  bold digits). Added `AmountText`'s `muteCurrency` prop (opt-in,
+  `colors.mutedDarker` on dark cards / `colors.mutedLight` on light ones) so
+  every other `AmountText` call site (transaction rows, Analytics, Plan
+  Detail) is untouched — this is scoped to just the two cards that were
+  singled out.
+- Tightened the gap between the "In Hand" label and the balance figure on
+  both cards (`heroBalance`/`cardBalance` `marginTop` reduced).
+
+**Deliberately deferred, not built**: persisting the income/expense chart's
+visibility-toggle selection (per-account vs per-user vs not at all) — user
+was leaning toward "unnecessary" after the tradeoffs were discussed; revisit
+if it comes up again.

@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
+import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddAccountSheetContext = createContext(null);
 
@@ -32,6 +33,7 @@ export function useAddAccountSheet() {
 
 const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
   const { showToast } = useToast();
@@ -144,6 +146,7 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
+      onChange={handleSheetChange}
       snapPoints={useMemo(() => ['65%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

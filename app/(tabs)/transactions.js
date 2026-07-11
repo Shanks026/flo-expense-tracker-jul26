@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { addMonths, subMonths, format, isToday, isYesterday } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -31,13 +31,19 @@ function groupByDay(transactions) {
   for (const tx of transactions) {
     const label = dayLabel(tx.occurred_at);
     if (!byLabel.has(label)) {
-      const group = { label, items: [] };
+      const group = { label, items: [], income: 0, expense: 0 };
       byLabel.set(label, group);
       groups.push(group);
     }
-    byLabel.get(label).items.push(tx);
+    const group = byLabel.get(label);
+    group.items.push(tx);
+    group[tx.type] += tx.amount;
   }
   return groups;
+}
+
+function formatAmount(n) {
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
 }
 
 export default function Transactions() {
@@ -100,34 +106,48 @@ export default function Transactions() {
           </Card>
         ) : (
           groups.map((group) => (
-            <View key={group.label}>
-              <Text style={styles.dayLabel}>{group.label}</Text>
-              <Card style={styles.dayCard}>
-                {group.items.map((tx, idx) => (
-                  <Pressable
-                    key={tx.id}
-                    style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
-                    onPress={() => openAdd(tx)}
-                  >
-                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
-                      <CategoryIcon
-                        icon={tx.category?.icon}
-                        size={19}
-                        color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
-                      />
-                    </IconTile>
-                    <View style={styles.rowMid}>
-                      <View style={styles.rowTitleWrap}>
-                        <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
-                        {tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
-                      </View>
-                      <Text style={styles.rowSub}>{tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}</Text>
+            <Card key={group.label} style={styles.dayCard}>
+              <View style={styles.dayHeaderRow}>
+                <Text style={styles.dayLabel}>{group.label}</Text>
+                <View style={styles.dayTotals}>
+                  {group.expense > 0 && (
+                    <View style={styles.dayTotalItem}>
+                      <TrendingDown size={11} color={colors.dangerStrong} strokeWidth={2.6} />
+                      <Text style={styles.dayTotalValue}>{formatAmount(group.expense)}</Text>
                     </View>
-                    <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
-                  </Pressable>
-                ))}
-              </Card>
-            </View>
+                  )}
+                  {group.income > 0 && (
+                    <View style={styles.dayTotalItem}>
+                      <TrendingUp size={11} color={colors.income} strokeWidth={2.6} />
+                      <Text style={styles.dayTotalValue}>{formatAmount(group.income)}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              {group.items.map((tx, idx) => (
+                <Pressable
+                  key={tx.id}
+                  style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
+                  onPress={() => openAdd(tx)}
+                >
+                  <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
+                    <CategoryIcon
+                      icon={tx.category?.icon}
+                      size={19}
+                      color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
+                    />
+                  </IconTile>
+                  <View style={styles.rowMid}>
+                    <View style={styles.rowTitleWrap}>
+                      <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
+                      {tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                    </View>
+                    <Text style={styles.rowSub}>{tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}</Text>
+                  </View>
+                  <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
+                </Pressable>
+              ))}
+            </Card>
           ))
         )}
       </ScrollView>
@@ -202,17 +222,37 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: 120,
   },
+  dayHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
   dayLabel: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
     color: colors.mutedMid,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    marginLeft: 4,
+  },
+  dayTotals: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  dayTotalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dayTotalValue: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: colors.mutedDarker,
   },
   dayCard: {
     padding: 0,
     paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
   },
   emptyText: {
     fontFamily: fontFamily.semibold,
