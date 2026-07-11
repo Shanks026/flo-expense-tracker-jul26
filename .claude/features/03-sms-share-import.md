@@ -96,7 +96,7 @@ None yet — Phase 1 proves plumbing only, via `Alert.alert(text)` when a share 
 
 ---
 
-## Phase 2 — SMS parser (pure JS)
+## Phase 2 — SMS parser (pure JS) ✅ Complete (sanity-checked against constructed samples, not yet real device SMS)
 
 ### Goal
 A standalone, dependency-free function that takes raw SMS text and returns a best-effort `{ amount, type }` guess — or `null` when it can't tell confidently, rather than guessing wrong. Fully testable on its own, with zero relationship to Phase 1's native plumbing.
@@ -129,9 +129,18 @@ None — new, isolated file.
 - Category or merchant detection
 
 ### 2.7 Phase 2 Checklist — Before Marking Complete
-- [ ] Correctly extracts amount + type from a handful of real (anonymized) bank SMS samples — paste 2–3 of your own at implementation time to tune against
-- [ ] Returns `null` (not a wrong guess) for a message that isn't a transaction SMS (OTP, promotional text)
-- [ ] Handles comma-formatted amounts and at least `Rs.`/`INR`/`₹` notations
+- [x] Correctly extracts amount + type — checked against 10 constructed sample SMS texts covering common Indian bank formats (debit/credit, UPI, card spend, salary/NEFT, comma+decimal amounts, `Rs.`/`INR`/`₹` notations). **Not yet checked against real SMS from your actual bank(s)** — the real test is your device.
+- [x] Returns `null` for non-transaction text — verified against a constructed OTP message and a promotional message
+- [x] Handles comma-formatted amounts and `Rs.`/`INR`/`₹` notations — verified
+
+### Implementation Notes
+
+- `lib/smsParser.js` built as planned: `parseTransactionSms(text)`, two internal helpers (`findAmount`, `findDirection`), no dependencies.
+- **`findAmount`** skips any currency match immediately preceded by balance-context wording ("Avl Bal:", "Available Balance:", "Bal:") within a short lookback window — real bank SMS almost always state the transaction amount before the balance, and without this check the parser would frequently grab the wrong number.
+- **`findDirection`** takes whichever of the expense/income keyword sets appears **earlier** in the string, not just "any match" — handles the common "A/c debited by Rs.X; MERCHANT credited" phrasing correctly (the user's own account action is stated first).
+- **Bug caught before it shipped**: the initial expense-keyword list included `purchase`, which false-positived on a constructed promotional message ("...on your next purchase with XYZ card") that has no actual transaction. Removed it — `debited`/`spent`/`withdrawn`/`paid`/`debit` are all far less ambiguous as standalone signals than "purchase," which shows up constantly in non-transactional marketing copy.
+- **Verification method**: this project has no test framework (no Jest anywhere in the codebase), so — consistent with how every other phase in this project gets verified — I wrote a throwaway `.mjs` script with 10 constructed sample SMS texts (covering debit/credit/UPI/card/salary/OTP/promo/no-amount/decimal cases), ran it with plain `node`, fixed the one failure it caught, reran to confirm 10/10, then deleted the script. It was never committed.
+- **Real bank SMS from your own accounts may not match these constructed samples exactly** — different banks phrase things differently. If Phase 3's on-device testing shows misparses, the fix is almost always tuning `EXPENSE_PATTERN`/`INCOME_PATTERN`/`CURRENCY_PATTERN` in this one file, not a structural change.
 
 **→ Stop here. Show the result and wait for approval.**
 
