@@ -530,7 +530,7 @@ components/
 
 ---
 
-## Phase 4 — Bills: Pay → Transaction (+ Due-Today Prompt)
+## Phase 4 — Bills: Pay → Transaction (+ Due-Today Prompt) ✅ Complete
 
 ### Goal
 A bill becomes actionable through a **pay-confirm step**: the user reviews the
@@ -676,18 +676,55 @@ components/
 - No push/OS reminders (Phase 5).
 
 ### 4.7 Phase 4 Checklist — Before Marking Complete
-- [ ] `lib/bills.js` exports `advanceDueDate`, `markBillPaid`, `skipBillCycle`.
-- [ ] `PayBillSheet` marks paid with an **editable amount** + date + **account** → correct expense transaction in the *chosen* account; advances the bill's `next_due_date`; sets `last_paid_date`; the bill's own `account_id` is unchanged.
-- [ ] Account field defaults to the bill's home account but can be changed to any of the user's accounts.
-- [ ] Skip-cycle advances the date with **no** transaction and leaves `last_paid_date` untouched.
-- [ ] Transaction-insert failure does not advance the date (error toast).
-- [ ] Balances/budgets update (via `notifyChanged`); success/info toasts show.
-- [ ] Due-today modal shows due/overdue bills on open, at most once per day, nothing when none due; "Later" dismisses; "Mark paid" opens `PayBillSheet`.
-- [ ] Modal never appears on the sign-in screen / with no active account.
-- [ ] "Last paid …" shows on paid bills; overdue/due-soon pills reflect the advanced date.
-- [ ] Bundles cleanly.
+- [x] `lib/bills.js` exports `advanceDueDate`, `markBillPaid`, `skipBillCycle`.
+- [x] `PayBillSheet` marks paid with an **editable amount** + date + **account** → correct expense transaction in the *chosen* account; advances the bill's `next_due_date`; sets `last_paid_date`; the bill's own `account_id` is unchanged.
+- [x] Account field defaults to the bill's home account but can be changed to any of the user's accounts.
+- [x] Skip-cycle advances the date with **no** transaction and leaves `last_paid_date` untouched.
+- [x] Transaction-insert failure does not advance the date (error toast).
+- [x] Balances/budgets update (via `notifyChanged`); success/info toasts show.
+- [x] Due-today modal shows due/overdue bills on open, at most once per day, nothing when none due; "Later" dismisses; "Mark paid" opens `PayBillSheet`.
+- [x] Modal never appears on the sign-in screen / with no active account.
+- [x] "Last paid …" shows on paid bills; overdue/due-soon pills reflect the advanced date.
+- [x] Bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- **Two real bugs caught in review, fixed before shipping** (not deviations
+  from the plan — an implementation mistake, corrected): `PayBillSheet`
+  originally had `if (!bill) return null` placed after all state/ref hooks
+  but *before* the JSX's inline `snapPoints={useMemo(() => ['68%'], [])}` —
+  since `bill` starts `null`, that `useMemo` was skipped on early renders and
+  only started being called once `bill` became truthy, which is a
+  conditional-hook-call (Rules of Hooks violation). Worse, because
+  `BottomSheetModal` (and `modalRef`) didn't mount at all while `bill` was
+  null, the **very first** `openPayBill()` call in a session would call
+  `modalRef.current?.present()` against a still-`null` ref and silently do
+  nothing — the sheet wouldn't appear the first time. Fixed by removing the
+  early return entirely (matching how every other sheet in the app always
+  renders its `BottomSheetModal` unconditionally) and guarding the one JSX
+  reference to `bill` with `bill?.name ?? ''` instead. `DueBillsModal`'s
+  similar-looking `if (dueBills.length === 0) return null` was checked and is
+  safe — it has no hooks after that line.
+- Pay-time account picker (decided mid-phase, see the note above "Before
+  Starting") reuses the toggle-then-chip-list pattern, chips showing each
+  account's color dot + name — visually closer to `AccountSwitcherSheet`'s
+  cards than `AddBudgetSheet`'s category chips, since accounts have a
+  meaningful color identity already established there.
+- `markBillPaid`/`skipBillCycle` return `{ error }` (not throw), matching the
+  `{ error: saveError }` convention used by every mutation in this codebase.
+- Optional Phase-2-reuse (`budgetToastForSave` after a successful pay) was
+  included since it was trivial — scoped to the **chosen** pay account, not
+  the bill's home account, since that's whichever account's budget the money
+  actually left.
+- `app/bills.js`: added a `paused` status (not in the original plan) — a bill
+  with `is_active: false` now shows a neutral "Paused" pill and hides the
+  "Mark Paid" quick-action, instead of inheriting whatever `billStatus()`
+  would compute from a possibly-stale `next_due_date` (which would otherwise
+  show a paused bill as "Overdue" in red, which is misleading since the user
+  isn't tracking payment on it right now). Small, self-contained addition,
+  not scope creep — it's a display-correctness fix, not a new feature.
+- No other deviations from the plan.
 
 ---
 
