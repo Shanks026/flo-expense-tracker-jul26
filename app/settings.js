@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, LogOut } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Trash2, TriangleAlert } from 'lucide-react-native';
 import Card from '../components/Card';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
@@ -10,12 +11,29 @@ import { useEditProfileSheet } from '../components/EditProfileSheet';
 
 export default function Settings() {
   const router = useRouter();
-  const { session, signOut } = useAuth();
-  const { profile } = useProfile();
+  const { session, deleteAccount } = useAuth();
+  const { profile, avatarUrl } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
+
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      // On success, signOut inside deleteAccount flips the session to null and
+      // the root navigator redirects to sign-in — nothing else to do here.
+    } catch (err) {
+      setDeleting(false);
+      setDeleteError(err.message ?? 'Could not delete your account. Try again.');
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -29,8 +47,8 @@ export default function Settings() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Pressable onPress={openEditProfile}>
           <Card dark style={styles.profileCard}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarInitial}>{initial}</Text>
@@ -73,13 +91,55 @@ export default function Settings() {
           </View>
         </Card>
 
-        <Pressable style={styles.logoutButton} onPress={signOut}>
-          <LogOut size={19} color={colors.danger} strokeWidth={2.2} />
-          <Text style={styles.logoutText}>Log Out</Text>
+        <Pressable style={styles.deleteButton} onPress={() => { setDeleteError(null); setConfirmVisible(true); }}>
+          <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
+          <Text style={styles.deleteText}>Delete Account</Text>
         </Pressable>
 
         <Text style={styles.version}>FLO v1.0.0</Text>
       </ScrollView>
+
+      <Modal
+        visible={confirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!deleting) setConfirmVisible(false); }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIcon}>
+              <TriangleAlert size={26} color={colors.danger} strokeWidth={2.2} />
+            </View>
+            <Text style={styles.modalTitle}>Delete Account?</Text>
+            <Text style={styles.modalBody}>
+              This permanently deletes your account and everything in it — all
+              accounts, transactions, budgets, plans and your profile. This
+              cannot be undone.
+            </Text>
+
+            {deleteError && <Text style={styles.modalError}>{deleteError}</Text>}
+
+            <Pressable
+              style={[styles.modalDelete, deleting && styles.modalDeleteDisabled]}
+              onPress={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.modalDeleteText}>Delete Everything</Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={styles.modalCancel}
+              onPress={() => setConfirmVisible(false)}
+              disabled={deleting}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -187,7 +247,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.muted,
   },
-  logoutButton: {
+  deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -199,10 +259,82 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginTop: spacing.lg,
   },
-  logoutText: {
+  deleteText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
     color: colors.danger,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radii.cardLg,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.pill,
+    backgroundColor: colors.dangerBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.title,
+    color: colors.ink,
+    marginBottom: spacing.sm,
+  },
+  modalBody: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.base,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  modalError: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.base,
+    color: colors.dangerStrong,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  modalDelete: {
+    width: '100%',
+    height: 54,
+    borderRadius: radii.buttonSm + 4,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalDeleteDisabled: {
+    opacity: 0.7,
+  },
+  modalDeleteText: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    color: colors.surface,
+  },
+  modalCancel: {
+    width: '100%',
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
+  modalCancelText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    color: colors.muted,
   },
   version: {
     fontFamily: fontFamily.semibold,

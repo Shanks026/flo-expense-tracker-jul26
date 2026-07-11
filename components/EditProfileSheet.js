@@ -32,7 +32,7 @@ export function useEditProfileSheet() {
 const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   const modalRef = useRef(null);
   const { session } = useAuth();
-  const { profile, updateProfile } = useProfile();
+  const { profile, avatarUrl, updateProfile } = useProfile();
 
   const [fullName, setFullName] = useState('');
   const [localImageUri, setLocalImageUri] = useState(null);
@@ -40,7 +40,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   const [error, setError] = useState(null);
 
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
-  const avatarSource = localImageUri ?? profile?.avatar_url;
+  const avatarSource = localImageUri ?? avatarUrl;
 
   useImperativeHandle(ref, () => ({
     open() {
@@ -76,7 +76,9 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
     setSaving(true);
     setError(null);
 
-    let avatarUrl = profile?.avatar_url ?? null;
+    // avatar_url stores the object PATH; the bucket is private and the display
+    // URL is signed on read in useProfile.
+    let avatarPath = profile?.avatar_url ?? null;
 
     if (localImageUri) {
       try {
@@ -86,8 +88,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
           .from('avatars')
           .upload(path, arraybuffer, { contentType: 'image/jpeg', upsert: true });
         if (uploadError) throw uploadError;
-        const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-        avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
+        avatarPath = path;
       } catch (err) {
         setSaving(false);
         setError(err.message);
@@ -95,7 +96,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
       }
     }
 
-    const { error: saveError } = await updateProfile({ full_name: fullName.trim(), avatar_url: avatarUrl });
+    const { error: saveError } = await updateProfile({ full_name: fullName.trim(), avatar_url: avatarPath });
     setSaving(false);
     if (saveError) {
       setError(saveError.message);

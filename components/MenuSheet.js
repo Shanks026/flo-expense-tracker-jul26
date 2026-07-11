@@ -2,8 +2,9 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { ChartColumn, Settings, X } from 'lucide-react-native';
+import { ChartColumn, Settings, LogOut, X } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useAuth } from '../lib/AuthContext';
 
 const MenuSheetContext = createContext(null);
 
@@ -33,6 +34,7 @@ const ITEMS = [
 const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   const modalRef = useRef(null);
   const router = useRouter();
+  const { signOut } = useAuth();
 
   useImperativeHandle(ref, () => ({
     open() {
@@ -50,10 +52,15 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
     router.push(route);
   }
 
+  function handleLogout() {
+    modalRef.current?.dismiss();
+    signOut();
+  }
+
   return (
     <BottomSheetModal
       ref={modalRef}
-      snapPoints={useMemo(() => ['34%'], [])}
+      snapPoints={useMemo(() => ['44%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
@@ -78,6 +85,15 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
             </Pressable>
           );
         })}
+
+        <View style={styles.divider} />
+
+        <Pressable style={styles.row} onPress={handleLogout}>
+          <View style={styles.rowIcon}>
+            <LogOut size={19} color={colors.dangerStrong} strokeWidth={2} />
+          </View>
+          <Text style={[styles.rowLabel, styles.logoutLabel]}>Log Out</Text>
+        </Pressable>
       </BottomSheetView>
     </BottomSheetModal>
   );
@@ -125,5 +141,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
     color: colors.surface,
+  },
+  logoutLabel: {
+    color: colors.dangerStrong,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.inkCard,
+    marginVertical: spacing.sm,
   },
 });

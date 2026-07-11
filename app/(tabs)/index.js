@@ -37,7 +37,7 @@ export default function Home() {
   const { summary } = useGlobalSummary();
   const { transactions } = useTransactions({ limit: 4 });
   const { data: dailyTotals } = useDailyTotals(7);
-  const { profile } = useProfile();
+  const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
   const { activeAccount } = useAccount();
@@ -52,8 +52,8 @@ export default function Home() {
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Pressable onPress={openMenu}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initial}</Text>
