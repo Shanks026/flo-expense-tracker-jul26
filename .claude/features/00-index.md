@@ -13,6 +13,17 @@ tracks 11 migrations from the original build (`flo_core_schema` through
 repo. Prefer checking live state over this doc when the two might have
 drifted; update this doc when you do.
 
+**Project gained native folders** (2026-07-11, `03-sms-share-import.md`
+Phase 1) — this was a pure-JS/Expo-managed project until `expo-share-intent`
+required a native manifest entry. `android/`/`ios/` are now generated via
+`npx expo prebuild` and gitignored, not committed — `app.json`'s `plugins`
+array is still the source of truth, same as before. `package.json`'s
+`android`/`ios` npm scripts now run `expo run:android`/`expo run:ios`
+(dev-client) instead of `expo start --android`/`--ios` (Expo Go); plain
+`npm start`/`npx expo start` is unchanged. Every feature before this one
+was fully Expo-Go-testable; this is the first to require a custom dev
+client, and only for this one feature — see `03-sms-share-import.md`.
+
 **Standing rule — view security_invoker**: any migration that does
 `DROP VIEW`/`CREATE VIEW` or `CREATE OR REPLACE VIEW` via the MCP must
 explicitly `SET (security_invoker = true)` on the new view (in the same
@@ -45,7 +56,7 @@ data model.
 | — | `FEATURE_PLAN.md` (repo root) | Core app (auth/transactions/budgets/plans/settings) | ✅ Complete (v1) |
 | 01 | `01-analytics.md` | Analytics (shared filter + Overview/Transactions/Categories/Budgets/Plans graphs) | ✅ Complete (all 3 phases built, pending final on-device confirmation) |
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
-| 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 📝 Planned — awaiting user go-ahead |
+| 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 In progress (Phase 1 of 3 implemented, awaiting on-device verification) |
 
 ---
 

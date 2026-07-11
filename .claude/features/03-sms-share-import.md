@@ -38,7 +38,7 @@ Phase 3 — Wire into Add Transaction + active-account awareness
 
 ---
 
-## Phase 1 — Native plumbing: share-target registration + raw receive
+## Phase 1 — Native plumbing: share-target registration + raw receive 🚧 Implementation done — awaiting on-device verification
 
 ### Goal
 Sharing plain text from another Android app (e.g. long-press an SMS in Messages → Share) shows **FLO** in the share sheet. Tapping it opens FLO and displays the raw shared text (a simple `Alert.alert`, nothing fancier) — proving the native manifest registration and the native-to-JS bridge both work, before any parsing or sheet-integration code depends on them.
@@ -75,13 +75,24 @@ None yet — Phase 1 proves plumbing only, via `Alert.alert(text)` when a share 
 - iOS share support
 
 ### 1.7 Phase 1 Checklist — Before Marking Complete
-- [ ] `app.json` includes the share-intent plugin with valid Android-only config
-- [ ] `npx expo run:android` (or an EAS dev-client build) succeeds and produces an installable app
-- [ ] FLO appears in Android's share sheet when sharing plain text (e.g. from the Messages app)
-- [ ] Tapping FLO in the share sheet opens the app and shows the raw shared text via `Alert.alert` — confirms the native → JS bridge works end to end
-- [ ] Expo Go still works normally for every other feature in the app after this change
+- [x] `app.json` includes the share-intent plugin with valid Android-only config
+- [ ] `npx expo run:android` (or an EAS dev-client build) succeeds and produces an installable app — **not run from this environment, no device/emulator attached; needs you**
+- [ ] FLO appears in Android's share sheet when sharing plain text (e.g. from the Messages app) — **on-device, needs you**
+- [ ] Tapping FLO in the share sheet opens the app and shows the raw shared text via `Alert.alert` — **on-device, needs you**
+- [ ] Expo Go still works normally for every other feature in the app after this change — **needs your confirmation; see note below on `expo start` behavior**
 
-**→ Stop here. Show the result and wait for approval.**
+### Implementation Notes
+
+- Installed `expo-share-intent@5.0.0` (confirmed via web research as the version compatible with Expo SDK 54; `expo-linking` was already a dependency, satisfying its peer requirement). `npx expo install` auto-added a bare `"expo-share-intent"` plugin entry to `app.json` — replaced with the array form actually needed: `{ "disableIOS": true, "androidIntentFilters": ["text/*"] }`.
+- `hooks/useIncomingShare.js` wraps `expo-share-intent`'s `useShareIntent()` as planned, returning `{ sharedText, clearSharedText }`.
+- `app/_layout.js`: `useIncomingShare()` mounted in `RootNavigator`; a `useEffect` shows `Alert.alert('Shared text received', sharedText, [{ text: 'OK', onPress: clearSharedText }])` — the Phase 1 proof-of-concept exactly as scoped.
+- Ran `npx expo prebuild --no-install --clean` — succeeded, generated `android/` (iOS skipped per `disableIOS`). **Verified directly in the generated `android/app/src/main/AndroidManifest.xml`** that the correct intent-filter landed on `MainActivity`: `action=android.intent.action.SEND`, `data mimeType=text/*`, `category=DEFAULT` — this is the actual mechanism that makes FLO show up in the Android share sheet, confirmed present rather than assumed from the plugin's log output alone.
+- **Investigated and ruled out a false alarm**: the generated manifest also contains `SYSTEM_ALERT_WINDOW` — the exact "draw over other apps" permission this feature was designed specifically to avoid. Traced it via `grep` across `node_modules` to `react-native/ReactAndroid/.../debug/AndroidManifest.xml` — it's React Native core's own **debug-build-only** manifest entry (powers the dev tools overlay/LogBox), present in every RN app's debug variant regardless of this feature, not something `expo-share-intent` or this implementation added. Not a regression from this feature's stated goal.
+- `expo prebuild` also rewrote `package.json`'s `android`/`ios` npm scripts from `expo start --android`/`--ios` to `expo run:android`/`expo run:ios` — this is standard once native folders exist, and matches the doc's plan (those two scripts are now dev-client launchers). **`npm start` / `npx expo start` is untouched** and should still work for Expo Go.
+- **One nuance to verify on your end**: with native `android/`/`ios/` folders now present, `npx expo start` may change its default QR/menu behavior (some Expo CLI versions prioritize dev-client launch options once native folders exist). If plain Expo Go scanning stops being the obvious default, `npx expo start --go` forces the old Expo-Go-only behavior. Please confirm which happens for you — I can't observe this from here.
+- **Nothing was run against a real device or emulator from this environment** — there isn't one attached. Everything above is verified as far as static analysis (config, generated manifest, `prebuild` exit code) can go; the actual share-sheet appearance and text hand-off need your phone.
+
+**→ Stop here for your on-device test. Report back what you see, then we'll mark Phase 1 complete and move to Phase 2.**
 
 ---
 
