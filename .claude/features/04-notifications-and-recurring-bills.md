@@ -332,7 +332,7 @@ additive.)
 
 ---
 
-## Phase 3 — Bills & Subscriptions: Data + Management
+## Phase 3 — Bills & Subscriptions: Data + Management ✅ Complete
 
 ### Goal
 The user can record recurring money — subscriptions (Netflix), bills (rent,
@@ -385,7 +385,10 @@ CREATE POLICY "Users manage own bills"
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
--- FK-covering indexes (matches the perf-advisor standard set in 00-index.md)
+-- FK-covering indexes (matches the perf-advisor standard set in 00-index.md
+-- and the pattern already on transactions/budgets/plans/accounts — every one
+-- of those has a user_id index too, not just account_id/category_id)
+CREATE INDEX idx_bills_user_id     ON public.bills (user_id);
 CREATE INDEX idx_bills_account_id  ON public.bills (account_id);
 CREATE INDEX idx_bills_category_id ON public.bills (category_id);
 ```
@@ -483,15 +486,47 @@ components/
 - No auto-detection of bills from transactions/SMS.
 
 ### 3.7 Phase 3 Checklist — Before Marking Complete
-- [ ] `bills` table (incl. `last_paid_date`) + RLS + indexes applied; SQL block matches live schema.
-- [ ] `useBills` returns account-scoped bills ordered by due date; `billStatus` helper exported.
-- [ ] Bills screen lists/creates/edits/deletes bills; reachable from the menu sheet.
-- [ ] `AddBillSheet` writes `account_id`, validates, toasts on save.
-- [ ] Next-due-date field auto-suggests (from cadence) but stays editable; never overwrites a manual choice.
-- [ ] Deleting an account with bills is guarded in `AddAccountSheet`.
-- [ ] Bundles cleanly.
+- [x] `bills` table (incl. `last_paid_date`) + RLS + indexes applied; SQL block matches live schema.
+- [x] `useBills` returns account-scoped bills ordered by due date; `billStatus` helper exported.
+- [x] Bills screen lists/creates/edits/deletes bills; reachable from the menu sheet.
+- [x] `AddBillSheet` writes `account_id`, validates, toasts on save.
+- [x] Next-due-date field auto-suggests (from cadence) but stays editable; never overwrites a manual choice.
+- [x] Deleting an account with bills is guarded in `AddAccountSheet`.
+- [x] Bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- Applied directly via the Supabase MCP (`apply_migration`), not manual
+  SQL-editor paste — consistent with how every other migration this session
+  has been handled (the MCP is connected; see `00-index.md`). Verified via
+  `information_schema.columns` and the security/performance advisors after.
+- **Caught by the performance advisor, not the plan**: the original SQL block
+  only indexed `account_id`/`category_id`, missing a `user_id` index — every
+  other table (`transactions`, `budgets`, `plans`, `accounts`) has one
+  (`idx_*_user`), and the advisor flagged `bills_user_id_fkey` as uncovered
+  immediately after applying. Fixed with a follow-up `idx_bills_user_id`
+  migration; the doc's SQL block (3.1) has been corrected to include it so
+  future copy-paste doesn't reintroduce the gap. Security advisor was and
+  remains clean (only the two pre-existing, unrelated items).
+- `hooks/useBills.js`: `billStatus` uses `differenceInCalendarDays` +
+  `startOfDay` (both `date-fns`) rather than raw `Date` subtraction, to avoid
+  time-of-day/DST edge cases when comparing dates.
+- `AddBillSheet.js`: "Active/Paused" is a segmented control (matching the
+  Week/Month, Expense/Income segments already used throughout the app), not
+  React Native's `Switch` — `Switch` isn't used anywhere else in this
+  codebase and would have introduced a visually inconsistent control.
+- Category picker on `AddBillSheet` reuses `AddBudgetSheet`'s exact
+  toggle-then-chip-grid pattern (not `AddTransactionSheet`'s always-visible
+  horizontal chip row), since both are "optional category" fields — the doc's
+  own "closest structural template" guidance.
+- `app/bills.js` follows `settings.js`/`manage-categories.js`'s pushed-screen
+  shape (`SafeAreaView` + back button, light theme) rather than the tab
+  screens' `Screen` wrapper, since Bills is reached via the menu sheet, not a
+  tab. Status pill (`Pill` component, reused as-is) only renders for
+  `overdue`/`due_soon`, mirroring how the Budgets tab hides its pill for the
+  `healthy` state — no pill for `scheduled`.
+- No deviations from the plan otherwise.
 
 ---
 
