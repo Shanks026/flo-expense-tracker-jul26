@@ -91,7 +91,7 @@ standing rule above.
 
 | Bucket | Purpose |
 |---|---|
-| `avatars` | Profile avatar images, uploaded via `expo-image-picker` in `EditProfileSheet.js`. |
+| `avatars` | Profile avatar images, uploaded via `expo-image-picker` in `EditProfileSheet.js`. Path is `{user_id}/avatar.jpg` (one per user, `upsert:true`). **Public bucket** — served via `getPublicUrl`. On auth-user deletion the metadata row is removed by the `on_auth_user_deleted` trigger (see `cascade_delete_user_data` migration). **Caveat**: deleting the `storage.objects` row does not physically delete the binary from the storage backend, and because the bucket is public the file stays directly downloadable at its URL until Supabase's storage GC reclaims it. For a hard "gone immediately" guarantee, either make the bucket private (requires switching the app from `getPublicUrl` to signed URLs) or delete via the Storage API. Not done — flagged for the user's decision. |
 
 ### RLS
 
@@ -110,6 +110,8 @@ Supabase performance advisor flags.
 | 2026-07-11 | `add_category_colors` | Added `categories.color` (NOT NULL, default lime); backfilled curated colors for the 10 default categories by name+type; updated `handle_new_user` to seed colors for future signups (preserved its existing `SECURITY DEFINER`/`search_path` exactly). Applied via Supabase MCP, not yet mirrored to a repo migration file. |
 | 2026-07-11 | `add_accounts` | New `accounts` table + RLS; `account_id` (NOT NULL) added to `transactions`/`budgets`/`plans` with defensive backfill; `v_global_summary` dropped+recreated grouped by `account_id`; `v_budgets_with_spent`/`v_plans_with_totals` gained `account_id`; `handle_new_user` also creates a default "Personal" account. `02-accounts.md` Phase 1. |
 | 2026-07-11 | `fix_views_security_invoker` | Immediate follow-up to `add_accounts` — see the standing rule above. Set `security_invoker = true` on all three views after recreating them silently reset it to definer behavior (RLS bypass). |
+| 2026-07-11 | `cascade_delete_user_data` | Deleting an auth user now fully purges their data. Changed `accounts_user_id_fkey` from `NO ACTION` → `ON DELETE CASCADE` — it was the one `user_id` FK not cascading, and because every user always has ≥1 account, `NO ACTION` was *blocking* auth-user deletion entirely (FK violation), not merely leaving orphans. Added `public.handle_user_delete()` (SECURITY DEFINER) + `on_auth_user_deleted` BEFORE DELETE trigger on `auth.users` (mirrors the existing `handle_new_user` insert trigger) to delete the user's avatar from the `avatars` storage bucket, which has no FK to `auth.users` and would otherwise orphan. All other `user_id` FKs (`profiles.id`, `transactions`, `budgets`, `plans`, `categories`) were already CASCADE from the original build. |
+| 2026-07-11 | `revoke_execute_on_user_delete_trigger` | `REVOKE EXECUTE` on `handle_user_delete()` from `public`/`anon`/`authenticated` — the advisor (0028/0029) flagged it as callable via `/rest/v1/rpc`. Trigger functions never need API-role EXECUTE; revoking removes it from the exposed RPC surface. |
 
 **Still open, not fixed**: Security advisor flags leaked-password-protection
 as disabled (Auth setting, not schema — toggle in Supabase dashboard under
