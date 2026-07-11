@@ -8,15 +8,26 @@ specific reason not to (and if so, say so explicitly in the feature doc).
 
 ## RLS Policy Template
 
-Every table is single-user-owned:
+Every table is single-user-owned. Wrap `auth.uid()` in `(select auth.uid())`
+in **both** `USING` and `WITH CHECK` — the Supabase performance advisor flags
+the unwrapped form (`auth_rls_initplan`) because it re-evaluates per row
+instead of once per statement:
 
 ```sql
 ALTER TABLE [table_name] ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users manage own [records]"
   ON [table_name] FOR ALL
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 ```
+
+`WITH CHECK` is not optional/redundant with `USING` — `USING` governs which
+existing rows are visible/matchable (SELECT/UPDATE/DELETE), `WITH CHECK`
+governs what a new/updated row is allowed to contain (INSERT/UPDATE). Without
+it, `FOR ALL` falls back to reusing `USING` for the check, which happens to
+work here only because both expressions are identical — write it explicitly
+anyway so a future edit to one doesn't silently desync from the other.
 
 FLO has no public/unauthenticated read paths anywhere — every table is
 private to its owner. Don't add a token-based public policy unless the
@@ -28,14 +39,28 @@ feature genuinely requires sharing outside the app (none has so far).
 
 ```sql
 id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-user_id    uuid NOT NULL REFERENCES auth.users(id),
+user_id    uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
 created_at timestamptz DEFAULT now()
 ```
 
+**`DEFAULT auth.uid()` on `user_id` is not optional.** Every client-side
+mutation in this codebase omits `user_id` from its insert payload entirely
+(see the Mutation Pattern below) and relies on this default to fill it in. A
+table without it will insert `user_id = NULL`, which the RLS `WITH CHECK`
+policy correctly rejects — but the resulting error is a *misleading*
+`new row violates row-level security policy`, not the more obvious NOT NULL
+violation, so it's a confusing thing to debug from the client side. Caught
+once already: the `bills` table (`04-notifications-and-recurring-bills.md`)
+shipped without it and failed on the very first real create, surfaced by
+on-device testing, not by any advisor. **Before applying a new table's SQL,
+verify the exact column list — including this default — against
+`information_schema.columns` for an existing table** (e.g. `budgets` or
+`transactions`), not from memory or this doc alone.
+
 No `updated_at` column exists on any table in this schema (`profiles`,
-`categories`, `transactions`, `budgets`, `plans`). Don't add one to a new
-table unless the feature specifically needs edit-history — call it out
-explicitly in the feature doc if you do, since it'd be the first.
+`categories`, `transactions`, `budgets`, `plans`, `accounts`, `bills`). Don't
+add one to a new table unless the feature specifically needs edit-history —
+call it out explicitly in the feature doc if you do, since it'd be the first.
 
 ---
 

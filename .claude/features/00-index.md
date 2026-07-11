@@ -24,6 +24,23 @@ array is still the source of truth, same as before. `package.json`'s
 was fully Expo-Go-testable; this is the first to require a custom dev
 client, and only for this one feature — see `03-sms-share-import.md`.
 
+**Standing rule — `user_id DEFAULT auth.uid()`**: every existing table's
+`user_id` column has `DEFAULT auth.uid()` (`accounts`, `budgets`,
+`categories`, `plans`, `transactions` — confirmed live via
+`information_schema.columns`), because every client-side insert in this
+codebase omits `user_id` from the payload entirely and relies on that
+default. A new table's `CREATE TABLE` SQL must include it too, or every
+insert fails with a *misleading* RLS-policy error (`new row violates
+row-level security policy`) instead of the more obvious NOT NULL error —
+because `user_id` lands as `NULL`, which fails `WITH CHECK ((select
+auth.uid()) = user_id)` before it ever hits the not-null constraint. Caught
+once already (2026-07-11, `bills` table, `04-notifications-and-recurring-bills.md`
+Phase 3 → surfaced by real on-device testing in Phase 4, not by any advisor —
+fixed via `ALTER TABLE bills ALTER COLUMN user_id SET DEFAULT auth.uid()`).
+When writing a new table's SQL, verify against an existing table's
+`information_schema.columns` output, not from memory — this is now also
+called out in the `flo-feature` skill's data-patterns reference.
+
 **Standing rule — view security_invoker**: any migration that does
 `DROP VIEW`/`CREATE VIEW` or `CREATE OR REPLACE VIEW` via the MCP must
 explicitly `SET (security_invoker = true)` on the new view (in the same

@@ -366,7 +366,7 @@ Paste into the Supabase SQL editor, confirm applied, then build against it.
 ```sql
 CREATE TABLE public.bills (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id        uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id        uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id     uuid NOT NULL REFERENCES public.accounts(id),
   category_id    uuid REFERENCES public.categories(id) ON DELETE SET NULL,
   name           text NOT NULL,
@@ -509,6 +509,23 @@ components/
   migration; the doc's SQL block (3.1) has been corrected to include it so
   future copy-paste doesn't reintroduce the gap. Security advisor was and
   remains clean (only the two pre-existing, unrelated items).
+- **Second, more serious gap — caught by real on-device testing during Phase 4,
+  not by any advisor**: creating a bill failed with "new row violates
+  row-level security policy". Root cause: every other table's `user_id`
+  column has `DEFAULT auth.uid()` (`accounts`, `budgets`, `categories`,
+  `plans`, `transactions` all do — confirmed via `information_schema.columns`)
+  because every client-side insert in this codebase omits `user_id` from the
+  payload entirely, relying on that default. The `bills` migration's SQL
+  (written from scratch for this doc, not copied from a working table) never
+  included it, so `user_id` inserted as `NULL`, which the `WITH CHECK
+  ((select auth.uid()) = user_id)` policy correctly rejected — surfacing as
+  an RLS error rather than a NOT NULL error, which is a bit misleading to
+  debug from the client side alone. Fixed live via `ALTER TABLE bills ALTER
+  COLUMN user_id SET DEFAULT auth.uid()`; the doc's SQL block (3.1) corrected
+  to match. **Standing rule, added to `00-index.md`**: any new table's
+  `user_id` column must have `DEFAULT auth.uid()`, not just the standard
+  columns/RLS/index checklist — verify against an existing table's
+  `information_schema.columns` output, not just written from memory.
 - `hooks/useBills.js`: `billStatus` uses `differenceInCalendarDays` +
   `startOfDay` (both `date-fns`) rather than raw `Date` subtraction, to avoid
   time-of-day/DST edge cases when comparing dates.
@@ -717,6 +734,15 @@ components/
   included since it was trivial — scoped to the **chosen** pay account, not
   the bill's home account, since that's whichever account's budget the money
   actually left.
+- **UI feedback from on-device testing (2026-07-11)**: Active/Paused was
+  originally a segmented control crammed into the same row as Next Due — the
+  user asked for a real `Switch` in its own row instead. `AddBillSheet.js`
+  now has: a full-width "Next Due" row, then a separate full-width row with
+  an "Active" label + hint text (changes based on state) + React Native's
+  `Switch` (`trackColor`/`thumbColor` matched to the sheet's dark theme —
+  this is the first use of `Switch` anywhere in the codebase, since nothing
+  else needed a real on/off control before now, everything else used a
+  segmented control).
 - `app/bills.js`: added a `paused` status (not in the original plan) — a bill
   with `is_active: false` now shows a neutral "Paused" pill and hides the
   "Mark Paid" quick-action, instead of inheriting whatever `billStatus()`
