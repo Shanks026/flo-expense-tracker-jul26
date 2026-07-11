@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell } from 'lucide-react-native';
+import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -15,6 +15,14 @@ import useTransactions from '../../hooks/useTransactions';
 import useDailyTotals from '../../hooks/useDailyTotals';
 import useProfile from '../../hooks/useProfile';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
+import { useMenuSheet } from '../../components/MenuSheet';
+import { useAccount } from '../../lib/AccountContext';
+import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
+
+function formatAmount(value) {
+  const rounded = Math.round(Math.abs(value));
+  return `${value < 0 ? '−' : ''}₹${rounded.toLocaleString('en-IN')}`;
+}
 
 function greeting() {
   const hour = new Date().getHours();
@@ -31,6 +39,9 @@ export default function Home() {
   const { data: dailyTotals } = useDailyTotals(7);
   const { profile } = useProfile();
   const { openAdd } = useAddTransactionSheet();
+  const { openMenu } = useMenuSheet();
+  const { activeAccount } = useAccount();
+  const { openAccountSwitcher } = useAccountSwitcherSheet();
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
@@ -40,7 +51,7 @@ export default function Home() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Pressable onPress={() => router.push('/settings')}>
+            <Pressable onPress={openMenu}>
               {profile?.avatar_url ? (
                 <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
               ) : (
@@ -54,29 +65,42 @@ export default function Home() {
               <Text style={styles.greetingName}>Hi, {firstName}</Text>
             </View>
           </View>
-          <Pressable style={styles.bellButton} onPress={() => router.push('/settings')}>
-            <Bell size={20} color={colors.ink} strokeWidth={2} />
-            <View style={styles.bellDot} />
-          </Pressable>
+          <View style={styles.headerRight}>
+            <View style={styles.bellButton}>
+              <Bell size={20} color={colors.ink} strokeWidth={2} />
+              <View style={styles.bellDot} />
+            </View>
+            <Pressable style={styles.menuButton} onPress={openMenu}>
+              <Menu size={20} color={colors.ink} strokeWidth={2} />
+            </Pressable>
+          </View>
         </View>
 
         <Card dark style={styles.heroCard}>
           <View style={styles.heroTopRow}>
-            <Text style={styles.heroLabel}>In Hand</Text>
-            <View style={styles.heroPill}>
-              <View style={styles.heroPillDot} />
-              <Text style={styles.heroPillText}>All accounts</Text>
+            <View style={styles.accountHeading}>
+              <View style={[styles.accountDot, activeAccount && { backgroundColor: activeAccount.color }]} />
+              <Text style={styles.accountName} numberOfLines={1}>
+                {activeAccount?.name ?? '—'}
+              </Text>
             </View>
+            <Pressable style={styles.heroPill} onPress={openAccountSwitcher}>
+              <Text style={styles.heroPillText}>Manage</Text>
+              <ChevronRight size={12} color={colors.brand} strokeWidth={2.6} />
+            </Pressable>
           </View>
+          <Text style={styles.heroLabel}>In Hand</Text>
           <AmountText value={summary.in_hand_balance} type="neutral" dark size={fontSize.amountLg} style={styles.heroBalance} />
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStat}>
+              <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
+              <Text style={styles.heroStatValue}>{formatAmount(summary.month_income)}</Text>
               <Text style={styles.heroStatLabel}>Income</Text>
-              <AmountText value={summary.month_income} type="neutral" dark size={fontSize.xl} />
             </View>
             <View style={styles.heroStat}>
+              <TrendingDown size={12} color={colors.dangerStrong} strokeWidth={2.6} />
+              <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense)}</Text>
               <Text style={styles.heroStatLabel}>Expenses</Text>
-              <AmountText value={summary.month_expense} type="neutral" dark size={fontSize.xl} />
             </View>
           </View>
         </Card>
@@ -173,7 +197,22 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     color: colors.ink,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   bellButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuButton: {
     width: 44,
     height: 44,
     borderRadius: 14,
@@ -203,6 +242,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  accountHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flexShrink: 1,
+    paddingRight: spacing.sm,
+  },
+  accountDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.mutedLight,
+  },
+  accountName: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.lg,
+    lineHeight: fontSize.lg,
+    letterSpacing: -0.1,
+    color: colors.surface,
+    flexShrink: 1,
   },
   heroLabel: {
     fontFamily: fontFamily.semibold,
@@ -212,20 +273,15 @@ const styles = StyleSheet.create({
   heroPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(187,220,18,0.14)',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    gap: 4,
+    backgroundColor: colors.inkCard,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: radii.pill,
-  },
-  heroPillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: radii.pill,
-    backgroundColor: colors.brand,
+    flexShrink: 0,
   },
   heroPillText: {
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xs,
     color: colors.brand,
   },
@@ -234,20 +290,24 @@ const styles = StyleSheet.create({
   },
   heroStatsRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.lg,
     marginTop: spacing.xl,
   },
   heroStat: {
-    flex: 1,
-    backgroundColor: colors.inkCard,
-    borderRadius: 16,
-    padding: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  heroStatValue: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.md,
+    letterSpacing: -0.2,
+    color: colors.surface,
   },
   heroStatLabel: {
     fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     color: colors.mutedMid,
-    marginBottom: 6,
   },
   sectionHeaderRow: {
     flexDirection: 'row',

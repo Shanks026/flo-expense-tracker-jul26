@@ -7,6 +7,7 @@ import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useAccount } from '../lib/AccountContext';
 import useCategories from '../hooks/useCategories';
 
 const AddBudgetSheetContext = createContext(null);
@@ -37,6 +38,7 @@ function budgetName(period, categoryName) {
 const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
+  const { activeAccountId } = useAccount();
   const { expenseCategories } = useCategories();
   const [editingId, setEditingId] = useState(null);
   const [amount, setAmount] = useState('');
@@ -85,7 +87,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
 
     const { error: saveError } = editingId
       ? await supabase.from('budgets').update(payload).eq('id', editingId)
-      : await supabase.from('budgets').insert(payload);
+      : await supabase.from('budgets').insert({ ...payload, account_id: activeAccountId });
 
     setSaving(false);
     if (saveError) {

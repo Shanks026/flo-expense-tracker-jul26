@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { format, subDays, addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useAccount } from '../lib/AccountContext';
 
 export default function useDailyTotals(days = 7) {
   const { version } = useDataRefresh();
+  const { activeAccountId } = useAccount();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,9 +20,16 @@ export default function useDailyTotals(days = 7) {
       byDay[format(d, 'yyyy-MM-dd')] = { date: d, income: 0, expense: 0 };
     }
 
+    if (!activeAccountId) {
+      setData(Object.values(byDay));
+      setLoading(false);
+      return;
+    }
+
     const { data: rows, error } = await supabase
       .from('transactions')
       .select('type, amount, occurred_at')
+      .eq('account_id', activeAccountId)
       .gte('occurred_at', format(start, 'yyyy-MM-dd'))
       .lte('occurred_at', format(end, 'yyyy-MM-dd'));
 
@@ -33,7 +42,7 @@ export default function useDailyTotals(days = 7) {
 
     setData(Object.values(byDay));
     setLoading(false);
-  }, [days]);
+  }, [days, activeAccountId]);
 
   useEffect(() => {
     refetch();

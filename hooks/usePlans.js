@@ -1,21 +1,30 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useAccount } from '../lib/AccountContext';
 
 export default function usePlans() {
   const { version } = useDataRefresh();
+  const { activeAccountId } = useAccount();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
+    if (!activeAccountId) {
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('v_plans_with_totals')
       .select('*')
+      .eq('account_id', activeAccountId)
       .order('status', { ascending: true })
       .order('created_at', { ascending: false });
     if (!error) setPlans(data ?? []);
     setLoading(false);
-  }, []);
+  }, [activeAccountId]);
 
   useEffect(() => {
     refetch();

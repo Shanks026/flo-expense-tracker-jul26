@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { X } from 'lucide-react-native';
 import Button from './Button';
-import CategoryIcon, { CATEGORY_ICON_KEYS } from './CategoryIcon';
+import CategoryIcon, { CATEGORY_ICON_KEYS, CATEGORY_COLORS } from './CategoryIcon';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -35,6 +35,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
   const [name, setName] = useState('');
   const [type, setType] = useState('expense');
   const [icon, setIcon] = useState(CATEGORY_ICON_KEYS[0]);
+  const [color, setColor] = useState(CATEGORY_COLORS[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -44,6 +45,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
       setName('');
       setType(defaultType ?? 'expense');
       setIcon(CATEGORY_ICON_KEYS[0]);
+      setColor(CATEGORY_COLORS[0]);
       modalRef.current?.present();
     },
   }));
@@ -60,6 +62,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
       name: name.trim(),
       type,
       icon,
+      color,
       is_default: false,
     });
 
@@ -121,6 +124,20 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
               <Pressable key={key} style={[styles.iconOption, selected && styles.iconOptionSelected]} onPress={() => setIcon(key)}>
                 <CategoryIcon icon={key} size={20} color={selected ? colors.ink : colors.surface} strokeWidth={2} />
               </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.fieldLabel}>Color</Text>
+        <View style={styles.colorGrid}>
+          {CATEGORY_COLORS.map((swatch) => {
+            const selected = swatch === color;
+            return (
+              <Pressable
+                key={swatch}
+                style={[styles.colorOption, { backgroundColor: swatch }, selected && styles.colorOptionSelected]}
+                onPress={() => setColor(swatch)}
+              />
             );
           })}
         </View>
@@ -212,6 +229,20 @@ const styles = StyleSheet.create({
   },
   iconOptionSelected: {
     backgroundColor: colors.brand,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  colorOption: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.pill,
+  },
+  colorOptionSelected: {
+    borderWidth: 3,
+    borderColor: colors.surface,
   },
   errorText: {
     fontFamily: fontFamily.semibold,

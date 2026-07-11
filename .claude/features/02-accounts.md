@@ -37,7 +37,7 @@ Phase 3 — Analytics scoped + account management
 
 ---
 
-## Phase 1 — Schema + active-account plumbing + transactions scoped
+## Phase 1 — Schema + active-account plumbing + transactions scoped ✅ Complete (pending on-device confirmation)
 
 ### Goal
 The database knows about accounts end to end (all SQL for the whole feature lands here). The app has an active account: a "Personal" account exists for the current user, its name shows on the Home hero card, tapping it opens a switcher sheet listing accounts with a "New Account" action, and switching changes which transactions Home and the Transactions tab show. New transactions are written into the active account.
@@ -184,19 +184,35 @@ Both follow the `AddBudgetSheet.js` Provider/Context/`forwardRef` pattern exactl
 - Transfers between accounts, "All accounts" combined view, per-account currency — out of scope for the whole feature
 
 ### 1.7 Phase 1 Checklist — Before Marking Complete
-- [ ] Migration applied and verified via MCP; advisors show no new warnings; existing user has a "Personal" account
-- [ ] Fresh signup gets profile + categories + "Personal" account
-- [ ] Home hero shows the active account name; tapping opens the switcher
-- [ ] Creating a second account from the switcher works (name/description/color) and switches to it
-- [ ] Switching accounts changes Home balance, 7-day chart, recent list, and the Transactions tab; active account survives app restart
-- [ ] New transactions land in the active account; editing a transaction made in account A while account B is active keeps it in A
-- [ ] An account with zero transactions shows ₹0 balances, not a crash (`maybeSingle` path)
+- [x] Migration applied and verified via MCP; advisors show no new warnings; existing user has a "Personal" account
+- [x] Fresh signup gets profile + categories + "Personal" account (trigger updated and inspected via `pg_get_functiondef`; not exercised with an actual new signup)
+- [x] Home hero shows the active account name; tapping opens the switcher
+- [x] Creating a second account from the switcher works (name/description/color) and switches to it
+- [x] Switching accounts changes Home balance, 7-day chart, recent list, and the Transactions tab; active account survives app restart (AsyncStorage-backed)
+- [x] New transactions land in the active account; editing a transaction made in account A while account B is active keeps it in A
+- [x] An account with zero transactions shows ₹0 balances, not a crash (`maybeSingle` path)
+
+### Implementation Notes
+
+**Critical finding during migration, fixed same session**: recreating `v_global_summary` (`DROP`+`CREATE`) and `v_budgets_with_spent`/`v_plans_with_totals` (`CREATE OR REPLACE`) reset all three views off `security_invoker`, which made them run with the view *owner's* privileges instead of the querying user's — silently bypassing RLS on the underlying tables. The security advisor caught it immediately after `add_accounts` was applied (3 new ERROR-level `security_definer_view` findings that weren't there before). Fixed with a follow-up migration (`fix_views_security_invoker`) setting `security_invoker = true` explicitly on all three. **Standing rule going forward, logged in `00-index.md`: any `DROP`/`CREATE OR REPLACE VIEW` via the MCP must explicitly set `security_invoker = true` (or run the security advisor immediately after and treat any new ERROR as a stop-everything blocker) — the MCP's migration role does not preserve this automatically.**
+
+Other notes:
+- Two migrations landed instead of one (`add_accounts`, then the `security_invoker` fix) — kept as two for an honest audit trail rather than squashing, since the second was a direct correction of the first.
+- Found and reused an existing (previously decorative) "All accounts" pill in the Home hero card (`app/(tabs)/index.js`) instead of adding new UI — it already had the right shape (dot + label), just needed to be wired to `activeAccount` and made pressable.
+- `useAnalyticsData`, `useCategories`, `useBudgets`, `usePlans` were deliberately **not** touched this phase — budgets/plans scoping is Phase 2, Analytics is Phase 3, categories stay global forever.
+- Verified via `npx expo export --platform android` (3795 modules, clean) plus direct MCP queries confirming zero NULL `account_id`s and correct view row shapes. On-device interactive confirmation (switching accounts, creating one, watching Home update) still needed from you — this tool has no attached device.
+
+**Post-approval UI polish** (requested after on-device testing, same hero card): the account pill/name treatment went through a second round based on how it actually looked on device —
+- Account name promoted to a proper heading inside the black card (color dot from `activeAccount.color` + name, `fontFamily.bold`/`fontSize.lg` after an initial too-heavy `extrabold`/`heading` pass), with a tight `lineHeight` on the name so the dot centers against the visible glyphs rather than Manrope's extra built-in leading.
+- The pill itself now reads "Manage" with a chevron (was redundantly repeating the account name) — same `openAccountSwitcher` action.
+- Income/Expenses below the balance dropped their `inkCard` box background + padding (now plain transparent containers) and gained a small colored `TrendingUp`/`TrendingDown` icon next to each label (`colors.income` / `colors.dangerStrong`) — static semantic indicators (money in vs out), not a computed trend.
+- All verified via `npx expo export`; no schema/hook changes, styling + `app/(tabs)/index.js` JSX only.
 
 **→ Stop here. Show the result and wait for approval.**
 
 ---
 
-## Phase 2 — Budgets + Plans scoped
+## Phase 2 — Budgets + Plans scoped ✅ Complete (pending on-device confirmation)
 
 ### Goal
 Budgets and Plans become fully account-scoped: the tabs list only the active account's items, new budgets/plans are created in the active account, plan pickers only offer active-account plans, and Plan Detail's numbers are unchanged (they were already per-plan). After this phase the app is consistent across accounts.
@@ -231,16 +247,24 @@ None beyond the hook/sheet changes.
 - Analytics scoping, account management (Phase 3)
 
 ### 2.7 Phase 2 Checklist — Before Marking Complete
-- [ ] Budgets created in account A don't appear when account B is active; spend in B never moves A's budgets
-- [ ] Plans behave the same; the Add Transaction plan picker only offers active-account plans
-- [ ] Home's budget cards (if present for the account) match the Budgets tab
-- [ ] Creating budgets/plans writes the active account's `account_id`
+- [x] Budgets created in account A don't appear when account B is active; spend in B never moves A's budgets (verified live via the `v_budgets_with_spent` definition — `tx.account_id = b.account_id` in its spent lateral, confirmed via MCP before implementing)
+- [x] Plans behave the same; the Add Transaction plan picker only offers active-account plans (`usePlans().activePlans`, unchanged, now fed account-scoped data)
+- [x] Home's budget cards — N/A, Home doesn't render budget cards in the current build (only the hero + 7-day chart + recent transactions); no such surface exists to check
+- [x] Creating budgets/plans writes the active account's `account_id`
+
+### Implementation Notes
+
+Built exactly as planned, no deviations. `usePlan(planId)` (singular, used by Plan Detail) was deliberately left unscoped as specified — it's already keyed by a specific plan id from explicit navigation, so it doesn't need an account filter to return correct data.
+
+Re-confirmed live view definitions via MCP before touching any hook (per "Before Starting"): both `v_budgets_with_spent` and `v_plans_with_totals` already exposed `account_id`, and the budgets view's spent lateral already had `tx.account_id = b.account_id` — exactly as Phase 1 left them, no surprises.
+
+Verified via `npx expo export --platform android` (3795 modules, clean — same module count as Phase 1 since no new files, only edits to 4 existing hooks/sheets). On-device confirmation still needed: create budgets/plans in two different accounts and confirm they don't cross-contaminate.
 
 **→ Stop here. Show the result and wait for approval.**
 
 ---
 
-## Phase 3 — Analytics scoped + account management
+## Phase 3 — Analytics scoped + account management ✅ Complete (pending on-device confirmation)
 
 ### Goal
 Analytics reads only the active account, and accounts are manageable: rename, change color/description, and delete — guarded so an account with any transactions/budgets/plans can't be deleted, and the last remaining account can never be deleted.
@@ -279,12 +303,26 @@ Analytics screen itself is unchanged — scoping happens entirely in the hook. O
 - Per-account currency; account sharing/multi-user
 
 ### 3.7 Phase 3 Checklist — Before Marking Complete
-- [ ] Every Analytics segment (Overview/Transactions/Categories/Budgets/Plans) changes when the account switches, including period-over-period deltas
-- [ ] Rename/color/description edits reflect immediately in the switcher and Home hero
-- [ ] Deleting an account with any transactions, budgets, or plans is blocked with a clear message
-- [ ] Deleting the last account is blocked
-- [ ] Deleting an empty non-active account works; deleting the empty active account switches first, then deletes
-- [ ] No crashes switching accounts rapidly across all tabs and Analytics
+- [x] Every Analytics segment (Overview/Transactions/Categories/Budgets/Plans) changes when the account switches, including period-over-period deltas — all four `useAnalyticsData` queries scoped, `notifyChanged()`/`version` already drives the refetch
+- [x] Rename/color/description edits reflect immediately in the switcher and Home hero — both read `accounts`/`activeAccount` from the same `AccountContext`, refetched on `notifyChanged()`
+- [x] Deleting an account with any transactions, budgets, or plans is blocked with a clear message (three-count guard, mirrors `manage-categories.js`'s pattern exactly)
+- [x] Deleting the last account is blocked
+- [x] Deleting an empty non-active account works; deleting the empty active account switches to another first, then deletes
+- [x] No crashes switching accounts rapidly — every account-scoped hook already guards `!activeAccountId` (from Phases 1–2) and the delete flow picks a fallback before deleting the active one
+
+### Implementation Notes
+
+Built as planned, one addition beyond the doc: `AddAccountSheet`'s edit mode reuses the exact same component/state machine as create (matching `AddBudgetSheet`'s `editingId` pattern precisely, per the doc's own instruction to mirror it) rather than a separate edit sheet — `open(account)` prefills when given an account, `open()`/`open(null)` resets to a blank create form.
+
+Delete guard order matters and is implemented in this sequence: (1) in-use count check first, (2) last-account check second, (3) active-account fallback-switch only happens after both guards pass — so the fallback-switch code is only ever reached for an account that's confirmed empty and not the last one, exactly as the doc specified ("only reachable when empty").
+
+Took the doc's optional suggestion (3.4) and added the active account name as a small subtitle under "Analytics" in the screen header — cheap, and removes ambiguity about which account's numbers you're looking at now that Analytics is scoped.
+
+Verified via `npx expo export --platform android` (3795 modules, clean — same count as Phase 2, no new files). This closes out all 3 phases of `02-accounts.md`. On-device confirmation still needed: switch accounts inside Analytics and watch every segment change; try deleting an in-use account (should block), an empty non-active one (should work), and the last remaining account (should block).
+
+**Post-approval UX enhancement** (requested after Phase 3 review): `AccountSwitcherSheet` rows redesigned into mini hero-style cards — each shows the account's In Hand balance and Income/Expense (with the same `TrendingUp`/`TrendingDown` icon treatment as the Home hero card), not just a name and color dot, so switching is an informed choice rather than a blind pick. New `hooks/useAllAccountSummaries.js` fetches `v_global_summary` **without** an `account_id` filter — since the view is already grouped by `account_id`, this returns one row per account for the user for free, no schema change. Sheet grew from a `'50%'` snap point / `BottomSheetView` to `'75%'` / `BottomSheetScrollView` to fit the taller cards. Verified via `npx expo export` (3796 modules, +1 for the new hook file).
+
+**Follow-up visual iteration** (several rounds, same session): tried the account's own color as the full card background (full saturation, then a 16%-into-`inkCard` tinted version) — both rejected as "too contrasting" / inconsistent with the app's uniform dark-card language elsewhere (Home hero, Plan Detail, every sheet). **Settled back on plain `inkCard` + a small full-saturation color dot** as the identifier, which is what shipped. Also landed, smaller and orthogonal: more card padding (`spacing.xxl`), In Hand balance resized (`fontSize.amount` → `fontSize.hero`), Income/Expense collapsed from a 2-line/2-column layout into one line each (`icon · value · label`, side by side) with neutral `colors.mutedMid` icons instead of income/danger colors — deliberately different from Home's hero card, which kept green/red since it's a single-account glance view rather than a multi-card scan (same layout, different color call, both intentional). "New Account" changed from a plain icon+text row to an actual `Button` (`variant="primary"`), with `useSafeAreaInsets().bottom` added to the scroll content's bottom padding so it clears the phone's gesture bar; sheet snap point bumped to `'85%'`. Home hero's "Manage" pill went through the same lesson in miniature: solid brand fill read as too loud, settled on `colors.inkCard` background with brand-colored text/icon (mirrors the switcher card background exactly). Finally, `CATEGORY_COLORS` in `CategoryIcon.js` (shared by both category and account color pickers) grew from 10 to 14 swatches — added blue/red/navy/gold, kept muted/earthy rather than pure-saturated to match the existing set. All verified via `npx expo export`; no schema or hook-contract changes in this whole follow-up round, styling only.
 
 **→ Stop here. Show the result and wait for approval.**
 

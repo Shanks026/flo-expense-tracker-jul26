@@ -8,6 +8,7 @@ import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useAccount } from '../lib/AccountContext';
 
 const AddPlanSheetContext = createContext(null);
 
@@ -32,6 +33,7 @@ export function useAddPlanSheet() {
 const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
+  const { activeAccountId } = useAccount();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
@@ -80,7 +82,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
 
     const { error: saveError } = editingId
       ? await supabase.from('plans').update(payload).eq('id', editingId)
-      : await supabase.from('plans').insert(payload);
+      : await supabase.from('plans').insert({ ...payload, account_id: activeAccountId });
 
     setSaving(false);
     if (saveError) {

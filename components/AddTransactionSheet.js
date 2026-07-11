@@ -10,6 +10,7 @@ import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useAccount } from '../lib/AccountContext';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
 
@@ -42,6 +43,7 @@ function formatDateLabel(date) {
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
+  const { activeAccountId } = useAccount();
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
 
@@ -112,7 +114,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
     const { error: saveError } = editingId
       ? await supabase.from('transactions').update(payload).eq('id', editingId)
-      : await supabase.from('transactions').insert(payload);
+      : await supabase.from('transactions').insert({ ...payload, account_id: activeAccountId });
 
     setSaving(false);
     if (saveError) {
