@@ -69,7 +69,7 @@ migration files exist). Keep this in sync as feature files land.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. |
+| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. |
 | `categories` | `id`, `user_id`, `name`, `icon`, `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `type` (`'income'`\|`'expense'`), `is_default` | Seeded on signup: Food, Travel, Shopping, Bills, Coffee, Groceries, Other (expense); Salary, Freelance, Other (income) — 10 rows, each with a curated `color` (see `add_category_colors` migration below). `color` added 2026-07-11; picked via a curated swatch grid in `AddCategorySheet.js`, currently consumed only by Analytics (not tinted elsewhere in the app). **Global — not scoped by account, shared across all of a user's accounts.** |
 | `accounts` | `id`, `user_id`, `name`, `description` (nullable), `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `created_at` | Added 2026-07-11 (`add_accounts` migration, `02-accounts.md` Phase 1). Every user always has ≥1 account; `handle_new_user` auto-creates a "Personal" account on signup. Active account is client-side state (`lib/AccountContext.js`), persisted to AsyncStorage — not itself a DB concept. |
 | `transactions` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `type` (`'income'`\|`'expense'`), `amount` (always positive), `category_id`, `plan_id`, `note`, `occurred_at` (date), `created_at` | The single source of truth — every summary is computed from this table. |
@@ -91,7 +91,7 @@ standing rule above.
 
 | Bucket | Purpose |
 |---|---|
-| `avatars` | Profile avatar images, uploaded via `expo-image-picker` in `EditProfileSheet.js`. Path is `{user_id}/avatar.jpg` (one per user, `upsert:true`). **Public bucket** — served via `getPublicUrl`. On auth-user deletion the metadata row is removed by the `on_auth_user_deleted` trigger (see `cascade_delete_user_data` migration). **Caveat**: deleting the `storage.objects` row does not physically delete the binary from the storage backend, and because the bucket is public the file stays directly downloadable at its URL until Supabase's storage GC reclaims it. For a hard "gone immediately" guarantee, either make the bucket private (requires switching the app from `getPublicUrl` to signed URLs) or delete via the Storage API. Not done — flagged for the user's decision. |
+| `avatars` | Profile avatar images, uploaded via `expo-image-picker` in `EditProfileSheet.js`. Path is `{user_id}/avatar.jpg` (one per user, `upsert:true`). **Private bucket** (since `private_avatars_and_self_delete`, 2026-07-11) — the app stores the object *path* in `profiles.avatar_url` and renders it via a 24h **signed URL** generated in `useProfile` (`createSignedUrl`); the owner's existing `avatars_owner_select` RLS policy permits the signing. On account deletion the file is physically removed by the client Storage API (`deleteAccount` in `AuthContext`) and the metadata row is cleared by the `on_auth_user_deleted` trigger as a safety net (covers Dashboard-initiated deletes too). **Note**: direct `DELETE FROM storage.objects` is blocked by `protect_objects_delete` unless `storage.allow_delete_query='true'` is set for the transaction — the trigger does this; app code deletes via the Storage API instead. |
 
 ### RLS
 
@@ -112,6 +112,8 @@ Supabase performance advisor flags.
 | 2026-07-11 | `fix_views_security_invoker` | Immediate follow-up to `add_accounts` — see the standing rule above. Set `security_invoker = true` on all three views after recreating them silently reset it to definer behavior (RLS bypass). |
 | 2026-07-11 | `cascade_delete_user_data` | Deleting an auth user now fully purges their data. Changed `accounts_user_id_fkey` from `NO ACTION` → `ON DELETE CASCADE` — it was the one `user_id` FK not cascading, and because every user always has ≥1 account, `NO ACTION` was *blocking* auth-user deletion entirely (FK violation), not merely leaving orphans. Added `public.handle_user_delete()` (SECURITY DEFINER) + `on_auth_user_deleted` BEFORE DELETE trigger on `auth.users` (mirrors the existing `handle_new_user` insert trigger) to delete the user's avatar from the `avatars` storage bucket, which has no FK to `auth.users` and would otherwise orphan. All other `user_id` FKs (`profiles.id`, `transactions`, `budgets`, `plans`, `categories`) were already CASCADE from the original build. |
 | 2026-07-11 | `revoke_execute_on_user_delete_trigger` | `REVOKE EXECUTE` on `handle_user_delete()` from `public`/`anon`/`authenticated` — the advisor (0028/0029) flagged it as callable via `/rest/v1/rpc`. Trigger functions never need API-role EXECUTE; revoking removes it from the exposed RPC surface. |
+| 2026-07-11 | `private_avatars_and_self_delete` | Made the `avatars` bucket **private** (`storage.buckets.public = false`); avatars are now served via short-lived signed URLs. Repurposed `profiles.avatar_url` to store the object **path** (`{user_id}/avatar.jpg`) instead of a full public URL, and migrated/nulled existing rows accordingly. Added `public.delete_current_user()` (SECURITY DEFINER, `authenticated`-only) — lets a signed-in user delete their own `auth.users` row, cascading everything (via `cascade_delete_user_data`). |
+| 2026-07-11 | `fix_user_delete_trigger_storage_guard` | Critical follow-up: `storage.objects` has a `protect_objects_delete` BEFORE-DELETE trigger that rejects any direct delete unless the session GUC `storage.allow_delete_query = 'true'`. `handle_user_delete()` was doing a direct delete, so it would have raised `42501` and **blocked** every auth-user deletion. Fixed by `perform set_config('storage.allow_delete_query','true',true)` before the delete. **Standing rule**: any DB code that deletes from `storage.objects` directly must set this GUC transaction-locally first, or use the Storage API instead. |
 
 **Still open, not fixed**: Security advisor flags leaked-password-protection
 as disabled (Auth setting, not schema — toggle in Supabase dashboard under
@@ -177,6 +179,21 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   other sheets, but its rows navigate (`router.push`) instead of submitting
   a form. Add new global, non-tab destinations here rather than a new tab
   or a bespoke header button.
+- **Account deletion** (`AuthContext.deleteAccount`, added 2026-07-11) —
+  removes the avatar via the Storage API (best-effort, while still authed),
+  calls the `delete_current_user()` RPC (deletes `auth.users` → cascades all
+  data + fires the avatar-cleanup trigger), then `signOut({ scope: 'local' })`
+  so logout completes even though the server-side session no longer exists.
+  Triggered from Settings via a `Modal` confirmation (Delete Everything /
+  Cancel, with inline loading + error). **Log Out** moved out of Settings to
+  the `MenuSheet` (Home header menu); Settings' destructive action is now
+  Delete Account only.
+- **Signed avatar URLs** — the `avatars` bucket is private, so avatars are
+  never rendered from a stored URL. `useProfile` returns `avatarUrl` (a 24h
+  signed URL freshly generated from `profiles.avatar_url`'s path on every
+  refetch) alongside `profile`. Any screen showing an avatar consumes
+  `avatarUrl`, not `profile.avatar_url`. `EditProfileSheet` uploads to the
+  fixed path and saves that path (not a URL) to `profiles.avatar_url`.
 - **Google Sign-In** — `AuthContext.signInWithGoogle` is fully implemented
   (`expo-auth-session`/`expo-web-browser`/`expo-linking`) but the UI button
   in `sign-in.js` is currently disabled/unreachable, per `FEATURE_PLAN.md`'s
