@@ -209,6 +209,21 @@ components/
   Settings' Delete Account flow (has its own modal with inline error, and
   navigates to sign-in on success — a toast would be orphaned by the redirect).
 
+### Toast Trigger Reference (Current State, After Scope Expansion)
+
+| Sheet / Screen | Success toast | Error toast | Notes |
+|---|---|---|---|
+| `AddTransactionSheet` | "Transaction saved" / "Transaction updated" / "Transaction deleted" | ✓ save/delete failure | Plus Phase 2 warn toasts on over-threshold budget/plan (new expense only) |
+| `AddBudgetSheet` | "Budget created" / "Budget updated" / "Budget deleted" | ✓ save/delete failure | |
+| `AddPlanSheet` | "Plan created" / "Plan updated" / "Plan deleted" | ✓ save/delete failure | |
+| `AddAccountSheet` | "Account created" / "Account updated" / "Account deleted" | ✓ save/delete failure | "In use" / "cannot delete" guards stay `Alert.alert`, unchanged |
+| `AddCategorySheet` | "Category created" | ✓ save failure | Create-only sheet (no edit path exists) |
+| `EditProfileSheet` | "Profile updated" | ✓ permission denied, upload failure, save failure | |
+| `AccountSwitcherSheet` | "Switched to `<name>`" | — | Suppressed when re-selecting the already-active account |
+| `manage-categories.js` | "Category deleted" | ✓ delete failure | "In use" guard stays `Alert.alert` |
+| `MenuSheet` (Log Out) | — | — | Navigates away immediately; a toast would be orphaned |
+| Settings (Delete Account) | — | ✓ (inline in its own modal, not a toast) | Navigates to sign-in on success |
+
 ---
 
 ## Phase 2 — Smart Budget/Plan Toasts ✅ Complete
