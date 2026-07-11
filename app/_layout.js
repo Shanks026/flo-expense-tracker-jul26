@@ -14,7 +14,7 @@ import {
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider } from '../lib/AccountContext';
-import { AddTransactionSheetProvider } from '../components/AddTransactionSheet';
+import { AddTransactionSheetProvider, useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { AddBudgetSheetProvider } from '../components/AddBudgetSheet';
 import { AddPlanSheetProvider } from '../components/AddPlanSheet';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
@@ -22,8 +22,27 @@ import { AddCategorySheetProvider } from '../components/AddCategorySheet';
 import { AddAccountSheetProvider } from '../components/AddAccountSheet';
 import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet';
 import { MenuSheetProvider } from '../components/MenuSheet';
+import useIncomingShare from '../hooks/useIncomingShare';
+import { parseTransactionSms } from '../lib/smsParser';
 
 SplashScreen.preventAutoHideAsync();
+
+// Rendered inside the sheet providers (unlike RootNavigator itself, which
+// defines them) so it can actually call useAddTransactionSheet().
+function ShareIntentHandler() {
+  const { session } = useAuth();
+  const { sharedText, clearSharedText } = useIncomingShare();
+  const { openAdd } = useAddTransactionSheet();
+
+  useEffect(() => {
+    if (!sharedText || !session) return;
+    const parsed = parseTransactionSms(sharedText);
+    openAdd(parsed ? { amount: parsed.amount, type: parsed.type } : { note: sharedText });
+    clearSharedText();
+  }, [sharedText, session]);
+
+  return null;
+}
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -46,23 +65,24 @@ function RootNavigator() {
     <DataRefreshProvider>
       <AccountProvider>
         <BottomSheetModalProvider>
-          <AddTransactionSheetProvider>
-            <AddBudgetSheetProvider>
-              <AddPlanSheetProvider>
-                <EditProfileSheetProvider>
-                  <AddCategorySheetProvider>
-                    <AddAccountSheetProvider>
-                      <AccountSwitcherSheetProvider>
+          <AddAccountSheetProvider>
+            <AccountSwitcherSheetProvider>
+              <AddTransactionSheetProvider>
+                <AddBudgetSheetProvider>
+                  <AddPlanSheetProvider>
+                    <EditProfileSheetProvider>
+                      <AddCategorySheetProvider>
                         <MenuSheetProvider>
+                          <ShareIntentHandler />
                           <Stack screenOptions={{ headerShown: false }} />
                         </MenuSheetProvider>
-                      </AccountSwitcherSheetProvider>
-                    </AddAccountSheetProvider>
-                  </AddCategorySheetProvider>
-                </EditProfileSheetProvider>
-              </AddPlanSheetProvider>
-            </AddBudgetSheetProvider>
-          </AddTransactionSheetProvider>
+                      </AddCategorySheetProvider>
+                    </EditProfileSheetProvider>
+                  </AddPlanSheetProvider>
+                </AddBudgetSheetProvider>
+              </AddTransactionSheetProvider>
+            </AccountSwitcherSheetProvider>
+          </AddAccountSheetProvider>
         </BottomSheetModalProvider>
       </AccountProvider>
     </DataRefreshProvider>

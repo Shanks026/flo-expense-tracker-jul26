@@ -19,7 +19,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F6F7F3"
+        "backgroundColor": "#BBDC12"
       },
       "package": "com.anonymous.flo"
     },
@@ -31,7 +31,14 @@
       "expo-font",
       "expo-asset",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-share-intent",
+        {
+          "disableIOS": true,
+          "androidIntentFilters": ["text/*"]
+        }
+      ]
     ]
   }
 }

@@ -10,9 +10,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import Button from '../components/Button';
+import Logo from '../components/Logo';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 
@@ -55,10 +56,7 @@ export default function SignIn() {
           <View style={styles.spacerTop} />
 
           <View style={styles.brandRow}>
-            <View style={styles.brandTile}>
-              <ArrowRight size={26} color={colors.brand} strokeWidth={2.4} />
-            </View>
-            <Text style={styles.wordmark}>FLO</Text>
+            <Logo size={52} radius={26} />
           </View>
 
           <View style={{ height: 20 }} />
@@ -212,21 +210,6 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  brandTile: {
-    width: 52,
-    height: 52,
-    borderRadius: radii.iconTileLg,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wordmark: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 36,
-    letterSpacing: -0.6,
-    color: colors.ink,
   },
   title: {
     fontFamily: fontFamily.extrabold,

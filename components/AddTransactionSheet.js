@@ -11,6 +11,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
+import { useAccountSwitcherSheet } from './AccountSwitcherSheet';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
 
@@ -43,7 +44,8 @@ function formatDateLabel(date) {
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, activeAccount } = useAccount();
+  const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
 
@@ -76,13 +78,15 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setDate(new Date(tx.occurred_at));
         setNote(tx.note ?? '');
       } else {
+        const prefillType = payload?.type ?? 'expense';
         setEditingId(null);
-        setType('expense');
-        setAmount('');
-        setCategoryId(expenseCategories[0]?.id ?? null);
+        setType(prefillType);
+        setAmount(payload?.amount ? String(Math.round(payload.amount)) : '');
+        const prefillList = prefillType === 'expense' ? expenseCategories : incomeCategories;
+        setCategoryId(prefillList[0]?.id ?? null);
         setPlanId(payload?.plan_id ?? null);
         setDate(new Date());
-        setNote('');
+        setNote(payload?.note ?? '');
       }
       modalRef.current?.present();
     },
@@ -159,6 +163,21 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
+
+        {activeAccount && (
+          <Pressable
+            style={styles.accountRow}
+            onPress={() => {
+              modalRef.current?.dismiss();
+              openAccountSwitcher();
+            }}
+          >
+            <View style={[styles.accountDot, { backgroundColor: activeAccount.color }]} />
+            <Text style={styles.accountText}>
+              Adding to <Text style={styles.accountName}>{activeAccount.name}</Text>
+            </Text>
+          </Pressable>
+        )}
 
         <View style={styles.segmentWrap}>
           <Pressable
@@ -314,6 +333,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    backgroundColor: colors.chipBg,
+    borderRadius: radii.pill,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    marginBottom: spacing.lg,
+  },
+  accountDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radii.pill,
+  },
+  accountText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.mutedDarker,
+  },
+  accountName: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.ink,
   },
   segmentWrap: {
     flexDirection: 'row',
