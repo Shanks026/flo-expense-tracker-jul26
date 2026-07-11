@@ -12,8 +12,10 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useAccountSwitcherSheet } from './AccountSwitcherSheet';
+import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
+import { budgetToastForSave, planToastForSave } from '../lib/alerts';
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -46,6 +48,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId, activeAccount } = useAccount();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
+  const { showToast } = useToast();
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
 
@@ -122,11 +125,19 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
     setSaving(false);
     if (saveError) {
-      setError(saveError.message);
+      showToast({ message: saveError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
+    showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
+
+    if (!editingId && type === 'expense') {
+      const budgetMsg = await budgetToastForSave({ categoryId, accountId: activeAccountId });
+      const planMsg = planId ? await planToastForSave({ planId }) : null;
+      if (budgetMsg) showToast({ message: budgetMsg, variant: 'warn' });
+      if (planMsg) showToast({ message: planMsg, variant: 'warn' });
+    }
   }
 
   async function handleDelete() {
@@ -135,11 +146,12 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     const { error: deleteError } = await supabase.from('transactions').delete().eq('id', editingId);
     setSaving(false);
     if (deleteError) {
-      setError(deleteError.message);
+      showToast({ message: deleteError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
+    showToast({ message: 'Transaction deleted', variant: 'success' });
   }
 
   const renderBackdrop = useCallback(

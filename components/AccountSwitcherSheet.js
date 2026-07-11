@@ -8,6 +8,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAccount } from '../lib/AccountContext';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import { useAddAccountSheet } from './AddAccountSheet';
+import { useToast } from './Toast';
 
 const AccountSwitcherSheetContext = createContext(null);
 
@@ -79,6 +80,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
   const { summaries } = useAllAccountSummaries();
   const { openAddAccount } = useAddAccountSheet();
+  const { showToast } = useToast();
 
   const orderedAccounts = useMemo(() => {
     const active = accounts.find((a) => a.id === activeAccountId);
@@ -97,9 +99,11 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
     []
   );
 
-  function handleSelect(id) {
-    setActiveAccount(id);
+  function handleSelect(account) {
+    const switching = account.id !== activeAccountId;
+    setActiveAccount(account.id);
     modalRef.current?.dismiss();
+    if (switching) showToast({ message: `Switched to ${account.name}`, variant: 'success' });
   }
 
   function handleNewAccount() {
@@ -139,7 +143,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
             account={account}
             summary={summaries[account.id]}
             active={account.id === activeAccountId}
-            onSelect={() => handleSelect(account.id)}
+            onSelect={() => handleSelect(account)}
             onEdit={() => handleEdit(account)}
           />
         ))}

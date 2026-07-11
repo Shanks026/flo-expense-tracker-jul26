@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { ChartColumn, Settings, LogOut, X } from 'lucide-react-native';
+import { ChartColumn, Flag, Settings, LogOut, X } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 
@@ -28,6 +28,7 @@ export function useMenuSheet() {
 
 const ITEMS = [
   { key: 'analytics', label: 'Analytics', route: '/analytics', icon: ChartColumn },
+  { key: 'plans', label: 'Plans', route: '/plans', icon: Flag },
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
 
@@ -60,7 +61,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
-      snapPoints={useMemo(() => ['44%'], [])}
+      snapPoints={useMemo(() => ['50%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}

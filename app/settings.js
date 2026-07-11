@@ -1,26 +1,130 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Trash2, TriangleAlert } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Trash2, TriangleAlert } from 'lucide-react-native';
+import { format } from 'date-fns';
 import Card from '../components/Card';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
+import useBills from '../hooks/useBills';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
+import { useToast } from '../components/Toast';
+import {
+  getNotificationSettings,
+  setNotificationEnabled,
+  setDailyReminderSettings,
+  setBillReminderSettings,
+  requestPermission,
+  getPermissionStatus,
+  rescheduleAll,
+} from '../lib/notifications';
+
+const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 
 export default function Settings() {
   const router = useRouter();
   const { session, deleteAccount } = useAuth();
   const { profile, avatarUrl } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
+  const { bills } = useBills();
+  const { showToast } = useToast();
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [dailyReminder, setDailyReminder] = useState({ enabled: false, hour: 20, minute: 0 });
+  const [billReminders, setBillReminders] = useState({ enabled: true, daysBefore: 2 });
+  const [permissionBlocked, setPermissionBlocked] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
+
+  useEffect(() => {
+    getNotificationSettings().then(async (s) => {
+      setDailyReminder(s.dailyReminder);
+      setBillReminders(s.billReminders);
+      if (s.enabled) {
+        // The OS permission can be revoked from outside the app (system
+        // settings) without FLO knowing — cross-check on open rather than
+        // trusting the stored toggle blindly, so a silently-revoked
+        // permission shows the "blocked" hint immediately, not only after
+        // the user happens to retry the toggle.
+        const status = await getPermissionStatus();
+        setNotifEnabled(status.granted);
+        // "Open system settings" wouldn't help in Expo Go (unsupported, not
+        // a real OS permission denial) — only show that hint for a genuine
+        // OS-level block.
+        setPermissionBlocked(!status.unsupported && !status.granted && !status.canAskAgain);
+      } else {
+        setNotifEnabled(false);
+      }
+    });
+  }, []);
+
+  async function sync(nextEnabled, nextDaily, nextBillReminders) {
+    await rescheduleAll({
+      bills,
+      settings: { enabled: nextEnabled, dailyReminder: nextDaily, billReminders: nextBillReminders },
+    });
+  }
+
+  async function handleToggleNotifications(value) {
+    if (value) {
+      const permission = await requestPermission();
+      if (!permission.granted) {
+        if (permission.unsupported) {
+          showToast({ message: 'Notifications need a development build, not Expo Go', variant: 'error' });
+          return;
+        }
+        setPermissionBlocked(!permission.canAskAgain);
+        showToast({
+          message: permission.canAskAgain ? 'Notification permission denied' : 'Enable notifications in system settings',
+          variant: 'error',
+        });
+        return;
+      }
+      setPermissionBlocked(false);
+    }
+    setNotifEnabled(value);
+    await setNotificationEnabled(value);
+    await sync(value, dailyReminder, billReminders);
+  }
+
+  async function handleToggleDaily(value) {
+    const next = { ...dailyReminder, enabled: value };
+    setDailyReminder(next);
+    await setDailyReminderSettings(next);
+    await sync(notifEnabled, next, billReminders);
+  }
+
+  async function handleTimeChange(_event, selected) {
+    setShowTimePicker(false);
+    if (!selected) return;
+    const next = { ...dailyReminder, hour: selected.getHours(), minute: selected.getMinutes() };
+    setDailyReminder(next);
+    await setDailyReminderSettings(next);
+    await sync(notifEnabled, next, billReminders);
+  }
+
+  async function handleToggleBillReminders(value) {
+    const next = { ...billReminders, enabled: value };
+    setBillReminders(next);
+    await setBillReminderSettings(next);
+    await sync(notifEnabled, dailyReminder, next);
+  }
+
+  async function handleDaysBeforeChange(daysBefore) {
+    const next = { ...billReminders, daysBefore };
+    setBillReminders(next);
+    await setBillReminderSettings(next);
+    await sync(notifEnabled, dailyReminder, next);
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -90,6 +194,74 @@ export default function Settings() {
             <Text style={styles.rowValue}>Light</Text>
           </View>
         </Card>
+
+        <Text style={styles.sectionLabel}>Notifications</Text>
+        <Card style={styles.rowsCard}>
+          <View style={[styles.row, styles.rowBorder]}>
+            <View style={styles.rowIcon}>
+              <Bell size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <Text style={styles.rowTitle}>Notifications</Text>
+            <Switch value={notifEnabled} onValueChange={handleToggleNotifications} />
+          </View>
+
+          {permissionBlocked && (
+            <Pressable style={[styles.row, styles.rowBorder]} onPress={() => Linking.openSettings()}>
+              <Text style={styles.permissionHint}>Notifications are blocked. Tap to open system settings.</Text>
+            </Pressable>
+          )}
+
+          <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
+            <View style={styles.rowIcon}>
+              <SunMedium size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <Text style={styles.rowTitle}>Daily Reminder</Text>
+            <Switch value={dailyReminder.enabled} onValueChange={handleToggleDaily} disabled={!notifEnabled} />
+          </View>
+          {notifEnabled && dailyReminder.enabled && (
+            <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setShowTimePicker(true)}>
+              <Text style={styles.subRowLabel}>Remind me at</Text>
+              <Text style={styles.subRowValue}>
+                {format(new Date(0, 0, 0, dailyReminder.hour, dailyReminder.minute), 'h:mm a')}
+              </Text>
+            </Pressable>
+          )}
+
+          <View style={[styles.row, !notifEnabled && styles.rowDisabled]}>
+            <View style={styles.rowIcon}>
+              <Receipt size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <Text style={styles.rowTitle}>Bill Reminders</Text>
+            <Switch value={billReminders.enabled} onValueChange={handleToggleBillReminders} disabled={!notifEnabled} />
+          </View>
+          {notifEnabled && billReminders.enabled && (
+            <View style={styles.subRow}>
+              <Text style={styles.subRowLabel}>Remind me</Text>
+              <View style={styles.daysBeforeGroup}>
+                {DAYS_BEFORE_OPTIONS.map((days) => {
+                  const selected = billReminders.daysBefore === days;
+                  return (
+                    <Pressable
+                      key={days}
+                      style={[styles.dayChip, selected && styles.dayChipSelected]}
+                      onPress={() => handleDaysBeforeChange(days)}
+                    >
+                      <Text style={[styles.dayChipText, selected && styles.dayChipTextSelected]}>{days}d before</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </Card>
+        {showTimePicker && (
+          <DateTimePicker
+            value={new Date(0, 0, 0, dailyReminder.hour, dailyReminder.minute)}
+            mode="time"
+            display="default"
+            onChange={handleTimeChange}
+          />
+        )}
 
         <Pressable style={styles.deleteButton} onPress={() => { setDeleteError(null); setConfirmVisible(true); }}>
           <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
@@ -246,6 +418,64 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
     color: colors.muted,
+  },
+  rowDisabled: {
+    opacity: 0.45,
+  },
+  sectionLabel: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
+  },
+  permissionHint: {
+    flex: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.dangerStrong,
+    paddingVertical: spacing.sm,
+  },
+  subRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingLeft: 52,
+  },
+  subRowLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.base,
+    color: colors.mutedDarker,
+  },
+  subRowValue: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.base,
+    color: colors.ink,
+  },
+  daysBeforeGroup: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  dayChip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    backgroundColor: colors.iconTileBg,
+  },
+  dayChipSelected: {
+    backgroundColor: colors.ink,
+  },
+  dayChipText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: colors.mutedDarker,
+  },
+  dayChipTextSelected: {
+    color: colors.surface,
   },
   deleteButton: {
     flexDirection: 'row',

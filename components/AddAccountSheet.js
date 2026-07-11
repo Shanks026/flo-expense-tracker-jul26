@@ -8,6 +8,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
+import { useToast } from './Toast';
 
 const AddAccountSheetContext = createContext(null);
 
@@ -33,6 +34,7 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
+  const { showToast } = useToast();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
@@ -75,18 +77,21 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
 
     setSaving(false);
     if (saveError) {
-      setError(saveError.message);
+      showToast({ message: saveError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     if (!editingId && data) setActiveAccount(data.id);
     modalRef.current?.dismiss();
+    showToast({ message: editingId ? 'Account updated' : 'Account created', variant: 'success' });
   }
 
   async function handleDelete() {
     if (!editingId) return;
     setSaving(true);
 
+    // Bills are global (not account-scoped), so they're never part of this
+    // guard — deleting an account can't orphan a bill.
     const [{ count: txCount }, { count: budgetCount }, { count: planCount }] = await Promise.all([
       supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('account_id', editingId),
       supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('account_id', editingId),
@@ -116,11 +121,12 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
     const { error: deleteError } = await supabase.from('accounts').delete().eq('id', editingId);
     setSaving(false);
     if (deleteError) {
-      setError(deleteError.message);
+      showToast({ message: deleteError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
+    showToast({ message: 'Account deleted', variant: 'success' });
   }
 
   function confirmDelete() {

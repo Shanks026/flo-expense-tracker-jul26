@@ -7,6 +7,7 @@ import CategoryIcon, { CATEGORY_ICON_KEYS, CATEGORY_COLORS } from './CategoryIco
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useToast } from './Toast';
 
 const AddCategorySheetContext = createContext(null);
 
@@ -31,6 +32,7 @@ export function useAddCategorySheet() {
 const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
+  const { showToast } = useToast();
 
   const [name, setName] = useState('');
   const [type, setType] = useState('expense');
@@ -68,11 +70,12 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
 
     setSaving(false);
     if (saveError) {
-      setError(saveError.message);
+      showToast({ message: saveError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
+    showToast({ message: 'Category created', variant: 'success' });
   }
 
   const renderBackdrop = useCallback(

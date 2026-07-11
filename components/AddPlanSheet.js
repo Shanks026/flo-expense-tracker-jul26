@@ -9,6 +9,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
+import { useToast } from './Toast';
 
 const AddPlanSheetContext = createContext(null);
 
@@ -34,6 +35,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId } = useAccount();
+  const { showToast } = useToast();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
@@ -86,11 +88,12 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
 
     setSaving(false);
     if (saveError) {
-      setError(saveError.message);
+      showToast({ message: saveError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
+    showToast({ message: editingId ? 'Plan updated' : 'Plan created', variant: 'success' });
   }
 
   async function handleDelete() {
@@ -99,11 +102,12 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
     const { error: deleteError } = await supabase.from('plans').delete().eq('id', editingId);
     setSaving(false);
     if (deleteError) {
-      setError(deleteError.message);
+      showToast({ message: deleteError.message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
+    showToast({ message: 'Plan deleted', variant: 'success' });
   }
 
   const renderBackdrop = useCallback(

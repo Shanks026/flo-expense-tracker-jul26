@@ -1,15 +1,15 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Flag, Check } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronLeft, Plus, Flag, Check } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Screen from '../../components/Screen';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import ProgressBar from '../../components/ProgressBar';
-import Pill from '../../components/Pill';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import usePlans from '../../hooks/usePlans';
-import { useAddPlanSheet } from '../../components/AddPlanSheet';
+import Card from '../components/Card';
+import IconTile from '../components/IconTile';
+import ProgressBar from '../components/ProgressBar';
+import Pill from '../components/Pill';
+import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import usePlans from '../hooks/usePlans';
+import { useAddPlanSheet } from '../components/AddPlanSheet';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -20,24 +20,26 @@ function dateRangeLabel(plan) {
 }
 
 export default function Plans() {
+  const router = useRouter();
   const { plans } = usePlans();
   const { openAddPlan } = useAddPlanSheet();
-  const router = useRouter();
 
   return (
-    <Screen>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Plans</Text>
-        <Pressable style={styles.newButton} onPress={() => openAddPlan()}>
-          <Plus size={15} color={colors.brand} strokeWidth={3} />
-          <Text style={styles.newButtonText}>New Plan</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Plans</Text>
+        <Pressable style={styles.addButton} onPress={() => openAddPlan()}>
+          <Plus size={16} color={colors.surface} strokeWidth={3} />
         </Pressable>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {plans.length === 0 ? (
           <Card style={{ marginTop: spacing.lg }}>
-            <Text style={styles.emptyText}>No plans yet. Tap "New Plan" to start one.</Text>
+            <Text style={styles.emptyText}>No plans yet. Tap "+" to start one.</Text>
           </Card>
         ) : (
           plans.map((plan) => {
@@ -127,40 +129,52 @@ export default function Plans() {
           })
         )}
       </ScrollView>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   header: {
-    paddingTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
-  title: {
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
     fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.display,
+    fontSize: fontSize.title,
     letterSpacing: -0.3,
     color: colors.ink,
   },
-  newButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.ink,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
+  addButton: {
+    width: 32,
+    height: 32,
     borderRadius: radii.pill,
-  },
-  newButtonText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.surface,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scroll: {
-    paddingTop: spacing.lg,
-    paddingBottom: 120,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: 60,
     gap: spacing.md,
   },
   emptyText: {

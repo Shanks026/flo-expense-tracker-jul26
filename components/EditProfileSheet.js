@@ -8,6 +8,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
+import { useToast } from './Toast';
 
 const EditProfileSheetContext = createContext(null);
 
@@ -33,6 +34,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   const modalRef = useRef(null);
   const { session } = useAuth();
   const { profile, avatarUrl, updateProfile } = useProfile();
+  const { showToast } = useToast();
 
   const [fullName, setFullName] = useState('');
   const [localImageUri, setLocalImageUri] = useState(null);
@@ -54,7 +56,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   async function handlePickImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError('Photo library permission is required');
+      showToast({ message: 'Photo library permission is required', variant: 'error' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -91,7 +93,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
         avatarPath = path;
       } catch (err) {
         setSaving(false);
-        setError(err.message);
+        showToast({ message: err.message, variant: 'error' });
         return;
       }
     }
@@ -99,10 +101,11 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
     const { error: saveError } = await updateProfile({ full_name: fullName.trim(), avatar_url: avatarPath });
     setSaving(false);
     if (saveError) {
-      setError(saveError.message);
+      showToast({ message: saveError.message, variant: 'error' });
       return;
     }
     modalRef.current?.dismiss();
+    showToast({ message: 'Profile updated', variant: 'success' });
   }
 
   const renderBackdrop = useCallback(

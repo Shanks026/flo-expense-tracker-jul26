@@ -14,16 +14,22 @@ import {
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider } from '../lib/AccountContext';
+import { ToastProvider } from '../components/Toast';
 import { AddTransactionSheetProvider, useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { AddBudgetSheetProvider } from '../components/AddBudgetSheet';
 import { AddPlanSheetProvider } from '../components/AddPlanSheet';
+import { AddBillSheetProvider } from '../components/AddBillSheet';
+import { PayBillSheetProvider } from '../components/PayBillSheet';
+import DueBillsModal from '../components/DueBillsModal';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
 import { AddCategorySheetProvider } from '../components/AddCategorySheet';
 import { AddAccountSheetProvider } from '../components/AddAccountSheet';
 import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet';
 import { MenuSheetProvider } from '../components/MenuSheet';
+import { AlertsSheetProvider } from '../components/AlertsSheet';
 import useIncomingShare from '../hooks/useIncomingShare';
 import { parseTransactionSms } from '../lib/smsParser';
+import { useNotificationSync } from '../lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,6 +47,13 @@ function ShareIntentHandler() {
     clearSharedText();
   }, [sharedText, session]);
 
+  return null;
+}
+
+// Sibling of <Stack> (same reasoning as ShareIntentHandler) — keeps scheduled
+// notifications in sync with live bills/settings and handles tap routing.
+function NotificationSync() {
+  useNotificationSync();
   return null;
 }
 
@@ -64,26 +77,36 @@ function RootNavigator() {
   return (
     <DataRefreshProvider>
       <AccountProvider>
-        <BottomSheetModalProvider>
-          <AddAccountSheetProvider>
-            <AccountSwitcherSheetProvider>
-              <AddTransactionSheetProvider>
-                <AddBudgetSheetProvider>
-                  <AddPlanSheetProvider>
-                    <EditProfileSheetProvider>
-                      <AddCategorySheetProvider>
-                        <MenuSheetProvider>
-                          <ShareIntentHandler />
-                          <Stack screenOptions={{ headerShown: false }} />
-                        </MenuSheetProvider>
-                      </AddCategorySheetProvider>
-                    </EditProfileSheetProvider>
-                  </AddPlanSheetProvider>
-                </AddBudgetSheetProvider>
-              </AddTransactionSheetProvider>
-            </AccountSwitcherSheetProvider>
-          </AddAccountSheetProvider>
-        </BottomSheetModalProvider>
+        <ToastProvider>
+          <BottomSheetModalProvider>
+            <AddAccountSheetProvider>
+              <AccountSwitcherSheetProvider>
+                <AddTransactionSheetProvider>
+                  <AddBudgetSheetProvider>
+                    <AddPlanSheetProvider>
+                      <AddBillSheetProvider>
+                        <PayBillSheetProvider>
+                          <EditProfileSheetProvider>
+                            <AddCategorySheetProvider>
+                              <MenuSheetProvider>
+                                <AlertsSheetProvider>
+                                  <ShareIntentHandler />
+                                  <NotificationSync />
+                                  <DueBillsModal />
+                                  <Stack screenOptions={{ headerShown: false }} />
+                                </AlertsSheetProvider>
+                              </MenuSheetProvider>
+                            </AddCategorySheetProvider>
+                          </EditProfileSheetProvider>
+                        </PayBillSheetProvider>
+                      </AddBillSheetProvider>
+                    </AddPlanSheetProvider>
+                  </AddBudgetSheetProvider>
+                </AddTransactionSheetProvider>
+              </AccountSwitcherSheetProvider>
+            </AddAccountSheetProvider>
+          </BottomSheetModalProvider>
+        </ToastProvider>
       </AccountProvider>
     </DataRefreshProvider>
   );

@@ -11,12 +11,14 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import useCategories from '../hooks/useCategories';
 import { useAddCategorySheet } from '../components/AddCategorySheet';
+import { useToast } from '../components/Toast';
 
 export default function ManageCategories() {
   const router = useRouter();
   const { expenseCategories, incomeCategories } = useCategories();
   const { openAddCategory } = useAddCategorySheet();
   const { notifyChanged } = useDataRefresh();
+  const { showToast } = useToast();
   const [deletingId, setDeletingId] = useState(null);
 
   async function handleDelete(category) {
@@ -36,10 +38,11 @@ export default function ManageCategories() {
     const { error } = await supabase.from('categories').delete().eq('id', category.id);
     setDeletingId(null);
     if (error) {
-      Alert.alert('Error', error.message);
+      showToast({ message: error.message, variant: 'error' });
       return;
     }
     notifyChanged();
+    showToast({ message: 'Category deleted', variant: 'success' });
   }
 
   function confirmDelete(category) {

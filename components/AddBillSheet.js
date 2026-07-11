@@ -1,89 +1,107 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { View, Text, TextInput, Pressable, Switch, StyleSheet } from 'react-native';
+import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, Trash2 } from 'lucide-react-native';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
+import { format, addWeeks, addMonths, addYears } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
-import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 
-const AddBudgetSheetContext = createContext(null);
+const AddBillSheetContext = createContext(null);
 
-export function AddBudgetSheetProvider({ children }) {
+export function AddBillSheetProvider({ children }) {
   const sheetRef = useRef(null);
-  const openAddBudget = useCallback((budget) => sheetRef.current?.open(budget ?? null), []);
+  const openAddBill = useCallback((bill) => sheetRef.current?.open(bill ?? null), []);
 
   return (
-    <AddBudgetSheetContext.Provider value={{ openAddBudget }}>
+    <AddBillSheetContext.Provider value={{ openAddBill }}>
       {children}
-      <AddBudgetSheet ref={sheetRef} />
-    </AddBudgetSheetContext.Provider>
+      <AddBillSheet ref={sheetRef} />
+    </AddBillSheetContext.Provider>
   );
 }
 
-export function useAddBudgetSheet() {
-  const ctx = useContext(AddBudgetSheetContext);
-  if (!ctx) throw new Error('useAddBudgetSheet must be used within AddBudgetSheetProvider');
+export function useAddBillSheet() {
+  const ctx = useContext(AddBillSheetContext);
+  if (!ctx) throw new Error('useAddBillSheet must be used within AddBillSheetProvider');
   return ctx;
 }
 
-function budgetName(period, categoryName) {
-  if (!categoryName) return period === 'week' ? 'Weekly Budget' : 'Monthly Budget';
-  return period === 'week' ? `${categoryName} — Weekly` : categoryName;
-}
+const CADENCES = [
+  { key: 'weekly', label: 'Weekly', advance: (d) => addWeeks(d, 1) },
+  { key: 'monthly', label: 'Monthly', advance: (d) => addMonths(d, 1) },
+  { key: 'yearly', label: 'Yearly', advance: (d) => addYears(d, 1) },
+];
 
-// Matches v_budgets_with_spent's own period boundaries exactly (Postgres
-// date_trunc('week', ...) is Monday-start, same as weekStartsOn: 1 here; and
-// date_trunc('month', ...) is the calendar month) — so this always shows the
-// same range "spent" is actually computed over, never an approximation.
-function periodRangeLabel(period) {
-  const today = new Date();
-  const start = period === 'week' ? startOfWeek(today, { weekStartsOn: 1 }) : startOfMonth(today);
-  const end = period === 'week' ? endOfWeek(today, { weekStartsOn: 1 }) : endOfMonth(today);
-  return `${format(start, 'd MMM')} – ${format(end, 'd MMM')}`;
-}
-
-const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
+const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   const modalRef = useRef(null);
   const { notifyChanged } = useDataRefresh();
-  const { activeAccountId } = useAccount();
   const { showToast } = useToast();
   const { expenseCategories } = useCategories();
+
   const [editingId, setEditingId] = useState(null);
+  const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [period, setPeriod] = useState('month');
+  const [cadence, setCadence] = useState('monthly');
+  const [nextDueDate, setNextDueDate] = useState(new Date());
+  const [dateTouched, setDateTouched] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const selectedCategory = expenseCategories.find((c) => c.id === categoryId);
 
   useImperativeHandle(ref, () => ({
-    open(budget) {
+    open(bill) {
       setError(null);
       setPickerOpen(false);
-      if (budget) {
-        setEditingId(budget.id);
-        setAmount(String(Math.round(budget.amount)));
-        setPeriod(budget.period);
-        setCategoryId(budget.category_id);
+      setShowDatePicker(false);
+      if (bill) {
+        setEditingId(bill.id);
+        setName(bill.name);
+        setAmount(String(Math.round(bill.amount)));
+        setCadence(bill.cadence);
+        setNextDueDate(new Date(bill.next_due_date));
+        setDateTouched(true);
+        setCategoryId(bill.category_id);
+        setIsActive(bill.is_active);
       } else {
         setEditingId(null);
+        setName('');
         setAmount('');
-        setPeriod('month');
+        setCadence('monthly');
+        setNextDueDate(new Date());
+        setDateTouched(false);
         setCategoryId(null);
+        setIsActive(true);
       }
       modalRef.current?.present();
     },
   }));
 
+  function handleCadenceChange(nextCadence) {
+    setCadence(nextCadence);
+    // Suggest a date, but never overwrite one the user already picked —
+    // the picker is the source of truth for the anchor date once touched.
+    if (!dateTouched) {
+      const advance = CADENCES.find((c) => c.key === nextCadence)?.advance;
+      if (advance) setNextDueDate(advance(new Date()));
+    }
+  }
+
   async function handleSave() {
+    if (!name.trim()) {
+      setError('Enter a bill name');
+      return;
+    }
     const numericAmount = Number(amount);
     if (!numericAmount || numericAmount <= 0) {
       setError('Enter an amount');
@@ -93,15 +111,17 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     setError(null);
 
     const payload = {
-      name: budgetName(period, selectedCategory?.name),
+      name: name.trim(),
       amount: numericAmount,
-      period,
+      cadence,
+      next_due_date: format(nextDueDate, 'yyyy-MM-dd'),
       category_id: categoryId,
+      is_active: isActive,
     };
 
     const { error: saveError } = editingId
-      ? await supabase.from('budgets').update(payload).eq('id', editingId)
-      : await supabase.from('budgets').insert({ ...payload, account_id: activeAccountId });
+      ? await supabase.from('bills').update(payload).eq('id', editingId)
+      : await supabase.from('bills').insert(payload);
 
     setSaving(false);
     if (saveError) {
@@ -110,13 +130,13 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     }
     notifyChanged();
     modalRef.current?.dismiss();
-    showToast({ message: editingId ? 'Budget updated' : 'Budget created', variant: 'success' });
+    showToast({ message: editingId ? 'Bill updated' : 'Bill created', variant: 'success' });
   }
 
   async function handleDelete() {
     if (!editingId) return;
     setSaving(true);
-    const { error: deleteError } = await supabase.from('budgets').delete().eq('id', editingId);
+    const { error: deleteError } = await supabase.from('bills').delete().eq('id', editingId);
     setSaving(false);
     if (deleteError) {
       showToast({ message: deleteError.message, variant: 'error' });
@@ -124,7 +144,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     }
     notifyChanged();
     modalRef.current?.dismiss();
-    showToast({ message: 'Budget deleted', variant: 'success' });
+    showToast({ message: 'Bill deleted', variant: 'success' });
   }
 
   const renderBackdrop = useCallback(
@@ -135,21 +155,30 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   return (
     <BottomSheetModal
       ref={modalRef}
-      snapPoints={useMemo(() => ['70%'], [])}
+      snapPoints={useMemo(() => ['85%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
-      <BottomSheetView style={styles.sheet}>
+      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Budget' : 'New Budget'}</Text>
+          <Text style={styles.headerTitle}>{editingId ? 'Edit Bill' : 'New Bill'}</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
             <X size={16} color={colors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
-        <Text style={styles.fieldLabel}>Amount</Text>
+        <Text style={styles.fieldLabel}>Name</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="e.g. Netflix"
+          placeholderTextColor={colors.mutedDarker}
+          style={styles.textInput}
+        />
+
+        <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Amount</Text>
         <View style={styles.amountBox}>
           <Text style={styles.amountCurrency}>₹</Text>
           <TextInput
@@ -159,23 +188,58 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
             placeholderTextColor={colors.mutedDarker}
             keyboardType="number-pad"
             style={styles.amountInput}
-            autoFocus
           />
         </View>
 
+        <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Repeats</Text>
         <View style={styles.segmentWrap}>
-          <Pressable style={[styles.segment, period === 'week' && styles.segmentActive]} onPress={() => setPeriod('week')}>
-            <Text style={[styles.segmentText, period === 'week' && styles.segmentTextActive]}>Week</Text>
-          </Pressable>
-          <Pressable style={[styles.segment, period === 'month' && styles.segmentActive]} onPress={() => setPeriod('month')}>
-            <Text style={[styles.segmentText, period === 'month' && styles.segmentTextActive]}>Month</Text>
-          </Pressable>
+          {CADENCES.map((c) => (
+            <Pressable
+              key={c.key}
+              style={[styles.segment, cadence === c.key && styles.segmentActive]}
+              onPress={() => handleCadenceChange(c.key)}
+            >
+              <Text style={[styles.segmentText, cadence === c.key && styles.segmentTextActive]}>{c.label}</Text>
+            </Pressable>
+          ))}
         </View>
-        <Text style={styles.periodRangeText}>{periodRangeLabel(period)}</Text>
 
-        <Pressable style={styles.categoryRow} onPress={() => setPickerOpen((v) => !v)}>
+        <Pressable style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.fieldLabelInline}>Next Due</Text>
+          <Text style={styles.dateValue}>{format(nextDueDate, 'd MMM yyyy')}</Text>
+        </Pressable>
+
+        <View style={[styles.row, { marginTop: spacing.md }]}>
+          <View>
+            <Text style={styles.fieldLabelInline}>Active</Text>
+            <Text style={styles.rowHint}>{isActive ? 'Tracking this bill for payment' : 'Paused — hidden from due reminders'}</Text>
+          </View>
+          <Switch
+            value={isActive}
+            onValueChange={setIsActive}
+            trackColor={{ false: '#3a3a3a', true: colors.brand }}
+            thumbColor={colors.surface}
+          />
+        </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={nextDueDate}
+            mode="date"
+            display="default"
+            onChange={(_event, selected) => {
+              setShowDatePicker(false);
+              if (selected) {
+                setNextDueDate(selected);
+                setDateTouched(true);
+              }
+            }}
+          />
+        )}
+
+        <Pressable style={[styles.categoryRow, { marginTop: spacing.md }]} onPress={() => setPickerOpen((v) => !v)}>
           <Text style={styles.fieldLabelInline}>Category (optional)</Text>
-          <Text style={styles.categoryValue}>{selectedCategory?.name ?? 'Overall'}</Text>
+          <Text style={styles.categoryValue}>{selectedCategory?.name ?? 'None'}</Text>
         </Pressable>
 
         {pickerOpen && (
@@ -188,10 +252,10 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
               }}
             >
               <View style={[styles.chipIcon, categoryId === null && styles.chipIconSelected]}>
-                <Text style={styles.chipOverallText}>All</Text>
+                <Text style={styles.chipOverallText}>None</Text>
               </View>
               <Text style={styles.chipLabel} numberOfLines={1}>
-                Overall
+                None
               </Text>
             </Pressable>
             {expenseCategories.map((cat) => (
@@ -217,7 +281,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <Button
-          title={editingId ? 'Save Budget' : 'Create Budget'}
+          title={editingId ? 'Save Bill' : 'Create Bill'}
           variant="primary"
           onPress={handleSave}
           loading={saving}
@@ -226,18 +290,18 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
         {editingId && (
           <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
             <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-            <Text style={styles.deleteText}>Delete Budget</Text>
+            <Text style={styles.deleteText}>Delete Bill</Text>
           </Pressable>
         )}
-      </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheetModal>
   );
 });
 
 const styles = StyleSheet.create({
   sheet: {
-    flex: 1,
     paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   headerRow: {
     flexDirection: 'row',
@@ -264,6 +328,15 @@ const styles = StyleSheet.create({
     color: colors.mutedMid,
     marginBottom: spacing.sm,
   },
+  textInput: {
+    backgroundColor: colors.inkCard,
+    borderRadius: 14,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    color: colors.surface,
+  },
   amountBox: {
     backgroundColor: colors.inkCard,
     borderRadius: 14,
@@ -272,7 +345,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: spacing.lg,
   },
   amountCurrency: {
     fontFamily: fontFamily.bold,
@@ -291,14 +363,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inkCard,
     borderRadius: 12,
     padding: 4,
-    marginBottom: spacing.sm,
-  },
-  periodRangeText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   segment: {
     flex: 1,
@@ -318,6 +383,39 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     color: colors.ink,
   },
+  dateRow: {
+    backgroundColor: colors.inkCard,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+  },
+  fieldLabelInline: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.xs,
+    color: colors.mutedMid,
+  },
+  dateValue: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.base,
+    color: colors.surface,
+    marginTop: 2,
+  },
+  row: {
+    backgroundColor: colors.inkCard,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowHint: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.mutedDarker,
+    marginTop: 2,
+  },
   categoryRow: {
     backgroundColor: colors.inkCard,
     borderRadius: 12,
@@ -327,11 +425,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
-  },
-  fieldLabelInline: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
   },
   categoryValue: {
     fontFamily: fontFamily.extrabold,
@@ -362,7 +455,7 @@ const styles = StyleSheet.create({
   },
   chipOverallText: {
     fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.surface,
   },
   chipLabel: {

@@ -18,6 +18,8 @@ import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useMenuSheet } from '../../components/MenuSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
+import { useAlertsSheet } from '../../components/AlertsSheet';
+import useAlerts from '../../hooks/useAlerts';
 
 function formatAmount(value) {
   const rounded = Math.round(Math.abs(value));
@@ -42,6 +44,8 @@ export default function Home() {
   const { openMenu } = useMenuSheet();
   const { activeAccount } = useAccount();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
+  const { openAlerts } = useAlertsSheet();
+  const { count: alertCount } = useAlerts();
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
@@ -66,10 +70,10 @@ export default function Home() {
             </View>
           </View>
           <View style={styles.headerRight}>
-            <View style={styles.bellButton}>
+            <Pressable style={styles.bellButton} onPress={openAlerts}>
               <Bell size={20} color={colors.ink} strokeWidth={2} />
-              <View style={styles.bellDot} />
-            </View>
+              {alertCount > 0 && <View style={styles.bellDot} />}
+            </Pressable>
             <Pressable style={styles.menuButton} onPress={openMenu}>
               <Menu size={20} color={colors.ink} strokeWidth={2} />
             </Pressable>
