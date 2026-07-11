@@ -334,40 +334,60 @@ additive.)
 
 ## Phase 3 — Bills & Subscriptions: Data + Management ✅ Complete
 
+> **⚠️ Course correction (2026-07-11, after real on-device testing)**: Phase 3
+> originally shipped bills as **account-scoped** (`account_id NOT NULL`,
+> filtered by `activeAccountId`, invisible when a different account was
+> active) — the same pattern as budgets/plans. The user corrected this: a bill
+> is a fact about the world ("Netflix, ₹649/month"), not a property of one
+> account — only the *payment* belongs to an account, which is exactly why
+> Phase 4 already added a pay-time account picker. Bills are now **global per
+> user**, the same way `categories` already are: always visible regardless of
+> which account is active; `account_id` was dropped from the table entirely.
+> The sections below describe the **corrected, final state** — see the
+> Implementation Notes at the end of this phase and of Phase 4 for the exact
+> migration/code changes this required. `Goal`/`3.1`–`3.4` below reflect what
+> actually shipped, not the original (superseded) account-scoped plan.
+
 ### Goal
 The user can record recurring money — subscriptions (Netflix), bills (rent,
 electricity), EMIs — each with an amount, a cadence (weekly/monthly/yearly), a
-next due date, an optional category, and an account. A new **Bills** screen
+next due date, and an optional category. Bills are **global to the user**, not
+tied to any one account — the same way categories are. A new **Bills** screen
 lists them grouped by upcoming vs overdue, and an Add/Edit Bill sheet
 creates/edits/deletes them. This phase is useful on its own: a subscription
-tracker. It does **not** yet touch the transactions ledger (that's Phase 4).
+tracker. It does **not** yet touch the transactions ledger (that's Phase 4,
+where the account is chosen — at pay time, not here).
 
 ### Before Starting — Confirm With Codebase
-1. Read `components/AddBudgetSheet.js` as the closest structural template
-   (account-scoped create/edit with category picker + a period-ish select).
-2. Read `components/AddAccountSheet.js`'s **delete guard** — Phase 3 must add
-   `bills` to the account-in-use check so an account with bills can't be deleted
-   out from under them (or is fallback-switched), matching how transactions/
-   budgets/plans are guarded there.
+1. Read `components/AddBudgetSheet.js` as the closest structural template for
+   the create/edit form shape (category picker + a period-ish select) — note
+   bills deliberately **don't** copy its account-scoping, since bills aren't
+   account-scoped.
+2. ~~Read `AddAccountSheet.js`'s delete guard...~~ **Superseded**: bills are
+   global, so deleting an account can never orphan one — no guard needed.
 3. Confirm `MenuSheet.js` `ITEMS` array — add a "Bills" entry (route `/bills`)
    alongside Analytics/Settings.
 4. Read `app/(tabs)/budgets.js` for the list-screen layout idiom (header, cards,
    empty state, `useSafeAreaInsets`) to match Bills to it.
 5. Confirm the new-migration FK conventions from `00-index.md`: `user_id` →
-   `auth.users` **`ON DELETE CASCADE`** (so account deletion / Phase-02 cascade
-   work without another migration), `account_id` → `accounts`, `category_id` →
-   `categories` `ON DELETE SET NULL`.
+   `auth.users` **`ON DELETE CASCADE`**, **with `DEFAULT auth.uid()`** (see the
+   standing rule added to `00-index.md` after this phase's RLS bug), and
+   `category_id` → `categories` `ON DELETE SET NULL`. **No `account_id`.**
 
 ### 3.1 Database
 
-Paste into the Supabase SQL editor, confirm applied, then build against it.
-**This block is the durable schema record for `bills`.**
+**This block is the durable schema record for `bills` — reflects the final,
+corrected (account-less) schema actually live in Supabase, applied via the
+MCP across three migrations** (`add_bills`, `add_bills_user_id_index`,
+`add_bills_user_id_default` — plus a fourth, `bills_remove_account_scoping`,
+during Phase 4 that dropped the `account_id` column this course-correction
+removed). If replaying this from scratch, the block below is the equivalent
+single migration — no need to replay the account_id add/drop history.
 
 ```sql
 CREATE TABLE public.bills (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
-  account_id     uuid NOT NULL REFERENCES public.accounts(id),
   category_id    uuid REFERENCES public.categories(id) ON DELETE SET NULL,
   name           text NOT NULL,
   amount         numeric NOT NULL CHECK (amount > 0),
@@ -386,12 +406,15 @@ CREATE POLICY "Users manage own bills"
   WITH CHECK ((select auth.uid()) = user_id);
 
 -- FK-covering indexes (matches the perf-advisor standard set in 00-index.md
--- and the pattern already on transactions/budgets/plans/accounts — every one
--- of those has a user_id index too, not just account_id/category_id)
+-- and the pattern already on transactions/budgets/plans/accounts)
 CREATE INDEX idx_bills_user_id     ON public.bills (user_id);
-CREATE INDEX idx_bills_account_id  ON public.bills (account_id);
 CREATE INDEX idx_bills_category_id ON public.bills (category_id);
 ```
+
+**No `account_id`** — bills are global per user, not account-scoped (see the
+course-correction note above). The account is chosen only at pay time
+(Phase 4's `PayBillSheet`), which is when the actual transaction — and its
+`account_id` — gets created.
 
 Notes:
 - No `updated_at` — consistent with the rest of the schema.
@@ -414,19 +437,23 @@ Notes:
 hooks/useBills.js   ← NEW
 ```
 
-Standard read-hook shape (subscribed to `version`, account-scoped like
-`useBudgets`):
+Standard read-hook shape (subscribed to `version`), but **global, not
+account-scoped** — no `.eq('account_id', ...)` filter, since `bills` has no
+such column:
 
 ```js
 const { data } = await supabase
   .from('bills')
   .select('*, category:categories(name, icon, color)')
-  .eq('account_id', activeAccountId)
   .order('next_due_date', { ascending: true });
 ```
 
-Returns `{ bills, loading, refetch }`. A plain exported helper
-`billStatus(nextDueDate)` → `'overdue' | 'due_soon' | 'scheduled'`
+Because it has no `activeAccountId` dependency to force a refetch once auth
+resolves (unlike every account-scoped hook), it must depend on
+`session?.user?.id` directly instead — same fix already applied to
+`useCategories`/`useAllAccountSummaries` for the same reason (see the standing
+rule in `00-index.md`). Returns `{ bills, loading, refetch }`. A plain exported
+helper `billStatus(nextDueDate)` → `'overdue' | 'due_soon' | 'scheduled'`
 (`due_soon` = within 3 days), used by the list and later the alert feed.
 
 Mutations (create/edit/delete) live inline in `AddBillSheet` per the mutation
@@ -447,11 +474,13 @@ components/
   (`format(date, 'd MMM')`), amount, an optional "Last paid …" line
   (`last_paid_date`, hidden until first paid), and a small status pill
   (overdue = danger, due soon = warn, scheduled = neutral). Empty state matches
-  the other tabs. Account-scoped to the active account.
+  the other tabs. **Global — the same list regardless of which account is
+  active**, not account-scoped.
 - **`AddBillSheet.js`** — fields: name, amount, cadence
   (weekly/monthly/yearly segment), next due date, category (chip row like
-  AddTransactionSheet, expense categories), an "Active" toggle (pause without
-  deleting).
+  AddTransactionSheet, expense categories), an "Active"/"Paused" toggle (a
+  `Switch`, its own row — pause without deleting). **No account field** —
+  bills aren't account-scoped.
   - **Next-due-date UX** (decided in planning): cadence alone can't set the
     date (monthly ≠ *which* day), so there's an explicit next-due-date
     `DateTimePicker`. It **auto-fills a suggestion but stays fully editable** —
@@ -461,21 +490,22 @@ components/
     explicit choice. Cadence governs how the date advances after each payment
     (Phase 4); the picker is the anchor for the *first* due date.
   - Create/edit/delete, inline validation error, `notifyChanged()` on success,
-    success toast (reuse Phase 1). Writes `account_id: activeAccountId` on
-    create; never reassigns it on edit (matches budgets/plans).
+    success toast (reuse Phase 1). Insert payload has **no `account_id`** —
+    bills aren't account-scoped, matching how `AddCategorySheet` writes no
+    account either.
 
 ### 3.4 Navigation / Integration
 - `MenuSheet.js`: add `{ key: 'bills', label: 'Bills', route: '/bills', icon: <Receipt/> }`
   to `ITEMS` (import `Receipt` from lucide). Bump the sheet snap point for the
   extra row.
-- `AddAccountSheet.js` delete guard: include a `bills` in-use count in the
-  existing check.
+- ~~`AddAccountSheet.js` delete guard: include a `bills` in-use count~~
+  **Superseded**: bills are global, not account-scoped, so no guard is needed
+  — deleting an account can never orphan one.
 
 ### 3.5 Impact on Existing Features
 | Area | Change | Watch for |
 |---|---|---|
 | `MenuSheet.js` | New "Bills" row + taller snap point | — |
-| `AddAccountSheet.js` | Delete guard now also counts bills | Don't let an account with bills be silently deleted |
 | Account cascade | `bills.user_id` is CASCADE, so user-deletion still fully purges | Confirm in `00-index.md`'s deletion notes |
 
 ### 3.6 What This Phase Does NOT Include
@@ -485,13 +515,13 @@ components/
 - No notifications (Phase 5). Bills are visible only inside the app.
 - No auto-detection of bills from transactions/SMS.
 
-### 3.7 Phase 3 Checklist — Before Marking Complete
-- [x] `bills` table (incl. `last_paid_date`) + RLS + indexes applied; SQL block matches live schema.
-- [x] `useBills` returns account-scoped bills ordered by due date; `billStatus` helper exported.
-- [x] Bills screen lists/creates/edits/deletes bills; reachable from the menu sheet.
-- [x] `AddBillSheet` writes `account_id`, validates, toasts on save.
+### 3.7 Phase 3 Checklist — Before Marking Complete (final, post-correction state)
+- [x] `bills` table (incl. `last_paid_date`, **no `account_id`**) + RLS + indexes applied; SQL block matches live schema.
+- [x] `useBills` returns all of the user's bills (global, not account-scoped) ordered by due date; `billStatus` helper exported.
+- [x] Bills screen lists/creates/edits/deletes bills; reachable from the menu sheet; same list regardless of active account.
+- [x] `AddBillSheet` writes no `account_id` (bills are global), validates, toasts on save.
 - [x] Next-due-date field auto-suggests (from cadence) but stays editable; never overwrites a manual choice.
-- [x] Deleting an account with bills is guarded in `AddAccountSheet`.
+- [x] ~~Deleting an account with bills is guarded~~ N/A — bills can't be orphaned by account deletion.
 - [x] Bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
@@ -529,10 +559,11 @@ components/
 - `hooks/useBills.js`: `billStatus` uses `differenceInCalendarDays` +
   `startOfDay` (both `date-fns`) rather than raw `Date` subtraction, to avoid
   time-of-day/DST edge cases when comparing dates.
-- `AddBillSheet.js`: "Active/Paused" is a segmented control (matching the
-  Week/Month, Expense/Income segments already used throughout the app), not
-  React Native's `Switch` — `Switch` isn't used anywhere else in this
-  codebase and would have introduced a visually inconsistent control.
+- `AddBillSheet.js`: "Active/Paused" originally shipped as a segmented control
+  (matching Week/Month, Expense/Income elsewhere) sharing a row with Next Due.
+  **Superseded during Phase 4 on-device testing** — the user asked for a real
+  `Switch` in its own row instead; see Phase 4's Implementation Notes for the
+  actual final shape (first use of `Switch` anywhere in this codebase).
 - Category picker on `AddBillSheet` reuses `AddBudgetSheet`'s exact
   toggle-then-chip-grid pattern (not `AddTransactionSheet`'s always-visible
   horizontal chip row), since both are "optional category" fields — the doc's
@@ -543,7 +574,17 @@ components/
   tab. Status pill (`Pill` component, reused as-is) only renders for
   `overdue`/`due_soon`, mirroring how the Budgets tab hides its pill for the
   `healthy` state — no pill for `scheduled`.
-- No deviations from the plan otherwise.
+- **Major course-correction during Phase 4 (2026-07-11), see the callout at
+  the top of this phase**: bills shipped account-scoped initially (this
+  section originally described that), which the user identified as wrong
+  while testing — a bill isn't a property of one account, only its payment
+  is. Reworked to global-per-user: dropped `bills.account_id` (column + FK +
+  index) via a follow-up migration (`bills_remove_account_scoping`), removed
+  `activeAccountId` filtering from `useBills` (switched to a `session`
+  dependency instead, to avoid reintroducing the categories-style pre-auth-
+  fetch bug), removed the account write from `AddBillSheet`, and removed the
+  bills count from `AddAccountSheet`'s delete guard. All sections above
+  already describe the corrected final state, not the superseded original.
 
 ---
 
@@ -563,17 +604,19 @@ editable amount at pay time, skip-cycle, and the on-open due prompt. The
 "2–3 days before / day before" *push* reminders remain Phase 5 (they need OS
 notifications); this phase is the in-app pay experience.
 
-**Pay-time account selection** (decided 2026-07-11, same planning pass): a
-bill's `account_id` is its fixed "home" — set implicitly at creation (whichever
-account is active, matching budgets/plans, **no creation-time picker**), never
-reassigned by editing the bill. But *paying* a bill creates a brand-new
-transaction, and — like any transaction — the user may genuinely want to pay
-it from a **different** account than where they track the bill (e.g. tracked
-under Personal, paid via Business one month). So `PayBillSheet` gets an
-**editable account field**, defaulting to `bill.account_id` but changeable to
-any of the user's accounts. Only the resulting transaction's account can
-differ; the bill itself never moves — it still lives in, and is listed under,
-its home account next cycle.
+**Pay-time account selection** (decided 2026-07-11, same planning pass —
+**and further corrected later the same day**, see the callout atop Phase 3):
+originally specified as "the bill has a fixed home account, `PayBillSheet`
+defaults to it but can override." Immediately after building this, the user
+pointed out the premise was still wrong: a bill isn't tied to *any* account,
+home or otherwise — only the payment is. So Phase 3 was reworked to drop
+`bills.account_id` entirely (global bills, see above), and this section's
+final, correct form is: `PayBillSheet` gets an **editable account field**
+defaulting to **whichever account is currently active** (simplest, most
+predictable guess — no bill-level account to default from anymore) but
+changeable to any of the user's accounts. The bill itself never stores an
+account at all; it's just as visible before and after paying, from any
+account.
 
 ### Before Starting — Confirm Phase 3 is Approved
 1. Re-read `AddTransactionSheet.handleSave`'s insert payload shape (columns:
@@ -590,6 +633,8 @@ its home account next cycle.
    list, each chip showing the account's color dot + name, tap to select and
    close), **not** `AccountSwitcherSheet` (that changes the app-wide active
    account; this only changes which account one transaction lands in).
+   **Default the selection to `activeAccountId`**, not a bill-level account —
+   `bills` has none (see the corrected note above).
 
 ### 4.1 Database
 No schema changes — `last_paid_date` already exists (Phase 3). This phase is
@@ -607,16 +652,16 @@ lib/bills.js   ← NEW (shared because two surfaces call it: the Bills list and
 - `advanceDueDate(dateStr, cadence)` — pure: returns the next `yyyy-MM-dd`
   after applying `addWeeks/addMonths/addYears(…, 1)`.
 - `markBillPaid(bill, { amount, occurredAt, accountId })` — `amount` defaults
-  to `bill.amount`, `occurredAt` defaults to today, **`accountId` defaults to
-  `bill.account_id`** but the caller may pass a different account (pay-time
-  selection):
+  to `bill.amount`, `occurredAt` defaults to today. **`accountId` has no
+  bill-level fallback and is required from the caller** (`bills` has no
+  `account_id` to fall back to — `PayBillSheet` supplies it, defaulted to
+  `activeAccountId`):
   1. Insert a transaction `{ type: 'expense', amount, category_id:
      bill.category_id, plan_id: null, occurred_at: occurredAt, note: bill.name,
-     account_id: accountId }` — note: **the transaction's account, not
-     necessarily the bill's**.
+     account_id: accountId }`.
   2. If insert fails → return the error (do **not** advance; caller shows an
      error toast).
-  3. Update the bill (its own row, `bill.account_id` untouched):
+  3. Update the bill (its own row — no account column to touch):
      `next_due_date = advanceDueDate(bill.next_due_date, bill.cadence)`,
      `last_paid_date = occurredAt`.
   4. Return success; caller calls `notifyChanged()` + success toast
@@ -640,18 +685,19 @@ components/
   both the Bills list ("Mark paid" on a card) and the due-today modal. Shows:
   bill name, an **editable amount** field (pre-filled with `bill.amount`), the
   paid date (defaults today, editable via `DateTimePicker`), an **editable
-  account field** (toggle-then-chip-grid, defaults to `bill.account_id`,
-  options = `useAccount().accounts`), and actions: **Mark as Paid** (calls
-  `markBillPaid` with the edited amount/date/account), **Skip this cycle**
-  (calls `skipBillCycle` — account selection irrelevant, no transaction is
-  created), and Cancel. On success: dismiss, `notifyChanged()`, toast. Dark
-  sheet matching the others. *Optional, if trivial*: after a successful pay,
-  run Phase 2's `budgetToastForSave` (scoped to the **chosen** account, not
-  necessarily the bill's) so a bill that blows a budget still warns — reuse it,
-  since the helper already exists.
+  account field** (toggle-then-chip-grid, defaults to `activeAccountId` — no
+  bill-level account to default from — options = `useAccount().accounts`), and
+  actions: **Mark as Paid** (calls `markBillPaid` with the edited
+  amount/date/account), **Skip this cycle** (calls `skipBillCycle` — account
+  selection irrelevant, no transaction is created), and Cancel. On success:
+  dismiss, `notifyChanged()`, toast. Dark sheet matching the others.
+  *Optional, if trivial*: after a successful pay, run Phase 2's
+  `budgetToastForSave` (scoped to the **chosen** account) so a bill that blows
+  a budget still warns — reuse it, since the helper already exists.
 - **`DueBillsModal`** — a `Modal` (like Settings' delete confirmation) that, on
-  app open, lists the active account's bills with `next_due_date <= today`
-  (due today + overdue), each with a **Mark paid** (→ opens `PayBillSheet`) and
+  app open, lists **all** of the user's bills (global, not account-scoped)
+  with `next_due_date <= today` (due today + overdue), each with a **Mark
+  paid** (→ opens `PayBillSheet`) and
   the modal offering a **Later** dismiss. Shows **at most once per calendar
   day**, gated by an AsyncStorage key `flo.dueBills.lastShown` (a `yyyy-MM-dd`
   string; show only if stored date < today, then write today). Renders nothing
@@ -672,30 +718,30 @@ components/
 |---|---|---|
 | Transactions/Home/Budgets | A paid bill now appears as a transaction and moves balances | Correct account + category; the edited amount + chosen date + chosen account |
 | `app/_layout.js` | New sheet provider + due-modal sibling | Provider order; modal must not fight the sign-in redirect (only show when a session + active account exist) |
-| Bills list | Cards gain pay/skip actions + "Last paid …" | — |
-| Active-account scoping | Paying into a **non-active** account won't show the new transaction until the user switches to that account (every read hook is `activeAccountId`-scoped) | Not a bug — same behavior as any other cross-account data; `notifyChanged()` still refreshes everything correctly once switched |
+| Bills list | Cards gain pay/skip actions + "Last paid …"; **now global**, same list regardless of active account | — |
+| Active-account scoping | The **bill** is always visible everywhere (global). The **transaction** it creates is still normal account-scoped data — paying into a non-active account won't show that transaction until the user switches to it | Not a bug, and no longer a bills limitation — just how transactions always work. `notifyChanged()` still refreshes everything correctly once switched |
 
 ### 4.6 What This Phase Does NOT Include
 - No `bill_id` link on the created transaction (it's a normal transaction after;
   edit/delete it like any other).
 - No "undo paid" beyond deleting the created transaction manually (the bill's
   date has already advanced).
-- **No creation-time account picker** — a bill's home `account_id` is still set
-  implicitly at creation only (matches budgets/plans); only the *pay-time*
-  transaction's account is selectable (decided this phase, see the note above
-  Before Starting).
-- **No cross-account due detection** — the due-today modal (and the Bills list
-  itself) are scoped to the *active* account, consistent with the rest of the
-  app. A bill due in a non-active account surfaces only after switching to it.
-  Deferred; same scoping as the Phase 6 alert feed. (Independent of the pay-time
-  account field — that changes where the *payment* lands, not which account's
-  bills you can see.)
+- **No account concept on bills at all** — bills have no `account_id`
+  (creation-time or otherwise); only the *pay-time* transaction's account is
+  selectable. (Originally specified as "no creation-time picker, but a fixed
+  home account" — corrected mid-phase, see the callout atop Phase 3.)
+- ~~No cross-account due detection~~ **Resolved by the correction, not
+  deferred**: since bills are global, there is no "non-active account" for one
+  to hide in anymore — the due-today modal and Bills list always show
+  everything. (What's still true: the resulting *transaction* only appears in
+  Transactions/Home/Budgets once you switch to the account it was paid from —
+  see 4.5.)
 - No push/OS reminders (Phase 5).
 
 ### 4.7 Phase 4 Checklist — Before Marking Complete
 - [x] `lib/bills.js` exports `advanceDueDate`, `markBillPaid`, `skipBillCycle`.
-- [x] `PayBillSheet` marks paid with an **editable amount** + date + **account** → correct expense transaction in the *chosen* account; advances the bill's `next_due_date`; sets `last_paid_date`; the bill's own `account_id` is unchanged.
-- [x] Account field defaults to the bill's home account but can be changed to any of the user's accounts.
+- [x] `PayBillSheet` marks paid with an **editable amount** + date + **account** → correct expense transaction in the *chosen* account; advances the bill's `next_due_date`; sets `last_paid_date`; the bill itself has no account column to change.
+- [x] Account field defaults to the **currently active account** but can be changed to any of the user's accounts.
 - [x] Skip-cycle advances the date with **no** transaction and leaves `last_paid_date` untouched.
 - [x] Transaction-insert failure does not advance the date (error toast).
 - [x] Balances/budgets update (via `notifyChanged`); success/info toasts show.
@@ -723,17 +769,29 @@ components/
   reference to `bill` with `bill?.name ?? ''` instead. `DueBillsModal`'s
   similar-looking `if (dueBills.length === 0) return null` was checked and is
   safe — it has no hooks after that line.
-- Pay-time account picker (decided mid-phase, see the note above "Before
-  Starting") reuses the toggle-then-chip-list pattern, chips showing each
-  account's color dot + name — visually closer to `AccountSwitcherSheet`'s
-  cards than `AddBudgetSheet`'s category chips, since accounts have a
-  meaningful color identity already established there.
+- **Major course-correction, same day (2026-07-11)**: after building the
+  above with bills still account-scoped (Phase 3's original design) and a
+  pay-time account field that merely *overrode* a bill's fixed "home"
+  account, the user pointed out this was backwards — a bill (e.g. "Netflix,
+  ₹649/month, paid from Account 2") is the same commitment no matter which
+  account is currently active; it shouldn't vanish from view when you switch
+  accounts. The account only ever belongs to the *payment*, never the bill.
+  Reworked (see the callout atop Phase 3 for the full change list):
+  `bills.account_id` dropped entirely; `PayBillSheet`'s account field now
+  defaults to `activeAccountId` instead of a now-nonexistent `bill.account_id`;
+  `markBillPaid`'s `accountId` param lost its bill-level fallback and is now
+  supplied unconditionally by the caller. This section and 4.2/4.3 above have
+  already been rewritten to describe the corrected, final design — not the
+  superseded one.
+- Pay-time account picker reuses the toggle-then-chip-list pattern, chips
+  showing each account's color dot + name — visually closer to
+  `AccountSwitcherSheet`'s cards than `AddBudgetSheet`'s category chips, since
+  accounts have a meaningful color identity already established there.
 - `markBillPaid`/`skipBillCycle` return `{ error }` (not throw), matching the
   `{ error: saveError }` convention used by every mutation in this codebase.
 - Optional Phase-2-reuse (`budgetToastForSave` after a successful pay) was
-  included since it was trivial — scoped to the **chosen** pay account, not
-  the bill's home account, since that's whichever account's budget the money
-  actually left.
+  included since it was trivial — scoped to the **chosen** pay account, since
+  that's whichever account's budget the money actually left.
 - **UI feedback from on-device testing (2026-07-11)**: Active/Paused was
   originally a segmented control crammed into the same row as Next Due — the
   user asked for a real `Switch` in its own row instead. `AddBillSheet.js`
@@ -885,11 +943,16 @@ No database changes. (No `notifications` table — the feed is computed live.)
 hooks/useAlerts.js   ← NEW
 ```
 
-Aggregates current alerts from existing hooks/views (active account scoped):
-- Overdue bills (`billStatus === 'overdue'`) and due-soon bills.
-- Budgets where `budgetStatus(spent, amount)` is `warn`/`over`.
+Aggregates current alerts from existing hooks/views — a **mixed-scope feed**,
+not uniformly account-scoped (updated after Phase 3/4's bills course-
+correction, see the callout atop Phase 3):
+- Overdue bills (`billStatus === 'overdue'`) and due-soon bills — **global**,
+  from `useBills()`, same regardless of active account.
+- Budgets where `budgetStatus(spent, amount)` is `warn`/`over` — **active-
+  account-scoped**, from `useBudgets()`.
 - Plans with `target_amount` and `total_spent > target_amount`, and (optionally)
-  active plans with an `end_date` within 7 days.
+  active plans with an `end_date` within 7 days — **active-account-scoped**,
+  from `usePlans()`.
 
 Returns `{ alerts, count }` where each alert is
 `{ id, kind, severity, title, subtitle, route }`. Sorted most-severe first.
@@ -927,7 +990,7 @@ components/AlertsSheet.js   ← NEW. Provider/Context/forwardRef, MenuSheet-styl
   — pay the bill, the alert goes away).
 
 ### 6.7 Phase 6 Checklist — Before Marking Complete
-- [ ] `useAlerts` returns a sorted, account-scoped feed from existing data.
+- [ ] `useAlerts` returns a sorted feed from existing data — bills global, budgets/plans active-account-scoped (a deliberate mix, not uniform).
 - [ ] Bell opens `AlertsSheet`; rows deep-link; empty state shows when clear.
 - [ ] Dot shows iff `count > 0`.
 - [ ] Paying an overdue bill / fixing a budget removes its alert (via `notifyChanged`).
@@ -942,11 +1005,13 @@ components/AlertsSheet.js   ← NEW. Provider/Context/forwardRef, MenuSheet-styl
 ```
 auth.users
   └─ bills (NEW)                      ← recurring money; user_id ON DELETE CASCADE
-       ├─ account_id → accounts       (account-scoped, like budgets/plans)
        └─ category_id → categories    (ON DELETE SET NULL)
+       (no account_id — global per user, like categories; the account is
+        chosen only at pay time, see transactions below)
 
-transactions (unchanged)              ← Phase 4 pay inserts a normal expense here
-  (no bill_id link in v1)
+transactions (unchanged)              ← Phase 4 pay inserts a normal expense here,
+  (no bill_id link in v1)               account_id = whichever account was chosen
+                                         at pay time (defaults to active account)
 
 Computed / derived (nothing stored):
   toasts            → transient React state (Phase 1–2)
@@ -960,8 +1025,7 @@ Computed / derived (nothing stored):
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid | PK, `default gen_random_uuid()` |
-| `user_id` | uuid | RLS, FK → `auth.users` **`ON DELETE CASCADE`** |
-| `account_id` | uuid | NOT NULL, FK → `accounts` (account-scoped) |
+| `user_id` | uuid | NOT NULL, **`DEFAULT auth.uid()`**, RLS, FK → `auth.users` **`ON DELETE CASCADE`** |
 | `category_id` | uuid | nullable, FK → `categories` `ON DELETE SET NULL` |
 | `name` | text | NOT NULL |
 | `amount` | numeric | NOT NULL, `CHECK (amount > 0)` — expected charge, not derived |
@@ -983,7 +1047,6 @@ derived client-side via `billStatus(next_due_date)`.
 | `app/_layout.js` | Gains ToastProvider (P1, done), PayBillSheetProvider + DueBillsModal sibling (P4), notification-sync sibling (P5), AlertsSheetProvider (P6) | Careful provider ordering |
 | `AddTransactionSheet.js` | Success/error toasts (P1) + threshold toasts (P2) | Keep inline validation for "Enter an amount" |
 | `MenuSheet.js` | New "Bills" entry (P3) | Taller snap point |
-| `AddAccountSheet.js` | Delete guard counts bills (P3) | — |
 | `app/settings.js` | Notifications section (P5) | Handle permission-denied |
 | `app/(tabs)/index.js` | Bell becomes interactive (P6) | — |
 | `app.json` / native | expo-notifications plugin + permission (P5) | Requires a rebuild; update security notes in `00-index.md` |
@@ -1004,12 +1067,11 @@ derived client-side via `billStatus(next_due_date)`.
   no stored log, no per-alert seen-state (deferred, Phase 6 notes).
 - **Budget-reset / monthly-digest scheduled notifications** — easy to add to
   `rescheduleAll` later; Phase 5 ships bill + daily reminders only.
-- **Cross-account due detection** — the due-today modal and bell feed are
-  active-account-scoped; a bill due in a non-active account surfaces only after
-  switching. Future build (needs an all-accounts bills query).
-- **`bill_id` back-link / variable-amount history** — pay creates a plain
-  transaction; the edited amount lives on the transaction, not tracked back on
-  the bill beyond `last_paid_date`.
+- ~~Cross-account due detection~~ — **not out of scope; resolved by the
+  Phase 3/4 course-correction.** Bills are global (no `account_id`), so the
+  due-today modal and bell feed already show every bill regardless of active
+  account. Only the resulting *transaction* (once paid) stays account-scoped,
+  same as any transaction.
 - **Recurring income (salary)** — bills are expenses only in v1.
 - **iOS notifications** — the app targets Android (share-intent is Android-only
   already); iOS local notifications would likely work but are untested/unscoped.
