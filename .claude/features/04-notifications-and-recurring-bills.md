@@ -1181,18 +1181,21 @@ derived client-side via `billStatus(next_due_date)`.
 - **Remote / push notifications** — Expo push tokens, Supabase Edge Functions,
   `pg_cron`. FLO has no server-side event source; local scheduling covers every
   useful case. Revisit only if multi-device sync is ever added.
-- **Tab bar swap: Bills ↔ Plans** (raised 2026-07-11, after Phase 4) — the user
-  suspects Bills gets used more often than Plans and floated giving Bills the
-  tab slot instead. Deliberately **not done as part of this feature** — it's a
-  standalone nav/IA change, not something Phases 5–6 need, and doing it now
-  would mean converting `app/bills.js`'s UI shell (pushed-screen pattern) and
-  `app/(tabs)/plans.js`'s (tab pattern) mid-stream for no benefit, since
-  `expo-router`'s `(tabs)` group doesn't affect route paths — Phase 5/6's
-  `router.push('/bills')`/`('/plans')` calls resolve identically either way.
-  Recommended follow-up **after Phase 6 ships**: swap which screen occupies
-  the tab slot (convert `app/bills.js` to the `Screen`-wrapper tab pattern,
-  `app/(tabs)/plans.js` to the back-button pushed-screen pattern), update the
-  tab layout config, and swap `MenuSheet.js`'s `ITEMS` entry accordingly.
+- ~~Tab bar swap: Bills ↔ Plans~~ **Done** (2026-07-11, after Phase 6 shipped
+  and on-device testing, per the plan above). Bills now occupies the tab slot
+  (`app/(tabs)/bills.js`, `Screen`-wrapper tab pattern, "New Bill" pill header,
+  no back button); Plans moved to a pushed screen (`app/plans.js`, back-button
+  header pattern, reached from the menu sheet). `app/(tabs)/_layout.js`'s
+  `Tabs.Screen` swapped from `plans` to `bills`; `TabBar.js`'s `ICONS`/`LABELS`
+  swapped `Flag`/'Plans' for `Receipt`/'Bills'; `MenuSheet.js`'s `ITEMS`
+  swapped the Bills row for a Plans row (`Flag` icon, `/plans`). Confirmed via
+  `expo export` (no duplicate-route errors) and a route-file listing that
+  exactly one file resolves each of `/bills` and `/plans` — `expo-router`'s
+  `(tabs)` group doesn't affect the URL, so every existing
+  `router.push('/bills')`/`` `/plan/${id}` `` call (Phase 5's notification
+  taps, Phase 6's `AlertsSheet` rows, `DueBillsModal`) needed no changes.
+  `app/plan/[id].js` (Plan Detail) uses `router.back()`, not a tab-specific
+  assumption, so it's unaffected either way.
 - **Bill auto-detection** — inferring recurring bills from transaction history
   or SMS. Future build.
 - **`bill_id` back-link on transactions** — a paid bill creates a plain

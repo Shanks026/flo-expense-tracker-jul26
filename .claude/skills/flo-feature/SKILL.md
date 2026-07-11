@@ -170,15 +170,28 @@ Quick reference only. `referenced/flo-data-patterns.md` is the source of truth �
 | Home | `app/(tabs)/index.js` | Tab |
 | Transactions | `app/(tabs)/transactions.js` | Tab |
 | Budgets | `app/(tabs)/budgets.js` | Tab |
-| Plans | `app/(tabs)/plans.js` | Tab |
+| Bills | `app/(tabs)/bills.js` | Tab (swapped in for Plans 2026-07-11 — see `04-notifications-and-recurring-bills.md`'s Out of Scope note; Bills gets used more often) |
+| Plans | `app/plans.js` | Pushed from Home's menu sheet (demoted from a tab in the same swap) |
 | Plan Detail | `app/plan/[id].js` | Pushed from Plans |
+| Analytics | `app/analytics.js` | Pushed from Home's menu sheet |
 | Sign In / Sign Up | `app/sign-in.js` | Pushed (unauthenticated gate) |
 | Settings | `app/settings.js` | Pushed from Home's menu sheet |
 | Manage Categories | `app/manage-categories.js` | Pushed from Settings |
 | Add Transaction | `AddTransactionSheet.js` | Sheet, opened from ⊕ tab or Plan Detail |
 | Add Budget | `AddBudgetSheet.js` | Sheet, opened from Budgets |
 | Add Plan | `AddPlanSheet.js` | Sheet, opened from Plans |
+| Add Bill | `AddBillSheet.js` | Sheet, opened from Bills |
+| Pay Bill | `PayBillSheet.js` | Sheet, opened from Bills or the due-bills modal |
 | Add Category | `AddCategorySheet.js` | Sheet, opened from Manage Categories |
 | Edit Profile | `EditProfileSheet.js` | Sheet, opened from Settings |
+| Alerts | `AlertsSheet.js` | Sheet, opened from Home's bell |
+| Menu | `MenuSheet.js` | Sheet, opened from Home's header — hub for Analytics/Plans/Settings/Log Out |
 
-New global destinations that aren't part of the 5-item tab bar (Home · Transactions · ⊕ · Budgets · Plans) go in the menu sheet opened from Home's header, alongside Settings — don't add a 6th tab unless the user explicitly asks for one.
+New global destinations that aren't part of the 5-item tab bar (Home ·
+Transactions · ⊕ · Budgets · Bills) go in the menu sheet opened from Home's
+header, alongside Settings — don't add a 6th tab unless the user explicitly
+asks for one. The tab bar slot is not fixed forever: it was swapped once
+already based on real usage (Bills replaced Plans), so a future feature could
+reasonably prompt swapping it again — don't treat this table as permanent,
+verify against the actual `app/(tabs)/` directory and
+`app/(tabs)/_layout.js` if anything here seems stale.
