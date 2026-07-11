@@ -125,22 +125,27 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
 ## Shared Infrastructure Notes
 
 - **`components/Logo.js`** (added 2026-07-11) — the real FLO brand mark
-  (`assets/FLO_LOGO.svg`), rendered via `react-native-svg`'s `SvgXml` with
-  the SVG source inlined as a string constant (this project has no
-  Metro SVG-file-loader configured, so the file isn't imported directly —
-  keep the inline string in sync if `FLO_LOGO.svg` changes). `<Logo size
-  radius />`. Used on the Sign In screen in place of the old placeholder
-  (a generic Lucide arrow icon in an ink tile). App icon/splash/adaptive-
-  icon/favicon PNGs are a separate, still-open item — see below.
-- **Known gap**: `assets/icon.png`, `splash-icon.png`, `adaptive-icon.png`,
-  `favicon.png` are still Expo's generic template placeholders (the
-  default gray target/bullseye), not the FLO logo — `app.json` points at
-  them but they were never regenerated. Needs proper exports of
-  `FLO_LOGO.svg` (1024×1024 solid-background version for `icon.png`;
-  1024×1024 *transparent*-background glyph-only version, safe-zone
-  centered, for `adaptive-icon.png`/`splash-icon.png`; 48×48 solid for
-  `favicon.png`) — deferred to the user rather than generated in-repo
-  (no SVG rasterization tooling available in this environment).
+  (`assets/FLO_LOGO.svg` — a lime-square badge with "FLO" as the actual
+  wordmark artwork, not an icon + separate text label), rendered via
+  `react-native-svg`'s `SvgXml` with the SVG source inlined as a string
+  constant (this project has no Metro SVG-file-loader configured, so the
+  file isn't imported directly — keep the inline string in sync if
+  `FLO_LOGO.svg` changes). `<Logo size radius />`. Used on the Sign In
+  screen in place of the old placeholder (a generic Lucide arrow icon in
+  an ink tile + a separate "FLO" `<Text>`) — since the logo already
+  contains the wordmark, don't pair it with another text label elsewhere.
+- **App icon/splash/adaptive-icon/favicon are branded** (resolved
+  2026-07-11, were Expo's generic gray-bullseye placeholders before) —
+  `assets/icon.png` (solid lime bg), `adaptive-icon.png`/`splash-icon.png`
+  (transparent glyph-only), `favicon.png`, all sourced from `FLO_LOGO.svg`
+  and exported by the user (no SVG rasterization tooling in this
+  environment). `android.adaptiveIcon.backgroundColor` in `app.json`
+  changed from the old cream `#F6F7F3` to brand lime `#BBDC12` to match,
+  since the foreground is now transparent rather than a solid tile.
+  `splash.backgroundColor` deliberately stayed cream — that's the app's
+  real background color, so the transition out of the splash screen
+  doesn't color-flash. Verified via `npx expo prebuild` succeeding
+  cleanly with the new assets (regenerates native icon resources).
 - **`useDataRefresh`** (`lib/DataRefreshContext.js`) — version-counter
   pattern; every read hook depends on it, every mutation calls
   `notifyChanged()`. The entire cache-invalidation strategy.
