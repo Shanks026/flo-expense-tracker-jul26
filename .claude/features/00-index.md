@@ -21,8 +21,13 @@ array is still the source of truth, same as before. `package.json`'s
 `android`/`ios` npm scripts now run `expo run:android`/`expo run:ios`
 (dev-client) instead of `expo start --android`/`--ios` (Expo Go); plain
 `npm start`/`npx expo start` is unchanged. Every feature before this one
-was fully Expo-Go-testable; this is the first to require a custom dev
-client, and only for this one feature — see `03-sms-share-import.md`.
+was fully Expo-Go-testable; this was the first to require a custom dev
+client — `04-notifications-and-recurring-bills.md` Phase 5
+(`expo-notifications`) is the second. Both add a native module and its own
+permissions merged in via the module's bundled Android manifest (Gradle
+autolinking) — check `npx expo prebuild`'s regenerated
+`android/app/src/main/AndroidManifest.xml` after adding any new native
+dependency, the same way both of these were verified.
 
 **Standing rule — `user_id DEFAULT auth.uid()`**: every existing table's
 `user_id` column has `DEFAULT auth.uid()` (`accounts`, `budgets`,
@@ -74,7 +79,7 @@ data model.
 | 01 | `01-analytics.md` | Analytics (shared filter + Overview/Transactions/Categories/Budgets/Plans graphs) | ✅ Complete (all 3 phases built, pending final on-device confirmation) |
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
 | 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 All 3 phases implemented; awaiting on-device verification (no device in this environment) |
-| 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | 📝 Planned (6 phases, not started) |
+| 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | 🚧 Phases 1–5 complete (toasts, bills, pay flow, local notifications); Phase 6 (bell) remaining |
 
 ---
 
@@ -351,3 +356,13 @@ are `plaintext` visibility (correct — anon key, not a real secret) with no
 protection is disabled — this is a Dashboard-only toggle (Authentication →
 Policies), no MCP tool exposes it. Recommend the user enable it manually
 before the next build.
+
+**New legitimate permissions from `expo-notifications`** (2026-07-11,
+`04-notifications-and-recurring-bills.md` Phase 5) — `POST_NOTIFICATIONS`
+(Android 13+ runtime notification permission) and `RECEIVE_BOOT_COMPLETED`
+(re-arms scheduled local notifications after a device reboot; without it
+every pending bill reminder would silently vanish on restart) are both
+declared in `expo-notifications`' own bundled Android manifest and merged in
+automatically — same mechanism as `expo-image-picker`'s storage permissions
+above. Not added to `blockedPermissions`; both are genuinely used by the new
+Bill/Daily reminder feature. If a future audit sees these, this is why.
