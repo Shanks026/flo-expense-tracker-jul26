@@ -57,9 +57,10 @@ Phase 3 — Bills & subscriptions: data + management
   New `bills` table; a Bills screen (list of upcoming/overdue) + Add/Edit Bill
   sheet; menu-sheet entry. Track recurring money without touching the ledger yet.
 
-Phase 4 — Bills: mark as paid → transaction
-  "Mark paid" creates a real transaction from the bill and advances its
-  next due date by its cadence. Overdue/upcoming states computed client-side.
+Phase 4 — Bills: pay → transaction (+ due-today prompt)
+  A pay-confirm step (editable amount, or skip-cycle) creates a real
+  transaction and advances the due date; an on-open modal surfaces bills
+  due today/overdue. Overdue/upcoming states computed client-side.
 
 Phase 5 — Local scheduled notifications
   Install expo-notifications; permission flow; notification settings in
@@ -372,6 +373,7 @@ CREATE TABLE public.bills (
   amount         numeric NOT NULL CHECK (amount > 0),
   cadence        text NOT NULL CHECK (cadence IN ('weekly', 'monthly', 'yearly')),
   next_due_date  date NOT NULL,
+  last_paid_date date,
   is_active      boolean NOT NULL DEFAULT true,
   created_at     timestamptz DEFAULT now()
 );
@@ -390,6 +392,14 @@ CREATE INDEX idx_bills_category_id ON public.bills (category_id);
 
 Notes:
 - No `updated_at` — consistent with the rest of the schema.
+- `last_paid_date` (nullable) records the last time the user actually marked
+  this bill **paid** (a real payment — *not* a skipped cycle, so the "Last
+  paid …" label never lies). It's a plain *fact* ("this happened on this
+  date"), not a derived running total, so it doesn't violate the
+  compute-don't-store rule — and since a paid bill becomes an ordinary
+  transaction with **no `bill_id` back-link** (see Phase 4), it genuinely can't
+  be derived. Used only to show "Last paid …" on the bill card. Null until
+  first paid.
 - No view. A bill's `amount` is the expected charge, not a derived total, so it
   doesn't violate the compute-don't-store rule. Overdue/upcoming is computed
   client-side from `next_due_date` (Phase 4).
@@ -431,16 +441,25 @@ components/
 - **`app/bills.js`** — header ("Bills") with back button (matches
   `settings.js`), a "＋ Add" affordance opening `AddBillSheet`, and a list of
   bill cards: name, category icon, cadence label, next-due date
-  (`format(date, 'd MMM')`), amount, and a small status pill
+  (`format(date, 'd MMM')`), amount, an optional "Last paid …" line
+  (`last_paid_date`, hidden until first paid), and a small status pill
   (overdue = danger, due soon = warn, scheduled = neutral). Empty state matches
   the other tabs. Account-scoped to the active account.
 - **`AddBillSheet.js`** — fields: name, amount, cadence
-  (weekly/monthly/yearly segment), next due date (`DateTimePicker`), category
-  (chip row like AddTransactionSheet, expense categories), an "Active" toggle
-  (pause without deleting). Create/edit/delete, inline validation error,
-  `notifyChanged()` on success, success toast (reuse Phase 1). Writes
-  `account_id: activeAccountId` on create; never reassigns it on edit (matches
-  budgets/plans).
+  (weekly/monthly/yearly segment), next due date, category (chip row like
+  AddTransactionSheet, expense categories), an "Active" toggle (pause without
+  deleting).
+  - **Next-due-date UX** (decided in planning): cadence alone can't set the
+    date (monthly ≠ *which* day), so there's an explicit next-due-date
+    `DateTimePicker`. It **auto-fills a suggestion but stays fully editable** —
+    default to today on open; when the user changes cadence, bump the
+    suggestion forward by that interval from today (`addWeeks/Months/Years`)
+    *only if the user hasn't manually set a date yet*, so we never overwrite an
+    explicit choice. Cadence governs how the date advances after each payment
+    (Phase 4); the picker is the anchor for the *first* due date.
+  - Create/edit/delete, inline validation error, `notifyChanged()` on success,
+    success toast (reuse Phase 1). Writes `account_id: activeAccountId` on
+    create; never reassigns it on edit (matches budgets/plans).
 
 ### 3.4 Navigation / Integration
 - `MenuSheet.js`: add `{ key: 'bills', label: 'Bills', route: '/bills', icon: <Receipt/> }`
@@ -457,15 +476,18 @@ components/
 | Account cascade | `bills.user_id` is CASCADE, so user-deletion still fully purges | Confirm in `00-index.md`'s deletion notes |
 
 ### 3.6 What This Phase Does NOT Include
-- No "mark as paid", no transaction creation, no due-date advancing (Phase 4).
+- No "mark as paid", no transaction creation, no due-date advancing, no
+  skip-cycle, no due-today prompt (all Phase 4). `last_paid_date` exists in the
+  schema but stays null this phase.
 - No notifications (Phase 5). Bills are visible only inside the app.
 - No auto-detection of bills from transactions/SMS.
 
 ### 3.7 Phase 3 Checklist — Before Marking Complete
-- [ ] `bills` table + RLS + indexes applied; SQL block matches live schema.
+- [ ] `bills` table (incl. `last_paid_date`) + RLS + indexes applied; SQL block matches live schema.
 - [ ] `useBills` returns account-scoped bills ordered by due date; `billStatus` helper exported.
 - [ ] Bills screen lists/creates/edits/deletes bills; reachable from the menu sheet.
 - [ ] `AddBillSheet` writes `account_id`, validates, toasts on save.
+- [ ] Next-due-date field auto-suggests (from cadence) but stays editable; never overwrites a manual choice.
 - [ ] Deleting an account with bills is guarded in `AddAccountSheet`.
 - [ ] Bundles cleanly.
 
@@ -473,67 +495,128 @@ components/
 
 ---
 
-## Phase 4 — Bills: Mark as Paid → Transaction
+## Phase 4 — Bills: Pay → Transaction (+ Due-Today Prompt)
 
 ### Goal
-A bill becomes actionable: "Mark as paid" creates a real expense transaction
-(the bill's amount, category, account, and a note like "Netflix subscription")
-and advances the bill's `next_due_date` by its cadence. Now bills flow into the
-ledger and balances/budgets reflect them, and overdue/upcoming states are
-meaningful.
+A bill becomes actionable through a **pay-confirm step**: the user reviews the
+bill, tweaks the amount if it varies (electricity), and marks it paid — which
+creates a real expense transaction and advances `next_due_date` by cadence.
+They can also **skip a cycle** (advance the date, no transaction) when a charge
+didn't happen. And on app open, a **due-today prompt modal** proactively
+surfaces any bills due today or overdue so they're paid on time, not forgotten.
+Now bills flow into the ledger and balances/budgets reflect them.
+
+This phase folds in the user's refined vision (2026-07-11 planning discussion):
+editable amount at pay time, skip-cycle, and the on-open due prompt. The
+"2–3 days before / day before" *push* reminders remain Phase 5 (they need OS
+notifications); this phase is the in-app pay experience.
 
 ### Before Starting — Confirm Phase 3 is Approved
 1. Re-read `AddTransactionSheet.handleSave`'s insert payload shape (columns:
    `type, amount, category_id, plan_id, occurred_at, note, account_id`).
-2. Confirm `date-fns` `add`/`addWeeks`/`addMonths`/`addYears` are available
+2. Confirm `date-fns` `addWeeks`/`addMonths`/`addYears` are available
    (`date-fns` is already a dependency).
-3. Decide the paid date: `occurred_at = today` (`format(new Date(),'yyyy-MM-dd')`).
+3. Re-read `app/settings.js`'s `Modal`-based delete-account confirmation as the
+   pattern for the due-today modal (transparent overlay, card, action buttons).
+4. Confirm the AsyncStorage device-pref pattern (`flo.activeAccountId` in
+   `AccountContext`) for the "last shown" key the due prompt uses.
 
 ### 4.1 Database
-No schema changes. (Optional future: a `bill_id` FK on `transactions` to
-back-link — **out of scope**; a plain transaction is enough for v1.)
+No schema changes — `last_paid_date` already exists (Phase 3). This phase is
+the first to write to it. (Still no `bill_id` FK on `transactions` — a paid
+bill becomes a plain transaction; back-link remains **out of scope**.)
 
 ### 4.2 Data Layer
-Inline mutation in the Bills screen / bill card, `markBillPaid(bill)`:
 
-1. Insert a transaction: `{ type: 'expense', amount: bill.amount,
-   category_id: bill.category_id, plan_id: null, occurred_at: today,
-   note: bill.name, account_id: bill.account_id }`.
-2. Advance the bill: `next_due_date` = `bill.next_due_date` +
-   (weekly→`addWeeks(...,1)`, monthly→`addMonths(...,1)`, yearly→`addYears(...,1)`),
-   `update` the `bills` row.
-3. `notifyChanged()`; success toast "Marked <name> paid".
+```
+lib/bills.js   ← NEW (shared because two surfaces call it: the Bills list and
+                 the due-today modal — this is exactly the reuse case that
+                 justifies a helper over an inline mutation)
+```
 
-Both writes then a single `notifyChanged()`. If the transaction insert fails,
-don't advance the date; error toast.
+- `advanceDueDate(dateStr, cadence)` — pure: returns the next `yyyy-MM-dd`
+  after applying `addWeeks/addMonths/addYears(…, 1)`.
+- `markBillPaid(bill, { amount, occurredAt })` — `amount` defaults to
+  `bill.amount`, `occurredAt` defaults to today:
+  1. Insert a transaction `{ type: 'expense', amount, category_id:
+     bill.category_id, plan_id: null, occurred_at: occurredAt, note: bill.name,
+     account_id: bill.account_id }`.
+  2. If insert fails → return the error (do **not** advance; caller shows an
+     error toast).
+  3. Update the bill: `next_due_date = advanceDueDate(bill.next_due_date,
+     bill.cadence)`, `last_paid_date = occurredAt`.
+  4. Return success; caller calls `notifyChanged()` + success toast
+     "`<name>` marked paid".
+- `skipBillCycle(bill)` — advances `next_due_date` only (no transaction, does
+  **not** touch `last_paid_date`, so "Last paid …" stays truthful). Caller
+  `notifyChanged()` + info toast "Skipped `<name>` this cycle".
 
-`billStatus` (from Phase 3) now drives the visible overdue/due-soon pills and,
-in Phase 6, the alert feed.
+`billStatus` (from Phase 3) drives the visible overdue/due-soon pills and, in
+Phase 6, the alert feed.
 
 ### 4.3 Components
-- Add a "Mark paid" button to each bill card (and/or a swipe/press action) on
-  `app/bills.js`. Reuses Phase 2 threshold helpers optionally: after marking
-  paid, the same `budgetToastForSave` check could warn if this bill pushed a
-  budget over — **reuse if trivial, else defer**.
+
+```
+components/
+  PayBillSheet.js     ← NEW. Provider/Context/forwardRef confirm sheet.
+  DueBillsModal.js    ← NEW. On-open prompt for due/overdue bills.
+```
+
+- **`PayBillSheet`** — opened via `usePayBillSheet().openPayBill(bill)` from
+  both the Bills list ("Mark paid" on a card) and the due-today modal. Shows:
+  bill name, an **editable amount** field (pre-filled with `bill.amount`), the
+  paid date (defaults today, editable via `DateTimePicker`), and actions:
+  **Mark as Paid** (calls `markBillPaid` with the edited amount/date), **Skip
+  this cycle** (calls `skipBillCycle`), and Cancel. On success: dismiss,
+  `notifyChanged()`, toast. Dark sheet matching the others. *Optional, if
+  trivial*: after a successful pay, run Phase 2's `budgetToastForSave` so a
+  bill that blows a budget still warns — reuse it, since the helper already
+  exists.
+- **`DueBillsModal`** — a `Modal` (like Settings' delete confirmation) that, on
+  app open, lists the active account's bills with `next_due_date <= today`
+  (due today + overdue), each with a **Mark paid** (→ opens `PayBillSheet`) and
+  the modal offering a **Later** dismiss. Shows **at most once per calendar
+  day**, gated by an AsyncStorage key `flo.dueBills.lastShown` (a `yyyy-MM-dd`
+  string; show only if stored date < today, then write today). Renders nothing
+  when there are no due bills. One modal listing all due bills — never one
+  modal per bill.
 
 ### 4.4 Navigation / Integration
-No new routes. Action lives on the Bills screen.
+- Bills screen (`app/bills.js`): each card's primary action opens
+  `PayBillSheet`; overdue/due-soon cards can also show it more prominently.
+- `PayBillSheetProvider` mounted in `app/_layout.js` alongside the other sheet
+  providers.
+- `DueBillsModal` mounted as a sibling near `<Stack>` in `_layout.js` (the
+  `ShareIntentHandler` spot — it needs `useBills`, `usePayBillSheet`, and the
+  account context, so it can't be `RootNavigator` itself).
 
 ### 4.5 Impact on Existing Features
 | Area | Change | Watch for |
 |---|---|---|
-| Transactions/Home/Budgets | A paid bill now appears as a transaction and moves balances | Correct account + category; today's date |
+| Transactions/Home/Budgets | A paid bill now appears as a transaction and moves balances | Correct account + category; the edited amount + chosen date |
+| `app/_layout.js` | New sheet provider + due-modal sibling | Provider order; modal must not fight the sign-in redirect (only show when a session + active account exist) |
+| Bills list | Cards gain pay/skip actions + "Last paid …" | — |
 
 ### 4.6 What This Phase Does NOT Include
-- No editing the transaction from the bill (it's a normal transaction after).
-- No "undo paid" beyond deleting the created transaction manually.
-- No partial payments / variable amounts at pay time (uses the bill's amount).
+- No `bill_id` link on the created transaction (it's a normal transaction after;
+  edit/delete it like any other).
+- No "undo paid" beyond deleting the created transaction manually (the bill's
+  date has already advanced).
+- **No cross-account due detection** — the due-today modal (and pay actions) are
+  scoped to the *active* account, consistent with the rest of the app. A bill
+  due in a non-active account surfaces only after switching to it. Deferred;
+  same scoping as the Phase 6 alert feed.
+- No push/OS reminders (Phase 5).
 
 ### 4.7 Phase 4 Checklist — Before Marking Complete
-- [ ] "Mark paid" inserts a correct expense transaction and advances `next_due_date` by cadence.
-- [ ] Failure to insert does not advance the date.
-- [ ] Balances/budgets update (via `notifyChanged`), success toast shows.
-- [ ] Overdue/due-soon pills reflect the advanced date.
+- [ ] `lib/bills.js` exports `advanceDueDate`, `markBillPaid`, `skipBillCycle`.
+- [ ] `PayBillSheet` marks paid with an **editable amount** + date → correct expense transaction; advances `next_due_date`; sets `last_paid_date`.
+- [ ] Skip-cycle advances the date with **no** transaction and leaves `last_paid_date` untouched.
+- [ ] Transaction-insert failure does not advance the date (error toast).
+- [ ] Balances/budgets update (via `notifyChanged`); success/info toasts show.
+- [ ] Due-today modal shows due/overdue bills on open, at most once per day, nothing when none due; "Later" dismisses; "Mark paid" opens `PayBillSheet`.
+- [ ] Modal never appears on the sign-in screen / with no active account.
+- [ ] "Last paid …" shows on paid bills; overdue/due-soon pills reflect the advanced date.
 - [ ] Bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
@@ -731,11 +814,12 @@ auth.users
        ├─ account_id → accounts       (account-scoped, like budgets/plans)
        └─ category_id → categories    (ON DELETE SET NULL)
 
-transactions (unchanged)              ← Phase 4 "mark paid" inserts a normal expense here
+transactions (unchanged)              ← Phase 4 pay inserts a normal expense here
   (no bill_id link in v1)
 
 Computed / derived (nothing stored):
   toasts            → transient React state (Phase 1–2)
+  due-today prompt  → useBills + AsyncStorage "last shown" date (Phase 4)
   scheduled notifs  → device OS + AsyncStorage prefs (Phase 5)
   alert feed        → useAlerts() over bills + v_budgets_with_spent
                       + v_plans_with_totals (Phase 6)
@@ -750,8 +834,9 @@ Computed / derived (nothing stored):
 | `category_id` | uuid | nullable, FK → `categories` `ON DELETE SET NULL` |
 | `name` | text | NOT NULL |
 | `amount` | numeric | NOT NULL, `CHECK (amount > 0)` — expected charge, not derived |
-| `cadence` | text | `CHECK IN ('weekly','monthly','yearly')` |
-| `next_due_date` | date | NOT NULL; advanced by cadence on "mark paid" |
+| `cadence` | text | `CHECK IN ('weekly','monthly','yearly')` — how `next_due_date` advances after each payment |
+| `next_due_date` | date | NOT NULL; user-set anchor (auto-suggested), advanced by cadence on pay/skip |
+| `last_paid_date` | date | nullable; set on pay (not skip) — powers "Last paid …" |
 | `is_active` | boolean | NOT NULL default true (pause without deleting) |
 | `created_at` | timestamptz | `default now()` (no `updated_at`) |
 
@@ -764,7 +849,7 @@ derived client-side via `billStatus(next_due_date)`.
 
 | Existing Feature | Impact | Action Required |
 |---|---|---|
-| `app/_layout.js` | Gains ToastProvider (P1), notification-sync sibling (P5), AlertsSheetProvider (P6) | Careful provider ordering |
+| `app/_layout.js` | Gains ToastProvider (P1, done), PayBillSheetProvider + DueBillsModal sibling (P4), notification-sync sibling (P5), AlertsSheetProvider (P6) | Careful provider ordering |
 | `AddTransactionSheet.js` | Success/error toasts (P1) + threshold toasts (P2) | Keep inline validation for "Enter an amount" |
 | `MenuSheet.js` | New "Bills" entry (P3) | Taller snap point |
 | `AddAccountSheet.js` | Delete guard counts bills (P3) | — |
@@ -788,7 +873,17 @@ derived client-side via `billStatus(next_due_date)`.
   no stored log, no per-alert seen-state (deferred, Phase 6 notes).
 - **Budget-reset / monthly-digest scheduled notifications** — easy to add to
   `rescheduleAll` later; Phase 5 ships bill + daily reminders only.
-- **Wiring toasts into every sheet** — Phase 1 wires Add Transaction; other
-  sheets can adopt `useToast()` opportunistically, not as a tracked deliverable.
+- **Cross-account due detection** — the due-today modal and bell feed are
+  active-account-scoped; a bill due in a non-active account surfaces only after
+  switching. Future build (needs an all-accounts bills query).
+- **`bill_id` back-link / variable-amount history** — pay creates a plain
+  transaction; the edited amount lives on the transaction, not tracked back on
+  the bill beyond `last_paid_date`.
+- **Recurring income (salary)** — bills are expenses only in v1.
 - **iOS notifications** — the app targets Android (share-intent is Android-only
   already); iOS local notifications would likely work but are untested/unscoped.
+
+**Note**: "wiring toasts into every sheet" was originally listed here as
+out-of-scope but was **completed** during Phase 1 testing (see the Toast
+Trigger Reference table under Phase 1) — every mutation-bearing sheet now
+toasts.
