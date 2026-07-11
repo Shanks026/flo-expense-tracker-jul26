@@ -220,7 +220,19 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   self-heals to the first account if the stored one no longer exists.
   Mounted in `app/_layout.js` directly inside `DataRefreshProvider`.
   Reads that should be account-scoped filter `.eq('account_id',
-  activeAccountId)`; categories never do (global).
+  activeAccountId)`; categories never do (global). **Fixed 2026-07-11**:
+  its fetch now depends on `session?.user?.id` (via `useAuth()`), not just
+  `useDataRefresh`'s `version` — it originally only refetched on
+  `notifyChanged()`, so a fetch that ran before sign-in completed
+  (correctly empty, pre-auth) never got revisited once a session existed,
+  leaving `activeAccountId` stuck `null` indefinitely (found via the first
+  real on-device test: no account name on Home, `account_id` NOT NULL
+  violation on save). **General lesson for any future provider that
+  resolves-once-and-caches client state** (not just re-fetches blindly
+  like the plain read hooks do): if what it resolves can depend on auth
+  state, it needs `session` in its own dependency list, not just
+  `version` — `version` only changes on explicit mutations, never on
+  sign-in/sign-out by itself.
 - **Accounts are fully wired** (`02-accounts.md`, all 3 phases complete
   2026-07-11): every account-relevant hook (`useTransactions`,
   `useDailyTotals`, `useGlobalSummary`, `useBudgets`, `usePlans`,
