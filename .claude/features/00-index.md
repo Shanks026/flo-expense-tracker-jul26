@@ -56,7 +56,7 @@ data model.
 | — | `FEATURE_PLAN.md` (repo root) | Core app (auth/transactions/budgets/plans/settings) | ✅ Complete (v1) |
 | 01 | `01-analytics.md` | Analytics (shared filter + Overview/Transactions/Categories/Budgets/Plans graphs) | ✅ Complete (all 3 phases built, pending final on-device confirmation) |
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
-| 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 In progress (Phases 1–2 of 3 implemented; both await on-device verification together) |
+| 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 All 3 phases implemented; awaiting on-device verification (no device in this environment) |
 
 ---
 
@@ -124,6 +124,23 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
 
 ## Shared Infrastructure Notes
 
+- **`components/Logo.js`** (added 2026-07-11) — the real FLO brand mark
+  (`assets/FLO_LOGO.svg`), rendered via `react-native-svg`'s `SvgXml` with
+  the SVG source inlined as a string constant (this project has no
+  Metro SVG-file-loader configured, so the file isn't imported directly —
+  keep the inline string in sync if `FLO_LOGO.svg` changes). `<Logo size
+  radius />`. Used on the Sign In screen in place of the old placeholder
+  (a generic Lucide arrow icon in an ink tile). App icon/splash/adaptive-
+  icon/favicon PNGs are a separate, still-open item — see below.
+- **Known gap**: `assets/icon.png`, `splash-icon.png`, `adaptive-icon.png`,
+  `favicon.png` are still Expo's generic template placeholders (the
+  default gray target/bullseye), not the FLO logo — `app.json` points at
+  them but they were never regenerated. Needs proper exports of
+  `FLO_LOGO.svg` (1024×1024 solid-background version for `icon.png`;
+  1024×1024 *transparent*-background glyph-only version, safe-zone
+  centered, for `adaptive-icon.png`/`splash-icon.png`; 48×48 solid for
+  `favicon.png`) — deferred to the user rather than generated in-repo
+  (no SVG rasterization tooling available in this environment).
 - **`useDataRefresh`** (`lib/DataRefreshContext.js`) — version-counter
   pattern; every read hook depends on it, every mutation calls
   `notifyChanged()`. The entire cache-invalidation strategy.
@@ -174,6 +191,16 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   a spending cap, not a savings goal, and ahead/behind reads ambiguously
   for that direction. Reuse this label set for any future pace-style
   indicator on plans or budgets.
+- **`ShareIntentHandler` pattern** (`app/_layout.js`, added
+  `03-sms-share-import.md` Phase 3) — a component that needs to call a
+  sheet's `useAddXSheet()` hook (or read any other context defined
+  *inside* `RootNavigator`'s own returned JSX) can't be `RootNavigator`
+  itself — `RootNavigator` defines those providers, so it isn't their
+  descendant. Pattern: extract a small side-effect-only component
+  (returns `null`), render it as a sibling of `<Stack>` deep inside the
+  provider nest, and put the app-wide-event-reacting logic there instead.
+  Reuse this shape for any future feature that needs to react to
+  something at the app root and also touch sheet/account/etc. state.
 - **Known gap surfaced by Phase 3, not fixed (out of scope for
   `01-analytics.md`)**: `components/ProgressBar.js`'s status-to-color
   logic only special-cases `'danger'`, not `'over'` (the actual status

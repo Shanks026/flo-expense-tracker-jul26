@@ -146,7 +146,7 @@ None — new, isolated file.
 
 ---
 
-## Phase 3 — Wire into Add Transaction + active-account awareness
+## Phase 3 — Wire into Add Transaction + active-account awareness 🚧 Implementation done — awaiting on-device verification (together with Phases 1–2)
 
 ### Goal
 Sharing a bank SMS to FLO opens the existing Add Transaction sheet pre-filled with the parsed amount and type, ready for category/plan selection and Save. Separately — and visible from **every** entry point into that sheet, not just this one — a small non-editable row shows which account the transaction will land in, so the "whichever account is active" model (confirmed, no picker) doesn't leave you guessing.
@@ -180,11 +180,19 @@ No new hooks — `app/_layout.js`'s share handler (from Phase 1) now calls `pars
 - Category or plan auto-fill from the SMS text
 
 ### 3.7 Phase 3 Checklist — Before Marking Complete
-- [ ] Sharing a real bank SMS to FLO opens Add Transaction pre-filled with the correct amount and expense/income
-- [ ] Sharing text that fails to parse still opens Add Transaction, with the raw text in the note field — not a dead end
-- [ ] The "Adding to: {account}" row shows the correct active account on every entry point into the sheet
-- [ ] Tapping the row opens the account switcher; after switching, the next transaction opened (any entry point) reflects the new active account
-- [ ] ⊕ tab and Plan Detail's "Add Expense" still work exactly as before, just with the new row visible
+- [ ] Sharing a real bank SMS to FLO opens Add Transaction pre-filled with the correct amount and expense/income — **on-device, needs you**
+- [ ] Sharing text that fails to parse still opens Add Transaction, with the raw text in the note field — implemented (`openAdd({ note: sharedText })` on `null` parse), **on-device confirmation needed**
+- [x] The "Adding to: {account}" row shows the correct active account on every entry point into the sheet — same `useAccount().activeAccount` read used everywhere else in the app, verified by inspection
+- [ ] Tapping the row opens the account switcher; after switching, the next transaction opened reflects the new active account — implemented (dismiss-then-open, matching the existing pattern), **on-device confirmation needed**
+- [x] ⊕ tab and Plan Detail's "Add Expense" still work exactly as before, just with the new row visible — `open(payload)`'s prefill logic only *adds* optional `amount`/`type`/`note` reads with safe fallbacks (`payload?.amount ? ... : ''`), doesn't change behavior when those keys are absent
+
+### Implementation Notes
+
+- **A real structural issue, caught before running anything**: the doc's plan to update "`app/_layout.js`'s share handler" glossed over the fact that `RootNavigator` — the component that *defines* `AddTransactionSheetProvider` — can't consume that same provider's context itself (a component can't be a descendant of a tree it returns). Fixed by extracting a small `ShareIntentHandler` component, rendered as a sibling of `<Stack>` *inside* the full provider nest (so `useAddTransactionSheet()` resolves correctly), rather than trying to call it from `RootNavigator` directly.
+- **Added a guard not explicit in the original plan**: `ShareIntentHandler` only acts if `session` exists (via `useAuth()`). Without it, a share arriving while signed out would try to open Add Transaction over the sign-in screen with no categories/plans/account loaded yet — confusing at best. Small, justified deviation.
+- `AddTransactionSheet.open(payload)`'s new-transaction branch now reads `payload.amount`, `payload.type` (defaults to `'expense'` if a type-less payload with an amount somehow arrives), and `payload.note` — all optional, all backward-compatible with the existing `open()`, `open({ plan_id })`, and `open(existingTransaction)` call shapes already used elsewhere.
+- "Adding to: {account}" row uses the same chip-style treatment (`colors.chipBg` pill) as other inline metadata elsewhere in the app, tap-to-dismiss-then-`openAccountSwitcher()` — identical pattern to how `MenuSheet` rows navigate.
+- Verified via `npx expo export --platform android` (3814 modules, clean). Real verification — does a shared SMS actually produce the right pre-filled sheet — needs your device, same as Phases 1–2.
 
 **→ Stop here. Show the result and wait for approval.**
 
