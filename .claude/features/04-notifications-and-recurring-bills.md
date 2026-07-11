@@ -920,6 +920,40 @@ original plan; simpler than a separate sheet for three toggle rows):
 **→ Stop here. Show the result and wait for approval.**
 
 ### Implementation Notes
+- **Critical bug, caught via real device testing (2026-07-11, after this phase
+  was first marked complete) — app crashed on boot in Expo Go, not just
+  "notifications didn't work"**: `expo-notifications` auto-registers a device
+  push-token listener as a *module-level side effect on import*
+  (`DevicePushTokenAutoRegistration.fx.js`), and that throws outright in Expo
+  Go on Android (push support was removed from Expo Go in SDK 53) — even
+  though this codebase only ever calls *local* scheduling APIs, which Expo Go
+  does support. Since `lib/notifications.js` did `import * as Notifications
+  from 'expo-notifications'` and `app/_layout.js` imports that file at module
+  scope, the entire app failed to boot in Expo Go — every route, not just
+  Settings/notifications. Fixed by detecting Expo Go via
+  `Constants.executionEnvironment === ExecutionEnvironment.StoreClient`
+  (`expo-constants`) and gating the `expo-notifications` import behind a
+  conditional `require()` — Metro still bundles the module, but its
+  side-effecting top-level code never executes when the `require()` call
+  itself is never reached. Every exported function in `lib/notifications.js`
+  now checks `if (!Notifications) return ...` (a no-op, or a
+  `{ granted: false, unsupported: true }` status for the permission
+  functions). `app/settings.js` shows a distinct "Notifications need a
+  development build, not Expo Go" message for the `unsupported` case, and no
+  longer shows the (misleading, in Expo Go) "open system settings" hint for
+  it. **This is why Daily Reminder/Bill Reminders appeared permanently
+  greyed-out during testing**: both sub-toggles are `disabled={!notifEnabled}`
+  by design, and `notifEnabled` can only become `true` after the master
+  toggle's permission request actually succeeds — which it never can in Expo
+  Go. Testing the full working toggle chain still requires the dev
+  client/EAS build, as already noted below; this fix's scope is only "don't
+  crash the whole app," not "make notifications work in Expo Go" (impossible).
+- **Bill Reminders defaults to `enabled: true`, Daily Reminder defaults to
+  `enabled: false`** (`DEFAULT_BILL_REMINDERS`/`DEFAULT_DAILY_REMINDER` in
+  `lib/notifications.js`) — a deliberate, not-in-the-original-plan choice:
+  bill-due reminders were the primary ask driving this whole feature, so they
+  default on; the daily log-nudge is more of an opt-in nicety. Both defaults
+  are inert until the master toggle is also on (see above).
 - **VIBRATE decision**: left blocked in `app.json`'s `android.blockedPermissions`
   (not unblocked). Notifications will display/sound normally but won't vibrate
   the device. Chosen to stay consistent with the app's minimal-permissions
