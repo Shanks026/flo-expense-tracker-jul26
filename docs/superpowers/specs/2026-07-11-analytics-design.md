@@ -1,6 +1,6 @@
 # Analytics Section — Design
 
-> Status: approved by user, pending spec review
+> Status: superseded — carried forward into `.claude/features/01-analytics.md` under the `flo-feature` skill/process. Keeping this file for design-history context; treat the feature file as canonical for phases, checklists, and file paths.
 > Date: 2026-07-11
 
 ## 1. Purpose
