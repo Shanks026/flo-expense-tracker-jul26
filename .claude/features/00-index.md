@@ -79,7 +79,7 @@ data model.
 | 01 | `01-analytics.md` | Analytics (shared filter + Overview/Transactions/Categories/Budgets/Plans graphs) | ✅ Complete (all 3 phases built, pending final on-device confirmation) |
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
 | 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 All 3 phases implemented; awaiting on-device verification (no device in this environment) |
-| 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | 🚧 Phases 1–5 complete (toasts, bills, pay flow, local notifications); Phase 6 (bell) remaining |
+| 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | ✅ Complete (all 6 phases built); pending on-device verification of Phase 5's notifications (needs a new EAS build — native module) |
 
 ---
 

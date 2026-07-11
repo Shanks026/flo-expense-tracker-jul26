@@ -1,7 +1,7 @@
 # Feature: Notifications & Recurring Bills
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/04-notifications-and-recurring-bills.md`
-**Status**: Planned
+**Status**: ✅ Complete (all 6 phases built; pending on-device verification of Phase 5's notifications)
 **Last Updated**: July 2026
 
 ---
@@ -969,7 +969,7 @@ original plan; simpler than a separate sheet for three toggle rows):
 
 ---
 
-## Phase 6 — Bell Notification Center
+## Phase 6 — Bell Notification Center ✅ Complete
 
 ### Goal
 The Home header bell (today a static icon with a dead red dot) becomes a real
@@ -1043,13 +1043,48 @@ components/AlertsSheet.js   ← NEW. Provider/Context/forwardRef, MenuSheet-styl
   — pay the bill, the alert goes away).
 
 ### 6.7 Phase 6 Checklist — Before Marking Complete
-- [ ] `useAlerts` returns a sorted feed from existing data — bills global, budgets/plans active-account-scoped (a deliberate mix, not uniform).
-- [ ] Bell opens `AlertsSheet`; rows deep-link; empty state shows when clear.
-- [ ] Dot shows iff `count > 0`.
-- [ ] Paying an overdue bill / fixing a budget removes its alert (via `notifyChanged`).
-- [ ] Bundles cleanly.
+- [x] `useAlerts` returns a sorted feed from existing data — bills global, budgets/plans active-account-scoped (a deliberate mix, not uniform).
+- [x] Bell opens `AlertsSheet`; rows deep-link; empty state shows when clear.
+- [x] Dot shows iff `count > 0`.
+- [x] Paying an overdue bill / fixing a budget removes its alert (via `notifyChanged`).
+- [x] Bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- `useAlerts` composes `useBills`/`useBudgets`/`usePlans` directly (not a new
+  Supabase query) — each already reacts correctly to `notifyChanged()` via its
+  own `version` dependency, so the "paying a bill / fixing a budget removes
+  its alert" checklist item needed no extra wiring: `useMemo`'s dependency
+  array (`[bills, budgets, plans]`) recomputes automatically whenever any of
+  those hooks refetch.
+- Alert `route`s verified against actual working paths, not assumed —
+  confirmed `/budgets`, `/transactions`, `` `/plan/${id}` `` are all already
+  used elsewhere via `router.push` (`(tabs)` and other route groups are
+  transparent to the URL, same lesson as Phase 5's `/(tabs)` fix).
+- Icon-per-`kind` (not just per-severity) was a small addition beyond the
+  plan's "severity-colored icon" wording: `Receipt`/`Wallet`/`Flag` for
+  bill/budget/plan, tinted by severity (`dangerBg`+`dangerStrong` or
+  `warnBg`+`warnStrong`) — matches the existing pattern on the Budgets tab
+  (icon + status-tinted `IconTile`) rather than a single generic alert glyph,
+  and costs nothing extra to build since the icon-per-kind mapping is a
+  one-line lookup table.
+- Plan-ending-soon alerts only fire for **active** plans with a set `end_date`
+  within 7 days (`daysLeft >= 0`, so already-past end dates don't alert —
+  a plan past its end date either got marked `completed` or is simply
+  inactive-but-not-updated, neither of which this phase's scope covers).
+- Budget subtitle reuses the exact wording pattern from Phase 2's
+  `budgetToastForSave` (`lib/alerts.js`) — "Over by ₹X" / "N% used this
+  week/month" — for consistency between the toast that fires at the moment of
+  crossing and the persistent alert row for the same condition.
+- `AlertsSheetProvider` mounted wrapping `MenuSheetProvider`'s children (not
+  literally "alongside" as siblings, since one must be an ancestor of
+  `<Stack>` for `Home` to consume it) — functionally equivalent to the plan's
+  intent, just corrected for React's provider-nesting requirement (the same
+  class of ordering constraint documented earlier for `AddTransactionSheet`/
+  `AccountSwitcherSheet`).
+- Read/unread persistence remains deferred exactly as planned — not built.
+- No other deviations from the plan.
 
 ---
 
