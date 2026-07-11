@@ -546,6 +546,18 @@ editable amount at pay time, skip-cycle, and the on-open due prompt. The
 "2–3 days before / day before" *push* reminders remain Phase 5 (they need OS
 notifications); this phase is the in-app pay experience.
 
+**Pay-time account selection** (decided 2026-07-11, same planning pass): a
+bill's `account_id` is its fixed "home" — set implicitly at creation (whichever
+account is active, matching budgets/plans, **no creation-time picker**), never
+reassigned by editing the bill. But *paying* a bill creates a brand-new
+transaction, and — like any transaction — the user may genuinely want to pay
+it from a **different** account than where they track the bill (e.g. tracked
+under Personal, paid via Business one month). So `PayBillSheet` gets an
+**editable account field**, defaulting to `bill.account_id` but changeable to
+any of the user's accounts. Only the resulting transaction's account can
+differ; the bill itself never moves — it still lives in, and is listed under,
+its home account next cycle.
+
 ### Before Starting — Confirm Phase 3 is Approved
 1. Re-read `AddTransactionSheet.handleSave`'s insert payload shape (columns:
    `type, amount, category_id, plan_id, occurred_at, note, account_id`).
@@ -555,6 +567,12 @@ notifications); this phase is the in-app pay experience.
    pattern for the due-today modal (transparent overlay, card, action buttons).
 4. Confirm the AsyncStorage device-pref pattern (`flo.activeAccountId` in
    `AccountContext`) for the "last shown" key the due prompt uses.
+5. Re-read `useAccount()`'s shape (`{ accounts, activeAccountId }`) and
+   `AddBudgetSheet`'s toggle-then-chip-grid category picker — the pay-time
+   account field reuses that exact interaction pattern (tap to reveal a chip
+   list, each chip showing the account's color dot + name, tap to select and
+   close), **not** `AccountSwitcherSheet` (that changes the app-wide active
+   account; this only changes which account one transaction lands in).
 
 ### 4.1 Database
 No schema changes — `last_paid_date` already exists (Phase 3). This phase is
@@ -571,15 +589,19 @@ lib/bills.js   ← NEW (shared because two surfaces call it: the Bills list and
 
 - `advanceDueDate(dateStr, cadence)` — pure: returns the next `yyyy-MM-dd`
   after applying `addWeeks/addMonths/addYears(…, 1)`.
-- `markBillPaid(bill, { amount, occurredAt })` — `amount` defaults to
-  `bill.amount`, `occurredAt` defaults to today:
+- `markBillPaid(bill, { amount, occurredAt, accountId })` — `amount` defaults
+  to `bill.amount`, `occurredAt` defaults to today, **`accountId` defaults to
+  `bill.account_id`** but the caller may pass a different account (pay-time
+  selection):
   1. Insert a transaction `{ type: 'expense', amount, category_id:
      bill.category_id, plan_id: null, occurred_at: occurredAt, note: bill.name,
-     account_id: bill.account_id }`.
+     account_id: accountId }` — note: **the transaction's account, not
+     necessarily the bill's**.
   2. If insert fails → return the error (do **not** advance; caller shows an
      error toast).
-  3. Update the bill: `next_due_date = advanceDueDate(bill.next_due_date,
-     bill.cadence)`, `last_paid_date = occurredAt`.
+  3. Update the bill (its own row, `bill.account_id` untouched):
+     `next_due_date = advanceDueDate(bill.next_due_date, bill.cadence)`,
+     `last_paid_date = occurredAt`.
   4. Return success; caller calls `notifyChanged()` + success toast
      "`<name>` marked paid".
 - `skipBillCycle(bill)` — advances `next_due_date` only (no transaction, does
@@ -600,13 +622,16 @@ components/
 - **`PayBillSheet`** — opened via `usePayBillSheet().openPayBill(bill)` from
   both the Bills list ("Mark paid" on a card) and the due-today modal. Shows:
   bill name, an **editable amount** field (pre-filled with `bill.amount`), the
-  paid date (defaults today, editable via `DateTimePicker`), and actions:
-  **Mark as Paid** (calls `markBillPaid` with the edited amount/date), **Skip
-  this cycle** (calls `skipBillCycle`), and Cancel. On success: dismiss,
-  `notifyChanged()`, toast. Dark sheet matching the others. *Optional, if
-  trivial*: after a successful pay, run Phase 2's `budgetToastForSave` so a
-  bill that blows a budget still warns — reuse it, since the helper already
-  exists.
+  paid date (defaults today, editable via `DateTimePicker`), an **editable
+  account field** (toggle-then-chip-grid, defaults to `bill.account_id`,
+  options = `useAccount().accounts`), and actions: **Mark as Paid** (calls
+  `markBillPaid` with the edited amount/date/account), **Skip this cycle**
+  (calls `skipBillCycle` — account selection irrelevant, no transaction is
+  created), and Cancel. On success: dismiss, `notifyChanged()`, toast. Dark
+  sheet matching the others. *Optional, if trivial*: after a successful pay,
+  run Phase 2's `budgetToastForSave` (scoped to the **chosen** account, not
+  necessarily the bill's) so a bill that blows a budget still warns — reuse it,
+  since the helper already exists.
 - **`DueBillsModal`** — a `Modal` (like Settings' delete confirmation) that, on
   app open, lists the active account's bills with `next_due_date <= today`
   (due today + overdue), each with a **Mark paid** (→ opens `PayBillSheet`) and
@@ -628,24 +653,32 @@ components/
 ### 4.5 Impact on Existing Features
 | Area | Change | Watch for |
 |---|---|---|
-| Transactions/Home/Budgets | A paid bill now appears as a transaction and moves balances | Correct account + category; the edited amount + chosen date |
+| Transactions/Home/Budgets | A paid bill now appears as a transaction and moves balances | Correct account + category; the edited amount + chosen date + chosen account |
 | `app/_layout.js` | New sheet provider + due-modal sibling | Provider order; modal must not fight the sign-in redirect (only show when a session + active account exist) |
 | Bills list | Cards gain pay/skip actions + "Last paid …" | — |
+| Active-account scoping | Paying into a **non-active** account won't show the new transaction until the user switches to that account (every read hook is `activeAccountId`-scoped) | Not a bug — same behavior as any other cross-account data; `notifyChanged()` still refreshes everything correctly once switched |
 
 ### 4.6 What This Phase Does NOT Include
 - No `bill_id` link on the created transaction (it's a normal transaction after;
   edit/delete it like any other).
 - No "undo paid" beyond deleting the created transaction manually (the bill's
   date has already advanced).
-- **No cross-account due detection** — the due-today modal (and pay actions) are
-  scoped to the *active* account, consistent with the rest of the app. A bill
-  due in a non-active account surfaces only after switching to it. Deferred;
-  same scoping as the Phase 6 alert feed.
+- **No creation-time account picker** — a bill's home `account_id` is still set
+  implicitly at creation only (matches budgets/plans); only the *pay-time*
+  transaction's account is selectable (decided this phase, see the note above
+  Before Starting).
+- **No cross-account due detection** — the due-today modal (and the Bills list
+  itself) are scoped to the *active* account, consistent with the rest of the
+  app. A bill due in a non-active account surfaces only after switching to it.
+  Deferred; same scoping as the Phase 6 alert feed. (Independent of the pay-time
+  account field — that changes where the *payment* lands, not which account's
+  bills you can see.)
 - No push/OS reminders (Phase 5).
 
 ### 4.7 Phase 4 Checklist — Before Marking Complete
 - [ ] `lib/bills.js` exports `advanceDueDate`, `markBillPaid`, `skipBillCycle`.
-- [ ] `PayBillSheet` marks paid with an **editable amount** + date → correct expense transaction; advances `next_due_date`; sets `last_paid_date`.
+- [ ] `PayBillSheet` marks paid with an **editable amount** + date + **account** → correct expense transaction in the *chosen* account; advances the bill's `next_due_date`; sets `last_paid_date`; the bill's own `account_id` is unchanged.
+- [ ] Account field defaults to the bill's home account but can be changed to any of the user's accounts.
 - [ ] Skip-cycle advances the date with **no** transaction and leaves `last_paid_date` untouched.
 - [ ] Transaction-insert failure does not advance the date (error toast).
 - [ ] Balances/budgets update (via `notifyChanged`); success/info toasts show.
