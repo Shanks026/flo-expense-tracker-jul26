@@ -250,3 +250,39 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   future "show data across all accounts" need — no new view/RPC required,
   just drop the filter. Powers the account switcher's mini summary cards
   (added post-Phase-3, see `02-accounts.md`).
+
+---
+
+## Security Audit (2026-07-11)
+
+Full pass over the app requested before the next EAS build ("check for
+security and vulnerabilities, token issues"). Scope: secrets/git history,
+session/token storage, OAuth flow, Supabase advisors, RLS on every table,
+storage bucket policies, AndroidManifest permissions, EAS env var
+visibility, `.gitignore`/`.env` handling, the new SMS/share-intent parser,
+and a grep for `eval`/dynamic-code/unsafe patterns.
+
+**Fixed this pass:**
+
+| Finding | Fix |
+|---|---|
+| Supabase session (incl. long-lived refresh token) was persisted in plain, unencrypted `AsyncStorage` — readable by anything with filesystem access on a rooted device or via backup extraction. | `lib/supabase.js` now uses Supabase's official `LargeSecureStore`: the session blob is AES-256-CTR encrypted (`aes-js`) before it touches AsyncStorage; the encryption key itself lives in `expo-secure-store` (Android Keystore/iOS Keychain), never in AsyncStorage. AsyncStorage alone is now useless without the device's secure hardware store. Deps installed: `expo-secure-store`, `aes-js`, `react-native-get-random-values` (polyfills `crypto.getRandomValues`, required by the encrypt step). Verified via `npx expo export --platform android` bundling clean. **Side effect**: anyone with the old plaintext session in AsyncStorage (i.e. the user's already-installed APK) will have it silently fail to decrypt on next launch and fall back to signed-out — a one-time forced re-login after the next build, not a bug. |
+| `android/app/src/main/AndroidManifest.xml` (applies to release, not just debug) carried `SYSTEM_ALERT_WINDOW`, `RECORD_AUDIO`, `VIBRATE` — none used by any code in this app, injected by Expo's generic baseline template/dependencies. Unused permissions are pure attack surface and a Play Store review flag. | `app.json` → `android.blockedPermissions` strips all three via manifest-merger `tools:node="remove"`. Verified regenerated via `npx expo prebuild --no-install --clean`. `READ/WRITE_EXTERNAL_STORAGE` deliberately left alone — genuinely declared by `expo-image-picker` for the real avatar-upload feature. |
+| `lib/smsParser.js` had no ceiling on input length or parsed amount — the Android share target accepts text from *any* installed app, not just Messages, so it's untrusted input. | Added `MAX_INPUT_LENGTH` (2000 chars, truncate before parsing) and `MAX_SANE_AMOUNT` (₹1 crore, reject anything above as garbage/overflow) in `lib/smsParser.js`. Re-verified all parser cases (13 existing + new oversized-input/garbage-amount cases) via a throwaway test script. |
+| RLS policies on all 5 tables re-evaluated `auth.uid()` per row (`auth_rls_initplan` advisor). | Already fixed earlier this session — see `fix_rls_initplan_and_missing_index` in Applied Migrations above. Re-confirmed clean on this pass. |
+| 3 views went `SECURITY DEFINER` (RLS bypass) after a migration recreated them. | Already fixed earlier this session — see `fix_views_security_invoker`. Re-confirmed `security_invoker = true` on all three on this pass. |
+
+**Checked, no issue found:** no hardcoded secrets/keys in source or git
+history (`EXPO_PUBLIC_SUPABASE_URL`/`ANON_KEY` are meant to be public —
+anon key + RLS is the correct model, not a leak); Google OAuth uses PKCE
+(`exchangeCodeForSession`, not implicit flow) via `expo-auth-session`; no
+`eval`/`Function()`/dynamic `require` anywhere; `avatars` storage bucket
+policy correctly scopes reads/writes to the owning user; `.env` is
+gitignored and never committed; EAS env vars for `preview`/`development`
+are `plaintext` visibility (correct — anon key, not a real secret) with no
+`sensitive`/`secret` values needed.
+
+**Still open, not fixable from here**: Supabase Auth's leaked-password-
+protection is disabled — this is a Dashboard-only toggle (Authentication →
+Policies), no MCP tool exposes it. Recommend the user enable it manually
+before the next build.
