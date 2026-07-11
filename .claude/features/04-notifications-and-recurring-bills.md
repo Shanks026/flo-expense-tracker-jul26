@@ -191,6 +191,23 @@ components/
   light variants, `rgba(255,255,255,0.16)` on the dark `info` variant) since a
   flat token color would either vanish against the tinted background or clash
   — this is the same technique `IconTile.js` already uses, not a new pattern.
+- **Scope expanded post-approval (2026-07-11)**: after testing Phase 1+2, the
+  user expected toasts across the whole app, not just Add Transaction — the
+  original "Phase 1 wires only Add Transaction, others opportunistically
+  later" scoping (1.6) read as a bug when tested end-to-end. Wired the same
+  toast pattern into every remaining mutation-bearing sheet in one pass:
+  `AddBudgetSheet`, `AddPlanSheet`, `AddAccountSheet`, `AddCategorySheet`,
+  `EditProfileSheet` (create/update/delete → success toast; save/delete
+  failure → error toast; unsubmitted-field validation stays inline `error`,
+  unchanged), `AccountSwitcherSheet` (switching to a different account →
+  "Switched to `<name>`", suppressed if re-selecting the already-active one),
+  and `manage-categories.js`'s delete action (was `Alert.alert('Error', ...)`
+  on failure, now an error toast; added a success toast). Left alone by
+  design: `Alert.alert` destructive-confirmation/guard dialogs (delete
+  confirmation, "in use" guards) — those still block for a decision and
+  aren't a toast's job; `MenuSheet`'s Log Out (navigates away immediately);
+  Settings' Delete Account flow (has its own modal with inline error, and
+  navigates to sign-in on success — a toast would be orphaned by the redirect).
 
 ---
 
