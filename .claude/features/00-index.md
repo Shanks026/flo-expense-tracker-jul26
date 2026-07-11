@@ -270,6 +270,34 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   future "show data across all accounts" need — no new view/RPC required,
   just drop the filter. Powers the account switcher's mini summary cards
   (added post-Phase-3, see `02-accounts.md`).
+- **Bug: categories not loading after sign-in/sign-up** (found & fixed
+  2026-07-11, real on-device repro — "create an account, add a
+  transaction, categories don't show", reproduced in the EAS APK too) —
+  same root cause as the earlier `AccountContext` bug, but in a different
+  place. Most read hooks (`useTransactions`, `useBudgets`, `usePlans`,
+  `useGlobalSummary`, `useDailyTotals`, `useAnalyticsData`) depend on
+  `activeAccountId` in their `refetch` `useCallback`, so once
+  `AccountContext` was fixed to depend on `session`, those hooks got
+  "accidentally" refetched too — `activeAccountId` going from `null` to a
+  real id changes `refetch`'s identity, which reruns their `useEffect`.
+  **`useCategories.js` and `useAllAccountSummaries.js` are the only two
+  read hooks that fetch data *not* scoped by `activeAccountId`** (categories
+  are global; the all-accounts summary is deliberately unfiltered) — so
+  neither had anything forcing a refetch once auth resolved. Both mount as
+  part of always-mounted providers (`AddTransactionSheetProvider`,
+  `AddBudgetSheetProvider`, `AccountSwitcherSheetProvider`), so their first
+  fetch can run before/without a session (RLS-filtered to empty), and
+  nothing about signing in or signing up itself calls `notifyChanged()` —
+  so the empty result stuck forever. Fixed by giving both the same
+  `session`-dependency treatment as `AccountContext`: `useAuth()` →
+  `userId = session?.user?.id` → included in the `refetch` `useCallback`
+  deps, guarded with an early "not signed in → empty, stop loading" return.
+  **Standing rule, generalized from the earlier single-instance note**: any
+  read hook whose `refetch` has no dependency that changes once auth
+  resolves (i.e., it doesn't depend on `activeAccountId` or similar)
+  *must* depend on `session`/`userId` directly, or it will silently never
+  recover from a pre-auth empty fetch. When adding a new global
+  (non-account-scoped) hook, check this first.
 
 ---
 
