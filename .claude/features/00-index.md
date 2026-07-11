@@ -366,3 +366,28 @@ declared in `expo-notifications`' own bundled Android manifest and merged in
 automatically — same mechanism as `expo-image-picker`'s storage permissions
 above. Not added to `blockedPermissions`; both are genuinely used by the new
 Bill/Daily reminder feature. If a future audit sees these, this is why.
+
+- **Bug fixed: Android hardware back button exited the app while any sheet
+  was open** (found via real on-device testing, 2026-07-11) — `@gorhom/
+  bottom-sheet` v5.2.14 has **no built-in Android back-button handling at
+  all** (confirmed: no `BackHandler` usage anywhere in the library's source).
+  With nothing intercepting the press, it fell through to `expo-router`/React
+  Navigation, and since Home is the root screen with nothing to pop to, that
+  meant the OS default: exit the app. Fixed with a new shared hook,
+  **`hooks/useSheetBackHandler.js`** — `const handleSheetChange =
+  useSheetBackHandler(modalRef); <BottomSheetModal onChange={handleSheetChange} ...>`.
+  It tracks the modal's own open/closed state via `onChange` (the only signal
+  `@gorhom/bottom-sheet` exposes for this) and registers a
+  `BackHandler.addEventListener('hardwareBackPress', ...)` that dismisses
+  *that* sheet and returns `true` only while it's actually open — every sheet
+  is mounted persistently (per the standing Provider/Context/`forwardRef`
+  pattern) so all of them register a listener, but RN's `BackHandler`
+  correctly invokes only the most-recently-registered one first, so only the
+  currently-open sheet (if any) intercepts the press; the rest return `false`
+  and let it fall through untouched. **Applied to all 11 sheets in the app**
+  (`AddTransactionSheet`, `AddBudgetSheet`, `AddPlanSheet`, `AddBillSheet`,
+  `PayBillSheet`, `AddCategorySheet`, `AddAccountSheet`,
+  `AccountSwitcherSheet`, `EditProfileSheet`, `MenuSheet`, `AlertsSheet`).
+  **Standing rule**: every new sheet must wire this hook — it's not
+  optional/cosmetic, it's the only thing standing between a back-press and an
+  unwanted app exit.

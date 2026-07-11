@@ -198,16 +198,27 @@ export function useAddThingSheet() {
 
 const AddThingSheet = forwardRef(function AddThingSheet(_props, ref) {
   const modalRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(modalRef); // see note below — required, not optional
   useImperativeHandle(ref, () => ({
     open(existing) { /* seed form state, then */ modalRef.current?.present(); },
   }));
-  // BottomSheetModal with snapPoints, backdrop, dark (colors.ink) background
-  // matching AddBudgetSheet.js exactly for visual consistency
+  // <BottomSheetModal ref={modalRef} onChange={handleSheetChange} ...>
+  // snapPoints, backdrop, dark (colors.ink) background matching
+  // AddBudgetSheet.js exactly for visual consistency
 });
 ```
 
 Providers are mounted once near the app root (see `app/_layout.js`) so
 `openAddThing(...)` is callable from anywhere without prop-drilling.
+
+**`useSheetBackHandler(modalRef)` is mandatory on every sheet, not
+optional polish.** `@gorhom/bottom-sheet` v5 has no built-in Android
+hardware-back handling at all — without this hook wired to the modal's
+`onChange`, pressing the Android back button while the sheet is open falls
+through to `expo-router`, and since Home is the root screen with nothing to
+pop to, that means the OS exits the whole app. Found via real on-device
+testing (2026-07-11) and fixed on all 11 existing sheets — see the standing
+rule in `00-index.md`. Every new sheet must include it from the start.
 
 **When to reach for a sheet vs a pushed screen**: a sheet is for a quick,
 single-purpose create/edit form the user dismisses in a few seconds
