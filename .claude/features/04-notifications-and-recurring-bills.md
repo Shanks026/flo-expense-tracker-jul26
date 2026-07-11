@@ -75,7 +75,7 @@ Phase 6 — Bell notification center
 
 ---
 
-## Phase 1 — Toast System
+## Phase 1 — Toast System ✅ Complete
 
 ### Goal
 The app gains a transient, auto-dismissing banner ("toast") that any screen or
@@ -169,15 +169,28 @@ components/
 - No OS notifications, no persistence, no bell inbox.
 
 ### 1.7 Phase 1 Checklist — Before Marking Complete
-- [ ] `components/Toast.js` exports `ToastProvider`, `useToast`, mounted in `_layout.js`.
-- [ ] `useToast()` throws a clear error if used outside the provider (matches other contexts).
-- [ ] A toast appears on transaction save/update/delete and auto-dismisses.
-- [ ] Toasts stack (≤3), tap-to-dismiss works, host never blocks touches beneath it.
-- [ ] Variants render distinct colors/icons from `tokens.js` (no inline hex).
-- [ ] Save/delete errors surface as an error toast.
-- [ ] `npx expo export --platform android` bundles cleanly.
+- [x] `components/Toast.js` exports `ToastProvider`, `useToast`, mounted in `_layout.js`.
+- [x] `useToast()` throws a clear error if used outside the provider (matches other contexts).
+- [x] A toast appears on transaction save/update/delete and auto-dismisses.
+- [x] Toasts stack (≤3), tap-to-dismiss works, host never blocks touches beneath it.
+- [x] Variants render distinct colors/icons from `tokens.js` (no inline hex, aside from `rgba()` alpha-overlays for the icon badge — an established pattern already used in `IconTile.js`/`settings.js`).
+- [x] Save/delete errors surface as an error toast.
+- [x] `npx expo export --platform android` bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- No deviations from the plan. `components/Toast.js` built from scratch
+  (`Animated` slide-down + fade, no library), mounted in `app/_layout.js`
+  wrapping `BottomSheetModalProvider` per the plan (inside `AccountProvider`).
+- `AddTransactionSheet.js`: save/delete failures now show an error toast
+  instead of the old inline `error` text; the "Enter an amount" client-side
+  validation still uses inline `error` (kept, as planned — it's about an
+  unsubmitted field, not a request failure).
+- Icon badge on `ToastItem` uses a translucent overlay (`rgba(0,0,0,0.06)` on
+  light variants, `rgba(255,255,255,0.16)` on the dark `info` variant) since a
+  flat token color would either vanish against the tinted background or clash
+  — this is the same technique `IconTile.js` already uses, not a new pattern.
 
 ---
 
