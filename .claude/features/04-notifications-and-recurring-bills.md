@@ -194,7 +194,7 @@ components/
 
 ---
 
-## Phase 2 — Smart Budget/Plan Toasts
+## Phase 2 — Smart Budget/Plan Toasts ✅ Complete
 
 ### Goal
 When the user saves an **expense**, if that expense pushes a relevant budget to
@@ -269,14 +269,33 @@ additive.)
 - No income/refund alerts. No plan-nearing (only strictly over target).
 
 ### 2.7 Phase 2 Checklist — Before Marking Complete
-- [ ] `lib/alerts.js` exports `budgetToastForSave` and `planToastForSave`.
-- [ ] Saving an expense that pushes a category or overall budget to ≥80% toasts a warn.
-- [ ] Saving an expense to a plan past its target toasts a warn.
-- [ ] No toast when under all thresholds; no threshold toast on edits/income.
-- [ ] Sheet still dismisses immediately (no visible lag from the extra reads).
-- [ ] Bundles cleanly.
+- [x] `lib/alerts.js` exports `budgetToastForSave` and `planToastForSave`.
+- [x] Saving an expense that pushes a category or overall budget to ≥80% toasts a warn.
+- [x] Saving an expense to a plan past its target toasts a warn.
+- [x] No toast when under all thresholds; no threshold toast on edits/income.
+- [x] Sheet still dismisses immediately (no visible lag from the extra reads).
+- [x] Bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- No deviations from the plan. `lib/alerts.js` queries `v_budgets_with_spent`
+  filtered to `account_id` + (`category_id = categoryId` OR `category_id IS
+  NULL`) via a single PostgREST `.or()` call, picks the most-severe result
+  (`over` beats `warn`) using the existing `budgetStatus` helper from
+  `useBudgets.js`, and separately checks the attached plan's
+  `v_plans_with_totals` row against its `target_amount`.
+- `AddTransactionSheet.handleSave`: the success toast still fires immediately
+  after `dismiss()`; the two threshold reads run after that, so the sheet
+  closes with no perceptible delay and the warn toast(s) simply appear a beat
+  later, stacking on top of the success toast (Phase 1's 3-toast queue).
+- As flagged in the plan, this toasts on every warn/over save, not just the
+  crossing — confirmed with the user as acceptable for v1 (repetitive-toast
+  concern was raised during planning and explicitly deferred, not revisited
+  during implementation).
+- Not wired into `AddBudgetSheet`/`AddPlanSheet`/`AddAccountSheet` — per
+  Phase 1's precedent, only Add Transaction is a tracked deliverable; other
+  sheets pick up `useToast()` opportunistically.
 
 ---
 
