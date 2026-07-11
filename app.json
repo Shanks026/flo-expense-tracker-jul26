@@ -21,7 +21,12 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#BBDC12"
       },
-      "package": "com.anonymous.flo"
+      "package": "com.anonymous.flo",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,9 +41,18 @@
         "expo-share-intent",
         {
           "disableIOS": true,
-          "androidIntentFilters": ["text/*"]
+          "androidIntentFilters": [
+            "text/*"
+          ]
         }
-      ]
-    ]
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "080548cb-69f6-469e-a3da-38cac92c7b9c"
+      }
+    }
   }
 }
