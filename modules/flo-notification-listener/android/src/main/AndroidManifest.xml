@@ -1,0 +1,39 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Merged into the app's final manifest by AGP's standard library-manifest
+      merger — the same mechanism expo-notifications relies on for its own
+      bundled POST_NOTIFICATIONS/RECEIVE_BOOT_COMPLETED declarations (see
+      00-index.md). No config plugin is needed for this element.
+
+      android:permission restricts binding to the system itself — Android
+      only lets the OS bind a NotificationListenerService holding this
+      permission, regardless of android:exported. exported="true" is required
+      because the service declares an intent-filter (mandatory as of API 31+),
+      not because arbitrary apps can bind to it.
+
+      Fully-qualified android:name (not ".FloNotificationListenerService") to
+      avoid any ambiguity in how the merger resolves relative names against
+      this fragment's namespace vs. the app's final package.
+    -->
+    <service
+      android:name="com.anonymous.flo.detect.FloNotificationListenerService"
+      android:label="FLO Transaction Detection"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
+
+    <!--
+      Handles the "Not mine" action on a detected-transaction prompt
+      (PromptNotifier). exported="false" — only reachable via the PendingIntent
+      this app creates for its own notification, not by any other app sending
+      the same broadcast action directly.
+    -->
+    <receiver
+      android:name="com.anonymous.flo.detect.DismissDetectionReceiver"
+      android:exported="false" />
+  </application>
+</manifest>

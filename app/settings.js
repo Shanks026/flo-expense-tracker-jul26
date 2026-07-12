@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Landmark, Trash2, TriangleAlert } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
@@ -21,8 +21,27 @@ import {
   getPermissionStatus,
   rescheduleAll,
 } from '../lib/notifications';
+import {
+  isSupported as isDetectSupported,
+  hasNotificationAccess,
+  openNotificationAccessSettings,
+  isDetectionEnabled,
+  setDetectionEnabled,
+  setAllowedPackages,
+  DEFAULT_ALLOWED_PACKAGES,
+} from '../lib/detect';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
+
+// Human-readable labels for DEFAULT_ALLOWED_PACKAGES (lib/detect.js) — this
+// is a read-only display list (06-transaction-auto-detect.md Phase 3: "no
+// user-editable allowlist UI this round"), so it only needs to be readable,
+// not exhaustive of every package field.
+const WATCHED_APP_LABELS = {
+  'com.google.android.apps.nbu.paisa.user': 'Google Pay',
+  'com.phonepe.app': 'PhonePe',
+  'net.one97.paytm': 'Paytm',
+};
 
 export default function Settings() {
   const router = useRouter();
@@ -41,6 +60,16 @@ export default function Settings() {
   const [billReminders, setBillReminders] = useState({ enabled: true, daysBefore: 2 });
   const [permissionBlocked, setPermissionBlocked] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Transaction Detection (06-transaction-auto-detect.md). Notification
+  // access is granted outside the app (system settings), with no callback —
+  // same reason getPermissionStatus() exists for OS notifications below —
+  // so this re-checks on mount AND on every foreground (AppState → active),
+  // not just mount: a pushed screen like Settings doesn't remount when the
+  // app merely backgrounds to system settings and comes back via the OS
+  // back gesture, only when actually popped.
+  const [detectAccess, setDetectAccess] = useState(false);
+  const [detectEnabled, setDetectEnabled] = useState(false);
 
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
@@ -66,6 +95,27 @@ export default function Settings() {
       }
     });
   }, []);
+
+  const refreshDetectStatus = useCallback(() => {
+    setDetectAccess(hasNotificationAccess());
+    setDetectEnabled(isDetectionEnabled());
+  }, []);
+
+  useEffect(() => {
+    refreshDetectStatus();
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refreshDetectStatus();
+    });
+    return () => subscription.remove();
+  }, [refreshDetectStatus]);
+
+  function handleToggleDetect(value) {
+    if (value) {
+      setAllowedPackages(DEFAULT_ALLOWED_PACKAGES);
+    }
+    setDetectionEnabled(value);
+    setDetectEnabled(value);
+  }
 
   async function sync(nextEnabled, nextDaily, nextBillReminders) {
     await rescheduleAll({
@@ -263,6 +313,43 @@ export default function Settings() {
           />
         )}
 
+        <Text style={styles.sectionLabel}>Transaction Detection</Text>
+        <Card style={styles.rowsCard}>
+          {!isDetectSupported() ? (
+            <View style={styles.row}>
+              <Text style={styles.permissionHint}>Needs a development build, not Expo Go.</Text>
+            </View>
+          ) : (
+            <>
+              <Pressable style={[styles.row, styles.rowBorder]} onPress={openNotificationAccessSettings}>
+                <View style={styles.rowIcon}>
+                  <Landmark size={20} color={colors.ink} strokeWidth={2} />
+                </View>
+                <Text style={styles.rowTitle}>Notification access</Text>
+                <Text style={styles.rowValue}>{detectAccess ? 'Granted' : 'Tap to grant'}</Text>
+              </Pressable>
+
+              <View style={[styles.row, detectEnabled && styles.rowBorder, !detectAccess && styles.rowDisabled]}>
+                <View style={styles.rowIcon}>
+                  <Bell size={20} color={colors.ink} strokeWidth={2} />
+                </View>
+                <Text style={styles.rowTitle}>Enable detection</Text>
+                <Switch value={detectEnabled} onValueChange={handleToggleDetect} disabled={!detectAccess} />
+              </View>
+
+              {detectEnabled && (
+                <View style={styles.watchedAppsRow}>
+                  <Text style={styles.watchedAppsText}>
+                    Watches {Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit
+                    alerts, so FLO can prompt you to log them. Never reads SMS or any other
+                    app's notifications.
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </Card>
+
         <Pressable style={styles.deleteButton} onPress={() => { setDeleteError(null); setConfirmVisible(true); }}>
           <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
           <Text style={styles.deleteText}>Delete Account</Text>
@@ -455,6 +542,17 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
     color: colors.ink,
+  },
+  watchedAppsRow: {
+    paddingLeft: 52,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.md,
+  },
+  watchedAppsText: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    lineHeight: 18,
   },
   daysBeforeGroup: {
     flexDirection: 'row',

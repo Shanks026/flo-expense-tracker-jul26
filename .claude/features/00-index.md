@@ -80,6 +80,8 @@ data model.
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
 | 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 All 3 phases implemented; awaiting on-device verification (no device in this environment) |
 | 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | ✅ Complete (all 6 phases built); pending on-device verification of Phase 5's notifications (needs a new EAS build — native module) |
+| 05 | `05-koban-engagement.md` | Koban the maneki-neko: escalating/varied reminder copy, heads-up channels, basic streaks | 📋 Planned — `lib/streak.js` written; **deliberately sequenced after 06** (auto-detect is the higher-value feature) |
+| 06 | `06-transaction-auto-detect.md` | Bank/UPI notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | 🚧 **All 3 phases built, awaiting one combined on-device test** (deliberately combined per user request, not phase-by-phase — see doc's Phase 2 Implementation Notes) — `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. No Android SDK in the build environment — nothing Gradle/Kotlin-compile-dependent has been verified yet |
 
 ---
 

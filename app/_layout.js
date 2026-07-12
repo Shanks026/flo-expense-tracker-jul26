@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -14,7 +15,7 @@ import {
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider } from '../lib/AccountContext';
-import { ToastProvider } from '../components/Toast';
+import { ToastProvider, useToast } from '../components/Toast';
 import { AddTransactionSheetProvider, useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { AddBudgetSheetProvider } from '../components/AddBudgetSheet';
 import { AddPlanSheetProvider } from '../components/AddPlanSheet';
@@ -30,6 +31,7 @@ import { AlertsSheetProvider } from '../components/AlertsSheet';
 import useIncomingShare from '../hooks/useIncomingShare';
 import { parseTransactionSms } from '../lib/smsParser';
 import { useNotificationSync } from '../lib/notifications';
+import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -54,6 +56,52 @@ function ShareIntentHandler() {
 // notifications in sync with live bills/settings and handles tap routing.
 function NotificationSync() {
   useNotificationSync();
+  return null;
+}
+
+// Sibling of <Stack>, same placement/reason as ShareIntentHandler — drains
+// the native detection queue (06-transaction-auto-detect.md) on cold start
+// and whenever the app returns to the foreground, since a bank notification
+// may have arrived while FLO was closed. Guarded on session for the same
+// reason ShareIntentHandler is: opening the sheet over the sign-in screen
+// with no categories/account loaded would be broken, not just unhelpful.
+//
+// Only the first pending detection is opened. If more than one arrived, the
+// rest are surfaced as a toast, not queued — AddTransactionSheet has no
+// dismiss callback to open() against, and adding one is out of scope here
+// (see the doc's 3.5: "AddTransactionSheet — None — don't add a new open()
+// shape"). This is the doc's own pre-authorized fallback; the tradeoff is
+// real and worth being honest about: any "N more" beyond the first are
+// dropped from the queue, not persisted — the toast is the only record, and
+// the user re-enters those manually. Multiple detections between one app
+// open and the next should be rare.
+function DetectedTransactionHandler() {
+  const { session } = useAuth();
+  const { openAdd } = useAddTransactionSheet();
+  const { showToast } = useToast();
+
+  const drain = useCallback(() => {
+    if (!session) return;
+    if (!isDetectionEnabled() || !hasNotificationAccess()) return;
+
+    const pending = drainDetections();
+    if (!pending.length) return;
+
+    const [first, ...rest] = pending;
+    openAdd({ amount: first.amount, type: first.type });
+    if (rest.length) {
+      showToast({ message: `${rest.length} more detected — add them manually`, variant: 'info' });
+    }
+  }, [session, openAdd, showToast]);
+
+  useEffect(() => {
+    drain();
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') drain();
+    });
+    return () => subscription.remove();
+  }, [drain]);
+
   return null;
 }
 
@@ -92,6 +140,7 @@ function RootNavigator() {
                                 <AlertsSheetProvider>
                                   <ShareIntentHandler />
                                   <NotificationSync />
+                                  <DetectedTransactionHandler />
                                   <DueBillsModal />
                                   <Stack screenOptions={{ headerShown: false }} />
                                 </AlertsSheetProvider>
