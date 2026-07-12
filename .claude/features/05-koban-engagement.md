@@ -112,13 +112,22 @@ Phase 3 — Koban's voice (copy engine + rolling scheduler)
   notifications, split into the Nudge/Recap lanes Phase 1 already built.
   This is "the notifications" being done, in the user's words.
 
-Phase 4 — Mascot (illustrated icon) — LAST, deprioritized
+Phase 4 — In-app streak display (added 2026-07-12, after Phase 2/3 shipped
+  with no visible surface)
+  A compact 30-day strip on Home (below the balance hero) + a full-page,
+  Duolingo-style celebration on the day's first transaction, animated with
+  react-native-reanimated (already a dependency, no new library). Reuses
+  pickRecap for text — one voice, two surfaces. lib/streak.js's
+  computeStreak gains a `history` field; no other data-layer change needed,
+  exactly why Phase 2 was built the way it was.
+
+Phase 5 — Mascot (illustrated icon) — LAST, deprioritized
   Blocked on user-supplied artwork ("i will come up with illustrations").
   No code work until art exists; when it does, it's one app.json plugin
   option + a rebuild. Not scheduled until the user brings the asset.
 
-Phase 5 — Docs wrap-up
-  00-index.md rollup once Phases 1-3 are actually built.
+Phase 6 — Docs wrap-up
+  00-index.md rollup once Phases 1-4 are actually built.
 ```
 
 **After each phase: stop and wait for approval before proceeding.**
@@ -377,6 +386,87 @@ but that can't be confirmed without seeing the *actual* GPay/bank notification
 text, which nothing was recording. That's precisely what "What FLO has seen"
 above now captures. **Next step: user triggers a transaction, reads that log,
 and reports the raw title/text + the parser's verdict.**
+
+### Post-Phase-1 Round 2: scheduled but never delivered — OEM battery killer, not a code bug (2026-07-12)
+
+User report: **"Show scheduled" lists the daily reminder correctly, but it never
+fires. Bills likely have the same problem."** Investigated by re-reading the
+native scheduling source directly, not by guessing.
+
+**Confirmed by code, not assumption**: both the daily reminder and bill
+reminders schedule through the identical native path —
+`Notifications.scheduleNotificationAsync()` → expo-notifications'
+`ExpoSchedulingDelegate.setupAlarm()`
+(`node_modules/expo-notifications/android/.../delegates/ExpoSchedulingDelegate.kt:105-119`):
+
+```kotlin
+private fun setupAlarm(triggerAtMillis: Long, operation: PendingIntent) {
+  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+    AlarmManagerCompat.setExactAndAllowWhileIdle(...)
+  } else {
+    AlarmManagerCompat.setAndAllowWhileIdle(...)  // ← the only branch FLO ever hits
+  }
+}
+```
+
+FLO deliberately does not hold `SCHEDULE_EXACT_ALARM` (Google Play restricts it
+to alarm-clock/calendar-category apps), so every local notification — daily
+reminder **and** bill reminders, no exception — uses the **inexact** branch,
+which Android is free to defer or drop entirely.
+
+**The diagnostic signal that points at the specific cause**: the 3-second
+"Send test notification" button fired correctly (confirmed when the user
+reported the heads-up banner working), but an hours-out alarm never arrived at
+all — not just late. Short-interval delivery working while longer-delay
+delivery silently fails is the signature of an **OEM-level background-process
+killer**, not inexact-alarm lateness alone: the user's phone (iQOO, OriginOS —
+a Vivo sub-brand) is one of the more aggressive ones documented at
+[dontkillmyapp.com/vivo](https://dontkillmyapp.com/vivo). These skins run their
+own battery/process manager **on top of** stock Android Doze/App Standby, with
+no public API — it can kill a correctly-scheduled `AlarmManager` alarm
+regardless of what the Android API promised, unless the app is manually
+whitelisted through the OEM's own settings.
+
+**What was added — the one thing that's actually fixable from code**:
+Settings → Notifications → **"Battery settings"** deep-links to
+`android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS` (via React Native's
+`Linking.sendIntent`, already used nowhere else in this codebase but a real,
+documented RN API — verified against `node_modules/react-native/Libraries/Linking/Linking.js`
+before using it). This opens Android's own battery-optimization list so the
+user can set FLO to "Don't optimize."
+
+Deliberately **not** implemented: `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+(the direct exemption *request* dialog) — that needs its own manifest
+permission (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) which Google Play
+scrutinizes with a declared-use review, comparable to the notification-listener
+permission in `06-transaction-auto-detect.md`. The settings-list deep-link
+needs no special permission at all — same "link to a system screen, nothing
+new to declare" pattern as `openNotificationAccessSettings()`.
+
+**What code cannot fix, recorded so it isn't re-investigated as a bug later**:
+Vivo/iQOO's OriginOS layers a *separate*, proprietary background-process killer
+with no public Android API — `IGNORE_BATTERY_OPTIMIZATION_SETTINGS` only
+affects stock Android's Doze, not this second layer. There is no intent action
+to deep-link directly into it (confirmed via research — this is exactly why
+dontkillmyapp.com gives manual menu paths instead of a button). The user needs
+to manually configure, wording varies by OriginOS version:
+- **Settings → Battery → High background power consumption** → allow FLO
+- **Settings → Apps (or More settings → Applications) → Autostart** → enable FLO
+- Optionally: lock FLO in the Recents/task switcher (swipe up, tap the lock icon)
+
+**Standing implication for this whole feature**: local scheduled notifications
+on this class of device are inherently best-effort beyond a few seconds/minutes
+out, **regardless of anything FLO's code does** — this isn't unique to the
+daily reminder or bills, it would affect any future notification type the same
+way. Worth remembering before spending more time chasing "why didn't it fire"
+as if it were a FLO logic bug, once the two settings above are confirmed
+configured.
+
+**Not yet answered**: whether the 3-second test notification *reliably* fires
+every time (confirming short-interval delivery is solid and this is purely a
+long-delay/OEM-killer issue), or whether it was a one-off success. Worth the
+user re-confirming once the battery settings above are configured, to see if
+the daily reminder starts arriving.
 
 ---
 
@@ -763,23 +853,268 @@ None. Same `data.route` payloads, same tap-routing, untouched.
 - No gamification beyond the basic escalation ladder — same deferral as Phase 2.
 
 ### 3.7 Phase 3 Checklist — Before Marking Complete
-- [ ] `lib/koban.js` exports `pickNudge` / `pickRecap`; ≥5 lines per tier; no tier can produce "don't break your streak" when `current === 0`.
-- [ ] The `isNewStreak` recap says **"Day 0,"** not "Day 1."
-- [ ] `rescheduleAll` schedules a rolling 30-day window of `DATE` triggers onto Phase 1's channels; the repeating `DAILY` trigger is gone.
-- [ ] Logged today → today's slot is a **Recap** with both spend and income; not logged → a **Nudge**.
-- [ ] Copy escalates with projected silence across the window (day+1 ≠ day+7 tier).
-- [ ] Adding a transaction reschedules (the `version` dep) and flips today's slot to Recap.
-- [ ] Bill reminders still schedule correctly alongside the window.
-- [ ] Expo Go guard intact — app still boots in Expo Go (no `expo-notifications` top-level import).
-- [ ] Money helper hoisted; no fourth copy added.
-- [ ] Verified with a throwaway `node` script asserting the tier ladder + lane swap.
-- [ ] Bundles cleanly.
+- [x] `lib/koban.js` exports `pickNudge` / `pickRecap`; 5 lines per tier; no tier can produce "don't break your streak" when `current === 0` — **and, caught during implementation, `never_started` (`daysSinceLastLog === Infinity`) is now its own tier, separate from `silent_7_plus`**, so a brand-new user never sees "the lucky cat is not feeling lucky" guilt-copy meant for someone who *stopped*, not someone who never began.
+- [x] The `isNewStreak` recap says **"Day 0,"** not "Day 1" — verified.
+- [x] `rescheduleAll` schedules a rolling 30-day window of `DATE` triggers onto Phase 1's channels; the repeating `DAILY` trigger is gone.
+- [x] Logged today → today's slot is a **Recap** with both spend and income; not logged → a **Nudge**.
+- [x] Copy escalates with projected silence across the window (day+1 ≠ day+7 tier) — verified.
+- [x] Adding a transaction reschedules (the `version` dep, added explicitly to `useNotificationSync` rather than relied on indirectly — see Implementation Notes) and flips today's slot to Recap.
+- [x] Bill reminders still schedule correctly alongside the window — unchanged code path.
+- [x] Expo Go guard intact — no top-level `expo-notifications` import; new imports (`useAuth`, `useDataRefresh`, `fetchStreak`) are all pure-JS/React, no native side effects.
+- [x] Money helper hoisted to `lib/money.js`; `lib/alerts.js`, `hooks/useAlerts.js`, `lib/notifications.js` all import it — no fourth copy added.
+- [x] **Verified with a throwaway `node` script — 25 assertions across 11 scenarios, all passing.** Required extracting the projection logic into a pure `buildReminderPlan()` (see Implementation Notes) since the original design embedded it directly inside `rescheduleAll`, which depends on the native `Notifications` module and can't run in plain Node — the doc's own checklist item was unsatisfiable without this refactor.
+- [x] `npx tsc --noEmit` passes; `npx expo export --platform android` bundles cleanly (3973 modules).
+- [ ] Bundles cleanly natively — no Android SDK in this environment; needs your build, same boundary as every other native-adjacent phase.
 
 **→ Stop here. Show the result and wait for approval.**
 
+### Implementation Notes
+
+- **A real design bug caught and fixed before it shipped — the projection
+  model.** The original plan's rolling-window pseudocode said: *"the projected
+  streak... is `streak.current` today, and `0` for every `i >= 1`."* Taken
+  literally, this discards a real, strong streak's "at risk" messaging the very
+  next day: someone on day 15 who logs today would have *tomorrow's*
+  notification (`i=1`) immediately drop to generic "Day 1 silent, curious"
+  copy, never mentioning the 15 days they'd actually be risking. Replaced with
+  the **"first silent day"** model: only the single projected day immediately
+  following a real logged day carries that streak's actual count; every day
+  beyond that resets to 0, since the streak would already be broken by then.
+  Verified directly by test 3 in the throwaway script (a 15-day streak's count
+  correctly appears in tomorrow's slot, and is gone by the day after).
+- **A second, related gap found while deriving the projection model**:
+  empirically confirmed (`node` repro under `TZ=Asia/Kolkata`, see the
+  finding) that `daysSinceLastLog === 1` *always* implies `current >= 1` —
+  the streak-counting loop's very first check, when nothing is logged today,
+  **is** yesterday, the same cell `daysSinceLastLog` measures from. This means
+  the original copy table's "1 day silent" tier (implicitly `current === 0`)
+  can never actually be reached for a same-day Nudge — whenever there's
+  exactly one silent day, there is structurally always a streak (even a
+  1-day one) at risk. `nudgeTier()` now checks `current > 0` **first**, ahead
+  of any `daysSinceLastLog`-keyed tier, so "streak at risk" always wins where
+  it should. The `silent_1` pool is kept (harmless, costs nothing) as a
+  defensive fallback in case this invariant ever changes, documented as such
+  in `lib/koban.js` rather than silently removed.
+- **Extracted `buildReminderPlan()` into `lib/koban.js`**, pure, no
+  Notifications/Supabase import — not in the original plan, but necessary: the
+  projection logic was originally going to live directly inside
+  `rescheduleAll`, which depends on the native `expo-notifications` module and
+  therefore cannot run in a plain `node` script. The doc's own Phase 3
+  checklist requires verifying "the tier ladder + lane swap" with a throwaway
+  script — that was impossible without this extraction. `rescheduleAll` is
+  also simpler as a result: it just iterates the plan and calls
+  `scheduleNotificationAsync`, no branching logic of its own.
+- **`rescheduleAll`'s signature changed again**, on top of the earlier
+  stale-settings fix: it now takes `{ bills, userId }`, not `{ bills,
+  settings, streak }` as the original (pre-stale-settings-bug) pseudocode in
+  this doc specified. Settings are read from AsyncStorage internally
+  (unchanged from the earlier fix); **streak is now fetched fresh internally
+  too**, via a new `fetchStreak(userId)` extracted from `hooks/useStreak.js` —
+  same reasoning as the settings fix: a scheduler that trusts a passed-in
+  streak snapshot instead of reading live state will eventually schedule
+  against data that's no longer true. `userId` is the one thing that
+  genuinely must come from the caller (there's no "storage" for auth state to
+  read); both call sites (`useNotificationSync`, `app/settings.js`'s `sync()`)
+  already had `session` in scope.
+- **`version` added explicitly to `useNotificationSync`'s effect deps**, per
+  Architecture D, rather than relying on `useBills()`'s array reference
+  changing on every refetch (which it does today, incidentally — but that's
+  an implementation detail of `useBills`, not a contract, and a future
+  memoization of that hook could silently break an implicit dependency on it).
+  An explicit dependency on the actual signal is more robust than one that
+  happens to work today.
+- **`pickRecap` seeds its within-tier random pick from days-since-epoch**, not
+  a caller-supplied `dayIndex` the way `pickNudge` does — a Recap only ever
+  schedules for *today's* single slot (there's no "window position" to seed
+  from), so a fixed seed would otherwise always pick the same line, defeating
+  the point of having multiple lines at all.
+- No other deviations from the plan.
+
 ---
 
-## Phase 4 — Mascot (illustrated icon) — LAST, deprioritized
+## Phase 4 — In-App Streak Display
+
+> **Added 2026-07-12, after Phase 2/3 shipped with no visible surface.** The
+> user tested by creating an account and logging a transaction, expecting to
+> *see* something, and found nothing — a legitimate gap: `useStreak()` was
+> (and until this phase, remains) rendered nowhere in `app/` or `components/`.
+> This phase is the "Animated Home streak UI" both `05-koban-engagement.md`'s
+> and `FEATURE_PLAN.md`-adjacent docs previously listed as explicitly
+> deferred (*"streaks actually need a lot of research"*) — now unblocked by
+> the user's direct request, with Duolingo named as the reference point.
+
+### Goal
+Two pieces, both reading `useStreak()` — the data layer needed **zero**
+changes for this, exactly as Phase 2 was designed to allow:
+
+1. **A compact strip on Home**, near the top (below the balance hero card) —
+   current streak number + a horizontally-scrollable 30-day history (filled
+   cell = logged that day, empty = not), always visible, no interaction
+   required to see it.
+2. **A full-page celebration**, Duolingo-style — fires the moment the user's
+   *first* transaction of the day is saved (whichever entry point: ⊕ tab,
+   share-intent, auto-detect, `markBillPaid`), showing "Day 0 — you started a
+   streak" / "Day N — streak continues" with an animated calendar reveal (the
+   trailing up-to-7 days checking off in sequence), then dismisses back into
+   the app.
+
+### Before Starting — Confirm With Codebase
+1. Re-read `components/DueBillsModal.js` in full — it's the closest existing
+   pattern for "a root-mounted component that reactively watches a hook and
+   shows itself at most once per day," including the exact AsyncStorage
+   gating shape (`flo.dueBills.lastShown`, a `yyyy-MM-dd` string, shown only
+   if stored date < today). This phase's celebration trigger copies that
+   pattern under a new key, not a new mechanism.
+2. Confirm `react-native-reanimated` (`~4.1.1`) is already a dependency — no
+   new animation library needed. No Lottie, no new deps.
+3. Re-read `lib/koban.js`'s `pickRecap` — the celebration reuses it for
+   title/body text (same voice, same tier logic: `isNewStreak`/`isMilestone`/
+   ongoing), rather than writing a second, parallel copy pool. The visual
+   calendar-reveal is the new part; the words aren't.
+4. Confirm `app/(tabs)/index.js`'s current top section (header → hero balance
+   card → chart) — the strip inserts between the hero card and the chart.
+
+### 4.1 Database
+No database changes. Everything here reads `useStreak()`, already computed
+from `transactions.created_at` — no new fields, no stored celebration state
+beyond a single AsyncStorage "last celebrated" date (device-local, same class
+as `flo.dueBills.lastShown` and the notification-settings keys — not
+synced, not in Postgres).
+
+### 4.2 Data Layer
+
+```
+lib/streak.js   ← EXTEND. computeStreak gains a `history` field.
+```
+
+`computeStreak`'s return gains:
+```js
+history: [{ date: 'yyyy-MM-dd', logged: boolean }]  // oldest → newest, last 30 calendar days including today
+```
+Built from the same `days` Set the function already computes internally — no
+new query, no new hook. `hooks/useStreak.js` needs **no changes**; its spread
+return (`{ ...streak, loading, refetch }`) already carries `history` through
+once `computeStreak` returns it.
+
+**Trigger logic for the celebration — reactive, not called from each
+save site.** Watch `useStreak()`'s `loggedToday` at the app root, the same way
+`DueBillsModal` watches `useBills()`. This is deliberate: `AddTransactionSheet`,
+share-intent, auto-detect's `DetectedTransactionHandler`, and `markBillPaid`
+are four different call sites that can create the day's first transaction —
+duplicating "check and celebrate" logic into all four would be the wrong
+place to put it. A single reactive watcher fires regardless of which path
+created the transaction, and doesn't care that there are four.
+
+### 4.3 Components
+
+```
+components/
+  StreakCalendar.js     ← NEW. Compact Home strip.
+  StreakCelebration.js  ← NEW. Root-mounted, full-page, reactive.
+```
+
+**`StreakCalendar`** — plain functional component, `useStreak()` internally,
+no props. Current streak number/label at the top (reuses the existing
+Card/Home visual language — no new styling system), then a horizontally
+scrollable row of 30 small cells from `history`, today's cell visually
+distinct (border or the brand lime fill) from past logged/unlogged cells.
+Read-only — no tap interaction in v1 (a cell showing its date on tap is a
+reasonable v2, not required now).
+
+**`StreakCelebration`** — mirrors `DueBillsModal`'s shape exactly:
+- `useAuth()` for `session` (guard: only act when signed in).
+- `useStreak()` for `loggedToday`/`current`/`isNewStreak`/`isMilestone`/`todayTotals`.
+- AsyncStorage key `flo.streak.lastCelebrated` (`yyyy-MM-dd`) — on `loggedToday`
+  becoming `true`, check the stored date; if it's not today, show the
+  celebration and write today's date. This is what stops it from re-firing on
+  the 2nd, 3rd, ... transaction logged the same day, and from replaying every
+  time the app reopens after already being shown once today.
+- Full-screen `Modal` (not a centered card like `DueBillsModal` — this one
+  should feel like an event, not a prompt). Content: title/body from
+  `pickRecap()` (same function Phase 3's notification already calls — one
+  voice, two surfaces), and an animated reveal of the trailing
+  `Math.min(streak.current, 7)` days from `history`, each cell entrance
+  staggered via `react-native-reanimated`'s built-in entrance animations
+  (`FadeIn`/`ZoomIn` with per-index `.delay(i * N)` — no custom Lottie
+  asset, no new dependency). A single dismiss button ("Nice!" / "Continue").
+
+### 4.4 Navigation / Integration
+- `app/_layout.js`: mount `<StreakCelebration />` as a sibling near
+  `<DueBillsModal />` — same provider-nest placement reasoning (needs
+  `useAddTransactionSheet`-adjacent context depth for consistency, though it
+  doesn't itself open a sheet).
+- `app/(tabs)/index.js`: insert `<StreakCalendar />` between the hero balance
+  `Card` and the `IncomeExpenseChart` `Card`.
+
+### 4.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| `lib/streak.js` | `computeStreak` return gains `history` | Pure addition — existing fields (`current`, `loggedToday`, etc.) unchanged, so nothing that already reads the old shape breaks |
+| `app/(tabs)/index.js` | New section between hero and chart | Layout/spacing only — no existing section moves or changes behavior |
+| `app/_layout.js` | One more root-mounted sibling | Must guard on `session`, same as `DueBillsModal` |
+
+### 4.6 What This Phase Does NOT Include
+- No tap-to-see-date on calendar cells (v2 if wanted).
+- No celebration for the Nudge lane (not logged today) — celebrations are
+  exclusively a `loggedToday`-side thing, matching the governing principle:
+  reward the logging, not remind-and-celebrate in the same breath.
+- No settings toggle to disable the celebration. Revisit only if it proves
+  annoying in practice — the once-per-day gate already prevents the obvious
+  annoyance (repeated pop-ups per transaction).
+- No sound effects — Reanimated handles visual entrance only; no audio
+  library is a dependency of this app.
+
+### 4.7 Phase 4 Checklist — Before Marking Complete
+- [x] `computeStreak` returns `history`; verified with a throwaway `node` script — 9 assertions: 30 entries, oldest→newest, today last, gaps correctly marked false, late-night local-day boundary handled, `occurred_at` doesn't leak into it (only 1 day marked despite a backdated claim of 20).
+- [x] `StreakCalendar` renders on Home between the hero card and the chart; 30 cells (horizontally scrollable), today visually distinct (bordered).
+- [x] `StreakCelebration` reactively watches `loggedToday` (not a one-shot mount check like `DueBillsModal` — see Implementation Notes for why), so it fires from **any** entry point that creates the day's first transaction, without needing to duplicate trigger logic at each call site.
+- [x] AsyncStorage `flo.streak.lastCelebrated` gate — logging a 2nd/3rd transaction the same day does **not** re-trigger it; reopening later the same day does **not** replay it.
+- [x] Copy sourced from `pickRecap` — Day 0 for a new streak, milestone copy at 7/30/100, ordinary otherwise. Same function Phase 3's notification already calls — one voice, two surfaces, not a second copy pool.
+- [x] Guarded on `session` — signed-out state never triggers it.
+- [x] `npx tsc --noEmit` passes; `npx expo export --platform android` bundles cleanly (3975 modules).
+- [ ] **On-device** — no Android SDK in this environment; the animation timing, the full trigger-from-every-entry-point claim, and the visual result all need your device.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+
+- **Deliberately more reactive than `DueBillsModal`'s pattern, despite
+  copying its shape.** `DueBillsModal` gates its whole check behind a
+  `checkedRef` that only ever runs once per mount — correct for bills, whose
+  due-ness doesn't change *within* a session. Streak state does: logging the
+  day's first transaction happens *while the app is open*, flipping
+  `loggedToday` false→true mid-session. Using a one-shot ref here would mean
+  the celebration only ever fires on a fresh cold start, never right after
+  the triggering save. So the effect depends directly on `loggedToday`
+  instead, and the AsyncStorage date check is what does the "don't repeat"
+  job the ref was doing for `DueBillsModal`.
+- **Content is snapshotted at trigger time** (`contentRef.current`), not
+  re-read from `useStreak()` on every render while the modal is visible — if
+  another transaction landed while the celebration was still animating in
+  (unlikely but possible — auto-detect could theoretically queue a second
+  save moments later), the modal should keep describing whatever actually
+  triggered it, not silently mutate mid-animation.
+- **Reused `pickRecap` as-is**, no new copy pool — the celebration and
+  tonight's Recap notification (if the recap channel is what's showing rather
+  than a milestone escaping to the loud channel) now say the *same thing*, by
+  construction, not by keeping two pools in sync by hand.
+- **`Flame` (lucide) used for the streak icon, not a cat/paw glyph or
+  emoji.** No mascot artwork exists yet (Phase 5, blocked on user art), and
+  the app's own convention is lucide-only icons in rendered UI (emoji is used
+  in Koban's *notification* text only, a different surface with a different
+  convention). Flame is also the universally-recognized streak symbol
+  (Duolingo, Snapchat, etc.) — swapping it for a Koban-branded icon once
+  Phase 5 art exists is a one-line change, not a redesign.
+- **`react-native-reanimated`'s built-in entrance animations** (`ZoomIn`,
+  `FadeInDown`, chained `.delay()`/`.duration()`) — already a dependency, no
+  Lottie, no new library. The calendar cells stagger in via
+  `ZoomIn.delay(400 + i * 120)`, giving the "checking off in sequence" effect
+  the user asked for (Duolingo reference) without custom animation code.
+- No other deviations from the plan.
+
+---
+
+## Phase 5 — Mascot (illustrated icon) — LAST, deprioritized
 
 ### Goal
 The status bar wears Koban's actual face instead of a monochrome placeholder or
@@ -810,7 +1145,7 @@ to alarm and calling apps. The heads-up banner (already built, Phase 1) is the
 ceiling — and it's what Instagram actually uses for the case the user
 originally described.
 
-### Phase 4 Checklist — Before Marking Complete
+### Phase 5 Checklist — Before Marking Complete
 - [ ] `assets/notification-icon.png` present — 96×96, all-white, transparent.
 - [ ] `app.json` plugin updated with `icon` + `color`.
 - [ ] **On-device:** the status-bar icon is Koban's silhouette, not a white blob or the default app icon.
@@ -820,9 +1155,9 @@ originally described.
 
 ---
 
-## Phase 5 — Docs Wrap-Up
+## Phase 6 — Docs Wrap-Up
 
-Once Phases 1–3 are built and approved:
+Once Phases 1–4 are built and approved:
 - Update `00-index.md`: add this feature to the Feature Files table; add
   `useStreak`/`lib/streak.js`/`lib/koban.js` to Shared Infrastructure Notes;
   confirm the **`VIBRATE` un-block** (Phase 1) and the notification-channel
@@ -872,10 +1207,11 @@ deleted.
   single Day-0 origin case) — **explicitly deferred, the user's own call**:
   *"i will tell you my ideas for streaks and gamification once the
   notifications is done."* Phases 2–3 build the honest foundation only.
-- **Animated Home streak UI** — the user explicitly deferred it (*"streaks
-  actually need a lot of research"*). Phase 2 is built so this needs **no**
-  data-layer change when it lands: `useStreak()` already returns everything a UI
-  would want.
+- ~~Animated Home streak UI~~ — **no longer deferred; built as Phase 4**,
+  2026-07-12, after the user tested Phases 2–3 and found no visible surface at
+  all. Needed **zero** data-layer change beyond one additive field
+  (`history`) on `computeStreak` — exactly why Phase 2 was built the way it
+  was.
 - **An in-app "yesterday you spent ₹X" banner** — considered and **rejected**.
   Home already renders the balance hero, the income/expense chart, and recent
   transactions; a yesterday-specific card is a narrow slice of data already

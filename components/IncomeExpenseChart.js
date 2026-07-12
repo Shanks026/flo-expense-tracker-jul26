@@ -37,9 +37,15 @@ export default function IncomeExpenseChart({
   showPeriodLabel = false,
   periodLabel = 'Selected Period',
   emptyMessage,
+  // Kept as a prop, not a hardcoded default, so Home and Analytics can differ
+  // without touching each other: Home wants expense-first (a personal
+  // *expense* tracker's glanceable summary), Analytics is a data-exploration
+  // tool where showing both by default is still the right call. The default
+  // here preserves Analytics' existing behavior unchanged.
+  defaultVisible = { expense: true, income: true },
 }) {
   const [selectedIndex, setSelectedIndex] = useState(null);
-  const [visible, setVisible] = useState({ expense: true, income: true });
+  const [visible, setVisible] = useState(defaultVisible);
 
   const resolvedGranularity = range ? (range === '7d' ? 'day' : 'week') : granularity;
   const dayLabelFormat = resolvedGranularity === 'day' ? 'EEE' : 'd MMM';

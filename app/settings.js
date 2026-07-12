@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking, AppState, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking, AppState, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Landmark, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
@@ -175,7 +175,7 @@ export default function Settings() {
   // the stale-settings bug that forced this). So persist-then-sync is the
   // required order, not an incidental one.
   async function sync() {
-    await rescheduleAll({ bills });
+    await rescheduleAll({ bills, userId: session?.user?.id ?? null });
   }
 
   async function handleToggleNotifications(value) {
@@ -203,16 +203,23 @@ export default function Settings() {
   // Debug — shows what the OS actually has pending, so "my reminder didn't
   // fire" can be diagnosed instead of guessed at: present here but never
   // delivered = a delivery/Doze problem; absent = a scheduling/logic problem.
+  // Also the only practical way to verify Koban's copy engine
+  // (05-koban-engagement.md Phase 3) without waiting for real delivery —
+  // items are sorted soonest-first, so the top few are today's Nudge/Recap
+  // slot and the next several days, exactly what's worth reading to confirm
+  // the right lane/tier/streak-number was picked.
   async function handleShowScheduled() {
     const { unsupported, items } = await getScheduledSummary();
     if (unsupported) {
       showToast({ message: 'Needs a development build, not Expo Go', variant: 'error' });
       return;
     }
-    const body = items.length
-      ? items.map((i) => `• ${i.title}\n  ${i.when}\n  channel: ${i.channelId}`).join('\n\n')
+    const shown = items.slice(0, 8);
+    const body = shown.length
+      ? shown.map((i) => `${i.title}\n${i.body}\n${i.when} · ${i.channelId}`).join('\n\n───\n\n')
       : 'Nothing scheduled.\n\nIf you expected a daily reminder here, check that both the Notifications master toggle AND Daily Reminder are on.';
-    Alert.alert(`${items.length} scheduled`, body);
+    const suffix = items.length > shown.length ? `\n\n(+${items.length - shown.length} more not shown)` : '';
+    Alert.alert(`${items.length} scheduled`, body + suffix);
   }
 
   async function handleSendTest() {
@@ -222,6 +229,23 @@ export default function Settings() {
       return;
     }
     showToast({ message: 'Test notification in 3s — lock the screen or switch apps now', variant: 'info' });
+  }
+
+  // Deep-links to the OS battery-optimization LIST — not a direct
+  // exemption request (Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS),
+  // which needs its own manifest permission that Google Play scrutinizes
+  // similarly to notification-listener access. This needs no special
+  // permission at all — same "deep-link to a system screen" pattern as
+  // openNotificationAccessSettings() below. Only fixes stock Android's Doze;
+  // OEM skins (Vivo/iQOO's OriginOS especially) layer their own separate
+  // background-process killer on top with no public API — that part needs
+  // the user to configure manually (Settings > Battery > High background
+  // power consumption, and Settings > Apps > Autostart).
+  function handleOpenBatterySettings() {
+    if (Platform.OS !== 'android') return;
+    Linking.sendIntent('android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS').catch(() => {
+      Linking.openSettings();
+    });
   }
 
   async function handleToggleDaily(value) {
@@ -357,6 +381,20 @@ export default function Settings() {
             </View>
             <Text style={styles.rowTitle}>Show scheduled</Text>
             <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+          </Pressable>
+
+          <Pressable style={styles.row} onPress={handleOpenBatterySettings}>
+            <View style={styles.rowIcon}>
+              <BatteryWarning size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>Battery settings</Text>
+              <Text style={styles.rowHint}>
+                Reminders may be delayed or dropped by your phone's battery manager. Set FLO to
+                "Don't optimize" here — on Vivo/iQOO also check Settings → Battery → High
+                background power consumption, and Settings → Apps → Autostart.
+              </Text>
+            </View>
           </Pressable>
 
           <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
@@ -608,6 +646,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
     color: colors.ink,
+  },
+  rowHint: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    lineHeight: 18,
+    marginTop: 2,
   },
   rowValue: {
     fontFamily: fontFamily.extrabold,

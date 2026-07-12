@@ -51,6 +51,24 @@ protections when tested via a non-Play-Store build, not one:
    future feature needing this permission class, until the app ships via
    Google Play — at which point neither protection applies.
 
+**Standing rule — local scheduled notifications are best-effort on OEM Android
+skins, not a FLO bug** (added 2026-07-12, `05-koban-engagement.md`'s Post-Phase-1
+Round 2): FLO does not hold `SCHEDULE_EXACT_ALARM` (Play-restricted to
+alarm-clock apps), so every local notification — daily reminder, bill
+reminders, and anything scheduled the same way in the future — uses Android's
+**inexact** `AlarmManagerCompat.setAndAllowWhileIdle()`, which the OS is free to
+defer. On top of that, aggressive OEM skins (Vivo/iQOO's OriginOS confirmed;
+likely similar on Xiaomi/Oppo/OnePlus) run their **own** background-process
+killer with no public API, which can drop a correctly-scheduled alarm entirely
+regardless of what the Android API promised. Signature to recognize this,
+rather than re-debugging FLO's scheduling logic: a short-interval test
+notification (`sendTestNotification()` in `lib/notifications.js`) fires fine,
+but anything scheduled hours out silently never arrives. Settings → Notifications
+→ "Battery settings" deep-links to the fixable half (stock Android Doze
+exemption); the OEM-specific half (Vivo/iQOO: Settings → Battery → High
+background power consumption, and Settings → Apps → Autostart) has no
+programmatic fix and must be configured manually on-device.
+
 **Standing rule — `user_id DEFAULT auth.uid()`**: every existing table's
 `user_id` column has `DEFAULT auth.uid()` (`accounts`, `budgets`,
 `categories`, `plans`, `transactions` — confirmed live via
@@ -102,7 +120,7 @@ data model.
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
 | 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 All 3 phases implemented; awaiting on-device verification (no device in this environment) |
 | 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | ✅ Complete (all 6 phases built); pending on-device verification of Phase 5's notifications (needs a new EAS build — native module) |
-| 05 | `05-koban-engagement.md` | Notification visibility fix → transaction-based streaks → Koban's escalating/varied reminder copy → mascot icon (last, blocked on user art) | 🚧 **Phase 1 built** (heads-up channels: nudge/recap/bills, `VIBRATE` unblocked, `AGENTS.md` fixed) — awaiting on-device confirmation, no Android SDK here. Phase 2 (streak foundation) next; `lib/streak.js` already written |
+| 05 | `05-koban-engagement.md` | Notification visibility fix → transaction-based streaks → Koban's escalating/varied reminder copy → in-app streak display → mascot icon (last, blocked on user art) | 🚧 **Phases 1–4 built** — heads-up channels (Phase 1, on-device confirmed working); `lib/streak.js` + `hooks/useStreak.js` (Phase 2, 39/39 verified incl. DST); `lib/koban.js` copy engine + `buildReminderPlan()` rolling window (Phase 3, 25/25 verified); `StreakCalendar`/`StreakCelebration` in-app UI (Phase 4, added after the user found Phases 2-3 had no visible surface — 9/9 verified). `formatMoney` hoisted to `lib/money.js`. Awaiting on-device confirmation of Phases 3-4 — no Android SDK here. Phase 5 (mascot icon) blocked on user art |
 | 06 | `06-transaction-auto-detect.md` | Bank/UPI (+ SMS, personal-use-only) notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | ✅ **Go/no-go PASSED on real device** (2026-07-12) — core mechanism confirmed working. `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. **Allowlist reversed for personal use** — SMS/Messages added (`PERSONAL_USE_EXTRA_PACKAGES`, must be removed before any store submission — see doc). Swipe-away-specifically-isolated test still pending; otherwise on-device-verified |
 
 ---

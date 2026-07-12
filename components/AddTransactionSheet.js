@@ -46,6 +46,7 @@ function formatDateLabel(date) {
 
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
   const modalRef = useRef(null);
+  const amountInputRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId, activeAccount } = useAccount();
@@ -73,6 +74,16 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     open(payload) {
       setError(null);
       setPlanPickerOpen(false);
+      // Autofocus the amount field ONLY for a genuinely blank entry (the ⊕
+      // tab, no payload at all) — that's the one case where typing the amount
+      // is obviously the user's next move. Every other path already has an
+      // amount sitting in the field: editing an existing transaction, or a
+      // payload prefilled by share-intent/notification/auto-detect. Popping
+      // the keyboard over an already-correct value just obstructs the
+      // category chips below it, and is especially jarring right after a
+      // notification tap, before the user has even seen the sheet.
+      const isBlankEntry = !payload?.id && !payload?.amount;
+
       if (payload?.id) {
         const tx = payload;
         setEditingId(tx.id);
@@ -94,6 +105,16 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setNote(payload?.note ?? '');
       }
       modalRef.current?.present();
+
+      // Imperative, not the TextInput's `autoFocus` prop — this sheet is a
+      // single persistent instance (mounted once at the root), never
+      // remounted between opens, so a static prop can't express "sometimes".
+      // The short delay lets the sheet's present() animation settle first;
+      // focusing mid-animation is a known source of jank/no-ops with
+      // bottom-sheet + keyboard interactions.
+      if (isBlankEntry) {
+        setTimeout(() => amountInputRef.current?.focus(), 300);
+      }
     },
   }));
 
@@ -214,13 +235,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           <View style={styles.amountRow}>
             <Text style={styles.amountCurrency}>₹</Text>
             <TextInput
+              ref={amountInputRef}
               value={amount}
               onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
               placeholder="0"
               placeholderTextColor={colors.mutedLight}
               keyboardType="number-pad"
               style={styles.amountInput}
-              autoFocus
             />
           </View>
         </View>

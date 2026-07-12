@@ -22,6 +22,7 @@ import { AddPlanSheetProvider } from '../components/AddPlanSheet';
 import { AddBillSheetProvider } from '../components/AddBillSheet';
 import { PayBillSheetProvider } from '../components/PayBillSheet';
 import DueBillsModal from '../components/DueBillsModal';
+import StreakCelebration from '../components/StreakCelebration';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
 import { AddCategorySheetProvider } from '../components/AddCategorySheet';
 import { AddAccountSheetProvider } from '../components/AddAccountSheet';
@@ -142,6 +143,7 @@ function RootNavigator() {
                                   <NotificationSync />
                                   <DetectedTransactionHandler />
                                   <DueBillsModal />
+                                  <StreakCelebration />
                                   <Stack screenOptions={{ headerShown: false }} />
                                 </AlertsSheetProvider>
                               </MenuSheetProvider>

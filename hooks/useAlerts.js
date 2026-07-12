@@ -3,13 +3,10 @@ import { format, differenceInCalendarDays } from 'date-fns';
 import useBills, { billStatus } from './useBills';
 import useBudgets, { budgetStatus } from './useBudgets';
 import usePlans from './usePlans';
+import { formatMoney } from '../lib/money';
 
 const PLAN_ENDING_SOON_DAYS = 7;
 const SEVERITY_ORDER = { danger: 0, warn: 1 };
-
-function formatMoney(n) {
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
-}
 
 // Aggregates a live, computed alert feed — nothing is stored (see the Phase 6
 // goal in 04-notifications-and-recurring-bills.md). Deliberately mixed-scope:

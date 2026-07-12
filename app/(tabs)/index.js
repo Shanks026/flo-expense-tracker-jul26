@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -9,18 +9,28 @@ import IconTile from '../../components/IconTile';
 import AmountText from '../../components/AmountText';
 import CategoryIcon from '../../components/CategoryIcon';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
+import Pill from '../../components/Pill';
+import StreakCalendar from '../../components/StreakCalendar';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useAuth } from '../../lib/AuthContext';
 import useGlobalSummary from '../../hooks/useGlobalSummary';
 import useTransactions from '../../hooks/useTransactions';
 import useSpendingTrend from '../../hooks/useSpendingTrend';
 import useProfile from '../../hooks/useProfile';
+import useBills, { billStatus } from '../../hooks/useBills';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useMenuSheet } from '../../components/MenuSheet';
+import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
+
+const UPCOMING_BILL_STYLES = {
+  overdue: { iconTone: 'danger', amountColor: colors.danger, pill: { label: 'Overdue', tone: 'danger' } },
+  due_soon: { iconTone: 'warn', amountColor: colors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
+};
+const MAX_UPCOMING_BILLS = 4;
 
 function formatAmount(value) {
   const rounded = Math.round(Math.abs(value));
@@ -48,9 +58,25 @@ export default function Home() {
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
   const { count: alertCount } = useAlerts();
+  const { bills } = useBills();
+  const { openPayBill } = usePayBillSheet();
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
+
+  // Global (not account-scoped, per useBills) — overdue/due-soon only, the
+  // same billStatus() threshold the Bills tab and DueBillsModal already use,
+  // not a new window invented for this section. No free dismiss: a row only
+  // leaves this list when the underlying bill is actually paid or skipped
+  // (openPayBill → notifyChanged() → useBills refetches), the same
+  // computed-feed pattern the bell/AlertsSheet already uses app-wide — see
+  // 05-koban-engagement.md's "reward the logging, never the numbers" note for
+  // the same reasoning applied to a different surface. Renders nothing at all
+  // when empty; unlike Recent Transactions, "no bills due" isn't worth
+  // permanent scroll space.
+  const upcomingBills = bills
+    .filter((b) => b.is_active && ['overdue', 'due_soon'].includes(billStatus(b.next_due_date)))
+    .slice(0, MAX_UPCOMING_BILLS);
 
   return (
     <Screen padded={false}>
@@ -118,9 +144,59 @@ export default function Home() {
           </View>
         </Card>
 
+        <StreakCalendar />
+
         <Card style={styles.chartCard}>
-          <IncomeExpenseChart data={trendData} range={trendRange} onRangeChange={setTrendRange} />
+          <IncomeExpenseChart
+            data={trendData}
+            range={trendRange}
+            onRangeChange={setTrendRange}
+            defaultVisible={{ expense: true, income: false }}
+          />
         </Card>
+
+        {upcomingBills.length > 0 && (
+          <>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Upcoming Bills</Text>
+              <Pressable onPress={() => router.push('/bills')}>
+                <Text style={styles.sectionAction}>See all</Text>
+              </Pressable>
+            </View>
+            <Card style={styles.listCard}>
+              {upcomingBills.map((bill, idx) => {
+                const s = UPCOMING_BILL_STYLES[billStatus(bill.next_due_date)];
+                return (
+                  <Pressable
+                    key={bill.id}
+                    style={[styles.row, idx < upcomingBills.length - 1 && styles.rowBorder]}
+                    onPress={() => openPayBill(bill)}
+                  >
+                    <IconTile tone={s.iconTone}>
+                      {bill.category?.icon ? (
+                        <CategoryIcon icon={bill.category.icon} size={20} color={s.amountColor} />
+                      ) : (
+                        <Receipt size={20} color={s.amountColor} strokeWidth={2} />
+                      )}
+                    </IconTile>
+                    <View style={styles.rowMid}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>
+                        {bill.name}
+                      </Text>
+                      <Text style={styles.rowSub}>Due {format(new Date(bill.next_due_date), 'd MMM')}</Text>
+                    </View>
+                    <View style={styles.billRowRight}>
+                      <Text style={[styles.billAmount, { color: s.amountColor }]}>
+                        ₹{Math.round(bill.amount).toLocaleString('en-IN')}
+                      </Text>
+                      <Pill label={s.pill.label} tone={s.pill.tone} />
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Card>
+          </>
+        )}
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
@@ -372,5 +448,14 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.mutedMid,
     marginTop: 1,
+  },
+  billRowRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  billAmount: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.md,
+    letterSpacing: -0.2,
   },
 });
