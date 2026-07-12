@@ -1,6 +1,6 @@
 import { requireNativeModule } from 'expo';
 
-import { DetectedNotification } from './FloNotificationListener.types';
+import { DetectedNotification, DetectionDebugEntry } from './FloNotificationListener.types';
 
 declare class FloNotificationListenerModule {
   hasNotificationAccess(): boolean;
@@ -10,6 +10,8 @@ declare class FloNotificationListenerModule {
   getAllowedPackages(): string[];
   setAllowedPackages(packages: string[]): void;
   drainDetections(): DetectedNotification[];
+  getDebugLog(): DetectionDebugEntry[];
+  clearDebugLog(): void;
 }
 
 // This call loads the native module object from the JSI.

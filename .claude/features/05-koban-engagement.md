@@ -283,11 +283,100 @@ No new routes. Same `data.route` payloads, same tap-routing, untouched.
 - [x] `VIBRATE` reversal recorded in `00-index.md`'s security-audit table (the row that originally stripped it), not deferred to Phase 5.
 - [x] `npx tsc --noEmit` passes; `npx expo export --platform android` bundles cleanly.
 - [ ] **On-device:** the daily reminder **drops down over the screen**, with sound and vibration — not just into the shade.
+- [x] **On-device: heads-up banner confirmed working** (user, 2026-07-12) — "phase 1 works".
 - [ ] **On-device:** three separately-mutable channels ("Daily nudge", "Daily recap", "Bill reminders") appear under Android's app notification settings.
 - [ ] Tapping still deep-links to Home.
-- [ ] Bundles cleanly natively — no Android SDK in this environment (same boundary as `06-transaction-auto-detect.md`'s phases); needs your build.
+- [x] Bundles cleanly — JS confirmed; native confirmed by the user's successful build/install.
 
-**→ Stop here. Show the result and wait for approval.**
+**→ Phase 1 core is confirmed working on-device. Post-test fixes below.**
+
+### Post-Phase-1 On-Device Testing Round (2026-07-12)
+
+Heads-up notifications confirmed working. Two follow-up bugs reported and fixed.
+
+#### 🐛 Bug 1 (fixed): the 1899 time-picker
+The "Remind me at" display and the picker's initial value both used
+`new Date(0, 0, 0, hour, minute)`. Year `0` → **1900**, and month/day `0` rolls
+back to **31 Dec 1899**. India used *Madras Time* (**+5:21**) before 1906, not
+modern IST (+5:30), so the tz database applies the historical offset to that
+date. JS reads the hour/minute back correctly in-engine, but the **native
+Android picker widget** re-converts the underlying UTC timestamp using the
+*current* offset — landing ~9 minutes off, exactly matching the user's reported
+"10-12 minutes ahead".
+
+Reproduced directly (`TZ=Asia/Kolkata node`), not guessed. This was a display
+bug on the way to becoming a *data* bug: a silently-shifted pre-fill saved a
+wrong time if the user tapped OK without adjusting. Fixed with a `timeOnToday()`
+helper that builds from today's date. Grepped — no other occurrence in the
+codebase.
+
+#### 🐛 Bug 2 (fixed): stale settings could silently wipe the entire schedule
+**The likely cause of the user's "daily reminder never fires".** `rescheduleAll`
+opens with `cancelAllScheduledNotificationsAsync()` and bails early if
+`!settings.enabled`. It took `settings` as a **parameter**, and
+`useNotificationSync` held a copy loaded **once at mount**, while
+`app/settings.js` mutated and persisted its own separate copy.
+
+Failure sequence: launch app with notifications off → turn them on and set a
+time (Settings calls `rescheduleAll` with *fresh* settings; correctly scheduled)
+→ **anything bumps the `useDataRefresh` version** — logging a transaction does,
+and `06-transaction-auto-detect.md`'s GPay detection logs transactions
+*automatically* — → `useNotificationSync`'s effect re-runs with its **stale
+`enabled: false`** → cancels everything, schedules nothing. Silently. The user
+was testing detection and the daily reminder in the same session, which is
+exactly the sequence that triggers it.
+
+**Fixed by removing the bug class, not patching the instance**: `rescheduleAll`
+now reads settings from AsyncStorage *itself* (`rescheduleAll({ bills })` — the
+`settings` param is gone). Every caller already persists before calling, so
+storage is always current and a stale copy is now impossible to construct.
+`useNotificationSync` holds no settings state at all anymore.
+
+#### Not a bug: inexact alarms
+`expo-notifications`' `ExpoSchedulingDelegate.setupAlarm()` uses
+`AlarmManagerCompat.setExactAndAllowWhileIdle` **only if**
+`alarmManager.canScheduleExactAlarms()`; otherwise it falls back to
+`setAndAllowWhileIdle` (inexact). FLO deliberately does **not** hold
+`SCHEDULE_EXACT_ALARM` (Google Play restricts it to alarm-clock/calendar apps),
+so on Android 12+ reminders are **inexact and Android may defer them**,
+especially with the screen off.
+
+For a daily 8pm reminder, arriving at 8:04pm is fine — nobody notices. But it
+makes *short-interval manual testing* ("set it 5 minutes out and wait")
+unreliable, which is worth knowing before chasing a phantom bug. Use **Send test
+notification** (a 3-second `TIME_INTERVAL`) to verify delivery instead. Also
+verified from the native source that Expo's `DailyTrigger.nextTriggerDate()`
+*does* fire the same day when the time is still ahead (it only rolls to tomorrow
+if already past) — so "it always waits until tomorrow" was ruled out as a
+hypothesis, not assumed away.
+
+#### Diagnostics added (debug-only — remove before any store build)
+Guessing at these bugs from the outside wasted a test cycle, so both are now
+directly observable:
+- **Settings → Notifications → "Show scheduled"** — lists what the OS
+  *actually* has pending, with trigger times and channel IDs. Distinguishes a
+  **scheduling** bug (not in the list) from a **delivery** bug (in the list but
+  never arrives) — very different problems that look identical from the user's
+  side.
+- **Settings → Transaction Detection → "What FLO has seen"** — the native
+  listener now records *every* allowlisted notification and the parser's verdict
+  on it, **including ones that fail to parse** (`no-parse`) or get deduped. The
+  normal queue drops those silently, so a wrong income/expense classification was
+  previously invisible — this is what makes tuning `TransactionParser.kt` against
+  *real* bank/UPI wording possible instead of guessing at text nobody has read.
+  ⚠️ Persists raw notification content in SharedPreferences (capped at 15,
+  clearable in-app). **Debug only — remove this, `NotificationPrefs.recordDebug`,
+  and its Settings row before any store build.**
+
+#### Still open: detection picks the wrong income/expense tab
+Reported by the user; **root cause not yet known, and deliberately not guessed
+at.** The JS prefill path was re-read and is correct
+(`openAdd({ amount, type })` → `AddTransactionSheet.open()` sets `type` from the
+payload), which points at `TransactionParser.kt` mis-classifying the direction —
+but that can't be confirmed without seeing the *actual* GPay/bank notification
+text, which nothing was recording. That's precisely what "What FLO has seen"
+above now captures. **Next step: user triggers a transaction, reads that log,
+and reports the raw title/text + the parser's verdict.**
 
 ---
 
@@ -302,10 +391,91 @@ as a pure function plus a hook, so an animated Home UI later needs zero
 data-layer change.
 
 **Scope discipline**: this phase builds the *foundation* — a correct count and
-the day-0/day-N distinction below — not the full gamification layer (streak
-freezes, richer milestone tuning, in-app display). The user is bringing their
-own ideas for that once this and Phase 3 are done; building ahead of that would
-mean re-doing it.
+the day-0/day-N distinction below — not the full gamification layer (achievements,
+weekly report, streak freezes, in-app display). The user shared their
+gamification ideas on 2026-07-12 and chose to **build streaks first, then
+reassess** — the design decisions from that discussion are recorded below so
+they survive to whenever the gamification feature actually gets built, but
+**none of them are in this phase's scope.**
+
+---
+
+### 🔒 Gamification Design Decisions (2026-07-12) — for the FUTURE feature doc, not this phase
+
+These came out of a design discussion with the user and are recorded here so
+they aren't re-litigated or silently reversed later. **Nothing below is built
+in Phase 2 or Phase 3.** When the gamification/reporting feature is scoped, it
+gets its own doc (likely `07-...`) and starts from these.
+
+#### The governing principle: reward the logging, never the numbers
+
+A streak rewards *logging every day* — the incentive points at the behaviour we
+want. But any achievement tied to a spending **amount** points the wrong way: if
+the user is one coffee away from losing a "stayed under budget" badge, the
+cheapest way to keep it isn't to skip the coffee, it's to **not log the coffee**.
+That corrupts their own ledger to protect a badge, and makes FLO actively worse
+at its actual job.
+
+**Therefore**: streaks and achievements reward **engagement**. Spending outcomes
+get **reported**, honestly, with no reward attached. This single rule resolves
+most of the design questions below — apply it to anything new.
+
+#### Achievements — engagement-based only
+
+All derivable from existing data; **no new tables** (compute-don't-store still
+holds):
+
+| Achievement | Data source |
+|---|---|
+| First transaction logged | `transactions` |
+| 7 / 30 / 100-day streak | computed streak |
+| Longest streak beaten | computed streak |
+| Logged every day this week | computed streak |
+| First budget / plan / bill created | existing tables |
+| Bill paid on time | `bills.last_paid_date` vs `next_due_date` |
+
+Deliberately **absent**: anything rewarding "spent less," "stayed under budget,"
+or any other spending outcome — see the governing principle.
+
+#### Weekly report — user chose: **notification + in-app screen**
+
+A Sunday-evening notification as the hook, deep-linking into a proper weekly
+report screen that holds the detail. Content is the user's own real data:
+
+> **Your week: ₹4,200 out · ₹8,000 in · 12 entries**
+> That's 18% below your 4-week average. Food was your biggest category at ₹1,600.
+
+**History-sufficiency rule**: no "vs your average" comparison until there are
+~4 weeks of data to compare against. Before that, the report states facts only —
+it does **not** invent a baseline to sound clever.
+
+#### ❌ REJECTED — "you spent 58% less than an average person"
+
+The user originally proposed a comparison against an average person's spending.
+**Dropped, by the user's own decision after discussion.** Recorded here with the
+reasoning so it doesn't get reintroduced:
+
+- **The data doesn't exist and never will.** FLO is single-user; there is no
+  cohort, no benchmark, no population data anywhere in the schema. Any "average
+  person" figure would be **invented and presented as a statistic** — in a
+  *financial* app.
+- **It poisons trust in every other number.** The moment the user thinks *"how
+  would FLO even know that?"*, every real figure in the app becomes suspect. Bad
+  trade for a moment of dopamine.
+- **It backfires in both directions.** Told they spend *less* than average, a
+  user reads it as permission to spend more; told they spend *more*, they get
+  shamed by a number that was never real. Averages across income levels, cities
+  and life stages are meaningless as a personal benchmark even when honest.
+- **The honest version is strictly better**: compare the user to *themselves*
+  (above). It's real, personal, and actionable.
+
+If a benchmark is ever genuinely wanted, the only acceptable form is a
+**published, citable external statistic** (e.g. RBI/NSO household expenditure
+data), shown **explicitly labelled as an external figure** — never as a
+personalised claim about the user. Even then: limited real value, high
+misinterpretation risk.
+
+---
 
 ### Before Starting — Confirm With Codebase
 1. Read `lib/DataRefreshContext.js` — confirm `useDataRefresh()` returns
@@ -429,16 +599,46 @@ None. Nothing imports `useStreak` yet — Phase 3 does.
   user is bringing their own design for this next; don't build ahead of it.
 
 ### 2.7 Phase 2 Checklist — Before Marking Complete
-- [ ] `lib/streak.js` exports `computeStreak(rows, now)` — pure, no React/Supabase imports.
-- [ ] Streak counts from `created_at`, bucketed to **local** days; a code comment states why not `occurred_at`.
-- [ ] `current === 0` when nothing logged in the window; `isNewStreak` true only on `current === 1 && loggedToday`.
-- [ ] Streak is *at risk*, not dead, when nothing is logged yet today (counts back from yesterday).
-- [ ] `todayTotals` returns `{ spent, earned, count }` — both directions, not just spend.
-- [ ] `hooks/useStreak.js` depends on **both** `version` and `session?.user?.id`; returns data after auth resolves (not an empty pre-auth fetch).
-- [ ] Verified with a throwaway `node` script: empty / today-only / unbroken run / gap / **04:00-IST boundary** / backdated `occurred_at` must not inflate the streak.
-- [ ] `npx expo export --platform android` bundles cleanly.
+- [x] `lib/streak.js` exports `computeStreak(rows, now)` — pure, no React/Supabase imports.
+- [x] Streak counts from `created_at`, bucketed to **local** days; a code comment states why not `occurred_at`.
+- [x] `current === 0` when nothing logged in the window; `isNewStreak` true only on `current === 1 && loggedToday`.
+- [x] Streak is *at risk*, not dead, when nothing is logged yet today (counts back from yesterday).
+- [x] `todayTotals` returns `{ spent, earned, count }` — both directions, not just spend.
+- [x] `hooks/useStreak.js` depends on **both** `version` and `session?.user?.id`; returns data after auth resolves (not an empty pre-auth fetch).
+- [x] Verified with a throwaway `node` script — **39 assertions across 10 scenarios, all passing**: empty / today-only (Day-0 origin) / unbroken 7-day run + milestone / at-risk (yesterday, not today) / broken gap / milestone-only-fires-when-logged-today / late-night local-day boundary / **backdated `occurred_at` does not inflate the streak** / string amounts (Postgres `numeric` arrives as string) / multiple same-day entries don't double-count.
+- [x] **Also ran the suite under `TZ=America/New_York` (DST), `TZ=UTC`, and `TZ=Pacific/Chatham` (+12:45)** — all 39 pass in each. Confirms the day-stepping loop's fixed 86,400,000 ms decrements are DST-safe *because* `dayKey` normalises through `startOfDay` before comparing; that safety was assumed in the original design and is now actually verified, not just asserted.
+- [x] `npx tsc --noEmit` passes; `npx expo export --platform android` bundles cleanly.
 
 **→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+
+- **`lib/streak.js` needed no logic changes** — it was written before the
+  Day-0 decision and its logic was already correct. Only its comment was
+  updated, to record that `isNewStreak` is *displayed* as "Day 0" while
+  `current` still counts it as `1` internally (so tomorrow reads 2, milestones
+  stay plain integer comparisons, and `longest` stays a normal count). The
+  relabeling lives in the copy layer (`lib/koban.js`, Phase 3), not in the
+  computation.
+- **`hooks/useStreak.js` follows `useBills`'s global-hook shape exactly** —
+  depends on `session?.user?.id` (not `activeAccountId`), because a streak is a
+  habit, not a ledger view: logging into *any* account is still showing up. This
+  dependency is load-bearing, not stylistic — a global hook with no
+  `activeAccountId` dep has nothing to force a refetch once auth resolves, so it
+  would fetch pre-auth, get an empty result, and never revisit it. That exact bug
+  has been fixed twice in this codebase already (`useCategories`,
+  `useAllAccountSummaries` — the standing rule in `00-index.md`).
+- **Spread-return shape** (`{ ...streak, loading, refetch }`) so callers read
+  `streak.current` / `streak.loggedToday` directly rather than
+  `streak.streak.current`.
+- **Nothing imports it yet** — Phase 3 does. Genuinely isolated; this phase
+  cannot have broken anything.
+- **Verification note**: the DST/odd-offset timezone runs weren't in the plan's
+  checklist — added because the day-stepping loop subtracts a *fixed* 24-hour
+  millisecond value, which is exactly the shape of code that breaks across a DST
+  boundary. It turned out to be safe (`startOfDay` normalises before every
+  comparison), but that was worth proving rather than assuming, especially since
+  the app may not stay India-only forever.
 
 ---
 

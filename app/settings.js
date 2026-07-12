@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking, AppState } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Switch, Linking, AppState, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -21,6 +21,7 @@ import {
   getPermissionStatus,
   rescheduleAll,
   sendTestNotification,
+  getScheduledSummary,
 } from '../lib/notifications';
 import {
   isSupported as isDetectSupported,
@@ -29,6 +30,8 @@ import {
   isDetectionEnabled,
   setDetectionEnabled,
   setAllowedPackages,
+  getDetectionDebugLog,
+  clearDetectionDebugLog,
   DEFAULT_ALLOWED_PACKAGES,
 } from '../lib/detect';
 
@@ -139,11 +142,40 @@ export default function Settings() {
     setDetectEnabled(value);
   }
 
-  async function sync(nextEnabled, nextDaily, nextBillReminders) {
-    await rescheduleAll({
-      bills,
-      settings: { enabled: nextEnabled, dailyReminder: nextDaily, billReminders: nextBillReminders },
-    });
+  // Debug — the ONLY way to see what the parser is actually choking on.
+  // Failed parses never reach the queue, so without this a wrong/missing
+  // income-vs-expense classification is invisible: you'd be guessing at
+  // notification text you've never read.
+  function handleShowDetectionLog() {
+    const entries = getDetectionDebugLog();
+    if (!entries.length) {
+      Alert.alert('No notifications seen', 'Nothing from the watched apps has arrived since detection was enabled.');
+      return;
+    }
+    const body = entries
+      .slice()
+      .reverse()
+      .map((e) => {
+        const parsed =
+          e.outcome === 'no-parse'
+            ? '→ COULD NOT PARSE'
+            : `→ ₹${e.amount} ${e.type} (${e.outcome})`;
+        return `"${e.title}"\n"${e.text}"\n${parsed}`;
+      })
+      .join('\n\n───\n\n');
+    Alert.alert(`Last ${entries.length} seen`, body, [
+      { text: 'Clear', style: 'destructive', onPress: clearDetectionDebugLog },
+      { text: 'Close', style: 'cancel' },
+    ]);
+  }
+
+  // Every caller below persists to AsyncStorage BEFORE calling this —
+  // rescheduleAll reads settings straight from storage (it no longer accepts
+  // them as a param, deliberately; see its comment in lib/notifications.js for
+  // the stale-settings bug that forced this). So persist-then-sync is the
+  // required order, not an incidental one.
+  async function sync() {
+    await rescheduleAll({ bills });
   }
 
   async function handleToggleNotifications(value) {
@@ -165,7 +197,22 @@ export default function Settings() {
     }
     setNotifEnabled(value);
     await setNotificationEnabled(value);
-    await sync(value, dailyReminder, billReminders);
+    await sync();
+  }
+
+  // Debug — shows what the OS actually has pending, so "my reminder didn't
+  // fire" can be diagnosed instead of guessed at: present here but never
+  // delivered = a delivery/Doze problem; absent = a scheduling/logic problem.
+  async function handleShowScheduled() {
+    const { unsupported, items } = await getScheduledSummary();
+    if (unsupported) {
+      showToast({ message: 'Needs a development build, not Expo Go', variant: 'error' });
+      return;
+    }
+    const body = items.length
+      ? items.map((i) => `• ${i.title}\n  ${i.when}\n  channel: ${i.channelId}`).join('\n\n')
+      : 'Nothing scheduled.\n\nIf you expected a daily reminder here, check that both the Notifications master toggle AND Daily Reminder are on.';
+    Alert.alert(`${items.length} scheduled`, body);
   }
 
   async function handleSendTest() {
@@ -181,7 +228,7 @@ export default function Settings() {
     const next = { ...dailyReminder, enabled: value };
     setDailyReminder(next);
     await setDailyReminderSettings(next);
-    await sync(notifEnabled, next, billReminders);
+    await sync();
   }
 
   async function handleTimeChange(_event, selected) {
@@ -190,21 +237,21 @@ export default function Settings() {
     const next = { ...dailyReminder, hour: selected.getHours(), minute: selected.getMinutes() };
     setDailyReminder(next);
     await setDailyReminderSettings(next);
-    await sync(notifEnabled, next, billReminders);
+    await sync();
   }
 
   async function handleToggleBillReminders(value) {
     const next = { ...billReminders, enabled: value };
     setBillReminders(next);
     await setBillReminderSettings(next);
-    await sync(notifEnabled, dailyReminder, next);
+    await sync();
   }
 
   async function handleDaysBeforeChange(daysBefore) {
     const next = { ...billReminders, daysBefore };
     setBillReminders(next);
     await setBillReminderSettings(next);
-    await sync(notifEnabled, dailyReminder, next);
+    await sync();
   }
 
   async function handleDelete() {
@@ -304,6 +351,14 @@ export default function Settings() {
             <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
           </Pressable>
 
+          <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowScheduled}>
+            <View style={styles.rowIcon}>
+              <Receipt size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <Text style={styles.rowTitle}>Show scheduled</Text>
+            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+          </Pressable>
+
           <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
             <View style={styles.rowIcon}>
               <SunMedium size={20} color={colors.ink} strokeWidth={2} />
@@ -379,6 +434,16 @@ export default function Settings() {
                 <Text style={styles.rowTitle}>Enable detection</Text>
                 <Switch value={detectEnabled} onValueChange={handleToggleDetect} disabled={!detectAccess} />
               </View>
+
+              {detectEnabled && (
+                <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowDetectionLog}>
+                  <View style={styles.rowIcon}>
+                    <Receipt size={20} color={colors.ink} strokeWidth={2} />
+                  </View>
+                  <Text style={styles.rowTitle}>What FLO has seen</Text>
+                  <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+                </Pressable>
+              )}
 
               {detectEnabled && (
                 <View style={styles.watchedAppsRow}>

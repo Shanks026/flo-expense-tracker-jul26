@@ -11,7 +11,9 @@ private const val KEY_ENABLED = "enabled"
 private const val KEY_ALLOWED_PACKAGES = "allowed_packages"
 private const val KEY_QUEUE = "queue"
 private const val KEY_DEDUPE = "dedupe_keys"
+private const val KEY_DEBUG_LOG = "debug_log"
 private const val MAX_QUEUE_SIZE = 20
+private const val MAX_DEBUG_LOG_SIZE = 15
 private const val DEDUPE_WINDOW_MS = 5 * 60 * 1000L
 
 /**
@@ -119,6 +121,62 @@ class NotificationPrefs private constructor(context: Context) {
   private fun readQueue(): JSONArray {
     val raw = prefs.getString(KEY_QUEUE, null) ?: return JSONArray()
     return JSONArray(raw)
+  }
+
+  /**
+   * ⚠️ DEBUG ONLY — records EVERY allowlisted notification and what
+   * [TransactionParser] made of it, *including ones that failed to parse*
+   * (which the normal queue drops silently, leaving no evidence of why).
+   * Without this there is no way to tune the parser against real bank/UPI
+   * wording — you'd be guessing at text you've never seen.
+   *
+   * Deliberately NOT cleared by [drainQueue], so a detection survives being
+   * consumed by the app and can still be inspected afterwards.
+   *
+   * PRIVACY: this persists raw notification text (i.e. bank/payment details)
+   * in SharedPreferences until overwritten or explicitly cleared. Capped at
+   * [MAX_DEBUG_LOG_SIZE]. **Remove this, its callers, and the Settings row
+   * that reads it before any store build** — it exists to debug the parser on
+   * a personal device, not to ship.
+   */
+  @Synchronized
+  fun recordDebug(
+    packageName: String,
+    title: String,
+    text: String,
+    parsedAmount: Double?,
+    parsedType: String?,
+    outcome: String,
+  ) {
+    val raw = prefs.getString(KEY_DEBUG_LOG, null)
+    val log = if (raw != null) JSONArray(raw) else JSONArray()
+    log.put(
+      JSONObject().apply {
+        put("packageName", packageName)
+        put("title", title)
+        put("text", text)
+        put("amount", parsedAmount ?: JSONObject.NULL)
+        put("type", parsedType ?: JSONObject.NULL)
+        put("outcome", outcome)
+        put("at", System.currentTimeMillis())
+      }
+    )
+
+    val trimmed = JSONArray()
+    val start = maxOf(0, log.length() - MAX_DEBUG_LOG_SIZE)
+    for (i in start until log.length()) trimmed.put(log.get(i))
+    prefs.edit().putString(KEY_DEBUG_LOG, trimmed.toString()).apply()
+  }
+
+  @Synchronized
+  fun getDebugLog(): JSONArray {
+    val raw = prefs.getString(KEY_DEBUG_LOG, null) ?: return JSONArray()
+    return JSONArray(raw)
+  }
+
+  @Synchronized
+  fun clearDebugLog() {
+    prefs.edit().remove(KEY_DEBUG_LOG).apply()
   }
 
   /**

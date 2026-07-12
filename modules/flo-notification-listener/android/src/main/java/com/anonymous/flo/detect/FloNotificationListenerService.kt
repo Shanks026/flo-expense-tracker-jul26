@@ -41,10 +41,24 @@ class FloNotificationListenerService : NotificationListenerService() {
     // Some banks put the amount in the title, others in the body — parse
     // both combined rather than guessing which field has it.
     val combined = "$title. $text"
-    val parsed = TransactionParser.parse(combined) ?: return
+    val parsed = TransactionParser.parse(combined)
+
+    // Record EVERY allowlisted notification and its parse outcome, before any
+    // early return — a notification that fails to parse, or gets deduped, is
+    // otherwise dropped without a trace, which makes tuning the parser against
+    // real bank wording impossible. Debug only; see NotificationPrefs.recordDebug.
+    if (parsed == null) {
+      prefs.recordDebug(sbn.packageName, title, text, null, null, "no-parse")
+      return
+    }
 
     val dedupeKey = dedupeKeyFor(sbn.packageName, combined)
-    if (prefs.isDuplicateAndRecord(dedupeKey, sbn.postTime)) return
+    if (prefs.isDuplicateAndRecord(dedupeKey, sbn.postTime)) {
+      prefs.recordDebug(sbn.packageName, title, text, parsed.amount, parsed.type, "duplicate")
+      return
+    }
+
+    prefs.recordDebug(sbn.packageName, title, text, parsed.amount, parsed.type, "prompted")
 
     val id = prefs.enqueueDetection(
       packageName = sbn.packageName,

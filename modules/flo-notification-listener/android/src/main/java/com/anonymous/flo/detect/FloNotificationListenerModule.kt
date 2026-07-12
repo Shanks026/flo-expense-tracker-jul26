@@ -76,5 +76,32 @@ class FloNotificationListenerModule : Module() {
         )
       }
     }
+
+    // ⚠️ DEBUG ONLY — see NotificationPrefs.recordDebug. Returns every
+    // allowlisted notification seen recently AND what the parser made of it,
+    // including failures ("no-parse") and dedupe drops ("duplicate") that the
+    // normal queue discards silently. Remove before any store build.
+    Function("getDebugLog") {
+      val log = NotificationPrefs.with(context).getDebugLog()
+      (0 until log.length()).map { i ->
+        val entry = log.getJSONObject(i)
+        mapOf(
+          "packageName" to entry.optString("packageName"),
+          "title" to entry.optString("title"),
+          "text" to entry.optString("text"),
+          // optDouble returns NaN when the value is JSONObject.NULL (an
+          // unparsed notification) — send null to JS instead, since NaN would
+          // silently coerce to a falsy 0-ish value in the UI.
+          "amount" to entry.optDouble("amount").takeIf { !it.isNaN() },
+          "type" to entry.optString("type").takeIf { it.isNotEmpty() && it != "null" },
+          "outcome" to entry.optString("outcome"),
+          "at" to entry.optLong("at")
+        )
+      }
+    }
+
+    Function("clearDebugLog") {
+      NotificationPrefs.with(context).clearDebugLog()
+    }
   }
 }
