@@ -20,6 +20,7 @@ import {
   requestPermission,
   getPermissionStatus,
   rescheduleAll,
+  sendTestNotification,
 } from '../lib/notifications';
 import {
   isSupported as isDetectSupported,
@@ -32,6 +33,21 @@ import {
 } from '../lib/detect';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
+
+// NOT new Date(0, 0, 0, hour, minute) — that resolves to Dec 31, 1899, and
+// India's timezone database applies the *historical* Madras Time offset
+// (+5:21) for pre-1906 dates, not modern IST (+5:30). The JS-side
+// getHours()/getMinutes() still read back correctly within the same
+// environment, but the native Android time picker widget converts the
+// underlying UTC timestamp using the *current* offset when rendering,
+// producing a ~9-minute-ahead display — confirmed via TZ=Asia/Kolkata node
+// repro during debugging (2026-07-12). Building on today's date sidesteps
+// the whole historical-offset class of bug.
+function timeOnToday(hour, minute) {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
 
 // Human-readable labels for DEFAULT_ALLOWED_PACKAGES (lib/detect.js) — this
 // is a read-only display list (06-transaction-auto-detect.md Phase 3: "no
@@ -152,6 +168,15 @@ export default function Settings() {
     await sync(value, dailyReminder, billReminders);
   }
 
+  async function handleSendTest() {
+    const result = await sendTestNotification();
+    if (result.unsupported) {
+      showToast({ message: 'Notifications need a development build, not Expo Go', variant: 'error' });
+      return;
+    }
+    showToast({ message: 'Test notification in 3s — lock the screen or switch apps now', variant: 'info' });
+  }
+
   async function handleToggleDaily(value) {
     const next = { ...dailyReminder, enabled: value };
     setDailyReminder(next);
@@ -267,6 +292,18 @@ export default function Settings() {
             </Pressable>
           )}
 
+          <Pressable
+            style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}
+            onPress={handleSendTest}
+            disabled={!notifEnabled}
+          >
+            <View style={styles.rowIcon}>
+              <Bell size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <Text style={styles.rowTitle}>Send test notification</Text>
+            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+          </Pressable>
+
           <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
             <View style={styles.rowIcon}>
               <SunMedium size={20} color={colors.ink} strokeWidth={2} />
@@ -278,7 +315,7 @@ export default function Settings() {
             <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setShowTimePicker(true)}>
               <Text style={styles.subRowLabel}>Remind me at</Text>
               <Text style={styles.subRowValue}>
-                {format(new Date(0, 0, 0, dailyReminder.hour, dailyReminder.minute), 'h:mm a')}
+                {format(timeOnToday(dailyReminder.hour, dailyReminder.minute), 'h:mm a')}
               </Text>
             </Pressable>
           )}
@@ -312,7 +349,7 @@ export default function Settings() {
         </Card>
         {showTimePicker && (
           <DateTimePicker
-            value={new Date(0, 0, 0, dailyReminder.hour, dailyReminder.minute)}
+            value={timeOnToday(dailyReminder.hour, dailyReminder.minute)}
             mode="time"
             display="default"
             onChange={handleTimeChange}
