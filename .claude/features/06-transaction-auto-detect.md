@@ -119,16 +119,62 @@ those and lose a convenience — never the app.
 
 Do **not** make anything else in FLO depend on this feature's presence.
 
-### Bonus constraint: the allowlist excludes Google Messages
+### Bonus constraint: the allowlist excludes Google Messages — REVERSED FOR PERSONAL USE (2026-07-12)
 
-Watch **bank and UPI apps' own notifications only**. Reading the notification
-Google Messages posts for a bank *SMS* is functionally an end-run around the
+**Original constraint, as designed and built through Phase 3:** watch **bank
+and UPI apps' own notifications only**. Reading the notification Google
+Messages posts for a bank *SMS* is functionally an end-run around the
 SMS-permission policy Play explicitly targets ("must not use alternative methods
 to derive data granted by SMS permissions") — near-certain rejection, and the
 same landmine `03-sms-share-import.md` already dodged once.
 
-Yes, this means missing bank alerts that only arrive by SMS. That's the price of
-being publishable, and the share-intent path already covers those.
+**Reversed, the user's explicit call, after real on-device testing found the
+constraint was making the feature not work for its own stated purpose:**
+
+1. GPay's own notification does **not** reliably fire for outgoing transfers —
+   confirmed on-device: a self-transfer between the user's own accounts produced
+   **no GPay notification at all**, only a bank SMS ("AX-AXISBK-S"). FLO's
+   detection correctly did nothing, because nothing was there to detect — this
+   was never a capture bug.
+2. Separately, a different GPay transaction (one that *did* post its own
+   notification) worked end-to-end — heads-up prompt fired correctly, with FLO
+   closed. **This is the Phase 1 go/no-go result: it passed.** The pipeline
+   itself works; the gap was allowlist coverage, not the mechanism.
+3. The user reports bank SMS is their **most frequent** transaction signal —
+   more so than any UPI app's own notification. An allowlist that excludes it
+   means the feature misses most real transactions for this user, which
+   defeats the point of building it.
+
+**The decision, stated plainly**: this is a real reversal of a considered,
+documented Play-policy constraint, not a bug fix — so it's recorded here
+explicitly rather than silently changed. Priority is the user's own daily use
+working *now*; Play/App Store compliance is an explicitly deferred follow-up,
+not something this reversal pretends to solve. The user's own words: *"for
+play store and apple store release, we can comment out to remove the
+transaction parsing and sms... if there is a way to let these pass the google
+play store, then we can uncomment it. the first priority is for me to use the
+application."*
+
+**Implementation**: `lib/detect.js`'s `DEFAULT_ALLOWED_PACKAGES` is now built
+from two constants — `PLAY_SAFE_PACKAGES` (the original bank/UPI list, safe for
+any store build) and `PERSONAL_USE_EXTRA_PACKAGES` (currently just Messages),
+spread together with a single clearly-marked line
+(`...PERSONAL_USE_EXTRA_PACKAGES, // ⚠️ delete this line before any store build`).
+**Before ever submitting to Google Play or the Apple App Store: delete or
+comment out `PERSONAL_USE_EXTRA_PACKAGES` and that one spread line** — the
+`PLAY_SAFE_PACKAGES` base reverts the feature to the original, defensible
+scope with no other code changes needed. `app/settings.js`'s
+`WATCHED_APP_LABELS` has a matching `Messages` entry that should be removed in
+the same pass — the watched-apps disclosure text pulls its list from that map
+dynamically, so removing the entry there keeps the in-app disclosure honest
+automatically, without a separate text edit.
+
+**Unconfirmed**: the SMS app package used is `com.google.android.apps.messaging`
+(Google Messages) — a best guess for "Messages," the user's default SMS app on
+an **iQOO 12**, not yet verified. OEM Android phones sometimes ship a different
+default messaging app under the hood even when branded "Messages." Confirm via
+`adb shell settings get secure sms_default_application` on the actual device;
+correct the package name in `lib/detect.js` if it doesn't match.
 
 ---
 
@@ -273,15 +319,15 @@ approach `03-sms-share-import.md` Phase 1 used, and for the same reason.
 - [x] `npx expo prebuild --clean` regenerates `android/` without error, with the module's own manifest fragment (`modules/flo-notification-listener/android/src/main/AndroidManifest.xml`) present and well-formed — **verified by reading the file**.
 - [x] Expo Go still boots — `lib/detect.js` follows the guarded-`require()` pattern; `npx expo export --platform android` bundles cleanly (3969 modules) with `require('../modules/flo-notification-listener')` resolving through Metro, same shape as `lib/notifications.js`'s `expo-notifications` guard.
 - [x] `npx tsc --noEmit` passes — the module's TS wrapper type-checks against `expo`'s `requireNativeModule`.
-- [ ] **Not verified from this environment — no Android SDK installed here.** The generated `android/app/src/main/AndroidManifest.xml` is *not* the merged manifest — manifest merging is a Gradle build-time step (`processDebugManifest`), not a prebuild-time one. **The actual proof that the `<service>` merged in, and that the Kotlin compiles, only exists once you run `npx expo run:android` or an EAS build.**
-- [ ] **On-device:** FLO appears in Android's notification-access screen and can be granted.
-- [ ] **On-device:** a notification from an allowlisted app is captured.
-- [ ] **On-device, THE critical test:** swipe FLO away from Recents (not force-stop — see the correction above) → trigger a bank notification → reopen FLO → **the notification is in the drained queue.** If this fails, the feature is not viable — stop and report.
-- [ ] **On-device:** the user's real bank/UPI package names + their notification text shapes are recorded in the Implementation Notes (needed to write Phase 2's parser).
-- [ ] Non-allowlisted apps' notifications are **not** captured.
-- [ ] Bundles cleanly — confirmed for the JS bundle (above); native compile still needs your machine.
+- [x] **Native compile + manifest merge confirmed** — an EAS `preview` build installed and ran (2026-07-12); the `<service>` merge and Kotlin compile this environment couldn't check are proven by the app functioning at all.
+- [x] **On-device:** FLO appears in Android's notification-access screen — with one extra step not in the original plan: **Android's "Restricted settings"** blocked granting it at first ("financial data can be visible to the app"), separate from Play Protect's install-time block. Fixed via App Info → ⋮ → **Allow restricted settings**. This applies to *any* non-Play-Store install (adb included, not just browser downloads) — expect it on every fresh install until this ships via Play. Worth adding to `00-index.md` as a standing note for future native-module testing.
+- [x] **On-device:** a GPay notification was captured and produced a working heads-up prompt, with detection firing correctly.
+- [ ] **On-device, THE critical test — not explicitly confirmed yet:** swipe FLO away from Recents → trigger a bank/UPI notification → reopen → drained queue has it. Testing so far confirms detection works *while iterating on the app*, but hasn't explicitly isolated the swiped-away case. Worth a deliberate pass: trigger a transaction, swipe FLO away, *then* trigger the notification, *then* reopen.
+- [x] **On-device — real package/text data recorded**, and it changed the design (see the "Bonus constraint... REVERSED" note above): GPay's own notification doesn't fire for outgoing self-transfers at all (only a bank SMS from sender "AX-AXISBK-S" arrived); a *different* GPay transaction that did notify was captured correctly. Bank SMS confirmed as this user's dominant signal — allowlist reversed for personal use as a result.
+- [ ] Non-allowlisted apps' notifications are **not** captured — not explicitly tested; assumed fine given the allowlist check is a simple `in` test, but not yet falsified on-device.
+- [x] Bundles cleanly — JS confirmed repeatedly; native confirmed by the successful install.
 
-**→ Stop here. This phase is a go/no-go gate. Show the result and wait for approval.**
+**Go/no-go verdict: GO.** The mechanism works. **→ Proceeding past this gate; Phases 2–3 were already built in parallel per the user's earlier decision to combine testing.**
 
 ### Implementation Notes
 
@@ -674,6 +720,51 @@ Covered above. No new routes.
 
 ---
 
+## Post-Phase-3 On-Device Testing Round (2026-07-12)
+
+The user built an EAS `preview` APK and ran the combined on-device test. Real
+findings, and what changed as a result:
+
+1. **Go/no-go: PASSED.** The core mechanism — native capture, surviving app
+   backgrounding, parse, heads-up prompt, pre-filled sheet — works on a real
+   device. See Phase 1's checklist, now updated.
+2. **Two install-time frictions, both distinct from each other, both now
+   documented**: Google Play Protect's internet-sideloading block (requires
+   installing via `adb`/USB or wireless debugging, never a browser/link tap on
+   the phone itself), and Android's separate **"Restricted settings"**
+   protection, which blocks *granting* notification access to any non-Play-
+   Store-installed app (adb included) until the user does App Info → ⋮ →
+   "Allow restricted settings." Both are Android platform behavior aimed at
+   exactly this permission category, not bugs in this feature, and both
+   disappear once the app ships via Google Play (Play-installed apps aren't
+   sideloaded by either mechanism's definition).
+3. **The Google Messages allowlist reversal** — see the "Bonus constraint...
+   REVERSED FOR PERSONAL USE" note above. The single most consequential
+   finding: GPay's own notification is not a reliable signal for this user's
+   actual transaction volume (specifically silent for outgoing self-transfers),
+   while bank SMS is. Reversed for personal use; store-safe reversion is a
+   single documented, deliberately-deferred edit.
+4. **Real bug found and fixed as a direct result of this round**:
+   `lib/detect.js`'s Expo Go guard didn't also check `Platform.OS` — since the
+   user now has a stated Apple App Store goal (this same conversation), a real
+   iOS build would have hit the exact "native module not linked → throws at
+   import-time → whole app dead at boot" crash class that `lib/notifications.js`
+   already had to fix once for Expo Go (`04-notifications-and-recurring-bills.md`
+   Phase 5's Implementation Notes). Fixed proactively — `IS_SUPPORTED_PLATFORM`
+   now checks both `Platform.OS === 'android'` and the Expo Go check. This
+   feature has no iOS equivalent and never will (`NotificationListenerService`
+   is Android-only, no API exists on iOS at any price — noted in "Out of
+   Scope" below); the fix's job is only to make sure that absence fails
+   gracefully instead of crashing the app.
+
+**Not yet explicitly isolated**: the swipe-away-from-Recents test as its own
+deliberate step (trigger detection *after* swiping FLO away, not merely
+"detection worked at some point during a testing session where the app was
+also opened/closed incidentally"). Worth one more deliberate pass, low urgency
+given the mechanism is already proven to work.
+
+---
+
 ## Data Model Summary (Final State After All Phases)
 
 ```
@@ -708,9 +799,13 @@ Postgres.
 
 ## Out of Scope (All Phases)
 
-- **Reading Google Messages / SMS notifications** — deliberately excluded. It's
-  the SMS-permission end-run Play's policy targets. The share-intent path
-  (`03-sms-share-import.md`) covers SMS-only banks, manually.
+- ~~Reading Google Messages / SMS notifications~~ — **reversed for personal use,
+  2026-07-12** (see the "Bonus constraint... REVERSED" note above and the
+  Post-Phase-3 Testing Round section). Still out of scope for any store
+  build — it's the SMS-permission end-run Play's policy targets, and
+  `PERSONAL_USE_EXTRA_PACKAGES` in `lib/detect.js` must be removed before one.
+  The share-intent path (`03-sms-share-import.md`) remains the store-safe way
+  to cover SMS-only banks, manually.
 - **Auto-inserting a transaction without confirmation** — never. A parser that
   silently writes wrong rows into someone's ledger is worse than no feature.
 - **Category, merchant, or account inference** — amount + direction only, same as

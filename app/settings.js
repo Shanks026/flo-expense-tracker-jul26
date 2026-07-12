@@ -36,11 +36,17 @@ const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 // Human-readable labels for DEFAULT_ALLOWED_PACKAGES (lib/detect.js) — this
 // is a read-only display list (06-transaction-auto-detect.md Phase 3: "no
 // user-editable allowlist UI this round"), so it only needs to be readable,
-// not exhaustive of every package field.
+// not exhaustive of every package field. Must stay in sync with
+// lib/detect.js's actual list — this text is the "explicit user consent"
+// disclosure, so it needs to be true, not just reassuring; a stale list here
+// would make the disclosure a lie. Messages is the personal-use-only entry
+// (see lib/detect.js's PERSONAL_USE_EXTRA_PACKAGES) — remove this line too
+// if that one gets removed before a store build.
 const WATCHED_APP_LABELS = {
   'com.google.android.apps.nbu.paisa.user': 'Google Pay',
   'com.phonepe.app': 'PhonePe',
   'net.one97.paytm': 'Paytm',
+  'com.google.android.apps.messaging': 'Messages',
 };
 
 export default function Settings() {
@@ -317,7 +323,7 @@ export default function Settings() {
         <Card style={styles.rowsCard}>
           {!isDetectSupported() ? (
             <View style={styles.row}>
-              <Text style={styles.permissionHint}>Needs a development build, not Expo Go.</Text>
+              <Text style={styles.permissionHint}>Android only, and needs a development build (not Expo Go).</Text>
             </View>
           ) : (
             <>
@@ -341,8 +347,8 @@ export default function Settings() {
                 <View style={styles.watchedAppsRow}>
                   <Text style={styles.watchedAppsText}>
                     Watches {Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit
-                    alerts, so FLO can prompt you to log them. Never reads SMS or any other
-                    app's notifications.
+                    alerts, so FLO can prompt you to log them. Reads only these apps'
+                    notifications — nothing else on the device.
                   </Text>
                 </View>
               )}

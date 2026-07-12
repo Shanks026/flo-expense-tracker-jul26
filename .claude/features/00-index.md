@@ -29,6 +29,28 @@ autolinking) — check `npx expo prebuild`'s regenerated
 `android/app/src/main/AndroidManifest.xml` after adding any new native
 dependency, the same way both of these were verified.
 
+**Standing rule — installing a native-permission build for testing**
+(added 2026-07-12, `06-transaction-auto-detect.md`'s Phase 1 go/no-go round):
+any app declaring a Play Protect "sensitive permission" (`NOTIFICATION_LISTENER`,
+`READ_SMS`/`RECEIVE_SMS`, `ACCESSIBILITY`) hits **two separate** Android
+protections when tested via a non-Play-Store build, not one:
+1. **Play Protect's internet-sideload block** — triggers only when the APK is
+   downloaded/tapped *on the phone itself* (browser, chat app, file manager).
+   Installing via `adb install` or `npx expo run:android` over USB or wireless
+   debugging avoids it entirely — that install path isn't "sideloading" by
+   Play Protect's own definition. If you must tap-install on the phone, Play
+   Store → profile icon → Play Protect → gear icon → toggle off "Scan apps
+   with Play Protect" → accept the "Pause Play Protect instead?" prompt
+   (auto-resumes the next day).
+2. **Android's "Restricted settings"** — separate from the above, and **not**
+   avoided by `adb`. Blocks *granting* the permission itself (shows "For your
+   security, this setting is currently unavailable" / a warning about
+   financial-data visibility) for **any** non-Play-Store install, adb included.
+   Fixed per-install via the installed app's own App Info screen → ⋮ menu →
+   "Allow restricted settings." Expect this on every fresh install of any
+   future feature needing this permission class, until the app ships via
+   Google Play — at which point neither protection applies.
+
 **Standing rule — `user_id DEFAULT auth.uid()`**: every existing table's
 `user_id` column has `DEFAULT auth.uid()` (`accounts`, `budgets`,
 `categories`, `plans`, `transactions` — confirmed live via
@@ -81,7 +103,7 @@ data model.
 | 03 | `03-sms-share-import.md` | SMS Share Import (Android share-target → parsed prefill → Add Transaction) | 🚧 All 3 phases implemented; awaiting on-device verification (no device in this environment) |
 | 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | ✅ Complete (all 6 phases built); pending on-device verification of Phase 5's notifications (needs a new EAS build — native module) |
 | 05 | `05-koban-engagement.md` | Koban the maneki-neko: escalating/varied reminder copy, heads-up channels, basic streaks | 📋 Planned — `lib/streak.js` written; **deliberately sequenced after 06** (auto-detect is the higher-value feature) |
-| 06 | `06-transaction-auto-detect.md` | Bank/UPI notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | 🚧 **All 3 phases built, awaiting one combined on-device test** (deliberately combined per user request, not phase-by-phase — see doc's Phase 2 Implementation Notes) — `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. No Android SDK in the build environment — nothing Gradle/Kotlin-compile-dependent has been verified yet |
+| 06 | `06-transaction-auto-detect.md` | Bank/UPI (+ SMS, personal-use-only) notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | ✅ **Go/no-go PASSED on real device** (2026-07-12) — core mechanism confirmed working. `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. **Allowlist reversed for personal use** — SMS/Messages added (`PERSONAL_USE_EXTRA_PACKAGES`, must be removed before any store submission — see doc). Swipe-away-specifically-isolated test still pending; otherwise on-device-verified |
 
 ---
 
