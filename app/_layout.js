@@ -30,6 +30,7 @@ import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet
 import { MenuSheetProvider } from '../components/MenuSheet';
 import { AlertsSheetProvider } from '../components/AlertsSheet';
 import useIncomingShare from '../hooks/useIncomingShare';
+import useProfile from '../hooks/useProfile';
 import { parseTransactionSms } from '../lib/smsParser';
 import { useNotificationSync } from '../lib/notifications';
 import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
@@ -106,6 +107,43 @@ function DetectedTransactionHandler() {
   return null;
 }
 
+// Sibling of <Stack>, same placement/reason as ShareIntentHandler — and here
+// the constraint is absolute, not stylistic: this needs useProfile(), which
+// needs useDataRefresh(), and RootNavigator *defines* DataRefreshProvider, so
+// it is not a descendant of it and cannot consume it. Routing a new signup
+// into onboarding therefore cannot live in RootNavigator's own redirect
+// effect (07-onboarding.md Phase 1).
+//
+// profiles.onboarded_at is the flag: NULL means the flow hasn't been
+// finished. It's in the DB rather than AsyncStorage so it follows the user
+// across reinstalls and devices instead of re-triggering on every dev build.
+function OnboardingGate() {
+  const { session } = useAuth();
+  const { profile, loading } = useProfile();
+  const segments = useSegments();
+  const router = useRouter();
+
+  const onboardedAt = profile?.onboarded_at ?? null;
+
+  useEffect(() => {
+    if (!session || loading) return;
+    // profile is briefly null right after signUp — handle_new_user's trigger
+    // row may not have landed yet. Waiting is correct; treating a null
+    // profile as "not onboarded" would redirect on a race and drag an
+    // already-onboarded user back through the flow.
+    if (!profile) return;
+
+    const inOnboarding = segments[0] === 'onboarding';
+    if (!onboardedAt && !inOnboarding) {
+      router.replace('/onboarding/welcome');
+    } else if (onboardedAt && inOnboarding) {
+      router.replace('/');
+    }
+  }, [session, loading, profile, onboardedAt, segments]);
+
+  return null;
+}
+
 function RootNavigator() {
   const { session, loading } = useAuth();
   const segments = useSegments();
@@ -139,6 +177,7 @@ function RootNavigator() {
                             <AddCategorySheetProvider>
                               <MenuSheetProvider>
                                 <AlertsSheetProvider>
+                                  <OnboardingGate />
                                   <ShareIntentHandler />
                                   <NotificationSync />
                                   <DetectedTransactionHandler />

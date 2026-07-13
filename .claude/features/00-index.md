@@ -122,6 +122,7 @@ data model.
 | 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | ✅ Complete (all 6 phases built); pending on-device verification of Phase 5's notifications (needs a new EAS build — native module) |
 | 05 | `05-koban-engagement.md` | Notification visibility fix → transaction-based streaks → Koban's escalating/varied reminder copy → in-app streak display → mascot icon (last, blocked on user art) | 🚧 **Phases 1–4 built** — heads-up channels (Phase 1, on-device confirmed working); `lib/streak.js` + `hooks/useStreak.js` (Phase 2, 39/39 verified incl. DST); `lib/koban.js` copy engine + `buildReminderPlan()` rolling window (Phase 3, 25/25 verified); `StreakCalendar`/`StreakCelebration` in-app UI (Phase 4, added after the user found Phases 2-3 had no visible surface — 9/9 verified). `formatMoney` hoisted to `lib/money.js`. Awaiting on-device confirmation of Phases 3-4 — no Android SDK here. Phase 5 (mascot icon) blocked on user art |
 | 06 | `06-transaction-auto-detect.md` | Bank/UPI (+ SMS, personal-use-only) notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | ✅ **Go/no-go PASSED on real device** (2026-07-12) — core mechanism confirmed working. `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. **Allowlist reversed for personal use** — SMS/Messages added (`PERSONAL_USE_EXTRA_PACKAGES`, must be removed before any store submission — see doc). Swipe-away-specifically-isolated test still pending; otherwise on-device-verified |
+| 07 | `07-onboarding.md` | First-run onboarding (Welcome → Name account → First expense → Reminders & streak → Auto-detect → All set) | 🚧 **All 3 phases built**, bundle-verified only — awaiting on-device confirmation (no Android SDK here). Gated on `profiles.onboarded_at` (new column; existing users backfilled, so the flow only ever fires for **new** signups). Built from the `claude-design/` mock, which predated Koban/Bills/auto-detect — the detect step and the streak framing are additions to that design, not in it |
 
 ---
 
@@ -134,7 +135,7 @@ migration files exist). Keep this in sync as feature files land.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. |
+| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at`, `onboarded_at` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. |
 | `categories` | `id`, `user_id`, `name`, `icon`, `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `type` (`'income'`\|`'expense'`), `is_default` | Seeded on signup: Food, Travel, Shopping, Bills, Coffee, Groceries, Other (expense); Salary, Freelance, Other (income) — 10 rows, each with a curated `color` (see `add_category_colors` migration below). `color` added 2026-07-11; picked via a curated swatch grid in `AddCategorySheet.js`, currently consumed only by Analytics (not tinted elsewhere in the app). **Global — not scoped by account, shared across all of a user's accounts.** |
 | `accounts` | `id`, `user_id`, `name`, `description` (nullable), `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `created_at` | Added 2026-07-11 (`add_accounts` migration, `02-accounts.md` Phase 1). Every user always has ≥1 account; `handle_new_user` auto-creates a "Personal" account on signup. Active account is client-side state (`lib/AccountContext.js`), persisted to AsyncStorage — not itself a DB concept. |
 | `transactions` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `type` (`'income'`\|`'expense'`), `amount` (always positive), `category_id`, `plan_id`, `note`, `occurred_at` (date), `created_at` | The single source of truth — every summary is computed from this table. |
@@ -178,6 +179,7 @@ Supabase performance advisor flags.
 | 2026-07-11 | `cascade_delete_user_data` | Deleting an auth user now fully purges their data. Changed `accounts_user_id_fkey` from `NO ACTION` → `ON DELETE CASCADE` — it was the one `user_id` FK not cascading, and because every user always has ≥1 account, `NO ACTION` was *blocking* auth-user deletion entirely (FK violation), not merely leaving orphans. Added `public.handle_user_delete()` (SECURITY DEFINER) + `on_auth_user_deleted` BEFORE DELETE trigger on `auth.users` (mirrors the existing `handle_new_user` insert trigger) to delete the user's avatar from the `avatars` storage bucket, which has no FK to `auth.users` and would otherwise orphan. All other `user_id` FKs (`profiles.id`, `transactions`, `budgets`, `plans`, `categories`) were already CASCADE from the original build. |
 | 2026-07-11 | `revoke_execute_on_user_delete_trigger` | `REVOKE EXECUTE` on `handle_user_delete()` from `public`/`anon`/`authenticated` — the advisor (0028/0029) flagged it as callable via `/rest/v1/rpc`. Trigger functions never need API-role EXECUTE; revoking removes it from the exposed RPC surface. |
 | 2026-07-11 | `private_avatars_and_self_delete` | Made the `avatars` bucket **private** (`storage.buckets.public = false`); avatars are now served via short-lived signed URLs. Repurposed `profiles.avatar_url` to store the object **path** (`{user_id}/avatar.jpg`) instead of a full public URL, and migrated/nulled existing rows accordingly. Added `public.delete_current_user()` (SECURITY DEFINER, `authenticated`-only) — lets a signed-in user delete their own `auth.users` row, cascading everything (via `cascade_delete_user_data`). |
+| 2026-07-13 | `add_profiles_onboarded_at` | Added `profiles.onboarded_at` (nullable timestamptz, no default) — the first-run onboarding flag (`07-onboarding.md` Phase 1). NULL = hasn't finished onboarding; `OnboardingGate` in `app/_layout.js` reads it. **Backfilled every existing row to `now()`** so no existing user is dragged through the flow — the flag only fires for signups created after this migration. `handle_new_user` deliberately **not** changed: it inserts only `(id, full_name)`, so new profiles get NULL and onboard for free. |
 | 2026-07-11 | `fix_user_delete_trigger_storage_guard` | Critical follow-up: `storage.objects` has a `protect_objects_delete` BEFORE-DELETE trigger that rejects any direct delete unless the session GUC `storage.allow_delete_query = 'true'`. `handle_user_delete()` was doing a direct delete, so it would have raised `42501` and **blocked** every auth-user deletion. Fixed by `perform set_config('storage.allow_delete_query','true',true)` before the delete. **Standing rule**: any DB code that deletes from `storage.objects` directly must set this GUC transaction-locally first, or use the Storage API instead. |
 
 **Still open, not fixed**: Security advisor flags leaked-password-protection
@@ -238,6 +240,34 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   reuse this instead of calling `useGlobalSummary` in a loop.
 - **`theme/tokens.js`** — colors, radii, spacing, fontFamily, fontSize.
   Single source for all styling.
+- **Onboarding** (`07-onboarding.md`, all 3 phases built 2026-07-13) —
+  `lib/onboarding.js` holds the step registry (`ONBOARDING_STEPS`), and both
+  the progress dots and the "where does Continue go" routing derive from it,
+  so a step added/removed/filtered renumbers everything automatically. A step
+  can carry a `supported` predicate and is then **dropped from the flow
+  entirely** where it can't work (the auto-detect step on iOS/Expo Go) — that's
+  the pattern to copy for any future platform-conditional step, rather than
+  stubbing or disabling one. Screens live in `app/onboarding/`, all built on
+  `components/OnboardingScaffold.js`.
+- **`OnboardingGate`** (`app/_layout.js`) — third instance of the
+  `ShareIntentHandler` pattern (side-effect-only component, returns `null`,
+  sibling of `<Stack>` *inside* the providers). It needs `useProfile` →
+  `useDataRefresh`, and `RootNavigator` defines `DataRefreshProvider`, so this
+  logic **cannot** live in `RootNavigator`'s own redirect effect. Redirects on
+  `profiles.onboarded_at` being NULL. Anything else that needs to gate routing
+  on user data must go here too, not in `RootNavigator`.
+- **`components/Confetti.js`** — the project's first real animation.
+  `react-native-reanimated` (~4.1.1) was already a dependency via
+  `@gorhom/bottom-sheet`, so animation is available without adding anything —
+  an earlier plan wrongly assumed it wasn't. One shared value per piece, fires
+  once, honours `AccessibilityInfo.isReduceMotionEnabled()`, `pointerEvents:
+  none`. Reuse (or extend) this rather than reaching for a confetti library.
+- **`WATCHED_APP_LABELS` now lives in `lib/detect.js`**, not `app/settings.js`
+  (moved 2026-07-13, `07-onboarding.md` Phase 3). It's the auto-detect consent
+  disclosure — the text stating which apps FLO reads — and it's now rendered in
+  both Settings and the onboarding detect step. One definition, two consumers:
+  a drifted copy would make the disclosure untrue, not just untidy. Keep it in
+  sync with `DEFAULT_ALLOWED_PACKAGES` directly above it.
 - **`MenuSheet.js`** (added in `01-analytics.md` Phase 1) — the hub sheet
   opened from Home's header (avatar + new menu icon), listing Analytics and
   Settings. Follows the same Provider/Context/`forwardRef` shape as the

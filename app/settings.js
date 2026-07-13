@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Landmark, BatteryWarning, Compass, Trash2, TriangleAlert } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
@@ -33,6 +33,7 @@ import {
   getDetectionDebugLog,
   clearDetectionDebugLog,
   DEFAULT_ALLOWED_PACKAGES,
+  WATCHED_APP_LABELS,
 } from '../lib/detect';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
@@ -52,26 +53,10 @@ function timeOnToday(hour, minute) {
   return d;
 }
 
-// Human-readable labels for DEFAULT_ALLOWED_PACKAGES (lib/detect.js) — this
-// is a read-only display list (06-transaction-auto-detect.md Phase 3: "no
-// user-editable allowlist UI this round"), so it only needs to be readable,
-// not exhaustive of every package field. Must stay in sync with
-// lib/detect.js's actual list — this text is the "explicit user consent"
-// disclosure, so it needs to be true, not just reassuring; a stale list here
-// would make the disclosure a lie. Messages is the personal-use-only entry
-// (see lib/detect.js's PERSONAL_USE_EXTRA_PACKAGES) — remove this line too
-// if that one gets removed before a store build.
-const WATCHED_APP_LABELS = {
-  'com.google.android.apps.nbu.paisa.user': 'Google Pay',
-  'com.phonepe.app': 'PhonePe',
-  'net.one97.paytm': 'Paytm',
-  'com.google.android.apps.messaging': 'Messages',
-};
-
 export default function Settings() {
   const router = useRouter();
   const { session, deleteAccount } = useAuth();
-  const { profile, avatarUrl } = useProfile();
+  const { profile, avatarUrl, updateProfile } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
   const { bills } = useBills();
   const { showToast } = useToast();
@@ -278,6 +263,14 @@ export default function Settings() {
     await sync();
   }
 
+  // Nulling onboarded_at puts the user back in the "hasn't onboarded" state;
+  // updateProfile already calls notifyChanged(), so OnboardingGate re-reads
+  // the column and redirects into the flow without any navigation from here.
+  async function handleReplayOnboarding() {
+    const { error } = await updateProfile({ onboarded_at: null });
+    if (error) showToast({ message: error.message, variant: 'error' });
+  }
+
   async function handleDelete() {
     setDeleting(true);
     setDeleteError(null);
@@ -338,13 +331,24 @@ export default function Settings() {
             <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
           </Pressable>
 
-          <View style={styles.row}>
+          <View style={[styles.row, styles.rowBorder]}>
             <View style={styles.rowIcon}>
               <SunMedium size={20} color={colors.ink} strokeWidth={2} />
             </View>
             <Text style={styles.rowTitle}>Appearance</Text>
             <Text style={styles.rowValue}>Light</Text>
           </View>
+
+          {/* Clearing onboarded_at is all this needs to do — OnboardingGate
+              watches that column and redirects on its own. No confirmation
+              dialog: it's non-destructive and every step is skippable. */}
+          <Pressable style={styles.row} onPress={handleReplayOnboarding}>
+            <View style={styles.rowIcon}>
+              <Compass size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <Text style={styles.rowTitle}>Replay onboarding</Text>
+            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+          </Pressable>
         </Card>
 
         <Text style={styles.sectionLabel}>Notifications</Text>
