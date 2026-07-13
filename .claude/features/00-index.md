@@ -115,6 +115,9 @@ data model.
 
 | # | File | Feature | Status |
 |---|---|---|---|
+| — | `IDEAS-subscription-and-store.md` | **Idea** — monetisation (never gate the ledger, gate the leverage) **and the store-readiness problem it exposes**: auto-detect is iOS-impossible, Play-policy-fraught, and currently ships a personal-use-only SMS allowlist that must be stripped before submission. Conclusion: the paid tier **cannot** rest on auto-detect; AI (receipt scan + categorisation) is the cross-platform backbone. Read before planning either monetisation or a store release. | 📋 Reference |
+| — | `IDEAS-personal-onboarding.md` | **Idea** — conversational/personal onboarding v2 (MCQ questions → reflection screen → commitment → signup), a rework of `07`. Records the psychology, the one rule that keeps it honest (every question must configure something real), and the pre-auth technical wrinkle. | 📋 Reference |
+| — | `IDEAS.md` | **Ideas backlog** — unscheduled, unphased. Verified gaps (no transfers, no search, no merchant capture, dead `profiles.currency`), the AI discussion (categorisation before receipt scanning, and why), and the two open product decisions blocking plans. Read before proposing a new feature; graduate an idea into a numbered doc when it's picked up. | 📋 Reference |
 | — | `FEATURE_PLAN.md` (repo root) | Core app (auth/transactions/budgets/plans/settings) | ✅ Complete (v1) |
 | 01 | `01-analytics.md` | Analytics (shared filter + Overview/Transactions/Categories/Budgets/Plans graphs) | ✅ Complete (all 3 phases built, pending final on-device confirmation) |
 | 02 | `02-accounts.md` | Accounts (multiple ledgers; active-account scoping for transactions/budgets/plans/analytics) | ✅ Complete (all 3 phases built, pending on-device confirmation) |
