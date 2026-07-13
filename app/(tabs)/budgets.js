@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Plus, Wallet } from 'lucide-react-native';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -8,6 +9,7 @@ import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import useBudgets, { budgetStatus } from '../../hooks/useBudgets';
+import { formatPeriodLabel, isBudgetEnded } from '../../lib/budgets';
 import { useAddBudgetSheet } from '../../components/AddBudgetSheet';
 
 const STATUS_STYLES = {
@@ -17,6 +19,7 @@ const STATUS_STYLES = {
 };
 
 export default function Budgets() {
+  const router = useRouter();
   const { budgets } = useBudgets();
   const { openAddBudget } = useAddBudgetSheet();
 
@@ -40,10 +43,17 @@ export default function Budgets() {
             const status = budgetStatus(b.spent, b.amount);
             const s = STATUS_STYLES[status];
             const progress = b.amount > 0 ? b.spent / b.amount : 0;
+            // A custom budget doesn't recur, so once its end date passes its
+            // spent figure is final. That has to read as deliberate, not as a
+            // card that quietly stopped updating.
+            const ended = isBudgetEnded(b);
 
             return (
-              <Pressable key={b.id} onPress={() => openAddBudget(b)}>
-                <Card variant={s.cardVariant} style={styles.budgetCard}>
+              // Tapping a budget now opens its detail screen, not the editor —
+              // matching Plans (list card → /plan/[id]). Editing lives behind
+              // the pencil in the detail header.
+              <Pressable key={b.id} onPress={() => router.push(`/budget/${b.id}`)}>
+                <Card variant={ended ? 'default' : s.cardVariant} style={[styles.budgetCard, ended && styles.budgetCardEnded]}>
                   <View style={styles.rowBetween}>
                     <View style={styles.rowLeft}>
                       <IconTile tone={s.iconTone} size={42} radius={13}>
@@ -55,10 +65,17 @@ export default function Budgets() {
                       </IconTile>
                       <View>
                         <Text style={styles.budgetName}>{b.name}</Text>
-                        <Text style={styles.budgetPeriod}>{b.period === 'week' ? 'This Week' : 'This Month'}</Text>
+                        {/* The actual window `spent` is computed over. "This Week"
+                            told the user nothing and left them guessing whether it
+                            meant 7 days from creation — it doesn't. */}
+                        <Text style={styles.budgetPeriod}>{formatPeriodLabel(b)}</Text>
                       </View>
                     </View>
-                    {s.pill && <Pill label={s.pill.label} tone={s.pill.tone} />}
+                    {ended ? (
+                      <Pill label="Ended" tone="completed" />
+                    ) : (
+                      s.pill && <Pill label={s.pill.label} tone={s.pill.tone} />
+                    )}
                   </View>
 
                   <View style={styles.progressWrap}>
@@ -91,6 +108,9 @@ export default function Budgets() {
 }
 
 const styles = StyleSheet.create({
+  budgetCardEnded: {
+    opacity: 0.6,
+  },
   header: {
     paddingTop: spacing.sm,
     flexDirection: 'row',

@@ -31,7 +31,11 @@ export default function AmountText({
   if (isNegative) prefix = '−';
   else if (signed) prefix = type === 'income' ? '+' : type === 'danger' ? '−' : '−';
 
-  const currencyColor = dark ? colors.mutedDarker : colors.mutedLight;
+  // Muting the ₹ is a de-emphasis against a healthy figure — but on a negative
+  // one it fought the number it belongs to, leaving a grey ₹ glued to a red
+  // amount. A negative reading should be red all the way through, so the
+  // currency simply takes the amount's own colour.
+  const currencyColor = isNegative ? color : dark ? colors.mutedDarker : colors.mutedLight;
 
   return (
     <Text style={[styles.text, { color, fontSize: size }, style]}>

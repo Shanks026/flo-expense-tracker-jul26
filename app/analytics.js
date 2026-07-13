@@ -312,7 +312,7 @@ export default function Analytics() {
                     {periods.map((p) => {
                       const progress = p.limit > 0 ? p.spent / p.limit : 0;
                       const periodLabel =
-                        budget.period === 'month'
+                        budget.period_type === 'calendar_month'
                           ? format(p.periodStart, 'MMMM yyyy')
                           : `${format(p.periodStart, 'd MMM')} – ${format(p.periodEnd, 'd MMM')}`;
                       return (

@@ -2,10 +2,12 @@ import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { X, Trash2 } from 'lucide-react-native';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { addDays, format, isBefore, parseISO, startOfDay } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { previewPeriodDates } from '../lib/budgets';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -33,20 +35,30 @@ export function useAddBudgetSheet() {
   return ctx;
 }
 
-function budgetName(period, categoryName) {
-  if (!categoryName) return period === 'week' ? 'Weekly Budget' : 'Monthly Budget';
-  return period === 'week' ? `${categoryName} — Weekly` : categoryName;
+const PERIOD_LABELS = {
+  calendar_week: 'Week',
+  calendar_month: 'Month',
+  custom: 'Custom',
+};
+
+function budgetName(periodType, categoryName) {
+  if (periodType === 'custom') return categoryName ?? 'Custom Budget';
+  if (!categoryName) return periodType === 'calendar_week' ? 'Weekly Budget' : 'Monthly Budget';
+  return periodType === 'calendar_week' ? `${categoryName} — Weekly` : categoryName;
 }
 
-// Matches v_budgets_with_spent's own period boundaries exactly (Postgres
-// date_trunc('week', ...) is Monday-start, same as weekStartsOn: 1 here; and
-// date_trunc('month', ...) is the calendar month) — so this always shows the
-// same range "spent" is actually computed over, never an approximation.
-function periodRangeLabel(period) {
-  const today = new Date();
-  const start = period === 'week' ? startOfWeek(today, { weekStartsOn: 1 }) : startOfMonth(today);
-  const end = period === 'week' ? endOfWeek(today, { weekStartsOn: 1 }) : endOfMonth(today);
-  return `${format(start, 'd MMM')} – ${format(end, 'd MMM')}`;
+// The window this budget will actually be measured over, shown before it's
+// saved. For the calendar types this comes from previewPeriodDates(), which is
+// deliberately kept in lockstep with the view's own CASE (see lib/budgets.js) —
+// so it always shows the same range `spent` is really computed over, never an
+// approximation.
+function periodRangeLabel(periodType, startDate, endDate) {
+  if (periodType === 'custom') {
+    return `${format(startDate, 'd MMM')} – ${format(endDate, 'd MMM yyyy')}`;
+  }
+  const range = previewPeriodDates(periodType);
+  if (!range) return '';
+  return `${format(range.start, 'd MMM')} – ${format(range.end, 'd MMM')}`;
 }
 
 const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
@@ -58,28 +70,42 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const { expenseCategories } = useCategories();
   const [editingId, setEditingId] = useState(null);
   const [amount, setAmount] = useState('');
-  const [period, setPeriod] = useState('month');
+  const [periodType, setPeriodType] = useState('calendar_month');
+  const [startDate, setStartDate] = useState(startOfDay(new Date()));
+  const [endDate, setEndDate] = useState(addDays(startOfDay(new Date()), 6));
+  const [showPicker, setShowPicker] = useState(null); // 'start' | 'end' | null
   const [categoryId, setCategoryId] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const selectedCategory = expenseCategories.find((c) => c.id === categoryId);
+  const isCustom = periodType === 'custom';
 
   useImperativeHandle(ref, () => ({
     open(budget) {
       setError(null);
       setPickerOpen(false);
+      setShowPicker(null);
       if (budget) {
         setEditingId(budget.id);
         setAmount(String(Math.round(budget.amount)));
-        setPeriod(budget.period);
+        setPeriodType(budget.period_type);
         setCategoryId(budget.category_id);
+        // A calendar budget carries no dates; seed the custom fields with a
+        // sane default anyway, so switching it to Custom mid-edit doesn't open
+        // onto an empty or nonsensical range.
+        const today = startOfDay(new Date());
+        setStartDate(budget.start_date ? parseISO(budget.start_date) : today);
+        setEndDate(budget.end_date ? parseISO(budget.end_date) : addDays(today, 6));
       } else {
+        const today = startOfDay(new Date());
         setEditingId(null);
         setAmount('');
-        setPeriod('month');
+        setPeriodType('calendar_month');
         setCategoryId(null);
+        setStartDate(today);
+        setEndDate(addDays(today, 6));
       }
       modalRef.current?.present();
     },
@@ -91,14 +117,24 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
       setError('Enter an amount');
       return;
     }
+    // Mirrors the budgets_custom_dates_ck constraint, so an invalid range gets
+    // a sentence rather than a raw Postgres constraint violation.
+    if (isCustom && isBefore(endDate, startDate)) {
+      setError('The end date must be on or after the start date');
+      return;
+    }
     setSaving(true);
     setError(null);
 
     const payload = {
-      name: budgetName(period, selectedCategory?.name),
+      name: budgetName(periodType, selectedCategory?.name),
       amount: numericAmount,
-      period,
+      period_type: periodType,
       category_id: categoryId,
+      // The DB constraint requires calendar budgets to carry NO dates — a stale
+      // start_date must never outlive a switch back from Custom.
+      start_date: isCustom ? format(startDate, 'yyyy-MM-dd') : null,
+      end_date: isCustom ? format(endDate, 'yyyy-MM-dd') : null,
     };
 
     const { error: saveError } = editingId
@@ -167,14 +203,53 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
         </View>
 
         <View style={styles.segmentWrap}>
-          <Pressable style={[styles.segment, period === 'week' && styles.segmentActive]} onPress={() => setPeriod('week')}>
-            <Text style={[styles.segmentText, period === 'week' && styles.segmentTextActive]}>Week</Text>
-          </Pressable>
-          <Pressable style={[styles.segment, period === 'month' && styles.segmentActive]} onPress={() => setPeriod('month')}>
-            <Text style={[styles.segmentText, period === 'month' && styles.segmentTextActive]}>Month</Text>
-          </Pressable>
+          {Object.entries(PERIOD_LABELS).map(([value, label]) => (
+            <Pressable
+              key={value}
+              style={[styles.segment, periodType === value && styles.segmentActive]}
+              onPress={() => setPeriodType(value)}
+            >
+              <Text style={[styles.segmentText, periodType === value && styles.segmentTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
         </View>
-        <Text style={styles.periodRangeText}>{periodRangeLabel(period)}</Text>
+
+        {isCustom && (
+          <View style={styles.dateRow}>
+            <Pressable style={styles.dateField} onPress={() => setShowPicker('start')}>
+              <Text style={styles.fieldLabelInline}>Start</Text>
+              <Text style={styles.dateValue}>{format(startDate, 'd MMM yyyy')}</Text>
+            </Pressable>
+            <Pressable style={styles.dateField} onPress={() => setShowPicker('end')}>
+              <Text style={styles.fieldLabelInline}>End</Text>
+              <Text style={styles.dateValue}>{format(endDate, 'd MMM yyyy')}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {showPicker && (
+          <DateTimePicker
+            value={showPicker === 'start' ? startDate : endDate}
+            mode="date"
+            display="default"
+            onChange={(_event, selected) => {
+              setShowPicker(null);
+              if (!selected) return;
+              const picked = startOfDay(selected);
+              if (showPicker === 'start') {
+                setStartDate(picked);
+                // Keep the range coherent rather than letting the user save an
+                // inverted one and hit the validation wall: dragging the start
+                // past the end pushes the end along with it.
+                if (isBefore(endDate, picked)) setEndDate(picked);
+              } else {
+                setEndDate(picked);
+              }
+            }}
+          />
+        )}
+
+        <Text style={styles.periodRangeText}>{periodRangeLabel(periodType, startDate, endDate)}</Text>
 
         <Pressable style={styles.categoryRow} onPress={() => setPickerOpen((v) => !v)}>
           <Text style={styles.fieldLabelInline}>Category (optional)</Text>
@@ -302,6 +377,25 @@ const styles = StyleSheet.create({
     color: colors.mutedMid,
     textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  dateField: {
+    flex: 1,
+    backgroundColor: colors.inkCard,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
+  },
+  dateValue: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.md,
+    color: colors.surface,
   },
   segment: {
     flex: 1,

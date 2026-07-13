@@ -134,9 +134,17 @@ function OnboardingGate() {
     if (!profile) return;
 
     const inOnboarding = segments[0] === 'onboarding';
-    if (!onboardedAt && !inOnboarding) {
-      router.replace('/onboarding/welcome');
-    } else if (onboardedAt && inOnboarding) {
+    const onSignIn = segments[0] === 'sign-in';
+
+    // This gate — not RootNavigator — owns where an authenticated user lands.
+    // RootNavigator only knows about `session`, so if it sent signed-in users
+    // to '/' it would paint Home for a frame before this effect could redirect
+    // a new user into onboarding. Sending them from sign-in straight to the
+    // right destination, once the profile that determines it has actually
+    // loaded, is the only way to avoid that flash.
+    if (!onboardedAt) {
+      if (!inOnboarding) router.replace('/onboarding/welcome');
+    } else if (inOnboarding || onSignIn) {
       router.replace('/');
     }
   }, [session, loading, profile, onboardedAt, segments]);
@@ -149,13 +157,17 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Only the signed-OUT rule lives here. Where a signed-IN user goes depends on
+  // profiles.onboarded_at, which this component cannot read (it defines
+  // DataRefreshProvider, so it can't consume it) — so OnboardingGate owns that
+  // half, including the sign-in → Home hop for an already-onboarded user.
+  // Routing to '/' from here as well would repaint Home before the gate could
+  // send a new user to onboarding: that was the split-second Home flash.
   useEffect(() => {
     if (loading) return;
     const onSignIn = segments[0] === 'sign-in';
     if (!session && !onSignIn) {
       router.replace('/sign-in');
-    } else if (session && onSignIn) {
-      router.replace('/');
     }
   }, [session, loading, segments]);
 

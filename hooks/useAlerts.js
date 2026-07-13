@@ -4,9 +4,16 @@ import useBills, { billStatus } from './useBills';
 import useBudgets, { budgetStatus } from './useBudgets';
 import usePlans from './usePlans';
 import { formatMoney } from '../lib/money';
+import { isBudgetEnded } from '../lib/budgets';
 
 const PLAN_ENDING_SOON_DAYS = 7;
 const SEVERITY_ORDER = { danger: 0, warn: 1 };
+
+const BUDGET_PERIOD_PHRASE = {
+  calendar_week: 'this week',
+  calendar_month: 'this month',
+  custom: 'in this period',
+};
 
 // Aggregates a live, computed alert feed — nothing is stored (see the Phase 6
 // goal in 04-notifications-and-recurring-bills.md). Deliberately mixed-scope:
@@ -47,6 +54,10 @@ export default function useAlerts() {
     for (const budget of budgets) {
       const status = budgetStatus(budget.spent, budget.amount);
       if (status === 'healthy') continue;
+      // An ended custom budget can't be acted on — its window is closed and its
+      // spent figure is final. Alerting on it would nag about a trip you took
+      // last month, forever.
+      if (isBudgetEnded(budget)) continue;
       list.push({
         id: `budget-${budget.id}`,
         kind: 'budget',
@@ -55,7 +66,7 @@ export default function useAlerts() {
         subtitle:
           status === 'over'
             ? `Over by ${formatMoney(budget.spent - budget.amount)}`
-            : `${Math.round((budget.spent / budget.amount) * 100)}% used this ${budget.period === 'week' ? 'week' : 'month'}`,
+            : `${Math.round((budget.spent / budget.amount) * 100)}% used ${BUDGET_PERIOD_PHRASE[budget.period_type] ?? 'this period'}`,
         route: '/budgets',
       });
     }

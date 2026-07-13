@@ -122,6 +122,7 @@ data model.
 | 04 | `04-notifications-and-recurring-bills.md` | In-app toasts → recurring bills/subscriptions → local scheduled notifications + bell notification center | ✅ Complete (all 6 phases built); pending on-device verification of Phase 5's notifications (needs a new EAS build — native module) |
 | 05 | `05-koban-engagement.md` | Notification visibility fix → transaction-based streaks → Koban's escalating/varied reminder copy → in-app streak display → mascot icon (last, blocked on user art) | 🚧 **Phases 1–4 built** — heads-up channels (Phase 1, on-device confirmed working); `lib/streak.js` + `hooks/useStreak.js` (Phase 2, 39/39 verified incl. DST); `lib/koban.js` copy engine + `buildReminderPlan()` rolling window (Phase 3, 25/25 verified); `StreakCalendar`/`StreakCelebration` in-app UI (Phase 4, added after the user found Phases 2-3 had no visible surface — 9/9 verified). `formatMoney` hoisted to `lib/money.js`. Awaiting on-device confirmation of Phases 3-4 — no Android SDK here. Phase 5 (mascot icon) blocked on user art |
 | 06 | `06-transaction-auto-detect.md` | Bank/UPI (+ SMS, personal-use-only) notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | ✅ **Go/no-go PASSED on real device** (2026-07-12) — core mechanism confirmed working. `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. **Allowlist reversed for personal use** — SMS/Messages added (`PERSONAL_USE_EXTRA_PACKAGES`, must be removed before any store submission — see doc). Swipe-away-specifically-isolated test still pending; otherwise on-device-verified |
+| 08 | `08-budget-periods-and-detail.md` | Budget period model (`calendar_week`/`calendar_month`/**`custom`** date range) + visible period labels + budget detail screen | 🚧 **Both phases built**, bundle- and SQL-verified; awaiting on-device confirmation. `budgets.period` **dropped** → `period_type` + `start_date`/`end_date`; `v_budgets_with_spent` now exposes `period_start`/`period_end` (the keystone — the card can finally name its window, and the detail screen filters by the *same* bounds `spent` came from). Tapping a budget card now opens `/budget/[id]` instead of the edit sheet |
 | 07 | `07-onboarding.md` | First-run onboarding (Welcome → Name account → First expense → Reminders & streak → Auto-detect → All set) | 🚧 **All 3 phases built**, bundle-verified only — awaiting on-device confirmation (no Android SDK here). Gated on `profiles.onboarded_at` (new column; existing users backfilled, so the flow only ever fires for **new** signups). Built from the `claude-design/` mock, which predated Koban/Bills/auto-detect — the detect step and the streak framing are additions to that design, not in it |
 
 ---
@@ -139,7 +140,7 @@ migration files exist). Keep this in sync as feature files land.
 | `categories` | `id`, `user_id`, `name`, `icon`, `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `type` (`'income'`\|`'expense'`), `is_default` | Seeded on signup: Food, Travel, Shopping, Bills, Coffee, Groceries, Other (expense); Salary, Freelance, Other (income) — 10 rows, each with a curated `color` (see `add_category_colors` migration below). `color` added 2026-07-11; picked via a curated swatch grid in `AddCategorySheet.js`, currently consumed only by Analytics (not tinted elsewhere in the app). **Global — not scoped by account, shared across all of a user's accounts.** |
 | `accounts` | `id`, `user_id`, `name`, `description` (nullable), `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `created_at` | Added 2026-07-11 (`add_accounts` migration, `02-accounts.md` Phase 1). Every user always has ≥1 account; `handle_new_user` auto-creates a "Personal" account on signup. Active account is client-side state (`lib/AccountContext.js`), persisted to AsyncStorage — not itself a DB concept. |
 | `transactions` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `type` (`'income'`\|`'expense'`), `amount` (always positive), `category_id`, `plan_id`, `note`, `occurred_at` (date), `created_at` | The single source of truth — every summary is computed from this table. |
-| `budgets` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `name`, `amount`, `period` (`'week'`\|`'month'`), `category_id` (nullable = overall), `created_at` | Recurring by period type — "spent" is always for the *current* period, computed, never stored. **`account_id` column exists but hooks don't filter by it yet** — that's `02-accounts.md` Phase 2. |
+| `budgets` | `id`, `user_id`, `account_id` (NOT NULL), `name`, `amount`, `period_type` (`'calendar_week'`\|`'calendar_month'`\|`'custom'`), `start_date`/`end_date` (custom only, else NULL), `category_id` (nullable = overall), `created_at` | **`period` was dropped 2026-07-13** (`08-budget-periods-and-detail.md`) — grep for `.period` before assuming otherwise. Calendar types recur forever; `custom` is a one-off explicit range that **ends** (excluded from alerts once past). Two CHECK constraints: valid `period_type`, and custom-requires-both-dates / calendar-requires-neither. "spent" is always computed for the current period, never stored. |
 | `plans` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `name`, `icon`, `target_amount` (nullable), `start_date`, `end_date` (nullable), `status` (`'active'`\|`'completed'`), `created_at` | Same Phase 2 caveat as `budgets` — column exists, hooks don't filter by it yet. |
 
 ### Views (computed reads)
@@ -147,7 +148,7 @@ migration files exist). Keep this in sync as feature files land.
 | View | Purpose |
 |---|---|
 | `v_global_summary` | Per-account (added `account_id`, `GROUP BY account_id`, 2026-07-11): total income, total expense, in-hand balance, this-month income/expense **for one account**. Returns no row for an account with zero transactions — query with `.eq('account_id', …).maybeSingle()`, not `.single()`. |
-| `v_budgets_with_spent` | Each budget + current-period `spent`/`remaining` (negative when over). Gained `account_id` 2026-07-11; the `spent` lateral now also filters `tx.account_id = b.account_id`. |
+| `v_budgets_with_spent` | Each budget + current-period `spent`/`remaining` (negative when over). Gained `account_id` 2026-07-11. **Rewritten 2026-07-13** (`08-...md`): now also exposes **`period_start`/`period_end`** — the window `spent` is computed over — plus `period_type`, `start_date`/`end_date` and `category_color`. Any UI that needs to know or display a budget's window **must read these columns**, never re-derive the period client-side: a client that computes its own "this week" can disagree with the `spent` figure printed beside it, and both halves look correct in isolation. The one sanctioned exception is `previewPeriodDates()` in `lib/budgets.js`, which must show a window *before* a row exists — it duplicates the view's `CASE` and is commented on both sides. |
 | `v_plans_with_totals` | Each plan + `total_spent`/`remaining` vs target. Gained `account_id` 2026-07-11 (no filter change to the `spent` lateral — see `02-accounts.md` Phase 1 for why). |
 
 All three views have `security_invoker = true` set explicitly — see the
@@ -179,6 +180,7 @@ Supabase performance advisor flags.
 | 2026-07-11 | `cascade_delete_user_data` | Deleting an auth user now fully purges their data. Changed `accounts_user_id_fkey` from `NO ACTION` → `ON DELETE CASCADE` — it was the one `user_id` FK not cascading, and because every user always has ≥1 account, `NO ACTION` was *blocking* auth-user deletion entirely (FK violation), not merely leaving orphans. Added `public.handle_user_delete()` (SECURITY DEFINER) + `on_auth_user_deleted` BEFORE DELETE trigger on `auth.users` (mirrors the existing `handle_new_user` insert trigger) to delete the user's avatar from the `avatars` storage bucket, which has no FK to `auth.users` and would otherwise orphan. All other `user_id` FKs (`profiles.id`, `transactions`, `budgets`, `plans`, `categories`) were already CASCADE from the original build. |
 | 2026-07-11 | `revoke_execute_on_user_delete_trigger` | `REVOKE EXECUTE` on `handle_user_delete()` from `public`/`anon`/`authenticated` — the advisor (0028/0029) flagged it as callable via `/rest/v1/rpc`. Trigger functions never need API-role EXECUTE; revoking removes it from the exposed RPC surface. |
 | 2026-07-11 | `private_avatars_and_self_delete` | Made the `avatars` bucket **private** (`storage.buckets.public = false`); avatars are now served via short-lived signed URLs. Repurposed `profiles.avatar_url` to store the object **path** (`{user_id}/avatar.jpg`) instead of a full public URL, and migrated/nulled existing rows accordingly. Added `public.delete_current_user()` (SECURITY DEFINER, `authenticated`-only) — lets a signed-in user delete their own `auth.users` row, cascading everything (via `cascade_delete_user_data`). |
+| 2026-07-13 | `budget_period_types` | `08-budget-periods-and-detail.md` Phase 1. Dropped `budgets.period`; added `period_type` (`calendar_week`\|`calendar_month`\|`custom`) + `start_date`/`end_date`, with CHECK constraints (valid type; custom-requires-both-dates, calendar-requires-neither). Recreated `v_budgets_with_spent` exposing `period_start`/`period_end`/`period_type`/`start_date`/`end_date`/`category_color`, and re-set `security_invoker = true` (standing rule — verified via `pg_class.reloptions` and a clean security advisor run). Backfill (`'week'`→`calendar_week`) was a no-op: `budgets` had 0 rows. Verified live by inserting one budget of each type and reading the view back (calendar_week → Mon–Sun; calendar_month → 1st–EOM; custom → its own dates), then deleting them. |
 | 2026-07-13 | `add_profiles_onboarded_at` | Added `profiles.onboarded_at` (nullable timestamptz, no default) — the first-run onboarding flag (`07-onboarding.md` Phase 1). NULL = hasn't finished onboarding; `OnboardingGate` in `app/_layout.js` reads it. **Backfilled every existing row to `now()`** so no existing user is dragged through the flow — the flag only fires for signups created after this migration. `handle_new_user` deliberately **not** changed: it inserts only `(id, full_name)`, so new profiles get NULL and onboard for free. |
 | 2026-07-11 | `fix_user_delete_trigger_storage_guard` | Critical follow-up: `storage.objects` has a `protect_objects_delete` BEFORE-DELETE trigger that rejects any direct delete unless the session GUC `storage.allow_delete_query = 'true'`. `handle_user_delete()` was doing a direct delete, so it would have raised `42501` and **blocked** every auth-user deletion. Fixed by `perform set_config('storage.allow_delete_query','true',true)` before the delete. **Standing rule**: any DB code that deletes from `storage.objects` directly must set this GUC transaction-locally first, or use the Storage API instead. |
 
@@ -240,6 +242,42 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   reuse this instead of calling `useGlobalSummary` in a loop.
 - **`theme/tokens.js`** — colors, radii, spacing, fontFamily, fontSize.
   Single source for all styling.
+- **`lib/budgets.js`** (added 2026-07-13, `08-...md`) — `formatPeriodLabel`,
+  `budgetPeriodDates`, `isBudgetEnded`, `daysLeftInPeriod`,
+  `computeBudgetPace`, `previewPeriodDates`. `computeBudgetPace` reuses the
+  settled `on_track`/`over_pace`/`under_pace` vocabulary from
+  `computePlanPace` — a budget, like a plan target, is a spending *cap*, so
+  `ahead`/`behind` reads ambiguously. Don't reinvent the labels.
+- **Date-only strings from Postgres need `parseISO`, not `new Date()`**
+  (`lib/budgets.js`) — `new Date('2026-07-13')` parses as **UTC** midnight,
+  which lands on the *previous day* for any negative UTC offset. `parseISO`
+  treats a date-only string as *local* midnight, which is what a calendar
+  date means. Applies to every `date` column in this schema
+  (`occurred_at`, `period_start`/`period_end`, `start_date`/`end_date`).
+- **`useBudgetDetail(budgetId)`** — like `usePlan(planId)`, deliberately
+  **not** filtered by `activeAccountId`: it's keyed by an id that came from
+  explicit navigation, so it scopes to *that record's* `account_id`. This is
+  the standing pattern for any future singular-detail hook.
+- **Bug fixed: streak celebration was suppressed across accounts on a shared
+  device** (found 2026-07-13 during onboarding's first real run, fixed in
+  `05-koban-engagement.md`'s `StreakCelebration.js`) — the "already celebrated
+  today" guard used a bare AsyncStorage key (`flo.streak.lastCelebrated`) with
+  **no user scoping**, so once *any* account celebrated on a device, every
+  other account on that device was silently skipped for the rest of the day.
+  Now keyed `flo.streak.lastCelebrated.${userId}`. **Standing rule**: any
+  AsyncStorage key holding *user*-scoped state (as opposed to genuinely
+  device-scoped state like notification permissions) must include the user id.
+  This device has more than one account signed into it in practice — that is a
+  real configuration, not a hypothetical.
+- **Adding a new route DIRECTORY needs `npx expo start -c`** (learned
+  2026-07-13, `07-onboarding.md`) — Expo Router builds its route tree from a
+  Metro `require.context` over `app/`, and a dev server started before the
+  directory existed keeps serving a tree without it. `router.replace()` to a
+  route the tree doesn't know about does **not** crash and does **not** render
+  the unmatched-route screen: it warns to the console and silently leaves you
+  where you were. This cost a full debugging round that looked, from the
+  symptom, exactly like a broken navigation guard. Restart with `-c` before
+  suspecting the code.
 - **Onboarding** (`07-onboarding.md`, all 3 phases built 2026-07-13) —
   `lib/onboarding.js` holds the step registry (`ONBOARDING_STEPS`), and both
   the progress dots and the "where does Continue go" routing derive from it,
@@ -320,12 +358,17 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   provider nest, and put the app-wide-event-reacting logic there instead.
   Reuse this shape for any future feature that needs to react to
   something at the app root and also touch sheet/account/etc. state.
-- **Known gap surfaced by Phase 3, not fixed (out of scope for
-  `01-analytics.md`)**: `components/ProgressBar.js`'s status-to-color
-  logic only special-cases `'danger'`, not `'over'` (the actual status
-  value `budgetStatus()` returns) — an over-limit progress bar silently
-  falls back to the default brand color instead of red, both on the live
-  Budgets tab and in Analytics. Worth a small standalone fix later.
+- **`ProgressBar` over-limit colour — FIXED 2026-07-13** (was a known gap
+  since `01-analytics.md` Phase 3). `components/ProgressBar.js` only had a
+  `'danger'` key in `FILL_BY_STATUS`, not `'over'` — which is what
+  `budgetStatus()` actually returns — so an over-limit bar fell through to
+  the default **brand lime**: a green progress bar on a budget you'd blown,
+  on the Budgets tab and in Analytics both. `dark` cards separately
+  hard-coded the fill to brand, so a dark summary card could never show red
+  at all. Both fixed in `08-budget-periods-and-detail.md` Phase 2. If a new
+  status value is ever added to `budgetStatus()`, add it to
+  `FILL_BY_STATUS` in the same commit — the fallback fails *green*, which
+  is the worst possible direction for a failure of this kind.
 - **`AccountContext.js`** (`lib/AccountContext.js`, added
   `02-accounts.md` Phase 1) — every user always has ≥1 account (default
   "Personal" from `handle_new_user`). Holds `{ accounts, activeAccount,

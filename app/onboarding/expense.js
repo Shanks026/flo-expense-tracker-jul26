@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { format } from 'date-fns';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { ChevronDown } from 'lucide-react-native';
+import { format, isToday, isYesterday } from 'date-fns';
 import OnboardingScaffold from '../../components/OnboardingScaffold';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
 import useCategories from '../../hooks/useCategories';
+import usePlans from '../../hooks/usePlans';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
@@ -16,28 +19,48 @@ import { getNextRoute } from '../../lib/onboarding';
 // AddTransactionSheet over the flow — the user's explicit call (a modal sheet
 // on top of a linear stepper breaks the stepper's reading).
 //
-// The duplication that buys is bounded on purpose: amount, type, category.
-// There is deliberately NO plan link, note, date picker, account switcher,
-// edit/delete, or post-save budget-warning toast here. This step is "log one
-// expense, today, in a category" and nothing more. If it starts growing
-// toward parity with AddTransactionSheet, that's the signal this was the
-// wrong call — raise it rather than porting features across one at a time.
+// Field parity with AddTransactionSheet is deliberate and was also the user's
+// call: type, amount, category, date, plan and note, producing an identical
+// row. The only things left out are the ones that make no sense here — editing
+// and deleting (there's nothing to edit yet) and the account switcher (the
+// account was named on the previous step; the row below states which one this
+// lands in).
+//
+// This is now a genuine second implementation of transaction entry. If a third
+// appears, extract a shared form component rather than copying it again.
+// Width of the ₹ glyph's slot, mirrored by an empty spacer on the input's
+// right so the digits land dead-centre. See the amount row's comment below.
+const CURRENCY_SLOT = 26;
+
+function formatDateLabel(date) {
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'd MMM yyyy');
+}
+
 export default function OnboardingExpense() {
   const router = useRouter();
-  const { activeAccountId } = useAccount();
+  const { activeAccount, activeAccountId } = useAccount();
   const { expenseCategories, incomeCategories } = useCategories();
+  const { activePlans } = usePlans();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
 
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(null);
+  const [planId, setPlanId] = useState(null);
+  const [planPickerOpen, setPlanPickerOpen] = useState(false);
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
+  const selectedPlan = activePlans.find((p) => p.id === planId);
 
-  // Categories load a beat after mount; select the first one as soon as they
-  // arrive (and again when the type flips, since the two lists are disjoint).
+  // Categories load a beat after mount; select the first as soon as they
+  // arrive, and again when the type flips (the two lists are disjoint).
   useEffect(() => {
     if (!categories.some((c) => c.id === categoryId)) {
       setCategoryId(categories[0]?.id ?? null);
@@ -57,9 +80,9 @@ export default function OnboardingExpense() {
       type,
       amount: numericAmount,
       category_id: categoryId,
-      plan_id: null,
-      occurred_at: format(new Date(), 'yyyy-MM-dd'),
-      note: null,
+      plan_id: planId,
+      occurred_at: format(date, 'yyyy-MM-dd'),
+      note: note.trim() || null,
       account_id: activeAccountId,
     });
 
@@ -71,14 +94,15 @@ export default function OnboardingExpense() {
     // Without this, Home/Budgets/the streak wouldn't see the row until some
     // later mutation happened to bump the version.
     notifyChanged();
-    router.push(next);
+    router.replace(next);
   }
 
   return (
     <OnboardingScaffold
       stepKey="expense"
-      title="Add your first expense"
+      title="Add your first transaction"
       subtitle="Optional — try it now to see how fast it feels."
+      scrollable
       primaryLabel="Add & Continue"
       onPrimary={handleSave}
       primaryDisabled={!numericAmount || numericAmount <= 0 || !categoryId}
@@ -86,6 +110,15 @@ export default function OnboardingExpense() {
       secondaryLabel="I'll do this later"
       onSecondary={() => router.push(next)}
     >
+      {activeAccount && (
+        <View style={styles.accountRow}>
+          <View style={[styles.accountDot, { backgroundColor: activeAccount.color }]} />
+          <Text style={styles.accountText}>
+            Adding to <Text style={styles.accountName}>{activeAccount.name}</Text>
+          </Text>
+        </View>
+      )}
+
       <View style={styles.segmentWrap}>
         <Pressable
           style={[styles.segment, type === 'expense' && styles.segmentActive]}
@@ -113,6 +146,11 @@ export default function OnboardingExpense() {
             keyboardType="number-pad"
             style={styles.amountInput}
           />
+          {/* Balances the ₹ on the other side of the input. Without it the row
+              centres [₹][input] as a unit, which pushes the digits right of the
+              centred "Amount" label above them. Equal fixed-width slots on both
+              sides put the digits exactly on the centre line. */}
+          <View style={styles.currencySlot} />
         </View>
       </View>
 
@@ -138,11 +176,104 @@ export default function OnboardingExpense() {
           );
         })}
       </ScrollView>
+
+      <View style={styles.dateAndPlanRow}>
+        <Pressable style={[styles.field, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.fieldLabel}>Date</Text>
+          <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
+        </Pressable>
+        <Pressable style={[styles.field, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
+          <View style={styles.planRowInner}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Add to Plan</Text>
+              <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
+                {selectedPlan?.name ?? 'None'}
+              </Text>
+            </View>
+            <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+          </View>
+        </Pressable>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={(_event, selected) => {
+            setShowDatePicker(false);
+            if (selected) setDate(selected);
+          }}
+        />
+      )}
+
+      {planPickerOpen && (
+        <View style={styles.planPicker}>
+          <Pressable
+            style={[styles.planOption, planId === null && styles.planOptionSelected]}
+            onPress={() => {
+              setPlanId(null);
+              setPlanPickerOpen(false);
+            }}
+          >
+            <Text style={[styles.planOptionText, planId === null && styles.planOptionTextSelected]}>None</Text>
+          </Pressable>
+          {activePlans.map((p) => (
+            <Pressable
+              key={p.id}
+              style={[styles.planOption, planId === p.id && styles.planOptionSelected]}
+              onPress={() => {
+                setPlanId(p.id);
+                setPlanPickerOpen(false);
+              }}
+            >
+              <Text
+                style={[styles.planOptionText, planId === p.id && styles.planOptionTextSelected]}
+                numberOfLines={1}
+              >
+                {p.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.noteRow}>
+        <Text style={styles.fieldLabel}>Note</Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Add a note…"
+          placeholderTextColor={colors.mutedLight}
+          style={styles.noteInput}
+        />
+      </View>
     </OnboardingScaffold>
   );
 }
 
 const styles = StyleSheet.create({
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  accountDot: {
+    width: 9,
+    height: 9,
+    borderRadius: radii.pill,
+  },
+  accountText: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.base,
+    color: colors.muted,
+  },
+  accountName: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.ink,
+  },
   segmentWrap: {
     flexDirection: 'row',
     backgroundColor: colors.chipBg,
@@ -169,7 +300,7 @@ const styles = StyleSheet.create({
   },
   amountWrap: {
     alignItems: 'center',
-    marginTop: spacing.xxl,
+    marginTop: spacing.xl,
   },
   amountLabel: {
     fontFamily: fontFamily.semibold,
@@ -179,16 +310,23 @@ const styles = StyleSheet.create({
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
     marginTop: spacing.xs,
   },
   amountCurrency: {
+    width: CURRENCY_SLOT,
+    textAlign: 'right',
     fontFamily: fontFamily.bold,
     fontSize: fontSize.amount,
     color: colors.mutedLight,
   },
+  currencySlot: {
+    width: CURRENCY_SLOT,
+  },
   amountInput: {
-    minWidth: 120,
+    minWidth: 110,
+    textAlign: 'center',
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.amountXl,
     letterSpacing: -1.5,
@@ -200,7 +338,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.mutedMid,
     letterSpacing: 0.4,
-    marginTop: spacing.xxl,
+    marginTop: spacing.xl,
     marginBottom: spacing.md,
   },
   chipRow: {
@@ -234,5 +372,77 @@ const styles = StyleSheet.create({
   chipLabelInactive: {
     fontFamily: fontFamily.semibold,
     color: colors.muted,
+  },
+  dateAndPlanRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+  },
+  field: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.iconTileLg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  planRowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  fieldLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+  },
+  fieldValue: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    color: colors.ink,
+    marginTop: 2,
+  },
+  fieldValuePlan: {
+    color: colors.incomeAccent,
+  },
+  planPicker: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.iconTileLg,
+    overflow: 'hidden',
+  },
+  planOption: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  planOptionSelected: {
+    backgroundColor: colors.iconTileBg,
+  },
+  planOptionText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.lg,
+    color: colors.mutedDarker,
+  },
+  planOptionTextSelected: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.ink,
+  },
+  noteRow: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.iconTileLg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  noteInput: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.lg,
+    color: colors.ink,
+    padding: 0,
+    marginTop: 2,
   },
 });

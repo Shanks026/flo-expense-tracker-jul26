@@ -71,24 +71,25 @@ export default function OnboardingReminders() {
     await rescheduleAll({ bills, userId: session?.user?.id ?? null });
 
     setWorking(false);
-    router.push(next);
+    router.replace(next);
   }
 
   return (
     <OnboardingScaffold
       stepKey="reminders"
+      hero={
+        <View style={styles.heroTile}>
+          <Bell size={30} color={colors.incomeAccent} strokeWidth={2} />
+        </View>
+      }
       title="Never miss a bill"
       subtitle="A heads-up before bills are due, and a nightly nudge to log your day."
       primaryLabel="Enable Notifications"
       onPrimary={handleEnable}
       primaryLoading={working}
       secondaryLabel="Maybe later"
-      onSecondary={() => router.push(next)}
+      onSecondary={() => router.replace(next)}
     >
-      <View style={styles.hero}>
-        <Bell size={30} color={colors.incomeAccent} strokeWidth={2} />
-      </View>
-
       <View style={styles.cards}>
         <View style={styles.card}>
           <View style={styles.cardIcon}>
@@ -128,14 +129,13 @@ export default function OnboardingReminders() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
+  heroTile: {
     width: 66,
     height: 66,
     borderRadius: radii.card,
     backgroundColor: colors.incomeBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxl,
   },
   cards: {
     gap: spacing.md,

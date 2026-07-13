@@ -61,7 +61,7 @@ export default function OnboardingDetect() {
     setAllowedPackages(DEFAULT_ALLOWED_PACKAGES);
     setDetectionEnabled(true);
     setEnabled(true);
-    router.push(next);
+    router.replace(next);
   }
 
   const granted = access;
@@ -69,17 +69,18 @@ export default function OnboardingDetect() {
   return (
     <OnboardingScaffold
       stepKey="detect"
+      hero={
+        <View style={styles.heroTile}>
+          <Zap size={30} color={colors.incomeAccent} strokeWidth={2} />
+        </View>
+      }
       title="Log transactions automatically"
       subtitle="FLO can read your bank and UPI alerts, and offer to log them for you."
       primaryLabel={granted ? 'Turn on detection' : 'Grant access'}
       onPrimary={granted ? handleEnable : handleGrant}
       secondaryLabel="Not now"
-      onSecondary={() => router.push(next)}
+      onSecondary={() => router.replace(next)}
     >
-      <View style={styles.hero}>
-        <Zap size={30} color={colors.incomeAccent} strokeWidth={2} />
-      </View>
-
       <View style={styles.card}>
         <View style={styles.cardIcon}>
           {granted ? (
@@ -113,14 +114,13 @@ export default function OnboardingDetect() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
+  heroTile: {
     width: 66,
     height: 66,
     borderRadius: radii.card,
     backgroundColor: colors.incomeBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxl,
   },
   card: {
     flexDirection: 'row',

@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Wallet, Target, Zap } from 'lucide-react-native';
-import Logo from '../../components/Logo';
 import OnboardingScaffold from '../../components/OnboardingScaffold';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
 import { getNextRoute, useOnboarding } from '../../lib/onboarding';
@@ -28,14 +27,10 @@ export default function OnboardingWelcome() {
       title="Welcome to FLO"
       subtitle="Know where your money flows."
       primaryLabel="Get Started"
-      onPrimary={() => router.push(getNextRoute('welcome'))}
+      onPrimary={() => router.replace(getNextRoute('welcome'))}
       secondaryLabel="Skip intro"
       onSecondary={finish}
     >
-      <View style={styles.brand}>
-        <Logo size={56} radius={18} />
-      </View>
-
       <View style={styles.features}>
         {FEATURES.map(({ icon: Icon, title, body }) => (
           <View key={title} style={styles.row}>
@@ -54,10 +49,6 @@ export default function OnboardingWelcome() {
 }
 
 const styles = StyleSheet.create({
-  brand: {
-    alignItems: 'flex-start',
-    marginBottom: spacing.xxl,
-  },
   features: {
     gap: spacing.lg,
   },

@@ -1,15 +1,16 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { Plus, Receipt } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronLeft, Plus, Receipt } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Screen from '../../components/Screen';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import Pill from '../../components/Pill';
-import CategoryIcon from '../../components/CategoryIcon';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import useBills, { billStatus } from '../../hooks/useBills';
-import { useAddBillSheet } from '../../components/AddBillSheet';
-import { usePayBillSheet } from '../../components/PayBillSheet';
+import Card from '../components/Card';
+import IconTile from '../components/IconTile';
+import Pill from '../components/Pill';
+import CategoryIcon from '../components/CategoryIcon';
+import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import useBills, { billStatus } from '../hooks/useBills';
+import { useAddBillSheet } from '../components/AddBillSheet';
+import { usePayBillSheet } from '../components/PayBillSheet';
 
 const CADENCE_LABELS = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
 
@@ -23,14 +24,22 @@ const STATUS_STYLES = {
 };
 
 export default function Bills() {
+  const router = useRouter();
   const { bills } = useBills();
   const { openAddBill } = useAddBillSheet();
   const { openPayBill } = usePayBillSheet();
 
   return (
-    <Screen>
+    // Pushed from the menu sheet now, not a tab — so it needs its own back
+    // button and SafeAreaView, the same shape as Settings and Analytics.
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Bills</Text>
+        <View style={styles.headerLeft}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
+          </Pressable>
+          <Text style={styles.title}>Bills</Text>
+        </View>
         <Pressable style={styles.newButton} onPress={() => openAddBill()}>
           <Plus size={15} color={colors.brand} strokeWidth={3} />
           <Text style={styles.newButtonText}>New Bill</Text>
@@ -92,16 +101,37 @@ export default function Bills() {
           })
         )}
       </ScrollView>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   header: {
     paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: fontFamily.extrabold,
@@ -124,8 +154,12 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   scroll: {
+    // Screen used to supply the horizontal padding; a bare SafeAreaView
+    // doesn't. The 120 bottom pad existed to clear the tab bar — as a pushed
+    // screen there isn't one.
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
-    paddingBottom: 120,
+    paddingBottom: 60,
     gap: spacing.md,
   },
   emptyText: {

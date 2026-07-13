@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { ChartColumn, Flag, Settings, LogOut, X } from 'lucide-react-native';
+import { ChartColumn, Receipt, Settings, LogOut, X } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
@@ -27,9 +27,11 @@ export function useMenuSheet() {
   return ctx;
 }
 
+// Bills swapped in here and Plans out to the tab bar (2026-07-13), reversing
+// the 2026-07-11 swap. Plans is the more frequently used of the two.
 const ITEMS = [
   { key: 'analytics', label: 'Analytics', route: '/analytics', icon: ChartColumn },
-  { key: 'plans', label: 'Plans', route: '/plans', icon: Flag },
+  { key: 'bills', label: 'Bills', route: '/bills', icon: Receipt },
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
 

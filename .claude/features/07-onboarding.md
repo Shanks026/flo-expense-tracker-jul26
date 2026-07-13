@@ -688,6 +688,246 @@ be reachable on a platform where it can't work.
 
 ---
 
+## Post-Build Fixes — First On-Device Round (2026-07-13)
+
+First real run, in Expo Go. Five findings; all fixed.
+
+### 1. Onboarding never appeared at all — stale Metro route tree
+
+**Symptom**: created a new account, landed on Home. No onboarding, no error, no
+unmatched-route screen.
+
+**Not** a gate bug: the DB was correct (the new profile had `onboarded_at =
+NULL`), the gate was mounted, and its logic was sound. `app/onboarding/` was a
+**new directory**, and Expo Router builds its route tree from a Metro
+`require.context` over `app/` — a dev server started *before* those files
+existed keeps serving a tree with no `/onboarding/welcome` in it.
+`router.replace()` to a route the tree doesn't know about doesn't crash and
+doesn't render the unmatched screen; it warns to the console and leaves you
+where you were.
+
+**Fix**: `npx expo start -c`. **Standing lesson**: after adding a new route
+*directory*, restart the dev server with `-c` before concluding anything about
+the navigation code. This will bite again on the next feature that adds routes.
+
+### 2. Home flashed for a split second before onboarding
+
+The flash §1.4 predicted, now actually fixed rather than accepted. It was
+caused by **two** components both owning post-auth routing: `RootNavigator`
+redirected any signed-in user on `/sign-in` to `/`, then `OnboardingGate`
+redirected a non-onboarded user from `/` to onboarding a moment later, once the
+profile it depends on had loaded.
+
+**Fix**: `RootNavigator` now owns only the signed-OUT rule (`!session` →
+`/sign-in`). `OnboardingGate` owns *all* authenticated routing, including the
+sign-in → Home hop for an already-onboarded user. One component decides, so
+there's no intermediate destination to paint. **Rule**: don't split a routing
+decision across two effects when one of them has to wait for data.
+
+### 3. Confetti invisible — render order, not Reanimated
+
+`<Confetti />` was rendered *before* `<OnboardingScaffold />` inside `done.js`.
+The scaffold's `SafeAreaView` has an opaque background, and among siblings the
+later one paints on top — so forty pieces of confetti were animating perfectly,
+underneath a solid white sheet. **Fix**: render `<Confetti />` *after* the
+scaffold. It's `pointerEvents="none"`, so sitting above the button costs
+nothing.
+
+### 4. Screens read as disconnected slabs
+
+`OnboardingScaffold`'s body was `justifyContent: 'center'`, floating each
+screen's content into the middle of the viewport with dead bands above and
+below it — the title, the content, and the button looked like three unrelated
+blocks. **Fix**: the body is top-aligned and flows out of the subtitle; only
+the button is pinned. Added a `scrollable` prop (+ `KeyboardAvoidingView`) for
+the expense step, which now overflows once the keyboard is up. Also dropped the
+Logo from Welcome — the design doesn't have one there, and it was adding to the
+disjointed feel.
+
+### 5. The expense step now has full field parity — §2.2 is superseded
+
+The user asked for every `AddTransactionSheet` field. `app/onboarding/expense.js`
+now has type, amount, category, **date, plan and note**, producing an identical
+row. Left out only what makes no sense in a first-run flow: edit/delete (nothing
+exists to edit) and the account switcher (the account was named on the previous
+step — a static "Adding to X" line states where the row lands).
+
+**This voids the bounded-duplication argument in §2.2.** There are now two full
+implementations of transaction entry. That was the tradeoff of the no-sheet
+decision and it has now landed in full. **If a third entry point ever appears,
+extract a shared form component rather than copying this a third time** — and
+the same applies if these two start drifting in behaviour.
+
+### 6. Party popper is now the design's coloured mark
+
+`components/PartyPopper.js` — the design's own multi-colour SVG (coloured
+streamers + sparks), replacing Lucide's single-colour `PartyPopper`, which
+can't express it. The design's raw hex values are remapped onto
+`CATEGORY_COLORS` so the popper and the confetti read as one system rather than
+introducing a fourth palette.
+
+---
+
+## Post-Build Fixes — Second On-Device Round (2026-07-13)
+
+### 7. Vertical rhythm — third attempt, and the one that's right
+
+Two wrong versions preceded this, worth recording so it isn't re-litigated:
+- **v1** centred the *body* while the header stayed pinned to the top → each
+  screen read as disconnected slabs (the user's "it is separated").
+- **v2** top-aligned everything → the dots jammed up against the status bar and
+  every screen's whitespace pooled at the bottom.
+- **v3 (current)**: the entire group — dots, hero, title, subtitle, body — is
+  vertically **centred** as one unit in the space above the button. Only the
+  button is pinned. `scrollable` steps use `flexGrow: 1` +
+  `justifyContent: 'center'`, so they centre while short and scroll once tall.
+
+### 8. `hero` slot renders above the title
+
+The reminders and detect steps had their icon tile *below* the subtitle; the
+design puts it above the heading. `OnboardingScaffold` now takes a `hero` prop
+rendered ahead of the title.
+
+### 9. Exit flash: the first onboarding screen reappeared before Home
+
+Leaving the flow from the done screen briefly showed **Welcome** again. Cause:
+the steps were `router.push`ed, so the whole flow was a *stack*. Replacing the
+top of it with `/` unwound that stack, and the screen underneath — Welcome, the
+stack's root — painted for a frame during the transition.
+
+**Fix**: every step now `router.replace`s the next one instead of pushing it.
+The onboarding stack is never more than one screen deep, so there is nothing
+underneath to reveal on the way out. Back navigation between steps is not lost
+(there was none — `gestureEnabled: false`, and every step's only backwards
+affordance is its skip line).
+
+### 10. Streak celebration never fired for a new account — a pre-existing bug
+
+**Not an onboarding bug.** `StreakCelebration`'s "already celebrated today"
+guard used a bare AsyncStorage key, `flo.streak.lastCelebrated` — **not scoped
+to a user**. Any account that had celebrated on that device that day suppressed
+the celebration for *every other account* on the same device. Onboarding merely
+exposed it: a brand-new signup logged its first transaction on a phone where an
+existing account had already celebrated, and got nothing.
+
+**Fix**: key by user — `flo.streak.lastCelebrated.${userId}`
+(`components/StreakCelebration.js`). This is a real fix to
+`05-koban-engagement.md`'s Phase 4, not to this feature.
+
+### 11. Streak celebration copy and title size
+
+- Title dropped from `fontSize.amountLg` (44) to `fontSize.hero` (30) — the
+  recap titles are long enough to wrap badly at 44.
+- **In/out totals removed from the `new_streak` recap tier** (`lib/koban.js`).
+  On the day of your first-ever entry there is no day to summarise, and
+  "₹450 out, ₹0 in" reads as a bleak balance sheet at the moment the app should
+  be congratulating you. **Scoped to that tier only** — `ongoing` and
+  `milestone` keep their totals, where the number has earned its place.
+  Verified by running `pickRecap` directly: `new_streak` → "Day 0 of something
+  new."; `ongoing` → "₹450 out · ₹0 in."
+  Note this pool also feeds the scheduled *recap notification* via
+  `buildReminderPlan`, so the first-day notification loses the totals too —
+  intentional, same reasoning.
+
+### 12. Expense step
+
+Title → "Add your first **transaction**" (it always accepted income too — the
+old title was simply wrong). The amount is now truly centred: the row centred
+`[₹][input]` as a unit, which pushed the digits right of the centred "Amount"
+label; a fixed-width spacer mirroring the ₹ slot on the input's right puts the
+digits on the centre line.
+
+### 13. Streak celebration reads as a streak screen, and asks for something
+
+Three changes to `StreakCelebration.js` + `lib/koban.js` (this is
+`05-koban-engagement.md`'s surface, edited from here):
+
+- **Eyebrow pill** — `recapEyebrow()` renders `STREAK STARTED` (day 0) or
+  `{n}-DAY STREAK` above the title, every time. The title pools *rotate*, so
+  "the streak is mentioned somewhere in the pool" was worth nothing: a user
+  could draw a playful Koban line and have no idea what the screen was. The
+  eyebrow is the one element that always says it. Not used by the recap
+  notification — a notification has no room for one, and its title carries the
+  context instead.
+- **Every `new_streak` copy variant now says a streak started, in plain words.**
+  Previously only some did ("Paw's up" tells you nothing on its own).
+- **CTA is `recapCta()`**: "Lock it in" (day 0) / "Lock in day {n}". "Nice!" was
+  a dismissal — it asked nothing of the user at the exact moment they're most
+  willing to give something.
+
+`recapCta`/`recapEyebrow` are deliberately **separate functions**, not extra
+keys on `pickRecap`'s return: that object is spread straight into
+expo-notifications' `content`, and unexpected keys there are asking for trouble.
+
+Mascot art is still pending (`05-...md` Phase 5) — the 🐱 emoji stands in, as
+before.
+
+### 14. Exit flicker, actually fixed — a stale-read race, not a stack unwind
+
+Fix #9 (`push` → `replace`) was necessary but **not sufficient**; the Welcome
+flash on exit survived it, because the real cause was elsewhere.
+
+`useOnboarding().finish()` wrote `onboarded_at` and then immediately
+`router.replace('/')`. But `updateProfile()`'s `notifyChanged()` triggers an
+**asynchronous** refetch — so for one tick the gate saw us on a non-onboarding
+route with `onboarded_at` still reading `null`, and correctly did what it's told
+to do: redirect to `/onboarding/welcome`. The refetch then landed and bounced us
+to Home. Welcome, then Home — exactly the reported flash, and it was the gate
+doing its job on stale data.
+
+**Fix**: `finish()` no longer navigates at all. It writes the column and stops;
+the gate moves the user once the refetched profile genuinely says onboarded.
+There is no window in which we're outside onboarding with a stale flag. It
+returns `working` so the button can spin across the round trip.
+
+**Generalised lesson** (this is the second bug of this exact shape in this
+feature): when a redirect is driven by fetched state, never *also* navigate
+imperatively at the moment you mutate that state. One of the two will be
+working from a stale read. Pick the declarative one and let it fire.
+
+### 15. "You're all set" text vanished
+
+`done.js`'s content wrapper had `flex: 1` inside the scaffold's body — which
+sizes to its content, since the scaffold centres the whole group itself. A
+`flex: 1` child of a content-sized parent resolves to **zero height**, silently
+swallowing the popper and both lines of text. Removed the `flex: 1`.
+
+### 16. All transaction data removed from every recap tier
+
+Fix #11 removed money from the `new_streak` tier only. The user extended it to
+**all** tiers, and was right to — there's a correctness argument the first pass
+missed:
+
+The recap **notification** is composed at *schedule* time (`buildReminderPlan`),
+not at delivery time. Its totals are a snapshot from whenever `rescheduleAll`
+last ran, so the copy could confidently announce numbers that no longer matched
+the day by the time it arrived. Copy that quotes data must be generated at the
+moment it's shown, and this isn't.
+
+`pickRecap` no longer takes `todayTotals` at all, and `formatMoney` is no longer
+imported by `lib/koban.js`. The numbers live on Home/Analytics/Transactions,
+computed live; this surface is fun only. Verified by running all four tiers
+through an assertion that no `₹`, entry count, or "out ·" fragment survives.
+
+### 17. One CTA everywhere: "Let's go"
+
+`recapCta()` takes no arguments now. "Lock in day 7" was clever but it's the
+moment the user closes the app and gets on with their day; one warm line fits
+day 0, day 8 and day 100 without sounding smug.
+
+**Milestones were already `[7, 30, 100]`** in both `lib/streak.js` and
+`lib/koban.js` — the "day 5" the user saw was a test *input* of mine, not a
+configured milestone. No change needed; recorded here so it isn't "fixed" later
+by someone reading the same confusion.
+
+### 18. Negative amounts are red all the way through
+
+`AmountText`'s `muteCurrency` greyed the ₹ regardless of sign, leaving a grey ₹
+glued to a red figure. The ₹ now takes the amount's own colour when the value is
+negative; muting still applies to healthy figures, which is what it was for.
+
+---
+
 ## Data Model Summary (Final State After All Phases)
 
 ```

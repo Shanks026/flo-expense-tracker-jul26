@@ -1,11 +1,13 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, List, PieChart, Receipt, Plus } from 'lucide-react-native';
+import { Home, List, PieChart, Flag, Plus } from 'lucide-react-native';
 import { colors, radii, fontFamily } from '../theme/tokens';
 import { useAddTransactionSheet } from './AddTransactionSheet';
 
-const ICONS = { index: Home, transactions: List, budgets: PieChart, bills: Receipt };
-const LABELS = { index: 'Home', transactions: 'Transactions', budgets: 'Budgets', bills: 'Bills' };
+// Flag for Plans, matching the icon MenuSheet used for it — the same concept
+// shouldn't change symbol just because it moved between surfaces.
+const ICONS = { index: Home, transactions: List, budgets: PieChart, plans: Flag };
+const LABELS = { index: 'Home', transactions: 'Transactions', budgets: 'Budgets', plans: 'Plans' };
 
 export default function TabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();

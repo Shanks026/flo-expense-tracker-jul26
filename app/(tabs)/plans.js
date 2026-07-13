@@ -1,15 +1,15 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Plus, Flag, Check } from 'lucide-react-native';
+import { Plus, Flag, Check } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Card from '../components/Card';
-import IconTile from '../components/IconTile';
-import ProgressBar from '../components/ProgressBar';
-import Pill from '../components/Pill';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import usePlans from '../hooks/usePlans';
-import { useAddPlanSheet } from '../components/AddPlanSheet';
+import Screen from '../../components/Screen';
+import Card from '../../components/Card';
+import IconTile from '../../components/IconTile';
+import ProgressBar from '../../components/ProgressBar';
+import Pill from '../../components/Pill';
+import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import usePlans from '../../hooks/usePlans';
+import { useAddPlanSheet } from '../../components/AddPlanSheet';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -25,14 +25,14 @@ export default function Plans() {
   const { openAddPlan } = useAddPlanSheet();
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    // A tab now, not a pushed screen — so no back button, and the same
+    // Screen + title + "New X" header the other tabs use.
+    <Screen>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Plans</Text>
-        <Pressable style={styles.addButton} onPress={() => openAddPlan()}>
-          <Plus size={16} color={colors.surface} strokeWidth={3} />
+        <Text style={styles.title}>Plans</Text>
+        <Pressable style={styles.newButton} onPress={() => openAddPlan()}>
+          <Plus size={15} color={colors.brand} strokeWidth={3} />
+          <Text style={styles.newButtonText}>New Plan</Text>
         </Pressable>
       </View>
 
@@ -129,51 +129,39 @@ export default function Plans() {
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
   header: {
+    paddingTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    justifyContent: 'space-between',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
+  title: {
     fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
+    fontSize: fontSize.display,
     letterSpacing: -0.3,
     color: colors.ink,
   },
-  addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.ink,
+  newButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.ink,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: radii.pill,
+  },
+  newButtonText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.base,
+    color: colors.brand,
   },
   scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
     paddingBottom: 60,
     gap: spacing.md,
   },

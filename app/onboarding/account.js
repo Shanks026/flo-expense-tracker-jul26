@@ -51,7 +51,7 @@ export default function OnboardingAccount() {
       return;
     }
     notifyChanged();
-    router.push(next);
+    router.replace(next);
   }
 
   if (loading) {
@@ -72,7 +72,7 @@ export default function OnboardingAccount() {
       primaryDisabled={!name.trim()}
       primaryLoading={saving}
       secondaryLabel="Keep as Personal"
-      onSecondary={() => router.push(next)}
+      onSecondary={() => router.replace(next)}
     >
       <Text style={styles.label}>Account name</Text>
       <TextInput
