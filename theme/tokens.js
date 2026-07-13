@@ -21,6 +21,32 @@ export const colors = {
   incomeBg: '#EEF4CE',
   incomeAccent: '#7B8B0C',
 
+  // Streak — a dedicated system, deliberately NOT the brand lime.
+  //
+  // Fire is orange; a lime flame is a concept-colour mismatch that costs the
+  // viewer a beat every time. Orange is also the cross-app convention
+  // (Duolingo/Strava/Snapchat), so a flame + number is already a known object
+  // and needs no learning. And `brand` as *text* on white fails contrast, which
+  // is why the streak count previously had to compromise on the darker lime.
+  //
+  // Chosen to sit clear of BOTH warm colours already spoken for in this palette:
+  // `danger` (#E5484D, over budget) and `warn` (#E8A317, nearly out). In a money
+  // app, "achievement" must not land in the same temperature band as "you're in
+  // trouble" — hence a true orange, not a red.
+  //
+  // USE ONLY ON STREAK SURFACES (the flame, lit day cells, the count). Lime
+  // stays the money colour and the app's identity; orange means "you showed up".
+  streak: '#FF6B2C',
+  streakDeep: '#D9480F', // text + the flame's core; readable on white
+  streakBg: '#FFE8DC', // pale wash, for tiles behind the flame
+
+  // Unread-alert dot on the bell. Rose rather than the full `danger` red: this
+  // is "there is something to read", not "you are in trouble" — the alerts
+  // behind it may be warnings, not emergencies. It was brand lime, which read as
+  // a positive badge on an icon whose whole job is to say something needs
+  // attention.
+  rose: '#F43F5E',
+
   danger: '#E5484D',
   dangerStrong: '#F0605A',
   dangerBg: '#FBE2E1',

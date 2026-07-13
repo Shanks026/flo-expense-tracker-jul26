@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
 import { Flame } from 'lucide-react-native';
 import Button from './Button';
+import StreakDays from './StreakDays';
 import useStreak from '../hooks/useStreak';
 import { useAuth } from '../lib/AuthContext';
 import { pickRecap, recapEyebrow, recapCta } from '../lib/koban';
@@ -17,7 +18,6 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 // when a fresh onboarding signup logged its first expense and no celebration
 // appeared, because an earlier account had already celebrated that day.
 const storageKey = (userId) => `flo.streak.lastCelebrated.${userId}`;
-const CELL_SIZE = 32;
 
 // Root-mounted sibling, same shape as DueBillsModal (see that file for the
 // precedent this copies). One deliberate difference: DueBillsModal gates its
@@ -38,8 +38,20 @@ export default function StreakCelebration() {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const userId = session?.user?.id ?? null;
 
+  // The gate. It used to fire on the first transaction of EVERY day — a
+  // full-screen takeover on an ordinary Tuesday, which trains the user to
+  // dismiss it without reading and makes the day that actually matters land the
+  // same as the one that doesn't. Now it only fires on days worth stopping for:
+  // the day a streak starts, and the milestones (3, 7, 10, 30, 50, 100).
+  //
+  // Note this is `current`, the internal count — the Day-0 *label* is a copy-layer
+  // relabel of the first day only (see lib/streak.js), so milestone 3 is the 3rd
+  // logged day, not the 4th.
+  const worthCelebrating = isNewStreak || isMilestone;
+
   useEffect(() => {
     if (!session || !userId || loading || !loggedToday) return;
+    if (!worthCelebrating) return;
 
     const key = storageKey(userId);
     AsyncStorage.getItem(key)
@@ -59,17 +71,15 @@ export default function StreakCelebration() {
         };
         setVisible(true);
       });
-  }, [session, userId, loading, loggedToday, todayStr]);
+  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr]);
 
   if (!visible || !contentRef.current) return null;
-
-  const recentDays = history.slice(-Math.min(current, 7));
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={() => setVisible(false)}>
       <View style={styles.screen}>
         <Animated.View entering={ZoomIn.duration(400)} style={styles.iconTile}>
-          <Flame size={40} color={colors.brand} strokeWidth={2} />
+          <Flame size={40} color={colors.streak} fill={colors.streak} strokeWidth={2} />
         </Animated.View>
 
         {/* Says what this screen is, every time — the titles below rotate and
@@ -85,17 +95,15 @@ export default function StreakCelebration() {
           {contentRef.current.body}
         </Animated.Text>
 
-        <View style={styles.calendarRow}>
-          {recentDays.map((day, i) => (
-            <Animated.View
-              key={day.date}
-              entering={ZoomIn.delay(400 + i * 120).duration(300)}
-              style={[styles.cell, day.logged && styles.cellLogged]}
-            />
-          ))}
-        </View>
+        {/* Always the full 7-day window, same as Home — it used to render only
+            as many cells as the streak was long, so a day-2 streak showed two
+            lonely cells and the row meant something different every time you
+            saw it. */}
+        <Animated.View entering={ZoomIn.delay(400).duration(400)} style={styles.calendarRow}>
+          <StreakDays history={history} size={38} dark />
+        </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(400 + recentDays.length * 120 + 200).duration(400)} style={styles.buttonWrap}>
+        <Animated.View entering={FadeInDown.delay(900).duration(400)} style={styles.buttonWrap}>
           <Button variant="primary" title={contentRef.current.cta} onPress={() => setVisible(false)} />
         </Animated.View>
       </View>
@@ -115,13 +123,13 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: radii.pill,
-    backgroundColor: 'rgba(187,220,18,0.16)',
+    backgroundColor: 'rgba(255,107,44,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
   },
   eyebrow: {
-    backgroundColor: 'rgba(187,220,18,0.16)',
+    backgroundColor: 'rgba(255,107,44,0.16)',
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
@@ -131,7 +139,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xs,
     letterSpacing: 1.2,
-    color: colors.brand,
+    color: colors.streak,
   },
   title: {
     fontFamily: fontFamily.extrabold,
@@ -151,18 +159,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
   calendarRow: {
-    flexDirection: 'row',
-    gap: 8,
     marginBottom: spacing.xxl,
-  },
-  cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  cellLogged: {
-    backgroundColor: colors.brand,
   },
   buttonWrap: {
     width: '100%',

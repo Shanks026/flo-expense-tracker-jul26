@@ -4,6 +4,7 @@ import { colors, radii } from '../theme/tokens';
 const TONES = {
   neutral: colors.iconTileBg,
   brand: 'rgba(187,220,18,0.16)',
+  streak: colors.streakBg,
   income: colors.incomeBg,
   danger: colors.dangerBg,
   warn: colors.warnBg,

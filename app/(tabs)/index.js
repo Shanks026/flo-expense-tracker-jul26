@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt } from 'lucide-react-native';
+import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt, Flame } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -10,7 +10,7 @@ import AmountText from '../../components/AmountText';
 import CategoryIcon from '../../components/CategoryIcon';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import Pill from '../../components/Pill';
-import StreakCalendar from '../../components/StreakCalendar';
+import useStreak from '../../hooks/useStreak';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useAuth } from '../../lib/AuthContext';
 import useGlobalSummary from '../../hooks/useGlobalSummary';
@@ -60,6 +60,11 @@ export default function Home() {
   const { count: alertCount } = useAlerts();
   const { bills } = useBills();
   const { openPayBill } = usePayBillSheet();
+  const { current: streakCurrent, loading: streakLoading } = useStreak();
+
+  // Lit only when there IS a streak. The muted flame on a zero streak is not a
+  // failure state — it's the invitation.
+  const streakLit = streakCurrent > 0;
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
@@ -98,6 +103,27 @@ export default function Home() {
             </View>
           </View>
           <View style={styles.headerRight}>
+            {/* Duolingo's model: the streak lives in the header, always visible,
+                and it is a DOOR — it opens /streak, where the calendar and the
+                history live. Unlit when today hasn't been logged: that muted
+                flame IS the nudge, and it costs no words. */}
+            {!streakLoading && (
+              <Pressable style={styles.streakChip} onPress={() => router.push('/streak')}>
+                {/* Fire orange, not brand lime — see theme/tokens.js. Also the
+                    one warm accent in this header that must NOT be confused with
+                    the bell's red alert dot beside it, which is why it's a true
+                    orange rather than a red. */}
+                <Flame
+                  size={17}
+                  color={streakLit ? colors.streak : colors.mutedLight}
+                  fill={streakLit ? colors.streak : 'transparent'}
+                  strokeWidth={2.2}
+                />
+                <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>
+                  {streakCurrent}
+                </Text>
+              </Pressable>
+            )}
             <Pressable style={styles.bellButton} onPress={openAlerts}>
               <Bell size={20} color={colors.ink} strokeWidth={2} />
               {alertCount > 0 && <View style={styles.bellDot} />}
@@ -143,8 +169,6 @@ export default function Home() {
             </View>
           </View>
         </Card>
-
-        <StreakCalendar />
 
         <Card style={styles.chartCard}>
           <IncomeExpenseChart
@@ -287,6 +311,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  streakChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  streakCount: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    letterSpacing: -0.2,
+    color: colors.streakDeep,
+  },
+  streakCountEmpty: {
+    color: colors.mutedLight,
+  },
   bellButton: {
     width: 44,
     height: 44,
@@ -309,13 +353,15 @@ const styles = StyleSheet.create({
   },
   bellDot: {
     position: 'absolute',
-    top: 11,
-    right: 12,
-    width: 7,
-    height: 7,
+    top: 9,
+    right: 9,
+    width: 11,
+    height: 11,
     borderRadius: radii.pill,
-    backgroundColor: colors.brand,
-    borderWidth: 1.5,
+    backgroundColor: colors.rose,
+    // The white ring is what keeps it legible against the bell's strokes at this
+    // size — without it the dot merges into the icon rather than sitting on it.
+    borderWidth: 2,
     borderColor: colors.surface,
   },
   heroCard: {

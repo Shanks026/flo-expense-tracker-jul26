@@ -46,7 +46,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#BBDC12"
+        }
+      ]
     ],
     "extra": {
       "router": {},
