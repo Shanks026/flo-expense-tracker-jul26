@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Receipt, Wallet, Flag, ChevronRight, CircleCheck } from 'lucide-react-native';
+import { X, Receipt, Wallet, Flag, FileText, ChevronRight, CircleCheck } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import useAlerts from '../hooks/useAlerts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
@@ -27,7 +27,13 @@ export function useAlertsSheet() {
   return ctx;
 }
 
-const KIND_ICON = { bill: Receipt, budget: Wallet, plan: Flag };
+const KIND_ICON = { bill: Receipt, budget: Wallet, plan: Flag, report: FileText };
+
+const SEVERITY_TONE = {
+  danger: { icon: colors.dangerStrong, bg: colors.dangerBg },
+  warn: { icon: colors.warnStrong, bg: colors.warnBg },
+  info: { icon: colors.brand, bg: colors.inkCard },
+};
 
 const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
   const modalRef = useRef(null);
@@ -79,11 +85,15 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
         ) : (
           alerts.map((alert) => {
             const Icon = KIND_ICON[alert.kind] ?? Receipt;
-            const tone = alert.severity === 'danger' ? colors.dangerStrong : colors.warnStrong;
+            // 'info' (a report being ready — good news, not a problem) reuses
+            // this same file's own "you're all caught up" empty-state combo:
+            // brand lime on an inkCard tile, the established neutral-positive
+            // tone on this dark sheet.
+            const tone = SEVERITY_TONE[alert.severity];
             return (
               <Pressable key={alert.id} style={styles.row} onPress={() => handlePress(alert.route)}>
-                <View style={[styles.rowIcon, { backgroundColor: alert.severity === 'danger' ? colors.dangerBg : colors.warnBg }]}>
-                  <Icon size={19} color={tone} strokeWidth={2} />
+                <View style={[styles.rowIcon, { backgroundColor: tone.bg }]}>
+                  <Icon size={19} color={tone.icon} strokeWidth={2} />
                 </View>
                 <View style={styles.rowMid}>
                   <Text style={styles.rowTitle} numberOfLines={1}>

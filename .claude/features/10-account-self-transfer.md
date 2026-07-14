@@ -41,6 +41,19 @@ multi-account model.
   distinctly (transfer icon, neutral colour, "Transfer to/from X"), never counted
   in any spent/earned figure.
 
+**Settled after on-device review (2026-07-14): transfers are NOT per-account
+income/expense.** The question was raised directly — should transferring ₹10k
+from Personal to Test show as an *Expense ₹10k* on Personal's card and *Income
+₹10k* on Test's (a per-account cash-flow reading)? Considered and **rejected**:
+"Expense" would then include money you still hold (just in another account), it
+misleads a look-back ("I spent ₹10k" when you didn't), and summing across
+accounts double-counts money that never left your control. Kept the earned/spent
+meaning: a transfer moves **only `in_hand_balance`**; the `Income`/`Expenses`
+figures on the Home hero and account-switcher cards stay real earnings/spending.
+The transfer is still visible — as a distinct row in the transaction list — so
+nothing is hidden. (This is the standard YNAB/Actual model.) The current build
+already implements exactly this; the discussion changed nothing in code.
+
 **Explicitly rejected during planning:**
 
 - **Single row with `to_account_id`.** Would force `v_global_summary` to stop

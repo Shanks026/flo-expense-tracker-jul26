@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, Receipt, Landmark, BatteryWarning, Compass, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Compass, Trash2, TriangleAlert } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
@@ -36,8 +36,28 @@ import {
   DEFAULT_ALLOWED_PACKAGES,
   WATCHED_APP_LABELS,
 } from '../lib/detect';
+import { getReportSettings, setReportSettings, DEFAULT_REPORT_SETTINGS } from '../lib/reports';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
+
+const CADENCE_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+// value follows JS/date-fns Date#getDay() convention (0=Sun..6=Sat), matching
+// lib/reports.js's `weekday`. Displayed Monday-first, same convention as
+// weekStartsOn:1 elsewhere in the app.
+const WEEKDAY_CHIPS = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+];
 
 // NOT new Date(0, 0, 0, hour, minute) — that resolves to Dec 31, 1899, and
 // India's timezone database applies the *historical* Madras Time offset
@@ -72,6 +92,9 @@ export default function Settings() {
   const [permissionBlocked, setPermissionBlocked] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  const [reportSettings, setReportSettingsState] = useState(DEFAULT_REPORT_SETTINGS);
+  const [showReportTimePicker, setShowReportTimePicker] = useState(false);
+
   // Transaction Detection (06-transaction-auto-detect.md). Notification
   // access is granted outside the app (system settings), with no callback —
   // same reason getPermissionStatus() exists for OS notifications below —
@@ -84,6 +107,21 @@ export default function Settings() {
 
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
+
+  useEffect(() => {
+    getReportSettings().then(setReportSettingsState);
+  }, []);
+
+  async function persistReportSettings(partial) {
+    const next = await setReportSettings(partial);
+    setReportSettingsState(next);
+    // Without this, a cadence/day/time change only takes effect in the
+    // schedule on the next cold start (whenever useNotificationSync's effect
+    // happens to re-run) — the same stale-settings bug class already fixed
+    // once for the daily reminder (see rescheduleAll's own comment). Calling
+    // sync() here mirrors handleToggleDaily/handleTimeChange exactly.
+    await sync();
+  }
 
   useEffect(() => {
     getNotificationSettings().then(async (s) => {
@@ -454,6 +492,85 @@ export default function Settings() {
           />
         )}
 
+        <Text style={styles.sectionLabel}>Reports</Text>
+        <Card style={styles.rowsCard}>
+          <View style={[styles.reportCadenceBlock, reportSettings.cadence !== 'off' && styles.rowBorder]}>
+            <View style={styles.reportCadenceTop}>
+              <View style={styles.rowIcon}>
+                <FileText size={20} color={colors.ink} strokeWidth={2} />
+              </View>
+              <Text style={styles.rowTitle}>Cadence</Text>
+            </View>
+            <View style={styles.reportSegmentWrap}>
+              {CADENCE_OPTIONS.map((c) => (
+                <Pressable
+                  key={c.value}
+                  style={[styles.reportSegment, reportSettings.cadence === c.value && styles.reportSegmentActive]}
+                  onPress={() => persistReportSettings({ cadence: c.value })}
+                >
+                  <Text style={[styles.reportSegmentText, reportSettings.cadence === c.value && styles.reportSegmentTextActive]}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {reportSettings.cadence === 'weekly' && (
+            <View style={[styles.reportDayBlock, styles.rowBorder]}>
+              <Text style={styles.subRowLabel}>Day</Text>
+              <View style={styles.weekdayRow}>
+                {WEEKDAY_CHIPS.map((d) => (
+                  <Pressable
+                    key={d.value}
+                    style={[styles.weekdayChip, reportSettings.weekday === d.value && styles.weekdayChipActive]}
+                    onPress={() => persistReportSettings({ weekday: d.value })}
+                  >
+                    <Text style={[styles.weekdayChipText, reportSettings.weekday === d.value && styles.weekdayChipTextActive]}>
+                      {d.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {reportSettings.cadence === 'monthly' && (
+            <View style={[styles.subRow, styles.rowBorder]}>
+              <Text style={styles.subRowLabel}>Day of month</Text>
+              <View style={styles.dayStepper}>
+                <Pressable onPress={() => persistReportSettings({ dayOfMonth: Math.max(1, reportSettings.dayOfMonth - 1) })}>
+                  <ChevronLeft size={16} color={colors.ink} strokeWidth={2.4} />
+                </Pressable>
+                <Text style={styles.dayStepperValue}>{reportSettings.dayOfMonth}</Text>
+                <Pressable onPress={() => persistReportSettings({ dayOfMonth: Math.min(31, reportSettings.dayOfMonth + 1) })}>
+                  <ChevronRight size={16} color={colors.ink} strokeWidth={2.4} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {reportSettings.cadence !== 'off' && (
+            <Pressable style={styles.subRow} onPress={() => setShowReportTimePicker(true)}>
+              <Text style={styles.subRowLabel}>At</Text>
+              <Text style={styles.subRowValue}>{format(timeOnToday(reportSettings.hour, reportSettings.minute), 'h:mm a')}</Text>
+            </Pressable>
+          )}
+        </Card>
+
+        {showReportTimePicker && (
+          <DateTimePicker
+            value={timeOnToday(reportSettings.hour, reportSettings.minute)}
+            mode="time"
+            display="default"
+            onChange={(_event, selected) => {
+              setShowReportTimePicker(false);
+              if (!selected) return;
+              persistReportSettings({ hour: selected.getHours(), minute: selected.getMinutes() });
+            }}
+          />
+        )}
+
         <Text style={styles.sectionLabel}>Transaction Detection</Text>
         <Card style={styles.rowsCard}>
           {!isDetectSupported() ? (
@@ -700,6 +817,79 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
     color: colors.ink,
+  },
+  reportCadenceBlock: {
+    paddingVertical: spacing.md,
+  },
+  reportCadenceTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  reportSegmentWrap: {
+    flexDirection: 'row',
+    backgroundColor: colors.chipBg,
+    borderRadius: 14,
+    padding: 4,
+  },
+  reportSegment: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  reportSegmentActive: {
+    backgroundColor: colors.ink,
+  },
+  reportSegmentText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.base,
+    color: colors.muted,
+  },
+  reportSegmentTextActive: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.surface,
+  },
+  reportDayBlock: {
+    paddingVertical: spacing.md,
+    paddingLeft: 52,
+    gap: spacing.sm,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  weekdayChip: {
+    width: 36,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: colors.chipBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayChipActive: {
+    backgroundColor: colors.ink,
+  },
+  weekdayChipText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.xs,
+    color: colors.mutedDarker,
+  },
+  weekdayChipTextActive: {
+    color: colors.surface,
+  },
+  dayStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  dayStepperValue: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.base,
+    color: colors.ink,
+    minWidth: 20,
+    textAlign: 'center',
   },
   watchedAppsRow: {
     paddingLeft: 52,

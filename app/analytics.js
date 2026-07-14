@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { ChevronLeft, TrendingUp, TrendingDown, Download } from 'lucide-react-native';
 import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, format } from 'date-fns';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
@@ -15,9 +15,11 @@ import AnalyticsSegmentTabs from '../components/AnalyticsSegmentTabs';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import DayOfWeekChart from '../components/DayOfWeekChart';
 import DonutChart from '../components/DonutChart';
+import { useToast } from '../components/Toast';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import useAnalyticsData from '../hooks/useAnalyticsData';
 import { useAccount } from '../lib/AccountContext';
+import { buildTransactionsCsv, shareCsv } from '../lib/export';
 import {
   computeTrend,
   computeDelta,
@@ -61,13 +63,15 @@ function DeltaBadge({ delta, goodDirection = 'up' }) {
 
 export default function Analytics() {
   const router = useRouter();
-  const { activeAccount } = useAccount();
+  const { activeAccount, accounts } = useAccount();
+  const { showToast } = useToast();
   const [segment, setSegment] = useState('overview');
   const [categoryType, setCategoryType] = useState('expense');
   const [mode, setMode] = useState('month');
   const [month, setMonth] = useState(new Date());
   const [customFrom, setCustomFrom] = useState(subDays(new Date(), 6));
   const [customTo, setCustomTo] = useState(new Date());
+  const [exporting, setExporting] = useState(false);
 
   const { from, to } = useMemo(() => {
     if (mode === 'month') {
@@ -77,6 +81,25 @@ export default function Analytics() {
   }, [mode, month, customFrom, customTo]);
 
   const { current, prior, budgets, plans } = useAnalyticsData({ from, to });
+
+  // Scope follows the screen: Analytics is deliberately per-active-account
+  // (unlike the all-accounts report), so its export stays scoped the same
+  // way — `current` here already only ever contains activeAccountId's rows.
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const csv = buildTransactionsCsv(current, accounts);
+      const filename = `flo-analytics-${format(from, 'yyyy-MM-dd')}_${format(to, 'yyyy-MM-dd')}.csv`;
+      const result = await shareCsv(filename, csv);
+      if (result.unsupported) {
+        showToast({ message: 'Sharing is not available on this device', variant: 'error' });
+      }
+    } catch (err) {
+      showToast({ message: 'Export failed', variant: 'error' });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const totalIncome = useMemo(() => sumByType(current, 'income'), [current]);
   const totalExpense = useMemo(() => sumByType(current, 'expense'), [current]);
@@ -127,10 +150,17 @@ export default function Analytics() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
         </Pressable>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Analytics</Text>
           {activeAccount && <Text style={styles.headerSubtitle}>{activeAccount.name}</Text>}
         </View>
+        <Pressable style={styles.backButton} onPress={handleExport} disabled={exporting}>
+          {exporting ? (
+            <ActivityIndicator size="small" color={colors.ink} />
+          ) : (
+            <Download size={18} color={colors.ink} strokeWidth={2.2} />
+          )}
+        </Pressable>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

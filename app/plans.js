@@ -1,16 +1,16 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Flag, Check } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronLeft, Plus, Flag, Check } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Screen from '../../components/Screen';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import ProgressBar from '../../components/ProgressBar';
-import Pill from '../../components/Pill';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import usePlans from '../../hooks/usePlans';
-import useCollectingPlan from '../../hooks/useCollectingPlan';
-import { useAddPlanSheet } from '../../components/AddPlanSheet';
+import Card from '../components/Card';
+import IconTile from '../components/IconTile';
+import ProgressBar from '../components/ProgressBar';
+import Pill from '../components/Pill';
+import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import usePlans from '../hooks/usePlans';
+import useCollectingPlan from '../hooks/useCollectingPlan';
+import { useAddPlanSheet } from '../components/AddPlanSheet';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -27,11 +27,16 @@ export default function Plans() {
   const { openAddPlan } = useAddPlanSheet();
 
   return (
-    // A tab now, not a pushed screen — so no back button, and the same
-    // Screen + title + "New X" header the other tabs use.
-    <Screen>
+    // Pushed from the Menu sheet now, not a tab (2026-07-14) — so it needs its
+    // own back button and SafeAreaView, the same shape as Bills/Settings/Analytics.
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Plans</Text>
+        <View style={styles.headerLeft}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
+          </Pressable>
+          <Text style={styles.title}>Plans</Text>
+        </View>
         <Pressable style={styles.newButton} onPress={() => openAddPlan()}>
           <Plus size={15} color={colors.brand} strokeWidth={3} />
           <Text style={styles.newButtonText}>New Plan</Text>
@@ -135,16 +140,37 @@ export default function Plans() {
           })
         )}
       </ScrollView>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   header: {
     paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: fontFamily.extrabold,
@@ -167,6 +193,9 @@ const styles = StyleSheet.create({
     color: colors.brand,
   },
   scroll: {
+    // Screen used to supply the horizontal padding; a bare SafeAreaView
+    // doesn't (same migration note as bills.js's own).
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: 60,
     gap: spacing.md,

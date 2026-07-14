@@ -151,7 +151,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['62%'], [])}
+      snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}

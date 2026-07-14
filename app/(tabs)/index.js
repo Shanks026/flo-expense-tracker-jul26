@@ -10,6 +10,7 @@ import AmountText from '../../components/AmountText';
 import CategoryIcon from '../../components/CategoryIcon';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import Pill from '../../components/Pill';
+import ReportReadyCard from '../../components/ReportReadyCard';
 import useStreak from '../../hooks/useStreak';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useAuth } from '../../lib/AuthContext';
@@ -180,6 +181,8 @@ export default function Home() {
           />
         </Card>
 
+        <ReportReadyCard />
+
         {upcomingBills.length > 0 && (
           <>
             <View style={styles.sectionHeaderRow}>
@@ -252,9 +255,12 @@ export default function Home() {
                     )}
                   </IconTile>
                   <View style={styles.rowMid}>
-                    <Text style={styles.rowTitle}>
-                      {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
-                    </Text>
+                    <View style={styles.rowTitleWrap}>
+                      <Text style={styles.rowTitle}>
+                        {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                      </Text>
+                      {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                    </View>
                     <Text style={styles.rowSub}>
                       {format(new Date(tx.occurred_at), 'd MMM')} ·{' '}
                       {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
@@ -495,10 +501,19 @@ const styles = StyleSheet.create({
   rowMid: {
     flex: 1,
   },
+  rowTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
   rowTitle: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
     color: colors.ink,
+  },
+  planPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   rowSub: {
     fontFamily: fontFamily.semibold,

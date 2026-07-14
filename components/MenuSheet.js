@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { ChartColumn, Receipt, Settings, LogOut, X } from 'lucide-react-native';
+import { ChartColumn, FileText, Flag, Receipt, Settings, LogOut, X } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
@@ -27,10 +27,14 @@ export function useMenuSheet() {
   return ctx;
 }
 
-// Bills swapped in here and Plans out to the tab bar (2026-07-13), reversing
-// the 2026-07-11 swap. Plans is the more frequently used of the two.
+// Plans moved back in here (2026-07-14) — its old tab slot is now the "Menu"
+// action button in TabBar.js, since the menu itself was only reachable via
+// Home's header, hard to get to from other tabs. Same icon (Flag) it's always
+// had, on whichever surface it lives.
 const ITEMS = [
+  { key: 'plans', label: 'Plans', route: '/plans', icon: Flag },
   { key: 'analytics', label: 'Analytics', route: '/analytics', icon: ChartColumn },
+  { key: 'reports', label: 'Reports', route: '/report', icon: FileText },
   { key: 'bills', label: 'Bills', route: '/bills', icon: Receipt },
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
@@ -66,7 +70,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['50%'], [])}
+      snapPoints={useMemo(() => ['60%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}

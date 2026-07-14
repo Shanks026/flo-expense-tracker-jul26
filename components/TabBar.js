@@ -1,17 +1,23 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, List, PieChart, Flag, Plus } from 'lucide-react-native';
+import { Home, List, PieChart, Menu as MenuIcon, Plus } from 'lucide-react-native';
 import { colors, radii, fontFamily } from '../theme/tokens';
 import { useAddTransactionSheet } from './AddTransactionSheet';
+import { useMenuSheet } from './MenuSheet';
 
-// Flag for Plans, matching the icon MenuSheet used for it — the same concept
-// shouldn't change symbol just because it moved between surfaces.
-const ICONS = { index: Home, transactions: List, budgets: PieChart, plans: Flag };
-const LABELS = { index: 'Home', transactions: 'Transactions', budgets: 'Budgets', plans: 'Plans' };
+const ICONS = { index: Home, transactions: List, budgets: PieChart };
+const LABELS = { index: 'Home', transactions: 'Transactions', budgets: 'Budgets' };
 
+// Plans' old tab slot is now a "Menu" action button (2026-07-14) — the menu
+// was otherwise only reachable via Home's header, which meant walking all the
+// way back to the Home tab just to reach Analytics/Plans/Reports/Settings.
+// Like the ⊕ button, Menu is an action (opens a sheet), not a navigable
+// route, so it isn't part of `state.routes` and is appended after it rather
+// than rendered via renderItem.
 export default function TabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const { openAdd } = useAddTransactionSheet();
+  const { openMenu } = useMenuSheet();
 
   function renderItem(route, index) {
     const isFocused = state.index === index;
@@ -48,6 +54,12 @@ export default function TabBar({ state, navigation }) {
         <Plus size={28} color={colors.ink} strokeWidth={2.6} />
       </Pressable>
       {secondHalf.map((route, i) => renderItem(route, i + 2))}
+      <Pressable style={styles.item} onPress={openMenu}>
+        <MenuIcon size={24} color={colors.mutedLight} strokeWidth={2} />
+        <Text style={[styles.label, { color: colors.mutedLight, fontFamily: fontFamily.semibold }]} numberOfLines={1}>
+          Menu
+        </Text>
+      </Pressable>
     </View>
   );
 }

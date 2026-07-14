@@ -127,6 +127,7 @@ data model.
 | 06 | `06-transaction-auto-detect.md` | Bank/UPI (+ SMS, personal-use-only) notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | ✅ **Go/no-go PASSED on real device** (2026-07-12) — core mechanism confirmed working. `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. **Allowlist reversed for personal use** — SMS/Messages added (`PERSONAL_USE_EXTRA_PACKAGES`, must be removed before any store submission — see doc). Swipe-away-specifically-isolated test still pending; otherwise on-device-verified |
 | 08 | `08-budget-periods-and-detail.md` | Budget period model (`calendar_week`/`calendar_month`/**`custom`** date range) + visible period labels + budget detail screen | 🚧 **Both phases built**, bundle- and SQL-verified; awaiting on-device confirmation. `budgets.period` **dropped** → `period_type` + `start_date`/`end_date`; `v_budgets_with_spent` now exposes `period_start`/`period_end` (the keystone — the card can finally name its window, and the detail screen filters by the *same* bounds `spent` came from). Tapping a budget card now opens `/budget/[id]` instead of the edit sheet |
 | 07 | `07-onboarding.md` | First-run onboarding (Welcome → Name account → First expense → Reminders & streak → Auto-detect → All set) | 🚧 **All 3 phases built**, bundle-verified only — awaiting on-device confirmation (no Android SDK here). Gated on `profiles.onboarded_at` (new column; existing users backfilled, so the flow only ever fires for **new** signups). Built from the `claude-design/` mock, which predated Koban/Bills/auto-detect — the detect step and the streak framing are additions to that design, not in it |
+| 11 | `11-reports.md` | Weekly/monthly reports covering ALL of the user's accounts (headline delta, stats, category donut, budget/plan status, biggest transaction), with an in-place period picker (presets + custom range) so every report doubles as a custom report, scheduled push + bell delivery, and CSV export. | 🚧 **Phases 1–2 built, Phase 3 CSV done** (2026-07-14), bundle-verified; on-device pending. **No schema change** — config + seen-state in AsyncStorage (`lib/reports.js`). `hooks/useAnalyticsData.js` gained an `allAccounts` param (default `false`, `app/analytics.js` unaffected). New `app/report.js`, `components/ReportPeriodPicker.js` (a centred `Modal` dialog, not a bottom sheet — the trigger sits at the screen's top), `components/ReportReadyCard.js` (Home card), `hooks/useReportDue.js` (shared live due-check, also feeds `useAlerts`' new `info`-severity bell alert), `lib/export.js` (CSV, via newly-added `expo-sharing`/`expo-file-system`). Settings gained a "Reports" cadence card; Menu gained a "Reports" row; both Report and Analytics gained a header Export button. Scheduling uses genuine repeating `WEEKLY`/`MONTHLY` OS triggers (verified against the installed `expo-notifications` version's real type defs — caught a real weekday-numbering mismatch, 1=Sun vs JS's 0=Sun, before it shipped). `expo-file-system@19`'s API was found to have been completely rewritten (`File`/`Directory`/`Paths` classes; the old string-path functions still exist but throw at runtime) — caught by reading the installed version's actual types, not memory. Caught and fixed a real cross-account budget leak (categories are global) in Phase 1 — see doc's Implementation Notes. PDF export not started, pending an explicit go-ahead. |
 | 10 | `10-account-self-transfer.md` | Account-to-account self-transfer: a third **Transfer** tab in `AddTransactionSheet` (From/To pickers) writing a linked `transfer_out`/`transfer_in` pair. Moves balances between accounts but is excluded from all spent/earned totals, budgets, analytics, and the streak. | 🚧 **Phase 1 built** (2026-07-14), bundle- & DB-verified; on-device pending. Migration `account_self_transfer` (2 new `type` values + `transfer_id`/`transfer_account_id` + `v_global_summary` balance recreate). New `lib/transfers.js`; `AddTransactionSheet` Transfer mode (full create/edit/delete); `AmountText` transfer tones; transfer rendering in Transactions/Home; streak + `computeBiggestTransaction` exclusions. |
 | 09 | `09-plans-that-collect.md` | Make Plans' explicit-membership model usable: **Phase 1** add-from-history bulk-tagger; **Phase 2** collecting mode (one armed plan per account, new txns default in); **Phase 3** category-breakdown donut on Plan Detail | 🚧 **All 3 phases built** (2026-07-14), bundle- & DB-verified; on-device pending. P1: route restructured `app/plan/[id].js` → `[id]/index.js` + new `[id]/history.js`; `hooks/usePlanCandidates.js` (no DB change). P2: `plans.is_collecting` + partial unique index (migration `plan_collecting_mode`); `hooks/useCollectingPlan.js`, `lib/plans.js`; new transactions default into the armed plan via `AddTransactionSheet`. Also added branded **`components/Switch.js`** (replaced RN `Switch` everywhere). P3: "Where it went" donut + ranked category list on Plan Detail, reusing `lib/analytics.js`'s `computeCategoryBreakdown`/`getCategoryColor` — no new query, no new DB. |
 
@@ -276,6 +277,50 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   ×4, `AddBillSheet`, onboarding `reminders.js` ×2, plus `AddPlanSheet` and Plan
   Detail's collecting toggle). Extra props like `trackColor`/`thumbColor` aren't
   needed (and were removed from `AddBillSheet` where they'd been hand-rolled).
+- **`hooks/useAlerts.js` gained a third severity tier, `info`** (added
+  2026-07-14, `11-reports.md` Phase 2) — the prior model was strictly binary
+  (`danger`/`warn`); `info` is for good-news/neutral alerts (currently just
+  "your report is ready") that would read wrong painted amber/red. Sorts last
+  (`SEVERITY_ORDER: { danger: 0, warn: 1, info: 2 }`). `AlertsSheet.js` styles
+  it with brand-lime-on-`inkCard` — reusing that same file's own pre-existing
+  "you're all caught up" empty-state combo, not a new colour pairing. Any
+  future non-problem alert (an achievement, a completed goal, etc.) should use
+  this tier rather than overloading `warn`.
+- **`hooks/useReportDue.js`** — the live "is a scheduled report due and
+  unseen right now" check, shared by the Home `ReportReadyCard` and the bell's
+  `info` alert (`useAlerts`) so both can never disagree about what counts as
+  due. Like every other alert source in this app, nothing is stored — it's a
+  read of AsyncStorage settings + seen-state, recomputed on `userId`/`version`
+  change. Model for any future feature needing the same value read from two
+  UI surfaces.
+- **`expo-notifications@0.32.17` genuinely supports repeating `WEEKLY` and
+  `MONTHLY` triggers** (`SchedulableTriggerInputTypes.WEEKLY`/`MONTHLY`,
+  confirmed by reading the installed package's own type defs, not assumed) —
+  set once, fire forever, no rolling-reschedule dance needed the way bills/the
+  daily reminder require (those need per-occurrence content variation; a
+  fixed-content repeating notification doesn't). **`WeeklyTriggerInput.weekday`
+  uses 1–7 with 1=Sunday** — NOT JS's `Date#getDay()` 0=Sun..6=Sat convention
+  used everywhere else in this codebase's own date handling. Any future
+  feature scheduling a weekly OS notification must convert
+  (`lib/reports.js`'s `toExpoWeekday()` is the one existing conversion point);
+  getting this wrong silently schedules the notification on the wrong day.
+  `MonthlyTriggerInput.day` is a plain 1-indexed day-of-month (no conversion
+  needed) but does **not** clamp for short months — a day-31 cadence simply
+  skips firing in Feb/Apr/Jun/Sep/Nov.
+- **`expo-file-system@19` (installed 2026-07-14, `11-reports.md` Phase 3)
+  completely rewrote its API** around `File`/`Directory`/`Paths` classes —
+  the old string-path functions (`writeAsStringAsync`, `getInfoAsync`,
+  `cacheDirectory`, etc.) **still exist as exports from the main package but
+  are deprecated stubs that throw at runtime**, not just lint warnings; the
+  real replacement is `expo-file-system/legacy` if the old API is truly
+  wanted, or (preferred, what this codebase uses) the current class API:
+  `new File(Paths.cache, filename).write(content)` — note `.write()` is
+  **synchronous**, not a Promise. Confirmed by reading this installed
+  version's actual `.d.ts` files, not from memory of an older SDK — any
+  future feature touching file I/O should do the same rather than assume the
+  old API still works. `expo-sharing`'s API (`isAvailableAsync`/
+  `shareAsync(uri, options)`) is unchanged. `lib/export.js`'s `buildTransactionsCsv`/
+  `shareCsv` are the reference implementation.
 - **`lib/budgets.js`** (added 2026-07-13, `08-...md`) — `formatPeriodLabel`,
   `budgetPeriodDates`, `isBudgetEnded`, `daysLeftInPeriod`,
   `computeBudgetPace`, `previewPeriodDates`. `computeBudgetPace` reuses the
@@ -440,7 +485,20 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   view is already `GROUP BY account_id`, this is the pattern for any
   future "show data across all accounts" need — no new view/RPC required,
   just drop the filter. Powers the account switcher's mini summary cards
-  (added post-Phase-3, see `02-accounts.md`).
+  (added post-Phase-3, see `02-accounts.md`). **Generalized 2026-07-14**
+  (`11-reports.md`) — `useAnalyticsData` gained an `allAccounts` boolean that
+  does the exact same "drop the filter, guard on `userId` instead of
+  `activeAccountId`" move across all four of its queries (two transaction
+  windows + `v_budgets_with_spent` + `v_plans_with_totals`). **Caveat for any
+  new all-accounts aggregation**: `categories` are global, not account-scoped
+  (see the `categories` row below) — a computation keyed by `(account,
+  category)`, like a budget's spent-in-category, must pre-filter to the
+  specific account first or it will silently sum every account's spending in
+  that category. `computeBudgetPeriods` in `lib/analytics.js` has no
+  account_id filter of its own (never needed one — every prior caller already
+  passed single-account data), so the caller must filter before invoking it
+  once the transactions array spans more than one account. Caught and fixed in
+  `app/report.js`; not a bug in `lib/analytics.js` itself.
 - **Bug: categories not loading after sign-in/sign-up** (found & fixed
   2026-07-11, real on-device repro — "create an account, add a
   transaction, categories don't show", reproduced in the EAS APK too) —

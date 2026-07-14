@@ -159,7 +159,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['85%'], [])}
+      snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
