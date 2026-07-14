@@ -25,11 +25,15 @@ export default function AmountText({
         expense: dark ? colors.surface : colors.ink,
         danger: colors.danger,
         neutral: dark ? colors.surface : colors.ink,
+        // A transfer is neither a gain nor a loss — a muted tone keeps it clearly
+        // apart from income-green and expense-ink. Direction shows via the ± sign.
+        transfer_in: dark ? colors.mutedLight : colors.mutedDarker,
+        transfer_out: dark ? colors.mutedLight : colors.mutedDarker,
       }[type];
 
   let prefix = '';
   if (isNegative) prefix = '−';
-  else if (signed) prefix = type === 'income' ? '+' : type === 'danger' ? '−' : '−';
+  else if (signed) prefix = type === 'income' || type === 'transfer_in' ? '+' : '−';
 
   // Muting the ₹ is a de-emphasis against a healthy figure — but on a negative
   // one it fought the number it belongs to, leaving a grey ₹ glued to a red

@@ -29,6 +29,9 @@ export async function fetchStreak(userId) {
   const { data, error } = await supabase
     .from('transactions')
     .select('created_at, type, amount')
+    // Transfers are bookkeeping between your own accounts, not "showing up and
+    // logging" — they must not count toward the streak or today's totals.
+    .in('type', ['income', 'expense'])
     .gte('created_at', since)
     .order('created_at', { ascending: false });
 

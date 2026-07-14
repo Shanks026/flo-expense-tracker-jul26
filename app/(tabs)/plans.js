@@ -9,6 +9,7 @@ import ProgressBar from '../../components/ProgressBar';
 import Pill from '../../components/Pill';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import usePlans from '../../hooks/usePlans';
+import useCollectingPlan from '../../hooks/useCollectingPlan';
 import { useAddPlanSheet } from '../../components/AddPlanSheet';
 
 function dateRangeLabel(plan) {
@@ -22,6 +23,7 @@ function dateRangeLabel(plan) {
 export default function Plans() {
   const router = useRouter();
   const { plans } = usePlans();
+  const { plan: collectingPlan } = useCollectingPlan();
   const { openAddPlan } = useAddPlanSheet();
 
   return (
@@ -47,6 +49,7 @@ export default function Plans() {
             const hasTarget = plan.target_amount != null;
             const progress = hasTarget && plan.target_amount > 0 ? plan.total_spent / plan.target_amount : 0;
             const dateLabel = dateRangeLabel(plan);
+            const isCollecting = plan.id === collectingPlan?.id;
 
             if (isCompleted) {
               return (
@@ -80,14 +83,17 @@ export default function Plans() {
               return (
                 <Pressable key={plan.id} onPress={() => router.push(`/plan/${plan.id}`)}>
                   <Card style={styles.planCard}>
-                    <View style={styles.rowLeft}>
-                      <IconTile tone="neutral" size={44} radius={13}>
-                        <Flag size={21} color={colors.ink} strokeWidth={2} />
-                      </IconTile>
-                      <View>
-                        <Text style={styles.planName}>{plan.name}</Text>
-                        <Text style={styles.planSub}>No target · Ongoing</Text>
+                    <View style={styles.rowBetween}>
+                      <View style={styles.rowLeft}>
+                        <IconTile tone="neutral" size={44} radius={13}>
+                          <Flag size={21} color={colors.ink} strokeWidth={2} />
+                        </IconTile>
+                        <View>
+                          <Text style={styles.planName}>{plan.name}</Text>
+                          <Text style={styles.planSub}>No target · Ongoing</Text>
+                        </View>
                       </View>
+                      {isCollecting && <Pill label="Collecting" tone="brand" />}
                     </View>
                     <View style={styles.noTargetRow}>
                       <Text style={styles.planSub}>Total spent</Text>
@@ -111,7 +117,7 @@ export default function Plans() {
                         {dateLabel && <Text style={styles.planSubDark}>{dateLabel}</Text>}
                       </View>
                     </View>
-                    <Pill label="Active" tone="brand" />
+                    <Pill label={isCollecting ? 'Collecting' : 'Active'} tone="brand" />
                   </View>
                   <View style={styles.progressWrap}>
                     <ProgressBar progress={progress} dark status="healthy" />

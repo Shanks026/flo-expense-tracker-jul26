@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt, Flame } from 'lucide-react-native';
+import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -22,6 +22,7 @@ import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useMenuSheet } from '../../components/MenuSheet';
 import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccount } from '../../lib/AccountContext';
+import { isTransfer, transferLabel } from '../../lib/transfers';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
@@ -54,7 +55,7 @@ export default function Home() {
   const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
-  const { activeAccount } = useAccount();
+  const { activeAccount, accounts } = useAccount();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
   const { count: alertCount } = useAlerts();
@@ -235,24 +236,34 @@ export default function Home() {
           </Card>
         ) : (
           <Card style={styles.listCard}>
-            {transactions.map((tx, idx) => (
-              <Pressable
-                key={tx.id}
-                style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
-                onPress={() => openAdd(tx)}
-              >
-                <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
-                  <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
-                </IconTile>
-                <View style={styles.rowMid}>
-                  <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
-                  <Text style={styles.rowSub}>
-                    {format(new Date(tx.occurred_at), 'd MMM')} · {tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
-                  </Text>
-                </View>
-                <AmountText value={tx.amount} type={tx.type} signed />
-              </Pressable>
-            ))}
+            {transactions.map((tx, idx) => {
+              const transfer = isTransfer(tx);
+              return (
+                <Pressable
+                  key={tx.id}
+                  style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
+                  onPress={() => openAdd(tx)}
+                >
+                  <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
+                    {transfer ? (
+                      <ArrowLeftRight size={20} color={colors.mutedDarker} strokeWidth={2} />
+                    ) : (
+                      <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
+                    )}
+                  </IconTile>
+                  <View style={styles.rowMid}>
+                    <Text style={styles.rowTitle}>
+                      {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                    </Text>
+                    <Text style={styles.rowSub}>
+                      {format(new Date(tx.occurred_at), 'd MMM')} ·{' '}
+                      {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
+                    </Text>
+                  </View>
+                  <AmountText value={tx.amount} type={tx.type} signed />
+                </Pressable>
+              );
+            })}
           </Card>
         )}
       </ScrollView>

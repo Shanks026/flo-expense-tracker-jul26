@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react-native';
 import { addMonths, subMonths, format, isToday, isYesterday } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -11,6 +11,8 @@ import CategoryIcon from '../../components/CategoryIcon';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import useTransactions from '../../hooks/useTransactions';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
+import { useAccount } from '../../lib/AccountContext';
+import { isTransfer, transferLabel } from '../../lib/transfers';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -37,7 +39,9 @@ function groupByDay(transactions) {
     }
     const group = byLabel.get(label);
     group.items.push(tx);
-    group[tx.type] += tx.amount;
+    // Only income/expense feed the day-header totals; transfers are neither and
+    // must not land in a bucket (they'd create a NaN key and misstate the day).
+    if (tx.type === 'income' || tx.type === 'expense') group[tx.type] += tx.amount;
   }
   return groups;
 }
@@ -51,14 +55,17 @@ export default function Transactions() {
   const [typeFilter, setTypeFilter] = useState('all');
   const { transactions } = useTransactions({ month, type: typeFilter });
   const { openAdd } = useAddTransactionSheet();
+  const { accounts } = useAccount();
 
   const groups = useMemo(() => groupByDay(transactions), [transactions]);
 
   const totals = useMemo(() => {
+    // Transfers move money between the user's own accounts — never counted as
+    // spent or received. Only real expense/income rows feed these totals.
     return transactions.reduce(
       (acc, tx) => {
         if (tx.type === 'income') acc.received += tx.amount;
-        else acc.spent += tx.amount;
+        else if (tx.type === 'expense') acc.spent += tx.amount;
         return acc;
       },
       { spent: 0, received: 0 }
@@ -124,29 +131,40 @@ export default function Transactions() {
                   )}
                 </View>
               </View>
-              {group.items.map((tx, idx) => (
-                <Pressable
-                  key={tx.id}
-                  style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
-                  onPress={() => openAdd(tx)}
-                >
-                  <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
-                    <CategoryIcon
-                      icon={tx.category?.icon}
-                      size={19}
-                      color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
-                    />
-                  </IconTile>
-                  <View style={styles.rowMid}>
-                    <View style={styles.rowTitleWrap}>
-                      <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
-                      {tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+              {group.items.map((tx, idx) => {
+                const transfer = isTransfer(tx);
+                return (
+                  <Pressable
+                    key={tx.id}
+                    style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
+                    onPress={() => openAdd(tx)}
+                  >
+                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
+                      {transfer ? (
+                        <ArrowLeftRight size={19} color={colors.mutedDarker} strokeWidth={2} />
+                      ) : (
+                        <CategoryIcon
+                          icon={tx.category?.icon}
+                          size={19}
+                          color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
+                        />
+                      )}
+                    </IconTile>
+                    <View style={styles.rowMid}>
+                      <View style={styles.rowTitleWrap}>
+                        <Text style={styles.rowTitle}>
+                          {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                        </Text>
+                        {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                      </View>
+                      <Text style={styles.rowSub}>
+                        {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
+                      </Text>
                     </View>
-                    <Text style={styles.rowSub}>{tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}</Text>
-                  </View>
-                  <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
-                </Pressable>
-              ))}
+                    <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
+                  </Pressable>
+                );
+              })}
             </Card>
           ))
         )}

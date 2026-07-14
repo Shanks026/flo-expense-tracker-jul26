@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, Switch, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import Switch from './Switch';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, Trash2 } from 'lucide-react-native';
@@ -217,12 +218,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
             <Text style={styles.fieldLabelInline}>Active</Text>
             <Text style={styles.rowHint}>{isActive ? 'Tracking this bill for payment' : 'Paused — hidden from due reminders'}</Text>
           </View>
-          <Switch
-            value={isActive}
-            onValueChange={setIsActive}
-            trackColor={{ false: '#3a3a3a', true: colors.brand }}
-            thumbColor={colors.surface}
-          />
+          <Switch value={isActive} onValueChange={setIsActive} />
         </View>
 
         {showDatePicker && (

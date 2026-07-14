@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, Switch, Pressable, Linking, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Linking, StyleSheet } from 'react-native';
+import Switch from '../../components/Switch';
 import { useRouter } from 'expo-router';
 import { Bell, Receipt, Flame } from 'lucide-react-native';
 import OnboardingScaffold from '../../components/OnboardingScaffold';

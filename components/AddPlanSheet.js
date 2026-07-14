@@ -11,6 +11,8 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useCollectingPlan from '../hooks/useCollectingPlan';
+import Switch from './Switch';
 
 const AddPlanSheetContext = createContext(null);
 
@@ -38,6 +40,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId } = useAccount();
   const { showToast } = useToast();
+  const { plan: collectingPlan } = useCollectingPlan();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
@@ -45,6 +48,8 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [datePickerFor, setDatePickerFor] = useState(null);
+  const [isCollecting, setIsCollecting] = useState(false);
+  const [accountId, setAccountId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -58,12 +63,19 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
         setTargetAmount(plan.target_amount ? String(Math.round(plan.target_amount)) : '');
         setStartDate(plan.start_date ? new Date(plan.start_date) : null);
         setEndDate(plan.end_date ? new Date(plan.end_date) : null);
+        setAccountId(plan.account_id ?? activeAccountId);
+        // is_collecting isn't carried on the plan row (v_plans_with_totals omits
+        // it) — derive the switch's initial state from the active account's
+        // collecting plan instead.
+        setIsCollecting(collectingPlan?.id === plan.id);
       } else {
         setEditingId(null);
         setName('');
         setTargetAmount('');
         setStartDate(null);
         setEndDate(null);
+        setAccountId(activeAccountId);
+        setIsCollecting(false);
       }
       modalRef.current?.present();
     },
@@ -77,11 +89,29 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
     setSaving(true);
     setError(null);
 
+    // "At most one collecting plan per account" is DB-enforced (partial unique
+    // index). If we're arming this plan, clear whatever is armed in this account
+    // FIRST, or the insert/update violates the index. Same ordering rule as
+    // lib/plans.js's setPlanCollecting, used by the Plan Detail toggle.
+    if (isCollecting) {
+      const { error: clearError } = await supabase
+        .from('plans')
+        .update({ is_collecting: false })
+        .eq('account_id', accountId)
+        .eq('is_collecting', true);
+      if (clearError) {
+        setSaving(false);
+        showToast({ message: clearError.message, variant: 'error' });
+        return;
+      }
+    }
+
     const payload = {
       name: name.trim(),
       target_amount: targetAmount ? Number(targetAmount) : null,
       start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
       end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+      is_collecting: isCollecting,
     };
 
     const { error: saveError } = editingId
@@ -181,6 +211,14 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
             }}
           />
         )}
+
+        <View style={styles.collectRow}>
+          <View style={styles.collectText}>
+            <Text style={styles.collectTitle}>Collect new transactions</Text>
+            <Text style={styles.collectSub}>New expenses default into this plan until you turn it off</Text>
+          </View>
+          <Switch value={isCollecting} onValueChange={setIsCollecting} />
+        </View>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -284,6 +322,30 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
     color: colors.surface,
+    marginTop: 2,
+  },
+  collectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.inkCard,
+    borderRadius: 14,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginTop: spacing.lg,
+  },
+  collectText: {
+    flex: 1,
+  },
+  collectTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    color: colors.surface,
+  },
+  collectSub: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.xs,
+    color: colors.mutedMid,
     marginTop: 2,
   },
   errorText: {

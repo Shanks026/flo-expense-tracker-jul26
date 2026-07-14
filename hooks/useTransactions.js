@@ -19,7 +19,7 @@ export default function useTransactions({ month, type = 'all', categoryId = null
 
     let query = supabase
       .from('transactions')
-      .select('*, category:categories(id, name, icon), plan:plans(id, name)')
+      .select('*, category:categories(id, name, icon, color), plan:plans(id, name)')
       .eq('account_id', activeAccountId)
       .order('occurred_at', { ascending: false })
       .order('created_at', { ascending: false });

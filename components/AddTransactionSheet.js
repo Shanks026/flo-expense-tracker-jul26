@@ -15,7 +15,9 @@ import { useAccountSwitcherSheet } from './AccountSwitcherSheet';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
+import useCollectingPlan from '../hooks/useCollectingPlan';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
+import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddTransactionSheetContext = createContext(null);
@@ -44,23 +46,65 @@ function formatDateLabel(date) {
   return format(date, 'd MMM yyyy');
 }
 
+// A From/To account picker for Transfer mode. `exclude` is the account chosen in
+// the *other* field, dropped from these options so From and To can never be the
+// same account. Same inline-dropdown shape as the plan picker.
+function AccountField({ label, value, exclude, accounts, open, onToggle, onSelect }) {
+  const selected = accounts.find((a) => a.id === value);
+  const options = accounts.filter((a) => a.id !== exclude);
+  return (
+    <>
+      <Pressable style={styles.accountField} onPress={onToggle}>
+        <View>
+          <Text style={styles.fieldLabel}>{label}</Text>
+          <Text style={[styles.fieldValue, selected && styles.fieldValuePlan]} numberOfLines={1}>
+            {selected?.name ?? 'Select account'}
+          </Text>
+        </View>
+        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+      </Pressable>
+      {open && (
+        <View style={styles.planPicker}>
+          {options.map((a) => (
+            <Pressable
+              key={a.id}
+              style={[styles.planOption, value === a.id && styles.planOptionSelected]}
+              onPress={() => onSelect(a.id)}
+            >
+              <Text style={[styles.planOptionText, value === a.id && styles.planOptionTextSelected]} numberOfLines={1}>
+                {a.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </>
+  );
+}
+
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
   const modalRef = useRef(null);
   const amountInputRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
-  const { activeAccountId, activeAccount } = useAccount();
+  const { activeAccountId, activeAccount, accounts } = useAccount();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { showToast } = useToast();
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
+  const { plan: collectingPlan } = useCollectingPlan();
 
   const [editingId, setEditingId] = useState(null);
+  const [editingTransferId, setEditingTransferId] = useState(null);
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(null);
   const [planId, setPlanId] = useState(null);
   const [planPickerOpen, setPlanPickerOpen] = useState(false);
+  const [fromAccountId, setFromAccountId] = useState(null);
+  const [toAccountId, setToAccountId] = useState(null);
+  const [fromPickerOpen, setFromPickerOpen] = useState(false);
+  const [toPickerOpen, setToPickerOpen] = useState(false);
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [note, setNote] = useState('');
@@ -69,11 +113,14 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   const selectedPlan = activePlans.find((p) => p.id === planId);
+  const canTransfer = accounts.length >= 2;
 
   useImperativeHandle(ref, () => ({
     open(payload) {
       setError(null);
       setPlanPickerOpen(false);
+      setFromPickerOpen(false);
+      setToPickerOpen(false);
       // Autofocus the amount field ONLY for a genuinely blank entry (the ⊕
       // tab, no payload at all) — that's the one case where typing the amount
       // is obviously the user's next move. Every other path already has an
@@ -84,9 +131,28 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // notification tap, before the user has even seen the sheet.
       const isBlankEntry = !payload?.id && !payload?.amount;
 
-      if (payload?.id) {
+      if (payload?.id && isTransfer(payload)) {
+        // Editing a transfer: recover From/To from whichever leg was tapped.
+        // transfer_out lives in the source account (From = its own account,
+        // To = its counterpart); transfer_in is the mirror.
         const tx = payload;
         setEditingId(tx.id);
+        setEditingTransferId(tx.transfer_id);
+        setType('transfer');
+        setAmount(String(Math.round(tx.amount)));
+        if (tx.type === 'transfer_out') {
+          setFromAccountId(tx.account_id);
+          setToAccountId(tx.transfer_account_id);
+        } else {
+          setFromAccountId(tx.transfer_account_id);
+          setToAccountId(tx.account_id);
+        }
+        setDate(new Date(tx.occurred_at));
+        setNote(tx.note ?? '');
+      } else if (payload?.id) {
+        const tx = payload;
+        setEditingId(tx.id);
+        setEditingTransferId(null);
         setType(tx.type);
         setAmount(String(Math.round(tx.amount)));
         setCategoryId(tx.category_id);
@@ -96,11 +162,22 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       } else {
         const prefillType = payload?.type ?? 'expense';
         setEditingId(null);
+        setEditingTransferId(null);
         setType(prefillType);
         setAmount(payload?.amount ? String(Math.round(payload.amount)) : '');
         const prefillList = prefillType === 'expense' ? expenseCategories : incomeCategories;
         setCategoryId(prefillList[0]?.id ?? null);
-        setPlanId(payload?.plan_id ?? null);
+        // Transfer From/To seed: From = the account you're in, To = unset.
+        setFromAccountId(activeAccountId);
+        setToAccountId(null);
+        // An explicit plan_id in the payload (Plan Detail's "Add Expense")
+        // always wins. Otherwise a new entry defaults into the active account's
+        // collecting plan, if one is armed — the whole point of Phase 2. This is
+        // the `else` branch (a brand-new entry): editing an existing transaction
+        // takes the `payload?.id` branch above and its plan is NEVER touched here.
+        // The plan lands in the visible "Add to Plan" field, so it can be seen
+        // and cleared before saving — not a hidden default.
+        setPlanId(payload?.plan_id ?? collectingPlan?.id ?? null);
         setDate(new Date());
         setNote(payload?.note ?? '');
       }
@@ -119,12 +196,53 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   }));
 
   function handleTypeChange(nextType) {
+    setError(null);
     setType(nextType);
+    if (nextType === 'transfer') return; // transfers have no category
     const list = nextType === 'expense' ? expenseCategories : incomeCategories;
     setCategoryId(list[0]?.id ?? null);
   }
 
+  async function handleSaveTransfer() {
+    const numericAmount = Number(amount);
+    if (!numericAmount || numericAmount <= 0) {
+      setError('Enter an amount');
+      return;
+    }
+    if (!fromAccountId || !toAccountId) {
+      setError('Choose both accounts');
+      return;
+    }
+    if (fromAccountId === toAccountId) {
+      setError('Choose two different accounts');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+
+    const fields = {
+      fromAccountId,
+      toAccountId,
+      amount: numericAmount,
+      occurredAt: format(date, 'yyyy-MM-dd'),
+      note: note.trim() || null,
+    };
+    const { error: saveError } = editingTransferId
+      ? await updateTransfer(editingTransferId, fields)
+      : await logTransfer(fields);
+
+    setSaving(false);
+    if (saveError) {
+      showToast({ message: saveError.message, variant: 'error' });
+      return;
+    }
+    notifyChanged();
+    modalRef.current?.dismiss();
+    showToast({ message: editingTransferId ? 'Transfer updated' : 'Transfer saved', variant: 'success' });
+  }
+
   async function handleSave() {
+    if (type === 'transfer') return handleSaveTransfer();
     const numericAmount = Number(amount);
     if (!numericAmount || numericAmount <= 0) {
       setError('Enter an amount');
@@ -164,9 +282,17 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   }
 
   async function handleDelete() {
-    if (!editingId) return;
     setSaving(true);
-    const { error: deleteError } = await supabase.from('transactions').delete().eq('id', editingId);
+    // A transfer is two rows — delete the whole pair by transfer_id, never one leg.
+    const { error: deleteError } = editingTransferId
+      ? await deleteTransfer(editingTransferId)
+      : editingId
+        ? await supabase.from('transactions').delete().eq('id', editingId)
+        : { error: null };
+    if (!editingTransferId && !editingId) {
+      setSaving(false);
+      return;
+    }
     setSaving(false);
     if (deleteError) {
       showToast({ message: deleteError.message, variant: 'error' });
@@ -174,7 +300,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     }
     notifyChanged();
     modalRef.current?.dismiss();
-    showToast({ message: 'Transaction deleted', variant: 'success' });
+    showToast({ message: editingTransferId ? 'Transfer deleted' : 'Transaction deleted', variant: 'success' });
   }
 
   const renderBackdrop = useCallback(
@@ -194,13 +320,21 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Transaction' : 'Add Transaction'}</Text>
+          <Text style={styles.headerTitle}>
+            {type === 'transfer'
+              ? editingId
+                ? 'Edit Transfer'
+                : 'Transfer'
+              : editingId
+                ? 'Edit Transaction'
+                : 'Add Transaction'}
+          </Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
             <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
-        {activeAccount && (
+        {activeAccount && type !== 'transfer' && (
           <Pressable
             style={styles.accountRow}
             onPress={() => {
@@ -228,6 +362,14 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           >
             <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
           </Pressable>
+          {canTransfer && (
+            <Pressable
+              style={[styles.segment, type === 'transfer' && styles.segmentActive]}
+              onPress={() => handleTypeChange('transfer')}
+            >
+              <Text style={[styles.segmentText, type === 'transfer' && styles.segmentTextActive]}>Transfer</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.amountWrap}>
@@ -246,40 +388,108 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>CATEGORY</Text>
-        <ScrollView key={type} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {categories.map((cat) => {
-            const selected = cat.id === categoryId;
-            return (
-              <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
-                <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
-                  <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.ink : colors.ink} strokeWidth={2} />
-                </View>
-                <Text style={[styles.chipLabel, !selected && styles.chipLabelInactive]} numberOfLines={1}>
-                  {cat.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {type === 'transfer' ? (
+          <>
+            <AccountField
+              label="From"
+              value={fromAccountId}
+              exclude={toAccountId}
+              accounts={accounts}
+              open={fromPickerOpen}
+              onToggle={() => {
+                setFromPickerOpen((v) => !v);
+                setToPickerOpen(false);
+              }}
+              onSelect={(id) => {
+                setFromAccountId(id);
+                setFromPickerOpen(false);
+              }}
+            />
+            <AccountField
+              label="To"
+              value={toAccountId}
+              exclude={fromAccountId}
+              accounts={accounts}
+              open={toPickerOpen}
+              onToggle={() => {
+                setToPickerOpen((v) => !v);
+                setFromPickerOpen(false);
+              }}
+              onSelect={(id) => {
+                setToAccountId(id);
+                setToPickerOpen(false);
+              }}
+            />
+            <Pressable style={styles.transferDate} onPress={() => setShowDatePicker(true)}>
+              <Text style={styles.fieldLabel}>Date</Text>
+              <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionLabel}>CATEGORY</Text>
+            <ScrollView key={type} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {categories.map((cat) => {
+                const selected = cat.id === categoryId;
+                return (
+                  <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
+                    <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
+                      <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.ink : colors.ink} strokeWidth={2} />
+                    </View>
+                    <Text style={[styles.chipLabel, !selected && styles.chipLabelInactive]} numberOfLines={1}>
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
-        <View style={styles.dateAndPlanRow}>
-          <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
-            <Text style={styles.fieldLabel}>Date</Text>
-            <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
-          </Pressable>
-          <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
-            <View style={styles.planRowInner}>
-              <View>
-                <Text style={styles.fieldLabel}>Add to Plan</Text>
-                <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
-                  {selectedPlan?.name ?? 'None'}
-                </Text>
-              </View>
-              <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+            <View style={styles.dateAndPlanRow}>
+              <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
+                <Text style={styles.fieldLabel}>Date</Text>
+                <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
+              </Pressable>
+              <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
+                <View style={styles.planRowInner}>
+                  <View>
+                    <Text style={styles.fieldLabel}>Add to Plan</Text>
+                    <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
+                      {selectedPlan?.name ?? 'None'}
+                    </Text>
+                  </View>
+                  <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+                </View>
+              </Pressable>
             </View>
-          </Pressable>
-        </View>
+            {planPickerOpen && (
+              <View style={styles.planPicker}>
+                <Pressable
+                  style={[styles.planOption, planId === null && styles.planOptionSelected]}
+                  onPress={() => {
+                    setPlanId(null);
+                    setPlanPickerOpen(false);
+                  }}
+                >
+                  <Text style={[styles.planOptionText, planId === null && styles.planOptionTextSelected]}>None</Text>
+                </Pressable>
+                {activePlans.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    style={[styles.planOption, planId === p.id && styles.planOptionSelected]}
+                    onPress={() => {
+                      setPlanId(p.id);
+                      setPlanPickerOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.planOptionText, planId === p.id && styles.planOptionTextSelected]} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
+        )}
         {showDatePicker && (
           <DateTimePicker
             value={date}
@@ -291,33 +501,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               if (selected) setDate(selected);
             }}
           />
-        )}
-        {planPickerOpen && (
-          <View style={styles.planPicker}>
-            <Pressable
-              style={[styles.planOption, planId === null && styles.planOptionSelected]}
-              onPress={() => {
-                setPlanId(null);
-                setPlanPickerOpen(false);
-              }}
-            >
-              <Text style={[styles.planOptionText, planId === null && styles.planOptionTextSelected]}>None</Text>
-            </Pressable>
-            {activePlans.map((p) => (
-              <Pressable
-                key={p.id}
-                style={[styles.planOption, planId === p.id && styles.planOptionSelected]}
-                onPress={() => {
-                  setPlanId(p.id);
-                  setPlanPickerOpen(false);
-                }}
-              >
-                <Text style={[styles.planOptionText, planId === p.id && styles.planOptionTextSelected]} numberOfLines={1}>
-                  {p.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
         )}
 
         <View style={styles.noteRow}>
@@ -337,7 +520,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         {editingId && (
           <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
             <Trash2 size={16} color={colors.danger} strokeWidth={2} />
-            <Text style={styles.deleteText}>Delete Transaction</Text>
+            <Text style={styles.deleteText}>{editingTransferId ? 'Delete Transfer' : 'Delete Transaction'}</Text>
           </Pressable>
         )}
       </BottomSheetScrollView>
@@ -502,6 +685,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
+  },
+  accountField: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  transferDate: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    marginBottom: spacing.md,
   },
   planRowInner: {
     flexDirection: 'row',

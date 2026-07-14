@@ -1,23 +1,29 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Pencil } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import ProgressBar from '../../components/ProgressBar';
-import AmountText from '../../components/AmountText';
-import Pill from '../../components/Pill';
-import Button from '../../components/Button';
-import CategoryIcon from '../../components/CategoryIcon';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import { usePlan } from '../../hooks/usePlans';
-import useTransactions from '../../hooks/useTransactions';
-import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
-import { useAddPlanSheet } from '../../components/AddPlanSheet';
-import { supabase } from '../../lib/supabase';
-import { useDataRefresh } from '../../lib/DataRefreshContext';
+import Card from '../../../components/Card';
+import IconTile from '../../../components/IconTile';
+import ProgressBar from '../../../components/ProgressBar';
+import AmountText from '../../../components/AmountText';
+import Pill from '../../../components/Pill';
+import Button from '../../../components/Button';
+import CategoryIcon from '../../../components/CategoryIcon';
+import Switch from '../../../components/Switch';
+import DonutChart from '../../../components/DonutChart';
+import { colors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
+import { usePlan } from '../../../hooks/usePlans';
+import useTransactions from '../../../hooks/useTransactions';
+import useCollectingPlan from '../../../hooks/useCollectingPlan';
+import { useAddTransactionSheet } from '../../../components/AddTransactionSheet';
+import { useAddPlanSheet } from '../../../components/AddPlanSheet';
+import { supabase } from '../../../lib/supabase';
+import { setPlanCollecting } from '../../../lib/plans';
+import { useDataRefresh } from '../../../lib/DataRefreshContext';
+import { useToast } from '../../../components/Toast';
+import { computeCategoryBreakdown, getCategoryColor } from '../../../lib/analytics';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -32,9 +38,23 @@ export default function PlanDetail() {
   const router = useRouter();
   const { plan, loading } = usePlan(id);
   const { transactions } = useTransactions({ planId: id });
+  const { plan: collectingPlan } = useCollectingPlan();
   const { openAdd } = useAddTransactionSheet();
   const { openAddPlan } = useAddPlanSheet();
   const { notifyChanged } = useDataRefresh();
+  const { showToast } = useToast();
+
+  // Pure client-side compute from the transactions the screen already holds —
+  // no new query. A one-slice donut is a circle, not information (same reason
+  // the budget detail screen has no chart at all), so hide below 2 categories.
+  // Hooks must run unconditionally every render, so this sits ABOVE the
+  // `if (!plan) return null` guard below — it doesn't depend on `plan` anyway,
+  // only on `transactions`.
+  const categoryBreakdown = useMemo(() => computeCategoryBreakdown(transactions, 'expense'), [transactions]);
+  const donutSegments = useMemo(
+    () => categoryBreakdown.map((entry) => ({ pct: entry.pct, color: getCategoryColor(entry.category) ?? colors.mutedLight })),
+    [categoryBreakdown]
+  );
 
   useEffect(() => {
     if (!loading && !plan) {
@@ -47,12 +67,24 @@ export default function PlanDetail() {
   const hasTarget = plan.target_amount != null;
   const progress = hasTarget && plan.target_amount > 0 ? plan.total_spent / plan.target_amount : 0;
   const isCompleted = plan.status === 'completed';
+  const isCollecting = collectingPlan?.id === plan.id;
+  const showBreakdown = categoryBreakdown.length >= 2;
 
   async function toggleStatus() {
-    await supabase
-      .from('plans')
-      .update({ status: isCompleted ? 'active' : 'completed' })
-      .eq('id', plan.id);
+    // Completing a plan clears its collecting flag — a finished trip must not
+    // keep swallowing new transactions. Reactivating does NOT re-arm it (the
+    // user opts back in deliberately via the switch).
+    const update = isCompleted ? { status: 'active' } : { status: 'completed', is_collecting: false };
+    await supabase.from('plans').update(update).eq('id', plan.id);
+    notifyChanged();
+  }
+
+  async function handleToggleCollecting(next) {
+    const { error } = await setPlanCollecting({ planId: plan.id, accountId: plan.account_id, collecting: next });
+    if (error) {
+      showToast({ message: error.message, variant: 'error' });
+      return;
+    }
     notifyChanged();
   }
 
@@ -79,6 +111,16 @@ export default function PlanDetail() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {!isCompleted && (
+          <View style={styles.collectRow}>
+            <View style={styles.collectText}>
+              <Text style={styles.collectTitle}>Collecting</Text>
+              <Text style={styles.collectSub}>New transactions default into this plan</Text>
+            </View>
+            <Switch value={isCollecting} onValueChange={handleToggleCollecting} />
+          </View>
+        )}
+
         <Card dark style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total spent</Text>
           <View style={styles.summaryAmountRow}>
@@ -97,6 +139,32 @@ export default function PlanDetail() {
             </>
           )}
         </Card>
+
+        {showBreakdown && (
+          <>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Where it went</Text>
+            </View>
+            <Card style={styles.chartCard}>
+              <DonutChart segments={donutSegments} total={plan.total_spent} />
+            </Card>
+            <Card style={styles.breakdownCard}>
+              {categoryBreakdown.map((entry, idx) => (
+                <View
+                  key={entry.category?.id ?? 'uncategorized'}
+                  style={[styles.breakdownRow, idx < categoryBreakdown.length - 1 && styles.rowBorder]}
+                >
+                  <View style={[styles.colorDot, { backgroundColor: getCategoryColor(entry.category) ?? colors.mutedLight }]} />
+                  <View style={styles.rowMid}>
+                    <Text style={styles.rowTitle}>{entry.category?.name ?? 'Uncategorized'}</Text>
+                    <Text style={styles.rowSub}>{entry.pct.toFixed(0)}% of total</Text>
+                  </View>
+                  <AmountText value={entry.amount} type="neutral" />
+                </View>
+              ))}
+            </Card>
+          </>
+        )}
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Expenses</Text>
@@ -128,11 +196,20 @@ export default function PlanDetail() {
           </Card>
         )}
 
-        <Button
-          title="Add Expense"
-          onPress={() => openAdd({ plan_id: plan.id })}
-          style={{ marginTop: spacing.lg }}
-        />
+        <View style={styles.actionRow}>
+          <Button
+            title="Add Expense"
+            onPress={() => openAdd({ plan_id: plan.id })}
+            style={styles.actionButton}
+          />
+          <Button
+            title="Add from history"
+            variant="outline"
+            onPress={() => router.push(`/plan/${plan.id}/history`)}
+            style={styles.actionButton}
+          />
+        </View>
+
         <Pressable style={styles.toggleStatusRow} onPress={toggleStatus}>
           <Text style={styles.toggleStatusText}>{isCompleted ? 'Reactivate Plan' : 'Mark as Complete'}</Text>
         </Pressable>
@@ -267,6 +344,26 @@ const styles = StyleSheet.create({
     padding: 0,
     paddingHorizontal: spacing.lg,
   },
+  chartCard: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  breakdownCard: {
+    padding: 0,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 14,
+  },
+  colorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: radii.pill,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,6 +387,39 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.mutedMid,
     marginTop: 1,
+  },
+  actionRow: {
+    marginTop: spacing.lg,
+    gap: spacing.md,
+  },
+  actionButton: {
+    width: '100%',
+  },
+  collectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  collectText: {
+    flex: 1,
+  },
+  collectTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.lg,
+    color: colors.ink,
+  },
+  collectSub: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+    marginTop: 2,
   },
   toggleStatusRow: {
     alignItems: 'center',
