@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Compass, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
@@ -21,11 +21,10 @@ import {
   requestPermission,
   getPermissionStatus,
   rescheduleAll,
-  sendTestNotification,
-  getScheduledSummary,
 } from '../lib/notifications';
 import {
   isSupported as isDetectSupported,
+  isAutoDetectVariant,
   hasNotificationAccess,
   openNotificationAccessSettings,
   isDetectionEnabled,
@@ -77,7 +76,7 @@ function timeOnToday(hour, minute) {
 export default function Settings() {
   const router = useRouter();
   const { session, deleteAccount } = useAuth();
-  const { profile, avatarUrl, updateProfile } = useProfile();
+  const { profile, avatarUrl } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
   const { bills } = useBills();
   const { showToast } = useToast();
@@ -224,37 +223,6 @@ export default function Settings() {
     await sync();
   }
 
-  // Debug — shows what the OS actually has pending, so "my reminder didn't
-  // fire" can be diagnosed instead of guessed at: present here but never
-  // delivered = a delivery/Doze problem; absent = a scheduling/logic problem.
-  // Also the only practical way to verify Koban's copy engine
-  // (05-koban-engagement.md Phase 3) without waiting for real delivery —
-  // items are sorted soonest-first, so the top few are today's Nudge/Recap
-  // slot and the next several days, exactly what's worth reading to confirm
-  // the right lane/tier/streak-number was picked.
-  async function handleShowScheduled() {
-    const { unsupported, items } = await getScheduledSummary();
-    if (unsupported) {
-      showToast({ message: 'Needs a development build, not Expo Go', variant: 'error' });
-      return;
-    }
-    const shown = items.slice(0, 8);
-    const body = shown.length
-      ? shown.map((i) => `${i.title}\n${i.body}\n${i.when} · ${i.channelId}`).join('\n\n───\n\n')
-      : 'Nothing scheduled.\n\nIf you expected a daily reminder here, check that both the Notifications master toggle AND Daily Reminder are on.';
-    const suffix = items.length > shown.length ? `\n\n(+${items.length - shown.length} more not shown)` : '';
-    Alert.alert(`${items.length} scheduled`, body + suffix);
-  }
-
-  async function handleSendTest() {
-    const result = await sendTestNotification();
-    if (result.unsupported) {
-      showToast({ message: 'Notifications need a development build, not Expo Go', variant: 'error' });
-      return;
-    }
-    showToast({ message: 'Test notification in 3s — lock the screen or switch apps now', variant: 'info' });
-  }
-
   // Deep-links to the OS battery-optimization LIST — not a direct
   // exemption request (Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS),
   // which needs its own manifest permission that Google Play scrutinizes
@@ -300,14 +268,6 @@ export default function Settings() {
     setBillReminders(next);
     await setBillReminderSettings(next);
     await sync();
-  }
-
-  // Nulling onboarded_at puts the user back in the "hasn't onboarded" state;
-  // updateProfile already calls notifyChanged(), so OnboardingGate re-reads
-  // the column and redirects into the flow without any navigation from here.
-  async function handleReplayOnboarding() {
-    const { error } = await updateProfile({ onboarded_at: null });
-    if (error) showToast({ message: error.message, variant: 'error' });
   }
 
   async function handleDelete() {
@@ -370,24 +330,13 @@ export default function Settings() {
             <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
           </Pressable>
 
-          <View style={[styles.row, styles.rowBorder]}>
+          <View style={styles.row}>
             <View style={styles.rowIcon}>
               <SunMedium size={20} color={colors.ink} strokeWidth={2} />
             </View>
             <Text style={styles.rowTitle}>Appearance</Text>
             <Text style={styles.rowValue}>Light</Text>
           </View>
-
-          {/* Clearing onboarded_at is all this needs to do — OnboardingGate
-              watches that column and redirects on its own. No confirmation
-              dialog: it's non-destructive and every step is skippable. */}
-          <Pressable style={styles.row} onPress={handleReplayOnboarding}>
-            <View style={styles.rowIcon}>
-              <Compass size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Replay onboarding</Text>
-            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-          </Pressable>
         </Card>
 
         <Text style={styles.sectionLabel}>Notifications</Text>
@@ -406,27 +355,7 @@ export default function Settings() {
             </Pressable>
           )}
 
-          <Pressable
-            style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}
-            onPress={handleSendTest}
-            disabled={!notifEnabled}
-          >
-            <View style={styles.rowIcon}>
-              <Bell size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Send test notification</Text>
-            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-          </Pressable>
-
-          <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowScheduled}>
-            <View style={styles.rowIcon}>
-              <Receipt size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Show scheduled</Text>
-            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-          </Pressable>
-
-          <Pressable style={styles.row} onPress={handleOpenBatterySettings}>
+          <Pressable style={[styles.row, styles.rowBorder]} onPress={handleOpenBatterySettings}>
             <View style={styles.rowIcon}>
               <BatteryWarning size={20} color={colors.ink} strokeWidth={2} />
             </View>
@@ -571,52 +500,56 @@ export default function Settings() {
           />
         )}
 
-        <Text style={styles.sectionLabel}>Transaction Detection</Text>
-        <Card style={styles.rowsCard}>
-          {!isDetectSupported() ? (
-            <View style={styles.row}>
-              <Text style={styles.permissionHint}>Android only, and needs a development build (not Expo Go).</Text>
-            </View>
-          ) : (
-            <>
-              <Pressable style={[styles.row, styles.rowBorder]} onPress={openNotificationAccessSettings}>
-                <View style={styles.rowIcon}>
-                  <Landmark size={20} color={colors.ink} strokeWidth={2} />
+        {isAutoDetectVariant() && (
+          <>
+            <Text style={styles.sectionLabel}>Transaction Detection</Text>
+            <Card style={styles.rowsCard}>
+              {!isDetectSupported() ? (
+                <View style={styles.row}>
+                  <Text style={styles.permissionHint}>Android only, and needs a development build (not Expo Go).</Text>
                 </View>
-                <Text style={styles.rowTitle}>Notification access</Text>
-                <Text style={styles.rowValue}>{detectAccess ? 'Granted' : 'Tap to grant'}</Text>
-              </Pressable>
+              ) : (
+                <>
+                  <Pressable style={[styles.row, styles.rowBorder]} onPress={openNotificationAccessSettings}>
+                    <View style={styles.rowIcon}>
+                      <Landmark size={20} color={colors.ink} strokeWidth={2} />
+                    </View>
+                    <Text style={styles.rowTitle}>Notification access</Text>
+                    <Text style={styles.rowValue}>{detectAccess ? 'Granted' : 'Tap to grant'}</Text>
+                  </Pressable>
 
-              <View style={[styles.row, detectEnabled && styles.rowBorder, !detectAccess && styles.rowDisabled]}>
-                <View style={styles.rowIcon}>
-                  <Bell size={20} color={colors.ink} strokeWidth={2} />
-                </View>
-                <Text style={styles.rowTitle}>Enable detection</Text>
-                <Switch value={detectEnabled} onValueChange={handleToggleDetect} disabled={!detectAccess} />
-              </View>
-
-              {detectEnabled && (
-                <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowDetectionLog}>
-                  <View style={styles.rowIcon}>
-                    <Receipt size={20} color={colors.ink} strokeWidth={2} />
+                  <View style={[styles.row, detectEnabled && styles.rowBorder, !detectAccess && styles.rowDisabled]}>
+                    <View style={styles.rowIcon}>
+                      <Bell size={20} color={colors.ink} strokeWidth={2} />
+                    </View>
+                    <Text style={styles.rowTitle}>Enable detection</Text>
+                    <Switch value={detectEnabled} onValueChange={handleToggleDetect} disabled={!detectAccess} />
                   </View>
-                  <Text style={styles.rowTitle}>What FLO has seen</Text>
-                  <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-                </Pressable>
-              )}
 
-              {detectEnabled && (
-                <View style={styles.watchedAppsRow}>
-                  <Text style={styles.watchedAppsText}>
-                    Watches {Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit
-                    alerts, so FLO can prompt you to log them. Reads only these apps'
-                    notifications — nothing else on the device.
-                  </Text>
-                </View>
+                  {detectEnabled && (
+                    <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowDetectionLog}>
+                      <View style={styles.rowIcon}>
+                        <Receipt size={20} color={colors.ink} strokeWidth={2} />
+                      </View>
+                      <Text style={styles.rowTitle}>What FLO has seen</Text>
+                      <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+                    </Pressable>
+                  )}
+
+                  {detectEnabled && (
+                    <View style={styles.watchedAppsRow}>
+                      <Text style={styles.watchedAppsText}>
+                        Watches {Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit
+                        alerts, so FLO can prompt you to log them. Reads only these apps'
+                        notifications — nothing else on the device.
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </Card>
+            </Card>
+          </>
+        )}
 
         <Pressable style={styles.deleteButton} onPress={() => { setDeleteError(null); setConfirmVisible(true); }}>
           <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />

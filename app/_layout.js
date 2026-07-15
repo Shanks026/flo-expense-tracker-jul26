@@ -170,8 +170,18 @@ function RootNavigator() {
   // state (e.g. after a sign-out) goes straight to sign-in and never back
   // through the sales intro. The DB flag profiles.onboarded_at is the true
   // one-time guarantee across devices; this is just the device-local shortcut.
+  //
+  // Updates local state too, not just AsyncStorage: without this, signing out
+  // in the same app session that just signed up (no full reload in between —
+  // the common Expo Go testing loop) re-reads the stale `introSeen === false`
+  // this component captured at its OWN mount, before the sign-up ever
+  // happened, and wrongly sends a real returning user back through the
+  // pre-auth sales intro instead of straight to sign-in.
   useEffect(() => {
-    if (session) persistIntroSeen();
+    if (session) {
+      persistIntroSeen();
+      setIntroSeen(true);
+    }
   }, [session]);
 
   // Only the signed-OUT rule lives here. Where a signed-IN user goes depends on

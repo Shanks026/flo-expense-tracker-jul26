@@ -637,6 +637,46 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   *must* depend on `session`/`userId` directly, or it will silently never
   recover from a pre-auth empty fetch. When adding a new global
   (non-account-scoped) hook, check this first.
+- **Two APK variants — auto-detect / no-detect — from one codebase**
+  (2026-07-15) — `eas.json` gained `lite` (Play Store — AAB, no
+  notification-listener) and `full` (sideload-only — APK, internal
+  distribution) build profiles, both driven by a single `FLO_VARIANT` env
+  var read in the new `app.config.js`. Commenting out JS call sites alone
+  cannot exclude the feature: `modules/flo-notification-listener`'s
+  `BIND_NOTIFICATION_LISTENER_SERVICE` manifest fragment merges in via
+  AGP's manifest merger the moment the module directory is present and
+  autolinked, regardless of whether any JS calls it. `app.config.js`
+  instead rewrites `package.json`'s `expo.autolinking.exclude` as a side
+  effect (idempotent — only dirties the file when the exclude list
+  actually changes) before prebuild's native project generation runs.
+  Verified via `npx expo-modules-autolinking resolve --platform android`:
+  20 modules found normally, 19 (no `flo-notification-listener`) under
+  `FLO_VARIANT=lite`. `lib/detect.js`'s `IS_SUPPORTED_PLATFORM` gate and
+  `app/settings.js`'s Transaction Detection section both also read the same
+  flag (`Constants.expoConfig.extra.autoDetectEnabled`) — without the
+  JS-side gate too, the lite APK would crash at boot trying to `require()`
+  a native module that was deliberately excluded from the build.
+
+  Build commands:
+  ```
+  npx eas build --platform android --profile lite   # Play Store — AAB, no auto-detect
+  npx eas build --platform android --profile full   # sideload-only — APK, with auto-detect
+  ```
+  `full` was never intended for Play Store submission regardless of this
+  split — Google's sensitive-permissions policy restricts notification-
+  listener access to apps where it's a disclosed core feature, with its own
+  review form; realistically it ships via direct APK download only (see
+  `06-transaction-auto-detect.md`).
+
+  Also this same pass: removed dev/test-only rows from `app/settings.js`
+  (Replay onboarding, Send test notification, Show scheduled — none
+  end-user-relevant) and fixed a real bug in `app/_layout.js`: signing out
+  in the same app session that just signed up (no full reload in between —
+  the normal Expo Go test loop) re-read a stale local `introSeen === false`
+  and wrongly sent a returning user back through the full pre-auth intro
+  instead of straight to `/sign-in` — `persistIntroSeen()` was writing
+  AsyncStorage but never updating the local React state that actually
+  drives the redirect.
 
 ---
 

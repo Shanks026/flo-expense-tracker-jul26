@@ -19,9 +19,22 @@
     },
     "production": {
       "autoIncrement": true
+    },
+    "lite": {
+      "extends": "production",
+      "env": { "FLO_VARIANT": "lite" }
+    },
+    "full": {
+      "extends": "production",
+      "env": { "FLO_VARIANT": "full" },
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "lite": {}
   }
 }
