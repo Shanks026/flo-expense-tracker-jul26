@@ -7,6 +7,8 @@ import Card from '../components/Card';
 import IconTile from '../components/IconTile';
 import Pill from '../components/Pill';
 import CategoryIcon from '../components/CategoryIcon';
+import Skeleton from '../components/Skeleton';
+import FadeIn from '../components/FadeIn';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import useBills, { billStatus } from '../hooks/useBills';
 import { useAddBillSheet } from '../components/AddBillSheet';
@@ -25,7 +27,7 @@ const STATUS_STYLES = {
 
 export default function Bills() {
   const router = useRouter();
-  const { bills } = useBills();
+  const { bills, loading } = useBills();
   const { openAddBill } = useAddBillSheet();
   const { openPayBill } = usePayBillSheet();
 
@@ -47,12 +49,31 @@ export default function Bills() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {bills.length === 0 ? (
-          <Card style={{ marginTop: spacing.lg }}>
-            <Text style={styles.emptyText}>No bills yet. Tap "New Bill" to add a recurring bill or subscription.</Text>
-          </Card>
+        {loading ? (
+          <>
+            {[0, 1, 2].map((i) => (
+              <Card key={i} style={styles.billCard}>
+                <View style={styles.rowBetween}>
+                  <View style={styles.rowLeft}>
+                    <Skeleton width={42} height={42} radius={13} />
+                    <View>
+                      <Skeleton width={140} height={16} radius={6} style={{ marginBottom: 6 }} />
+                      <Skeleton width={100} height={12} radius={6} />
+                    </View>
+                  </View>
+                </View>
+              </Card>
+            ))}
+          </>
+        ) : bills.length === 0 ? (
+          <FadeIn>
+            <Card style={{ marginTop: spacing.lg }}>
+              <Text style={styles.emptyText}>No bills yet. Tap "New Bill" to add a recurring bill or subscription.</Text>
+            </Card>
+          </FadeIn>
         ) : (
-          bills.map((bill) => {
+          <FadeIn>
+          {bills.map((bill) => {
             const status = bill.is_active ? billStatus(bill.next_due_date) : 'paused';
             const s = STATUS_STYLES[status];
 
@@ -98,7 +119,8 @@ export default function Bills() {
                 </Card>
               </Pressable>
             );
-          })
+          })}
+          </FadeIn>
         )}
       </ScrollView>
     </SafeAreaView>

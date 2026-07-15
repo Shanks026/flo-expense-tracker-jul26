@@ -126,7 +126,8 @@ data model.
 | 05 | `05-koban-engagement.md` | Notification visibility fix → transaction-based streaks → Koban's escalating/varied reminder copy → in-app streak display → mascot icon (last, blocked on user art) | 🚧 **Phases 1–4 built** — heads-up channels (Phase 1, on-device confirmed working); `lib/streak.js` + `hooks/useStreak.js` (Phase 2, 39/39 verified incl. DST); `lib/koban.js` copy engine + `buildReminderPlan()` rolling window (Phase 3, 25/25 verified); `StreakCalendar`/`StreakCelebration` in-app UI (Phase 4, added after the user found Phases 2-3 had no visible surface — 9/9 verified). `formatMoney` hoisted to `lib/money.js`. Awaiting on-device confirmation of Phases 3-4 — no Android SDK here. Phase 5 (mascot icon) blocked on user art |
 | 06 | `06-transaction-auto-detect.md` | Bank/UPI (+ SMS, personal-use-only) notification listener → native parse → "₹450 debited, log it?" heads-up → pre-filled Add Transaction | ✅ **Go/no-go PASSED on real device** (2026-07-12) — core mechanism confirmed working. `modules/flo-notification-listener/` (local Expo module, 3rd native module after share-intent/notifications); `lib/detect.js`; `DetectedTransactionHandler` in `app/_layout.js`; Transaction Detection card in `app/settings.js`. **Allowlist reversed for personal use** — SMS/Messages added (`PERSONAL_USE_EXTRA_PACKAGES`, must be removed before any store submission — see doc). Swipe-away-specifically-isolated test still pending; otherwise on-device-verified |
 | 08 | `08-budget-periods-and-detail.md` | Budget period model (`calendar_week`/`calendar_month`/**`custom`** date range) + visible period labels + budget detail screen | 🚧 **Both phases built**, bundle- and SQL-verified; awaiting on-device confirmation. `budgets.period` **dropped** → `period_type` + `start_date`/`end_date`; `v_budgets_with_spent` now exposes `period_start`/`period_end` (the keystone — the card can finally name its window, and the detail screen filters by the *same* bounds `spent` came from). Tapping a budget card now opens `/budget/[id]` instead of the edit sheet |
-| 07 | `07-onboarding.md` | First-run onboarding (Welcome → Name account → First expense → Reminders & streak → Auto-detect → All set) | 🚧 **All 3 phases built**, bundle-verified only — awaiting on-device confirmation (no Android SDK here). Gated on `profiles.onboarded_at` (new column; existing users backfilled, so the flow only ever fires for **new** signups). Built from the `claude-design/` mock, which predated Koban/Bills/auto-detect — the detect step and the streak framing are additions to that design, not in it |
+| 07 | `07-onboarding.md` | First-run onboarding (Welcome → Name account → First expense → Reminders & streak → Auto-detect → All set) | 🗄️ **Superseded by `12-personal-onboarding.md`** (2026-07-14) — v2 is a substantial rework, not a patch: the pre-auth intro replaces Welcome, auto-detect is cut from the flow entirely, and `done.js` was rebuilt. `app/onboarding/welcome.js`/`detect.js` and `components/OnboardingScaffold.js`/`OnboardingProgress.js` (all built here) were **deleted** in `12`'s Phase 3 cleanup once nothing referenced them. Retained from this feature: `account.js`/`expense.js`/`reminders.js` (restyled, logic intact), `Confetti.js`, `PartyPopper.js`, the `profiles.onboarded_at` flag and its gate mechanics. Read this doc for the historical build log (the stale-read race fix, the vertical-rhythm iterations, the streak-celebration user-scoping bug) — `12` doesn't repeat it |
+| 12 | `12-personal-onboarding.md` | Personal onboarding v2 — a conversational pre-auth Introduction (12 screens: problem → aha stat → name/age/income → goal/leak/habit → reflection) that hands into sign-up framed as "save your progress," then a post-auth Climax (real budget created from the leak answer, report cadence, reminders) and Conclusion (journey/free/commitment/all-set) | ✅ **All 3 phases built** (2026-07-14), bundle-verified; on-device pending. **The gate inverts**: `RootNavigator` now makes a signed-out two-way choice (intro vs sign-in, via a device-local `introSeen` flag) while `OnboardingGate` still owns all signed-in routing — disjoint by session, same invariant `07` established. One schema change: `profiles.onboarding_answers` (jsonb) — **income is deliberately never stored**, it lives only in the pre-auth AsyncStorage draft (`lib/onboardingDraft.js`) and sizes the first budget before being cleared on finish. New shared components: `OnboardingScreen` (light/brand/ink scaffold + progress bar), `OnboardingReveal` (spring-based staggered entrance), `CountUp`, `OnboardingChoice`. `lib/koban.js` gained an opt-in `tone` param (`toneFromCommitment`) on `pickNudge`/`buildReminderPlan`, scoped to the tiers where pressure genuinely varies — recap copy untouched. Auto-detect is cut from onboarding entirely (see `06`'s store-readiness note) |
 | 11 | `11-reports.md` | Weekly/monthly reports covering ALL of the user's accounts (headline delta, stats, category donut, budget/plan status, biggest transaction), with an in-place period picker (presets + custom range) so every report doubles as a custom report, scheduled push + bell delivery, and CSV export. | 🚧 **Phases 1–2 built, Phase 3 CSV done** (2026-07-14), bundle-verified; on-device pending. **No schema change** — config + seen-state in AsyncStorage (`lib/reports.js`). `hooks/useAnalyticsData.js` gained an `allAccounts` param (default `false`, `app/analytics.js` unaffected). New `app/report.js`, `components/ReportPeriodPicker.js` (a centred `Modal` dialog, not a bottom sheet — the trigger sits at the screen's top), `components/ReportReadyCard.js` (Home card), `hooks/useReportDue.js` (shared live due-check, also feeds `useAlerts`' new `info`-severity bell alert), `lib/export.js` (CSV, via newly-added `expo-sharing`/`expo-file-system`). Settings gained a "Reports" cadence card; Menu gained a "Reports" row; both Report and Analytics gained a header Export button. Scheduling uses genuine repeating `WEEKLY`/`MONTHLY` OS triggers (verified against the installed `expo-notifications` version's real type defs — caught a real weekday-numbering mismatch, 1=Sun vs JS's 0=Sun, before it shipped). `expo-file-system@19`'s API was found to have been completely rewritten (`File`/`Directory`/`Paths` classes; the old string-path functions still exist but throw at runtime) — caught by reading the installed version's actual types, not memory. Caught and fixed a real cross-account budget leak (categories are global) in Phase 1 — see doc's Implementation Notes. PDF export not started, pending an explicit go-ahead. |
 | 10 | `10-account-self-transfer.md` | Account-to-account self-transfer: a third **Transfer** tab in `AddTransactionSheet` (From/To pickers) writing a linked `transfer_out`/`transfer_in` pair. Moves balances between accounts but is excluded from all spent/earned totals, budgets, analytics, and the streak. | 🚧 **Phase 1 built** (2026-07-14), bundle- & DB-verified; on-device pending. Migration `account_self_transfer` (2 new `type` values + `transfer_id`/`transfer_account_id` + `v_global_summary` balance recreate). New `lib/transfers.js`; `AddTransactionSheet` Transfer mode (full create/edit/delete); `AmountText` transfer tones; transfer rendering in Transactions/Home; streak + `computeBiggestTransaction` exclusions. |
 | 09 | `09-plans-that-collect.md` | Make Plans' explicit-membership model usable: **Phase 1** add-from-history bulk-tagger; **Phase 2** collecting mode (one armed plan per account, new txns default in); **Phase 3** category-breakdown donut on Plan Detail | 🚧 **All 3 phases built** (2026-07-14), bundle- & DB-verified; on-device pending. P1: route restructured `app/plan/[id].js` → `[id]/index.js` + new `[id]/history.js`; `hooks/usePlanCandidates.js` (no DB change). P2: `plans.is_collecting` + partial unique index (migration `plan_collecting_mode`); `hooks/useCollectingPlan.js`, `lib/plans.js`; new transactions default into the armed plan via `AddTransactionSheet`. Also added branded **`components/Switch.js`** (replaced RN `Switch` everywhere). P3: "Where it went" donut + ranked category list on Plan Detail, reusing `lib/analytics.js`'s `computeCategoryBreakdown`/`getCategoryColor` — no new query, no new DB. |
@@ -142,7 +143,7 @@ migration files exist). Keep this in sync as feature files land.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at`, `onboarded_at` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. |
+| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at`, `onboarded_at`, `onboarding_answers` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. **`onboarding_answers`** (jsonb, nullable, added 2026-07-14, `12-personal-onboarding.md`): `{ age_range, goal, leak_category, tracking_habit, commitment }` — a bag for personalisation + future callbacks, not filtered on in SQL. **Income is deliberately never stored anywhere** — it lives only in the pre-auth AsyncStorage draft and sizes the first budget before being cleared. |
 | `categories` | `id`, `user_id`, `name`, `icon`, `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `type` (`'income'`\|`'expense'`), `is_default` | Seeded on signup: Food, Travel, Shopping, Bills, Coffee, Groceries, Other (expense); Salary, Freelance, Other (income) — 10 rows, each with a curated `color` (see `add_category_colors` migration below). `color` added 2026-07-11; picked via a curated swatch grid in `AddCategorySheet.js`, currently consumed only by Analytics (not tinted elsewhere in the app). **Global — not scoped by account, shared across all of a user's accounts.** |
 | `accounts` | `id`, `user_id`, `name`, `description` (nullable), `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `created_at` | Added 2026-07-11 (`add_accounts` migration, `02-accounts.md` Phase 1). Every user always has ≥1 account; `handle_new_user` auto-creates a "Personal" account on signup. Active account is client-side state (`lib/AccountContext.js`), persisted to AsyncStorage — not itself a DB concept. |
 | `transactions` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `type` (`'income'`\|`'expense'`\|`'transfer_in'`\|`'transfer_out'`), `amount` (always positive), `category_id`, `plan_id`, `note`, `occurred_at` (date), `created_at`, `transfer_id` (uuid, nullable), `transfer_account_id` (uuid, nullable, FK → `accounts` ON DELETE SET NULL) | The single source of truth — every summary is computed from this table. **`transfer_in`/`transfer_out` added 2026-07-14** (`10-account-self-transfer.md`): a self-transfer is two rows sharing a `transfer_id`, each carrying the counterpart account in `transfer_account_id`. They move per-account balance (`v_global_summary`) but are excluded from every spent/earned total, budget, plan, analytics fn, and the streak — **because those all filter on the exact type string `'income'`/`'expense'`**. Any NEW aggregation must keep that exact-type discipline, or it will accidentally count transfers. |
@@ -190,6 +191,7 @@ Supabase performance advisor flags.
 | 2026-07-14 | `account_self_transfer` | `10-account-self-transfer.md` Phase 1. Widened `transactions_type_check` to allow `transfer_in`/`transfer_out`; added `transactions.transfer_id` (uuid, nullable) + `transfer_account_id` (uuid, nullable, FK → `accounts(id)` ON DELETE SET NULL) + partial index `idx_transactions_transfer_id`. Recreated `v_global_summary` with the transfer-aware `in_hand_balance` (re-set `security_invoker = true`). Verified live: a ₹1000 test transfer moved balances ±1000 with income/expense totals unchanged; advisor clean (only the 2 pre-existing WARNs). |
 | 2026-07-14 | `plan_collecting_mode` | `09-plans-that-collect.md` Phase 2. Added `plans.is_collecting` (boolean NOT NULL DEFAULT false) + partial unique index `plans_one_collecting_per_account ON plans (user_id, account_id) WHERE is_collecting` (at most one collecting plan per account). No view recreated (so no `security_invoker` step). Verified live: column shape, index def, and a DO-block test proving the index rejects a second collecting plan in one account and that clear-then-set works. Security advisor after: only the two pre-existing WARNs, no new finding. |
 | 2026-07-13 | `add_profiles_onboarded_at` | Added `profiles.onboarded_at` (nullable timestamptz, no default) — the first-run onboarding flag (`07-onboarding.md` Phase 1). NULL = hasn't finished onboarding; `OnboardingGate` in `app/_layout.js` reads it. **Backfilled every existing row to `now()`** so no existing user is dragged through the flow — the flag only fires for signups created after this migration. `handle_new_user` deliberately **not** changed: it inserts only `(id, full_name)`, so new profiles get NULL and onboard for free. |
+| 2026-07-14 | `add_profiles_onboarding_answers` | `12-personal-onboarding.md` Phase 1. Added `profiles.onboarding_answers` (nullable jsonb, no default). NULL until a user finishes the v2 pre-auth intro; both existing profiles confirmed NULL and already onboarded, so neither is dragged into the flow. No view recreated → no `security_invoker` step. Advisor clean (only the 2 pre-existing WARNs) both immediately after and after Phases 2–3. |
 | 2026-07-11 | `fix_user_delete_trigger_storage_guard` | Critical follow-up: `storage.objects` has a `protect_objects_delete` BEFORE-DELETE trigger that rejects any direct delete unless the session GUC `storage.allow_delete_query = 'true'`. `handle_user_delete()` was doing a direct delete, so it would have raised `42501` and **blocked** every auth-user deletion. Fixed by `perform set_config('storage.allow_delete_query','true',true)` before the delete. **Standing rule**: any DB code that deletes from `storage.objects` directly must set this GUC transaction-locally first, or use the Storage API instead. |
 
 **Still open, not fixed**: Security advisor flags leaked-password-protection
@@ -205,6 +207,67 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
 
 ## Shared Infrastructure Notes
 
+- **Logo revamp to the arrow "flow" mark (2026-07-15)** — the user replaced
+  the app's icon-level branding around the same two-arrow vector used for
+  `OnboardingArrowMotif.js`. `assets/icon.png` (1024×1024, solid lime bg,
+  arrow-only glyph, no wordmark), `assets/adaptive-icon.png` (transparent bg,
+  arrow inside the safe zone), `assets/splash-icon.png`, and
+  `assets/favicon.png` were all updated to match and verified correct.
+  `assets/notification-icon.png` (96×96, white-on-transparent, no wordmark —
+  Android force-renders this as a flat silhouette regardless of source color,
+  so white is convention not requirement) was verified via `npx expo prebuild
+  --platform android --clean`, confirming Expo generated all five density
+  variants (`mdpi`–`xxxhdpi`) under `android/app/src/main/res/drawable-*/`.
+  One real near-miss caught in this pass: the app icon file was briefly
+  renamed `Icon.png` (capital I) — harmless on Windows' case-insensitive
+  filesystem, but would have broken silently on EAS Build's case-sensitive
+  Linux runners, since `app.json`'s `"icon": "./assets/icon.png"` is
+  lowercase. Renamed back before it could ship.
+  **New `components/ArrowMark.js`** — the bare arrow (no lime badge, no
+  wordmark), same inlining pattern as `Logo.js`/`OnboardingArrowMotif.js` (no
+  Metro SVG-file-loader configured). Swapped into `app/sign-in.js` in place of
+  `Logo.js`, which read as too heavy/boxed on the auth screens. **`Logo.js` is
+  now unused anywhere in the app** (confirmed via grep) — left in place rather
+  than deleted, since the user may want it repointed at the new arrow mark
+  (instead of the old lettered "FLO" wordmark in `assets/FLO_LOGO.svg`) rather
+  than retired outright; flagging here so it isn't mistaken for dead code to
+  clean up blindly.
+  **Confirmed with the user**: `assets/LogoIconSVG.svg` (1024×1024, lime bg +
+  arrow, no text) *is* the full new brand mark — there is no separate
+  wordmark-bearing "full logo" coming. The brand direction going forward is
+  arrow-only.
+- **`components/Skeleton.js` / `components/FadeIn.js`** (added 2026-07-15,
+  `12-personal-onboarding.md` post-launch follow-up) — the app-wide pattern for
+  a screen whose data hooks already expose a `loading` boolean (most do — see
+  the "Loading = a simple `loading` boolean" convention) but the screen never
+  reads it, so the hook's default/empty value renders as if it were the real
+  answer (₹0 balances, a real empty state) before popping to the actual data a
+  beat later. `Skeleton` is a neutral placeholder block (slow opacity breathe,
+  skipped under reduce-motion); `FadeIn` is a one-time 240ms fade+6px-rise
+  mounted once a section's `loading` flips false. Both are reanimated-based
+  (already a dependency), animate-first/snap-on-reduce (start immediately,
+  only snap to final frame if reduce-motion resolves true later — see the
+  `OnboardingReveal` lesson below). Deliberately more restrained than
+  onboarding's spring/pop reveals — this is the main app, seen many times a
+  day. **Rolled out app-wide 2026-07-15** (same-day follow-up request): Home,
+  Transactions, Budgets, Bills, Plans, and Analytics all now wire `loading`
+  from their existing data hooks into `Skeleton`/`FadeIn` — every one of those
+  hooks already exposed `loading` per this app's own convention, the screens
+  just weren't reading it.
+  **Also surfaced a real (not cosmetic) bug this same pass**: Budget Detail
+  (`app/budget/[id].js`), Plan Detail (`app/plan/[id]/index.js`), and Plan
+  History (`app/plan/[id]/history.js`) all fell straight through to
+  `if (!record) return null` with no loading branch at all, rendering a
+  BLANK screen (not just a wrong-value flash) for the whole time their detail
+  hook (`useBudgetDetail`/`usePlan`) was in flight. Fixed with a centred
+  `ActivityIndicator` branch ahead of the null-check, matching the pattern
+  `app/streak.js` already had right. `app/report.js` was checked and already
+  handled this correctly (`if (!period) return <Text>Loading report…</Text>`,
+  and its "quiet period" empty state was already gated on `!loading`) — no
+  change needed there. `app/settings.js`/`app/manage-categories.js` were
+  checked and don't exhibit the misleading-value bug (no numeric/list
+  empty-state text that could flash incorrectly), so were deliberately left
+  alone rather than gaining unnecessary skeleton complexity.
 - **`components/Logo.js`** (added 2026-07-11) — the real FLO brand mark
   (`assets/FLO_LOGO.svg` — a lime-square badge with "FLO" as the actual
   wordmark artwork, not an icon + separate text label), rendered via
@@ -357,22 +420,69 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   where you were. This cost a full debugging round that looked, from the
   symptom, exactly like a broken navigation guard. Restart with `-c` before
   suspecting the code.
-- **Onboarding** (`07-onboarding.md`, all 3 phases built 2026-07-13) —
-  `lib/onboarding.js` holds the step registry (`ONBOARDING_STEPS`), and both
-  the progress dots and the "where does Continue go" routing derive from it,
-  so a step added/removed/filtered renumbers everything automatically. A step
-  can carry a `supported` predicate and is then **dropped from the flow
-  entirely** where it can't work (the auto-detect step on iOS/Expo Go) — that's
-  the pattern to copy for any future platform-conditional step, rather than
-  stubbing or disabling one. Screens live in `app/onboarding/`, all built on
-  `components/OnboardingScaffold.js`.
+- **Onboarding v2** (`12-personal-onboarding.md`, all 3 phases built
+  2026-07-14 — supersedes `07`'s mechanics, described here in its final
+  state). `lib/onboarding.js` holds **two** ordered lists: `INTRO_STEPS` (the
+  12-screen pre-auth Introduction, its own progress-bar span) and `STEPS` (the
+  post-auth Act 2 + Act 3 flow: account → expense → budget → reports →
+  reminders → journey → free → commitment). Both the progress bar
+  (`OnboardingScreen`'s `progress` prop) and the "where does Continue go"
+  routing derive from whichever list is active, so a step added/removed
+  renumbers everything automatically. `getSteps()`'s `supported` predicate
+  pattern (drop a step entirely, don't stub it) is preserved for any future
+  platform-conditional step — nothing currently uses it (auto-detect's step
+  was cut, not made conditional, since it can never ship to the stores). All
+  screens now build on **`components/OnboardingScreen.js`** (light/brand/ink
+  backgrounds + a thin progress bar), not the retired `OnboardingScaffold.js`/
+  `OnboardingProgress.js` (deleted in `12`'s Phase 3 once nothing imported
+  them). Pre-auth screens live in `app/onboarding/intro/`; post-auth screens
+  in `app/onboarding/` directly.
+- **`lib/onboardingDraft.js`** (added `12-personal-onboarding.md` Phase 1) —
+  the pre-auth answer store. `getDraft()`/`setDraftAnswer()` hold the intro's
+  answers in AsyncStorage (deliberately **not** user-scoped — it exists before
+  a user identity does), plus a device-local `introSeen` flag consumed by
+  `RootNavigator`. `pickDurableAnswers()` whitelists which draft keys get
+  flushed to `profiles.onboarding_answers` (`age_range`, `goal`,
+  `leak_category`, `tracking_habit`, `commitment`) — **`income_band` and
+  `name` are never persisted**: income sizes the first budget in-session only,
+  name rides in via signup metadata. `clearDraft()` runs once, at the very end
+  of `useOnboarding().finish()`.
+- **`components/OnboardingReveal.js`** (added `12-personal-onboarding.md`
+  Phase 1, tuned post-Phase-1 per user feedback) — the staggered
+  landing-page-style entrance every onboarding screen's content uses.
+  Spring-based (`withSpring`, not a fixed-duration ease) with a scale pop, not
+  just fade/translateY — a linear ease reads as mechanical once several items
+  stagger in sequence. Reduce-motion aware, mirroring `Confetti.js`'s guard
+  but inverted (revealed content must still appear, just without animation).
+  `app/onboarding/_layout.js`'s `Stack` also gained `animation: 'fade'` so the
+  screen-to-screen transition doesn't visually compete with each screen's own
+  entrance.
 - **`OnboardingGate`** (`app/_layout.js`) — third instance of the
   `ShareIntentHandler` pattern (side-effect-only component, returns `null`,
   sibling of `<Stack>` *inside* the providers). It needs `useProfile` →
   `useDataRefresh`, and `RootNavigator` defines `DataRefreshProvider`, so this
   logic **cannot** live in `RootNavigator`'s own redirect effect. Redirects on
-  `profiles.onboarded_at` being NULL. Anything else that needs to gate routing
-  on user data must go here too, not in `RootNavigator`.
+  `profiles.onboarded_at` being NULL — to `/onboarding/account` (the Act 2
+  resume point, changed from `07`'s `/onboarding/welcome` by
+  `12-personal-onboarding.md` Phase 1, since a signed-in user is already past
+  the pre-auth intro). Anything else that needs to gate routing on user data
+  must go here too, not in `RootNavigator`.
+- **The gate is now a genuine three-state split** (`12-personal-onboarding.md`
+  Phase 1) — `RootNavigator` still owns *all* of `!session`, but that's now a
+  two-way choice: a device that hasn't seen the pre-auth intro
+  (`lib/onboardingDraft.js`'s async `introSeen` flag) goes to
+  `/onboarding/intro/opener`; everyone else goes to `/sign-in`.
+  `RootNavigator` sets `introSeen` whenever any session appears (sign-in,
+  sign-up, or a restored session), so a later signed-out state on the same
+  device never re-shows the sales intro. The disjoint-by-session invariant
+  from `07`'s screen-flicker fix is preserved exactly: `RootNavigator` still
+  never touches `session`, `OnboardingGate` still never touches `!session`.
+  The redirect waits while `introSeen` is still resolving (`null`) rather than
+  guessing, so nothing flashes the wrong screen. The DB flag
+  (`profiles.onboarded_at`) remains the one true one-time guarantee across
+  devices/reinstalls — `introSeen` is only a device-local shortcut, and even if
+  it's wiped, the opener screen's "Already have an account? Sign in" link
+  routes a returning user straight to `/sign-in` regardless.
 - **`components/Confetti.js`** — the project's first real animation.
   `react-native-reanimated` (~4.1.1) was already a dependency via
   `@gorhom/bottom-sheet`, so animation is available without adding anything —

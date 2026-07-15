@@ -8,6 +8,8 @@ import IconTile from '../../components/IconTile';
 import AmountText from '../../components/AmountText';
 import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
+import Skeleton from '../../components/Skeleton';
+import FadeIn from '../../components/FadeIn';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import useTransactions from '../../hooks/useTransactions';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
@@ -53,7 +55,7 @@ function formatAmount(n) {
 export default function Transactions() {
   const [month, setMonth] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState('all');
-  const { transactions } = useTransactions({ month, type: typeFilter });
+  const { transactions, loading } = useTransactions({ month, type: typeFilter });
   const { openAdd } = useAddTransactionSheet();
   const { accounts } = useAccount();
 
@@ -98,75 +100,103 @@ export default function Transactions() {
       <View style={styles.summaryRow}>
         <View style={styles.summaryDark}>
           <Text style={styles.summaryLabelDark}>Spent</Text>
-          <AmountText value={totals.spent} type="neutral" dark size={fontSize.xxl} />
+          {loading ? (
+            <Skeleton width={80} height={fontSize.xxl} radius={6} style={{ marginTop: 4, backgroundColor: colors.inkCard }} />
+          ) : (
+            <FadeIn>
+              <AmountText value={totals.spent} type="neutral" dark size={fontSize.xxl} />
+            </FadeIn>
+          )}
         </View>
         <View style={styles.summaryLight}>
           <Text style={styles.summaryLabelLight}>Received</Text>
-          <AmountText value={totals.received} type="income" size={fontSize.xxl} />
+          {loading ? (
+            <Skeleton width={80} height={fontSize.xxl} radius={6} style={{ marginTop: 4 }} />
+          ) : (
+            <FadeIn>
+              <AmountText value={totals.received} type="income" size={fontSize.xxl} />
+            </FadeIn>
+          )}
         </View>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {groups.length === 0 ? (
-          <Card style={{ marginTop: spacing.lg }}>
-            <Text style={styles.emptyText}>No transactions this month.</Text>
-          </Card>
-        ) : (
-          groups.map((group) => (
-            <Card key={group.label} style={styles.dayCard}>
-              <View style={styles.dayHeaderRow}>
-                <Text style={styles.dayLabel}>{group.label}</Text>
-                <View style={styles.dayTotals}>
-                  {group.expense > 0 && (
-                    <View style={styles.dayTotalItem}>
-                      <TrendingDown size={11} color={colors.dangerStrong} strokeWidth={2.6} />
-                      <Text style={styles.dayTotalValue}>{formatAmount(group.expense)}</Text>
-                    </View>
-                  )}
-                  {group.income > 0 && (
-                    <View style={styles.dayTotalItem}>
-                      <TrendingUp size={11} color={colors.income} strokeWidth={2.6} />
-                      <Text style={styles.dayTotalValue}>{formatAmount(group.income)}</Text>
-                    </View>
-                  )}
+        {loading ? (
+          <Card style={styles.dayCard}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={[styles.row, i < 2 && styles.rowBorder]}>
+                <Skeleton width={40} height={40} radius={12} />
+                <View style={styles.rowMid}>
+                  <Skeleton width="55%" height={15} radius={6} style={{ marginBottom: 6 }} />
+                  <Skeleton width="35%" height={11} radius={6} />
                 </View>
               </View>
-              {group.items.map((tx, idx) => {
-                const transfer = isTransfer(tx);
-                return (
-                  <Pressable
-                    key={tx.id}
-                    style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
-                    onPress={() => openAdd(tx)}
-                  >
-                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
-                      {transfer ? (
-                        <ArrowLeftRight size={19} color={colors.mutedDarker} strokeWidth={2} />
-                      ) : (
-                        <CategoryIcon
-                          icon={tx.category?.icon}
-                          size={19}
-                          color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
-                        />
-                      )}
-                    </IconTile>
-                    <View style={styles.rowMid}>
-                      <View style={styles.rowTitleWrap}>
-                        <Text style={styles.rowTitle}>
-                          {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
-                        </Text>
-                        {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
-                      </View>
-                      <Text style={styles.rowSub}>
-                        {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
-                      </Text>
-                    </View>
-                    <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
-                  </Pressable>
-                );
-              })}
+            ))}
+          </Card>
+        ) : groups.length === 0 ? (
+          <FadeIn>
+            <Card style={{ marginTop: spacing.lg }}>
+              <Text style={styles.emptyText}>No transactions this month.</Text>
             </Card>
-          ))
+          </FadeIn>
+        ) : (
+          <FadeIn>
+            {groups.map((group) => (
+              <Card key={group.label} style={styles.dayCard}>
+                <View style={styles.dayHeaderRow}>
+                  <Text style={styles.dayLabel}>{group.label}</Text>
+                  <View style={styles.dayTotals}>
+                    {group.expense > 0 && (
+                      <View style={styles.dayTotalItem}>
+                        <TrendingDown size={11} color={colors.dangerStrong} strokeWidth={2.6} />
+                        <Text style={styles.dayTotalValue}>{formatAmount(group.expense)}</Text>
+                      </View>
+                    )}
+                    {group.income > 0 && (
+                      <View style={styles.dayTotalItem}>
+                        <TrendingUp size={11} color={colors.income} strokeWidth={2.6} />
+                        <Text style={styles.dayTotalValue}>{formatAmount(group.income)}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                {group.items.map((tx, idx) => {
+                  const transfer = isTransfer(tx);
+                  return (
+                    <Pressable
+                      key={tx.id}
+                      style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
+                      onPress={() => openAdd(tx)}
+                    >
+                      <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
+                        {transfer ? (
+                          <ArrowLeftRight size={19} color={colors.mutedDarker} strokeWidth={2} />
+                        ) : (
+                          <CategoryIcon
+                            icon={tx.category?.icon}
+                            size={19}
+                            color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
+                          />
+                        )}
+                      </IconTile>
+                      <View style={styles.rowMid}>
+                        <View style={styles.rowTitleWrap}>
+                          <Text style={styles.rowTitle}>
+                            {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                          </Text>
+                          {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                        </View>
+                        <Text style={styles.rowSub}>
+                          {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
+                        </Text>
+                      </View>
+                      <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
+                    </Pressable>
+                  );
+                })}
+              </Card>
+            ))}
+          </FadeIn>
         )}
       </ScrollView>
     </Screen>

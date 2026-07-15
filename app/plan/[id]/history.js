@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Check } from 'lucide-react-native';
@@ -93,6 +93,18 @@ export default function PlanHistory() {
     notifyChanged();
     showToast({ message: `Added ${selectedCount} to ${plan.name}`, variant: 'success' });
     router.back();
+  }
+
+  // Same blank-screen bug fixed on Plan Detail/Budget Detail: this fell
+  // straight through to `if (!plan) return null` with no loading branch.
+  if (planLoading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.ink} />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (!plan) return null;
@@ -241,6 +253,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',

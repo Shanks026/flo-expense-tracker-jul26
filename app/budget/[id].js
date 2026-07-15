@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Pencil, Wallet } from 'lucide-react-native';
@@ -38,6 +38,22 @@ export default function BudgetDetail() {
   useEffect(() => {
     if (!loading && !budget) router.back();
   }, [loading, budget]);
+
+  // Real bug, not just a missing polish pass: this used to fall straight
+  // through to `if (!budget) return null`, rendering a BLANK screen for the
+  // whole time useBudgetDetail's fetch was in flight — worse than a wrong
+  // value flash, since there was nothing on screen at all. A centred spinner
+  // (matching streak.js's own loading branch) at least shows something is
+  // happening.
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.ink} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!budget) return null;
 
@@ -167,6 +183,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',

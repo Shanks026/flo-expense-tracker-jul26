@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Pressable, Linking, StyleSheet } from 'react-native';
 import Switch from '../../components/Switch';
 import { useRouter } from 'expo-router';
 import { Bell, Receipt, Flame } from 'lucide-react-native';
-import OnboardingScaffold from '../../components/OnboardingScaffold';
+import OnboardingScreen from '../../components/OnboardingScreen';
 import { useToast } from '../../components/Toast';
 import useBills from '../../hooks/useBills';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
 import { useAuth } from '../../lib/AuthContext';
-import { getNextRoute } from '../../lib/onboarding';
+import { getNextRoute, getStepPosition } from '../../lib/onboarding';
+import { getDraft } from '../../lib/onboardingDraft';
 import {
   requestPermission,
   setNotificationEnabled,
@@ -23,9 +24,22 @@ import {
 //
 // The streak copy here is deliberately static. A brand-new user's streak is 0,
 // and rendering a live useStreak() read on this screen would sell nothing.
+//
+// The framing line varies by the intro's tracking-habit answer (screen 11) —
+// the nudge itself always defaults on, but WHY it matters differs by what the
+// user already told us about their habits.
 const DEFAULT_HOUR = 20;
 const DEFAULT_MINUTE = 0;
 const DEFAULT_DAYS_BEFORE = 2;
+
+const STREAK_NOTE_BY_HABIT = {
+  daily: 'You already check in often. The nightly nudge just makes sure the streak never breaks.',
+  weekly: 'Log something every day and your streak grows. The nightly nudge is what keeps it from slipping between check-ins.',
+  when_off: 'The nudge means you won’t need to wait until something feels off. You’ll just know.',
+  never: 'This is the fix. One ping a day, and you’ll never lose track again. Miss a day and the streak resets to zero.',
+};
+const DEFAULT_STREAK_NOTE =
+  'Log something every day and your streak grows. The nightly nudge is what keeps it alive. Miss a day and it resets to zero.';
 
 export default function OnboardingReminders() {
   const router = useRouter();
@@ -37,7 +51,15 @@ export default function OnboardingReminders() {
   const [nudgeOn, setNudgeOn] = useState(true);
   const [blocked, setBlocked] = useState(false);
   const [working, setWorking] = useState(false);
+  const [streakNote, setStreakNote] = useState(DEFAULT_STREAK_NOTE);
 
+  useEffect(() => {
+    getDraft().then((d) => {
+      if (d.tracking_habit) setStreakNote(STREAK_NOTE_BY_HABIT[d.tracking_habit] ?? DEFAULT_STREAK_NOTE);
+    });
+  }, []);
+
+  const pos = getStepPosition('reminders');
   const next = getNextRoute('reminders');
 
   async function handleEnable() {
@@ -76,8 +98,9 @@ export default function OnboardingReminders() {
   }
 
   return (
-    <OnboardingScaffold
-      stepKey="reminders"
+    <OnboardingScreen
+      bg="light"
+      progress={pos ? pos.index / pos.total : undefined}
       hero={
         <View style={styles.heroTile}>
           <Bell size={30} color={colors.incomeAccent} strokeWidth={2} />
@@ -115,17 +138,14 @@ export default function OnboardingReminders() {
         </View>
       </View>
 
-      <Text style={styles.streakNote}>
-        Log something every day and your streak grows. The nightly nudge is what keeps it alive —
-        miss a day and it resets to zero.
-      </Text>
+      <Text style={styles.streakNote}>{streakNote}</Text>
 
       {blocked && (
         <Pressable onPress={() => Linking.openSettings()}>
           <Text style={styles.blockedHint}>Notifications are blocked. Tap to open system settings.</Text>
         </Pressable>
       )}
-    </OnboardingScaffold>
+    </OnboardingScreen>
   );
 }
 

@@ -2,20 +2,23 @@ import { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
-import OnboardingScaffold from '../../components/OnboardingScaffold';
+import OnboardingScreen from '../../components/OnboardingScreen';
 import { CATEGORY_COLORS } from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
-import { getNextRoute } from '../../lib/onboarding';
+import useProfile from '../../hooks/useProfile';
+import { getNextRoute, getStepPosition } from '../../lib/onboarding';
+import { getDraft, pickDurableAnswers } from '../../lib/onboardingDraft';
 
 export default function OnboardingAccount() {
   const router = useRouter();
   const { activeAccount, activeAccountId, loading } = useAccount();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
+  const { profile, updateProfile } = useProfile();
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
@@ -32,6 +35,19 @@ export default function OnboardingAccount() {
     setColor(activeAccount.color ?? CATEGORY_COLORS[0]);
   }, [activeAccount, touched]);
 
+  // Entry point to Act 2 — flush the durable pre-auth draft answers into
+  // profiles.onboarding_answers once, guarded on the column still being null
+  // so a re-mount (or a user who arrived here from Settings' Replay onboarding,
+  // with no draft at all) never overwrites an already-set value.
+  useEffect(() => {
+    if (!profile || profile.onboarding_answers) return;
+    getDraft().then((draft) => {
+      const durable = pickDurableAnswers(draft);
+      if (Object.keys(durable).length) updateProfile({ onboarding_answers: durable });
+    });
+  }, [profile]);
+
+  const pos = getStepPosition('account');
   const next = getNextRoute('account');
 
   async function handleSave() {
@@ -63,10 +79,11 @@ export default function OnboardingAccount() {
   }
 
   return (
-    <OnboardingScaffold
-      stepKey="account"
+    <OnboardingScreen
+      bg="light"
+      progress={pos ? pos.index / pos.total : undefined}
       title="Name your account"
-      subtitle="Track separate spaces later — Personal, Business, Family. Start with one."
+      subtitle="Track separate spaces later, like Personal or Business. Start with one."
       primaryLabel="Continue"
       onPrimary={handleSave}
       primaryDisabled={!name.trim()}
@@ -105,7 +122,7 @@ export default function OnboardingAccount() {
           );
         })}
       </View>
-    </OnboardingScaffold>
+    </OnboardingScreen>
   );
 }
 
@@ -114,7 +131,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
   },
   label: {
     fontFamily: fontFamily.bold,

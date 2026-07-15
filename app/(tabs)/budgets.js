@@ -7,6 +7,8 @@ import IconTile from '../../components/IconTile';
 import ProgressBar from '../../components/ProgressBar';
 import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
+import Skeleton from '../../components/Skeleton';
+import FadeIn from '../../components/FadeIn';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import useBudgets, { budgetStatus } from '../../hooks/useBudgets';
 import { formatPeriodLabel, isBudgetEnded } from '../../lib/budgets';
@@ -20,7 +22,7 @@ const STATUS_STYLES = {
 
 export default function Budgets() {
   const router = useRouter();
-  const { budgets } = useBudgets();
+  const { budgets, loading } = useBudgets();
   const { openAddBudget } = useAddBudgetSheet();
 
   return (
@@ -34,12 +36,34 @@ export default function Budgets() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {budgets.length === 0 ? (
-          <Card style={{ marginTop: spacing.lg }}>
-            <Text style={styles.emptyText}>No budgets yet. Tap "New Budget" to set a spending limit.</Text>
-          </Card>
+        {loading ? (
+          <>
+            {[0, 1].map((i) => (
+              <Card key={i} style={styles.budgetCard}>
+                <View style={styles.rowBetween}>
+                  <View style={styles.rowLeft}>
+                    <Skeleton width={42} height={42} radius={13} />
+                    <View>
+                      <Skeleton width={120} height={17} radius={6} style={{ marginBottom: 6 }} />
+                      <Skeleton width={80} height={12} radius={6} />
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.progressWrap}>
+                  <Skeleton height={9} radius={radii.pill} />
+                </View>
+              </Card>
+            ))}
+          </>
+        ) : budgets.length === 0 ? (
+          <FadeIn>
+            <Card style={{ marginTop: spacing.lg }}>
+              <Text style={styles.emptyText}>No budgets yet. Tap "New Budget" to set a spending limit.</Text>
+            </Card>
+          </FadeIn>
         ) : (
-          budgets.map((b) => {
+          <FadeIn>
+          {budgets.map((b) => {
             const status = budgetStatus(b.spent, b.amount);
             const s = STATUS_STYLES[status];
             const progress = b.amount > 0 ? b.spent / b.amount : 0;
@@ -100,7 +124,8 @@ export default function Budgets() {
                 </Card>
               </Pressable>
             );
-          })
+          })}
+          </FadeIn>
         )}
       </ScrollView>
     </Screen>

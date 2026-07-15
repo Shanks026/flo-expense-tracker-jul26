@@ -11,6 +11,8 @@ import CategoryIcon from '../../components/CategoryIcon';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import Pill from '../../components/Pill';
 import ReportReadyCard from '../../components/ReportReadyCard';
+import Skeleton from '../../components/Skeleton';
+import FadeIn from '../../components/FadeIn';
 import useStreak from '../../hooks/useStreak';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useAuth } from '../../lib/AuthContext';
@@ -49,10 +51,10 @@ function greeting() {
 export default function Home() {
   const { session } = useAuth();
   const router = useRouter();
-  const { summary } = useGlobalSummary();
-  const { transactions } = useTransactions({ limit: 4 });
+  const { summary, loading: summaryLoading } = useGlobalSummary();
+  const { transactions, loading: transactionsLoading } = useTransactions({ limit: 4 });
   const [trendRange, setTrendRange] = useState('7d');
-  const { data: trendData } = useSpendingTrend(trendRange);
+  const { data: trendData, loading: trendLoading } = useSpendingTrend(trendRange);
   const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
@@ -60,7 +62,7 @@ export default function Home() {
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
   const { count: alertCount } = useAlerts();
-  const { bills } = useBills();
+  const { bills, loading: billsLoading } = useBills();
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
 
@@ -110,21 +112,23 @@ export default function Home() {
                 history live. Unlit when today hasn't been logged: that muted
                 flame IS the nudge, and it costs no words. */}
             {!streakLoading && (
-              <Pressable style={styles.streakChip} onPress={() => router.push('/streak')}>
-                {/* Fire orange, not brand lime — see theme/tokens.js. Also the
-                    one warm accent in this header that must NOT be confused with
-                    the bell's red alert dot beside it, which is why it's a true
-                    orange rather than a red. */}
-                <Flame
-                  size={17}
-                  color={streakLit ? colors.streak : colors.mutedLight}
-                  fill={streakLit ? colors.streak : 'transparent'}
-                  strokeWidth={2.2}
-                />
-                <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>
-                  {streakCurrent}
-                </Text>
-              </Pressable>
+              <FadeIn>
+                <Pressable style={styles.streakChip} onPress={() => router.push('/streak')}>
+                  {/* Fire orange, not brand lime — see theme/tokens.js. Also the
+                      one warm accent in this header that must NOT be confused with
+                      the bell's red alert dot beside it, which is why it's a true
+                      orange rather than a red. */}
+                  <Flame
+                    size={17}
+                    color={streakLit ? colors.streak : colors.mutedLight}
+                    fill={streakLit ? colors.streak : 'transparent'}
+                    strokeWidth={2.2}
+                  />
+                  <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>
+                    {streakCurrent}
+                  </Text>
+                </Pressable>
+              </FadeIn>
             )}
             <Pressable style={styles.bellButton} onPress={openAlerts}>
               <Bell size={20} color={colors.ink} strokeWidth={2} />
@@ -150,41 +154,60 @@ export default function Home() {
             </Pressable>
           </View>
           <Text style={styles.heroLabel}>In Hand</Text>
-          <AmountText
-            value={summary.in_hand_balance}
-            type="neutral"
-            dark
-            muteCurrency
-            size={fontSize.amountLg}
-            style={styles.heroBalance}
-          />
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStat}>
-              <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
-              <Text style={styles.heroStatValue}>{formatAmount(summary.month_income)}</Text>
-              <Text style={styles.heroStatLabel}>Income</Text>
+          {summaryLoading ? (
+            <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: colors.inkCard }} />
+          ) : (
+            <FadeIn>
+              <AmountText
+                value={summary.in_hand_balance}
+                type="neutral"
+                dark
+                muteCurrency
+                size={fontSize.amountLg}
+                style={styles.heroBalance}
+              />
+            </FadeIn>
+          )}
+          {summaryLoading ? (
+            <View style={styles.heroStatsRow}>
+              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: colors.inkCard }} />
+              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: colors.inkCard }} />
             </View>
-            <View style={styles.heroStat}>
-              <TrendingDown size={12} color={colors.dangerStrong} strokeWidth={2.6} />
-              <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense)}</Text>
-              <Text style={styles.heroStatLabel}>Expenses</Text>
-            </View>
-          </View>
+          ) : (
+            <FadeIn style={styles.heroStatsRow}>
+              <View style={styles.heroStat}>
+                <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
+                <Text style={styles.heroStatValue}>{formatAmount(summary.month_income)}</Text>
+                <Text style={styles.heroStatLabel}>Income</Text>
+              </View>
+              <View style={styles.heroStat}>
+                <TrendingDown size={12} color={colors.dangerStrong} strokeWidth={2.6} />
+                <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense)}</Text>
+                <Text style={styles.heroStatLabel}>Expenses</Text>
+              </View>
+            </FadeIn>
+          )}
         </Card>
 
         <Card style={styles.chartCard}>
-          <IncomeExpenseChart
-            data={trendData}
-            range={trendRange}
-            onRangeChange={setTrendRange}
-            defaultVisible={{ expense: true, income: false }}
-          />
+          {trendLoading ? (
+            <Skeleton height={140} radius={radii.card} />
+          ) : (
+            <FadeIn>
+              <IncomeExpenseChart
+                data={trendData}
+                range={trendRange}
+                onRangeChange={setTrendRange}
+                defaultVisible={{ expense: true, income: false }}
+              />
+            </FadeIn>
+          )}
         </Card>
 
         <ReportReadyCard />
 
-        {upcomingBills.length > 0 && (
-          <>
+        {!billsLoading && upcomingBills.length > 0 && (
+          <FadeIn>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Upcoming Bills</Text>
               <Pressable onPress={() => router.push('/bills')}>
@@ -223,7 +246,7 @@ export default function Home() {
                 );
               })}
             </Card>
-          </>
+          </FadeIn>
         )}
 
         <View style={styles.sectionHeaderRow}>
@@ -233,44 +256,60 @@ export default function Home() {
           </Pressable>
         </View>
 
-        {transactions.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyText}>No transactions yet. Tap + to add one.</Text>
-          </Card>
-        ) : (
+        {transactionsLoading ? (
           <Card style={styles.listCard}>
-            {transactions.map((tx, idx) => {
-              const transfer = isTransfer(tx);
-              return (
-                <Pressable
-                  key={tx.id}
-                  style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
-                  onPress={() => openAdd(tx)}
-                >
-                  <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
-                    {transfer ? (
-                      <ArrowLeftRight size={20} color={colors.mutedDarker} strokeWidth={2} />
-                    ) : (
-                      <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
-                    )}
-                  </IconTile>
-                  <View style={styles.rowMid}>
-                    <View style={styles.rowTitleWrap}>
-                      <Text style={styles.rowTitle}>
-                        {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
-                      </Text>
-                      {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
-                    </View>
-                    <Text style={styles.rowSub}>
-                      {format(new Date(tx.occurred_at), 'd MMM')} ·{' '}
-                      {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
-                    </Text>
-                  </View>
-                  <AmountText value={tx.amount} type={tx.type} signed />
-                </Pressable>
-              );
-            })}
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={[styles.row, i < 2 && styles.rowBorder]}>
+                <Skeleton width={42} height={42} radius={radii.iconTile} />
+                <View style={styles.rowMid}>
+                  <Skeleton width="55%" height={15} radius={6} style={{ marginBottom: 6 }} />
+                  <Skeleton width="35%" height={11} radius={6} />
+                </View>
+              </View>
+            ))}
           </Card>
+        ) : transactions.length === 0 ? (
+          <FadeIn>
+            <Card>
+              <Text style={styles.emptyText}>No transactions yet. Tap + to add one.</Text>
+            </Card>
+          </FadeIn>
+        ) : (
+          <FadeIn>
+            <Card style={styles.listCard}>
+              {transactions.map((tx, idx) => {
+                const transfer = isTransfer(tx);
+                return (
+                  <Pressable
+                    key={tx.id}
+                    style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
+                    onPress={() => openAdd(tx)}
+                  >
+                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
+                      {transfer ? (
+                        <ArrowLeftRight size={20} color={colors.mutedDarker} strokeWidth={2} />
+                      ) : (
+                        <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
+                      )}
+                    </IconTile>
+                    <View style={styles.rowMid}>
+                      <View style={styles.rowTitleWrap}>
+                        <Text style={styles.rowTitle}>
+                          {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                        </Text>
+                        {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                      </View>
+                      <Text style={styles.rowSub}>
+                        {format(new Date(tx.occurred_at), 'd MMM')} ·{' '}
+                        {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
+                      </Text>
+                    </View>
+                    <AmountText value={tx.amount} type={tx.type} signed />
+                  </Pressable>
+                );
+              })}
+            </Card>
+          </FadeIn>
         )}
       </ScrollView>
     </Screen>

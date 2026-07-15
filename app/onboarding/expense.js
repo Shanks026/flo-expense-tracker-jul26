@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronDown } from 'lucide-react-native';
 import { format, isToday, isYesterday } from 'date-fns';
-import OnboardingScaffold from '../../components/OnboardingScaffold';
+import OnboardingScreen from '../../components/OnboardingScreen';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
 import useCategories from '../../hooks/useCategories';
@@ -13,7 +13,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
-import { getNextRoute } from '../../lib/onboarding';
+import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 
 // Design 03, built as a real stepper screen rather than opening
 // AddTransactionSheet over the flow — the user's explicit call (a modal sheet
@@ -67,6 +67,7 @@ export default function OnboardingExpense() {
     }
   }, [categories, categoryId]);
 
+  const pos = getStepPosition('expense');
   const next = getNextRoute('expense');
   const numericAmount = Number(amount);
 
@@ -98,10 +99,11 @@ export default function OnboardingExpense() {
   }
 
   return (
-    <OnboardingScaffold
-      stepKey="expense"
+    <OnboardingScreen
+      bg="light"
+      progress={pos ? pos.index / pos.total : undefined}
       title="Add your first transaction"
-      subtitle="Optional — try it now to see how fast it feels."
+      subtitle="Optional. Try it now to see how fast it feels."
       scrollable
       primaryLabel="Add & Continue"
       onPrimary={handleSave}
@@ -249,7 +251,7 @@ export default function OnboardingExpense() {
           style={styles.noteInput}
         />
       </View>
-    </OnboardingScaffold>
+    </OnboardingScreen>
   );
 }
 

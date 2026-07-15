@@ -7,6 +7,8 @@ import Card from '../components/Card';
 import IconTile from '../components/IconTile';
 import ProgressBar from '../components/ProgressBar';
 import Pill from '../components/Pill';
+import Skeleton from '../components/Skeleton';
+import FadeIn from '../components/FadeIn';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
@@ -22,7 +24,7 @@ function dateRangeLabel(plan) {
 
 export default function Plans() {
   const router = useRouter();
-  const { plans } = usePlans();
+  const { plans, loading } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
   const { openAddPlan } = useAddPlanSheet();
 
@@ -44,12 +46,34 @@ export default function Plans() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {plans.length === 0 ? (
-          <Card style={{ marginTop: spacing.lg }}>
-            <Text style={styles.emptyText}>No plans yet. Tap "+" to start one.</Text>
-          </Card>
+        {loading ? (
+          <>
+            {[0, 1].map((i) => (
+              <Card key={i} style={styles.planCard}>
+                <View style={styles.rowBetween}>
+                  <View style={styles.rowLeft}>
+                    <Skeleton width={44} height={44} radius={13} />
+                    <View>
+                      <Skeleton width={120} height={18} radius={6} style={{ marginBottom: 6 }} />
+                      <Skeleton width={80} height={12} radius={6} />
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.progressWrap}>
+                  <Skeleton height={9} radius={radii.pill} />
+                </View>
+              </Card>
+            ))}
+          </>
+        ) : plans.length === 0 ? (
+          <FadeIn>
+            <Card style={{ marginTop: spacing.lg }}>
+              <Text style={styles.emptyText}>No plans yet. Tap "+" to start one.</Text>
+            </Card>
+          </FadeIn>
         ) : (
-          plans.map((plan) => {
+          <FadeIn>
+          {plans.map((plan) => {
             const isCompleted = plan.status === 'completed';
             const hasTarget = plan.target_amount != null;
             const progress = hasTarget && plan.target_amount > 0 ? plan.total_spent / plan.target_amount : 0;
@@ -137,7 +161,8 @@ export default function Plans() {
                 </Card>
               </Pressable>
             );
-          })
+          })}
+          </FadeIn>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Pencil } from 'lucide-react-native';
@@ -61,6 +61,20 @@ export default function PlanDetail() {
       router.back();
     }
   }, [loading, plan]);
+
+  // Real bug fix (same class as budget/[id].js): this fell straight through to
+  // `if (!plan) return null`, rendering a BLANK screen for the whole time
+  // usePlan's fetch was in flight, not just a wrong-value flash. Centred
+  // spinner instead, matching streak.js's own loading branch.
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.ink} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!plan) return null;
 
@@ -222,6 +236,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',

@@ -34,6 +34,7 @@ import useProfile from '../hooks/useProfile';
 import { parseTransactionSms } from '../lib/smsParser';
 import { useNotificationSync } from '../lib/notifications';
 import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
+import { getIntroSeen, setIntroSeen as persistIntroSeen } from '../lib/onboardingDraft';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -143,7 +144,9 @@ function OnboardingGate() {
     // right destination, once the profile that determines it has actually
     // loaded, is the only way to avoid that flash.
     if (!onboardedAt) {
-      if (!inOnboarding) router.replace('/onboarding/welcome');
+      // Post-auth resume point is Act 2's first step — a signed-in user is
+      // already past the pre-auth intro (12-personal-onboarding.md).
+      if (!inOnboarding) router.replace('/onboarding/account');
     } else if (inOnboarding || onSignIn) {
       router.replace('/');
     }
@@ -156,22 +159,47 @@ function RootNavigator() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [introSeen, setIntroSeen] = useState(null); // null = still reading the flag
+
+  useEffect(() => {
+    getIntroSeen().then(setIntroSeen);
+  }, []);
+
+  // Once any session exists (sign-in, sign-up, or a restored session), the intro
+  // has served its purpose on this device — remember it, so a later signed-out
+  // state (e.g. after a sign-out) goes straight to sign-in and never back
+  // through the sales intro. The DB flag profiles.onboarded_at is the true
+  // one-time guarantee across devices; this is just the device-local shortcut.
+  useEffect(() => {
+    if (session) persistIntroSeen();
+  }, [session]);
 
   // Only the signed-OUT rule lives here. Where a signed-IN user goes depends on
   // profiles.onboarded_at, which this component cannot read (it defines
   // DataRefreshProvider, so it can't consume it) — so OnboardingGate owns that
-  // half, including the sign-in → Home hop for an already-onboarded user.
-  // Routing to '/' from here as well would repaint Home before the gate could
-  // send a new user to onboarding: that was the split-second Home flash.
+  // half. Keep the two disjoint by session (07's flicker fix): RootNavigator
+  // owns all of !session, the gate owns all of session.
+  //
+  // The signed-out choice is now two-way: a user who hasn't seen the intro on
+  // this device gets the pre-auth Introduction; everyone else gets sign-in.
+  // Already being on sign-in, or anywhere under /onboarding (the pre-auth intro
+  // lives there), is left alone.
   useEffect(() => {
-    if (loading) return;
-    const onSignIn = segments[0] === 'sign-in';
-    if (!session && !onSignIn) {
-      router.replace('/sign-in');
-    }
-  }, [session, loading, segments]);
+    if (loading || session) return;
+    if (introSeen === null) return; // wait for the flag — deciding now would flash the wrong screen
+    const first = segments[0];
+    if (first === 'sign-in' || first === 'onboarding') return;
+    router.replace(introSeen ? '/sign-in' : '/onboarding/intro/opener');
+  }, [session, loading, introSeen, segments]);
 
   if (loading) return null;
+  // Don't mount the Stack (and let it paint whatever its default route is)
+  // until we know where a signed-out user should land. Without this, there's
+  // a one-frame gap between the tree mounting and the redirect effect firing
+  // where the Stack's own default route (or a stale dev-reload route) flashes
+  // visibly — the exact bug class 07's original flicker fix addressed for the
+  // signed-in half; this is the same fix for the signed-out half.
+  if (!session && introSeen === null) return null;
 
   return (
     <DataRefreshProvider>

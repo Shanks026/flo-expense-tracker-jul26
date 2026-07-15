@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,26 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import Button from '../components/Button';
-import Logo from '../components/Logo';
+import ArrowMark from '../components/ArrowMark';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
+import { getDraft } from '../lib/onboardingDraft';
 
+// The hinge (12-personal-onboarding.md screen 13): the pre-auth intro already
+// asked for a name (screen 4), so a user arriving here with a drafted name
+// should not be asked again — that would read as the app not having listened.
+// Arriving from the intro's reflection screen passes ?mode=signup so this
+// opens straight into sign-up, framed as "save your progress" rather than
+// re-asking "create account" cold.
 export default function SignIn() {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState('signin');
+  const params = useLocalSearchParams();
+  const [mode, setMode] = useState(params.mode === 'signup' ? 'signup' : 'signin');
+  const [draftName, setDraftName] = useState(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,9 +38,15 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    getDraft().then((d) => {
+      if (d.name) setDraftName(d.name);
+    });
+  }, []);
+
   const isSignUp = mode === 'signup';
   const canSubmit = isSignUp
-    ? email && password && firstName.trim() && lastName.trim()
+    ? email && password && (draftName || (firstName.trim() && lastName.trim()))
     : email && password;
 
   async function handleSubmit() {
@@ -38,7 +54,8 @@ export default function SignIn() {
     setLoading(true);
     try {
       if (isSignUp) {
-        await signUp(email.trim(), password, `${firstName.trim()} ${lastName.trim()}`.trim());
+        const fullName = draftName || `${firstName.trim()} ${lastName.trim()}`.trim();
+        await signUp(email.trim(), password, fullName);
       } else {
         await signIn(email.trim(), password);
       }
@@ -56,16 +73,38 @@ export default function SignIn() {
           <View style={styles.spacerTop} />
 
           <View style={styles.brandRow}>
-            <Logo size={52} radius={26} />
+            <ArrowMark size={52} />
           </View>
 
           <View style={{ height: 20 }} />
-          <Text style={styles.title}>{isSignUp ? 'Create account' : 'Welcome back'}</Text>
-          <Text style={styles.subtitle}>Know where your money flows.</Text>
+          <Text style={styles.title}>
+            {isSignUp
+              ? draftName
+                ? `Save your progress, ${draftName}.`
+                : 'Create account'
+              : 'Welcome back'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isSignUp && draftName
+              ? 'Everything you just told us gets set up on the other side.'
+              : 'Know where your money flows.'}
+          </Text>
 
           <View style={{ height: 40 }} />
 
-          {isSignUp && (
+          {isSignUp && draftName && (
+            <>
+              <View style={styles.draftNameRow}>
+                <User size={18} color={colors.mutedMid} strokeWidth={2} />
+                <Text style={styles.draftNameText}>
+                  Signing up as <Text style={styles.draftNameValue}>{draftName}</Text>
+                </Text>
+              </View>
+              <View style={{ height: 16 }} />
+            </>
+          )}
+
+          {isSignUp && !draftName && (
             <>
               <View style={styles.nameRow}>
                 <View style={{ flex: 1 }}>
@@ -233,6 +272,24 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  draftNameRow: {
+    height: 56,
+    borderRadius: radii.buttonSm,
+    backgroundColor: colors.incomeBg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: 10,
+  },
+  draftNameText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.lg,
+    color: colors.mutedDarker,
+  },
+  draftNameValue: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.income,
   },
   inputRow: {
     height: 56,

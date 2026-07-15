@@ -15,6 +15,8 @@ import AnalyticsSegmentTabs from '../components/AnalyticsSegmentTabs';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import DayOfWeekChart from '../components/DayOfWeekChart';
 import DonutChart from '../components/DonutChart';
+import Skeleton from '../components/Skeleton';
+import FadeIn from '../components/FadeIn';
 import { useToast } from '../components/Toast';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import useAnalyticsData from '../hooks/useAnalyticsData';
@@ -80,7 +82,7 @@ export default function Analytics() {
     return { from: customFrom, to: customTo };
   }, [mode, month, customFrom, customTo]);
 
-  const { current, prior, budgets, plans } = useAnalyticsData({ from, to });
+  const { current, prior, budgets, plans, loading } = useAnalyticsData({ from, to });
 
   // Scope follows the screen: Analytics is deliberately per-active-account
   // (unlike the all-accounts report), so its export stays scoped the same
@@ -179,6 +181,24 @@ export default function Analytics() {
           <AnalyticsSegmentTabs active={segment} onChange={setSegment} />
         </View>
 
+        {loading ? (
+          <>
+            <Card style={styles.heroCard}>
+              <View style={styles.heroRow}>
+                {[0, 1, 2].map((i) => (
+                  <View key={i} style={styles.heroItem}>
+                    <Skeleton width={60} height={12} radius={6} style={{ marginBottom: 6 }} />
+                    <Skeleton width={80} height={22} radius={6} />
+                  </View>
+                ))}
+              </View>
+            </Card>
+            <Card style={styles.chartCard}>
+              <Skeleton height={140} radius={radii.card} />
+            </Card>
+          </>
+        ) : (
+        <FadeIn>
         {segment === 'overview' && (
           <>
             <Card style={styles.heroCard}>
@@ -406,6 +426,8 @@ export default function Analytics() {
               })
             )}
           </>
+        )}
+        </FadeIn>
         )}
       </ScrollView>
     </SafeAreaView>
