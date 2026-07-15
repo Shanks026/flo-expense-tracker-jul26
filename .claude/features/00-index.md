@@ -637,11 +637,26 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   *must* depend on `session`/`userId` directly, or it will silently never
   recover from a pre-auth empty fetch. When adding a new global
   (non-account-scoped) hook, check this first.
-- **Two APK variants — auto-detect / no-detect — from one codebase**
-  (2026-07-15) — `eas.json` gained `lite` (Play Store — AAB, no
-  notification-listener) and `full` (sideload-only — APK, internal
-  distribution) build profiles, both driven by a single `FLO_VARIANT` env
-  var read in the new `app.config.js`. Commenting out JS call sites alone
+- **Two feature variants (auto-detect / no-detect) × two build formats
+  (APK / AAB) = four EAS profiles** (2026-07-15, restructured same day) —
+  the `FLO_VARIANT` env var (read in `app.config.js`) and the Android build
+  format are **orthogonal**: variant toggles the notification-listener
+  module, format is just apk-vs-aab. So `eas.json` crosses them into four
+  profiles built on two `extends` bases (`preview` = internal APK,
+  `production` = store AAB + `autoIncrement`):
+
+  | Profile | Format | Variant | Auto-detect | Use |
+  |---|---|---|---|---|
+  | `lite` | AAB | lite | off | Play Store submission |
+  | `lite-preview` | APK | lite | off | sideloadable no-detect build |
+  | `full` | AAB | full | on | internal/closed-testing bundle |
+  | `full-preview` | APK | full | on | sideload-only, with auto-detect |
+
+  **`full` changed from APK → AAB** in this restructure; the old sideload
+  APK-with-auto-detect build is now **`full-preview`**. `submit` profiles
+  are `lite` and `full` (the two AABs). Both driven by a single
+  `FLO_VARIANT` env var read in `app.config.js` (anything `!== 'lite'` →
+  auto-detect on). Commenting out JS call sites alone
   cannot exclude the feature: `modules/flo-notification-listener`'s
   `BIND_NOTIFICATION_LISTENER_SERVICE` manifest fragment merges in via
   AGP's manifest merger the moment the module directory is present and
@@ -659,14 +674,17 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
 
   Build commands:
   ```
-  npx eas build --platform android --profile lite   # Play Store — AAB, no auto-detect
-  npx eas build --platform android --profile full   # sideload-only — APK, with auto-detect
+  npx eas build --platform android --profile lite           # Play Store — AAB, no auto-detect
+  npx eas build --platform android --profile lite-preview   # APK, no auto-detect
+  npx eas build --platform android --profile full           # AAB, with auto-detect
+  npx eas build --platform android --profile full-preview   # sideload APK, with auto-detect
   ```
-  `full` was never intended for Play Store submission regardless of this
-  split — Google's sensitive-permissions policy restricts notification-
+  The `full` **AAB** is for internal/closed-testing tracks — a `full`
+  variant was never meant for a *public* Play Store release regardless of
+  format: Google's sensitive-permissions policy restricts notification-
   listener access to apps where it's a disclosed core feature, with its own
-  review form; realistically it ships via direct APK download only (see
-  `06-transaction-auto-detect.md`).
+  review form. The public store build is `lite`; `full-preview` is the
+  direct-APK-download path (see `06-transaction-auto-detect.md`).
 
   Also this same pass: removed dev/test-only rows from `app/settings.js`
   (Replay onboarding, Send test notification, Show scheduled — none
