@@ -102,7 +102,7 @@ export default function OnboardingExpense() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
-      title="Add your first transaction"
+      title="Add a transaction"
       subtitle="Optional. Try it now to see how fast it feels."
       scrollable
       primaryLabel="Add & Continue"
@@ -328,7 +328,16 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     minWidth: 110,
+    height: 64,
+    lineHeight: 64,
     textAlign: 'center',
+    // See the identical comment in onboarding/balance.js's amountInput —
+    // same Android caret-centering fix, same root cause. lineHeight matching
+    // the fixed height was the missing piece: without it, an empty
+    // controlled value's caret still rendered off-centre ("sidelined")
+    // rather than through the placeholder's middle.
+    textAlignVertical: 'center',
+    includeFontPadding: false,
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.amountXl,
     letterSpacing: -1.5,

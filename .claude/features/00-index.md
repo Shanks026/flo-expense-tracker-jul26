@@ -677,6 +677,44 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   instead of straight to `/sign-in` — `persistIntroSeen()` was writing
   AsyncStorage but never updating the local React state that actually
   drives the redirect.
+- **Streak copy: "Day 0" dropped, reverted to "Day 1"; 🐱/Koban references
+  stripped from all streak titles** (2026-07-15) — `05-...md`'s original
+  "Day 0" convention (a deliberate call at the time, see that doc's Phase
+  2/3) turned out to disagree with how every other streak product counts a
+  first day (Duolingo etc. all show Day 1), and reads as an off-by-one
+  since `current` was already `1` internally the whole time — only the
+  *label* ever said 0. Reverted in `lib/koban.js` (`RECAP_POOLS.new_streak`,
+  `RECAP_NOTIFICATION_POOLS.new_streak`, `streakHeadline`) and
+  `lib/streak.js`'s comment; `app/(tabs)/index.js`'s header chip and
+  `app/streak.js`'s hero number, which had briefly grown an
+  `isNewStreak ? 0 : current` relabel to match the old convention, were
+  reverted back to the raw `current` value — no relabeling needed anywhere
+  now that display and internal count agree. Also stripped 🐱/😿/"Koban"
+  personification ("paw", "lucky cat") from every streak title across
+  `NUDGE_POOLS`, `RECAP_POOLS`, and `RECAP_NOTIFICATION_POOLS` — mascot art
+  doesn't exist yet (Phase 5, blocked on user art), so a placeholder cat
+  voice was premature; 🎉 (generic celebration, not mascot-specific) was
+  kept on milestone copy. `recapEyebrow()`'s "STREAK STARTED" pill was also
+  dropped for a new streak (returns `null`) — every new_streak title
+  already says "streak"/"day 1" outright, so the pill was pure repetition.
+  `StreakCelebration.js` now conditionally omits the eyebrow pill entirely
+  when absent. `StreakDays.js`'s 7-day row was also reversed to newest-first
+  (`.reverse()`) — a young streak's one or two real lit days used to sit at
+  the tail of a mostly-empty row; now the thing worth celebrating leads.
+- **New onboarding step: `app/onboarding/balance.js`** (2026-07-15) —
+  inserted into `STEPS` between `account` and `expense`. Without it, the
+  demo expense the very next screen invites was the account's first-ever
+  row, so a brand-new user's first look at Home was a negative balance —
+  technically correct, but a bad first impression when the fix is just
+  asking what they already have. Deliberately minimal compared to
+  `expense.js`: a single amount field, no type toggle/category
+  chips/date/plan/note, framed as a casual "what's already yours" ask
+  rather than "record a transaction" — auto-picks `incomeCategories[0]` and
+  inserts with `note: 'Starting balance'`, same `Add & Continue` / `I'll do
+  this later` skip pattern as every other optional onboarding entry.
+  `expense.js`'s title changed from "Add your first transaction" → "Add a
+  transaction" since it's no longer necessarily the first row once this
+  screen is used.
 
 ---
 

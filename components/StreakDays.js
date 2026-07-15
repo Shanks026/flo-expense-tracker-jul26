@@ -34,10 +34,16 @@ export function StreakFlame({ lit, size = 34, dark = false, dimmed = false }) {
 
 export const STREAK_WINDOW_DAYS = 7;
 
-// The trailing 7 days, oldest → newest. useStreak's history is longer (42 days,
-// for the month grid); only the last week is shown here.
+// The trailing 7 days, newest → oldest. useStreak's history is longer (42
+// days, for the month grid); only the last week is shown here. Reversed from
+// chronological (oldest-first) order deliberately: for a brand-new or young
+// streak, only the last day or two are actually lit, and oldest-first put
+// those lit cells at the very END of the row — a new user's one real day of
+// progress read as an afterthought tacked onto a mostly-empty week. Newest
+// (today) first puts the thing worth celebrating up front, with the rest of
+// the row reading as "what's ahead," not "what's missing."
 export default function StreakDays({ history, size = 34, dark = false }) {
-  const days = history.slice(-STREAK_WINDOW_DAYS);
+  const days = history.slice(-STREAK_WINDOW_DAYS).reverse();
 
   return (
     <View style={styles.row}>

@@ -83,10 +83,14 @@ export default function StreakCelebration() {
         </Animated.View>
 
         {/* Says what this screen is, every time — the titles below rotate and
-            can't be relied on to carry it. */}
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.eyebrow}>
-          <Text style={styles.eyebrowText}>{contentRef.current.eyebrow}</Text>
-        </Animated.View>
+            can't be relied on to carry it. Omitted on a new streak: every
+            new_streak title variant already says "streak"/"day 0" outright
+            (see lib/koban.js's recapEyebrow), so the pill would just repeat it. */}
+        {contentRef.current.eyebrow ? (
+          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.eyebrow}>
+            <Text style={styles.eyebrowText}>{contentRef.current.eyebrow}</Text>
+          </Animated.View>
+        ) : null}
 
         <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={styles.title}>
           {contentRef.current.title}
