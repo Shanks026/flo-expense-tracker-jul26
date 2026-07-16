@@ -178,3 +178,110 @@ But **do** resolve Part 1 early, because it changes what gets built: if the paid
 tier can't stand on auto-detect, then **AI (receipt scan + categorisation) isn't a
 nice-to-have — it's the product's cross-platform reason to charge**, and it should
 be sequenced accordingly.
+
+> **Amended 2026-07-17 — see Part 3.** "Don't monetise yet" survives as "don't
+> expect revenue yet," but the free/Pro *structure* now ships on day one of the
+> store release, for a reason this section didn't consider: limits that exist
+> from day one never take anything away from anyone.
+
+---
+
+# Part 3 — Decisions of 2026-07-17: day-one limits, the reports carve-out, grandfathering, and the master sequence
+
+Recorded from the gamification/monetisation discussion (see
+`IDEAS-gamification.md` for the sibling decisions). These are **decisions, not
+options** — re-open them only with new facts. Details get expanded into real
+feature docs at implementation time.
+
+## Decision: the free/Pro split ships live from day one of the store release
+
+Launching fully free and restricting later creates the retrofit problem: taking
+away something users already have reads as theft (loss aversion — Evernote's
+device-limit retrofit is the canonical disaster). Launching *with* the split
+means there are never "existing users" to grandfather — the walls were always
+on the map.
+
+What makes this near-free to do: **the chosen limits don't bite new users.** A
+brand-new user has 1 account, 1–2 budgets, maybe 1 plan — they won't touch
+these walls for weeks. So day-one limits cost ~zero activation, and the paywall
+surfaces exactly at Part 2's "moment of desire" (second account, third budget).
+
+Expect low conversion at launch (Pro without AI is just "remove limits" — a
+thin pitch). That's fine: launch isn't for revenue, it's so restriction never
+becomes removal. AI joins Pro later, purely additively.
+
+## The tier split
+
+**Free**: 1 account · 2 budgets · 1 plan · the basic weekly/monthly report ·
+everything in Part 2's never-gate list (logging, history, streaks, export,
+lock — unchanged).
+
+**Pro**: unlimited accounts/budgets/plans · report extras (custom date ranges,
+all-accounts reports, CSV/PDF export, and the AI-written summary when it
+exists) · AI categorisation + receipt scan (when built) · the Pro cosmetic
+line / coin stipend (per `IDEAS-gamification.md`) · ad-free forever (ibid).
+
+**The reports carve-out** (pushback accepted 2026-07-17): the report screen is
+a *retention* surface, not just a feature — `ReportReadyCard` and the bell
+alert are re-open triggers — and gating it entirely collides with Part 2's
+"viewing their own history stays free." So the **basic cadence report stays
+free**; Pro gets the extras above. Never hard-gate the whole screen.
+
+## Enforcement shape (cheap by design)
+
+- **Create-time gates only, never access-time**: `AddAccountSheet` /
+  `AddBudgetSheet` / `AddPlanSheet` check `count >= limit && !isPro` on
+  create and show the upsell instead of the form. Existing rows are always
+  viewable, editable, deletable — no data model changes anywhere.
+- `isPro` truth is **server-side**: the `entitlements` table written by the
+  RevenueCat webhook → Edge Function (Part 2's "entitlements must be
+  server-side"). Client-side count checks are sufficient for the limits —
+  someone decompiling the APK to create a third budget defrauds themselves of
+  ₹99. **AI is the only gate needing hard server enforcement**, because it
+  costs real money per call; it's metered in the same Edge Function that
+  holds the API key.
+
+## Grandfathering doctrine (for any FUTURE tightening)
+
+Day-one limits avoid the problem at launch; these rules govern every change
+after:
+
+1. **Additive paywall preferred** — gate new leverage (AI, insights); nobody
+   loses what never existed.
+2. **Keep-what-you-have** for any limit change — enforcement is always on
+   *create*, never on access. A user with 5 budgets when a 2-budget limit
+   lands keeps all 5 forever; they just can't create a 6th.
+3. **Founder status** — mark pre-pricing users explicitly (early-bird trophy /
+   exclusive card theme from the gamification system — zero cost — and
+   optionally a permanent Pro discount). Early users become promoters, not
+   casualties.
+4. **Announce before enforcing** — weeks of "here's exactly what stays free
+   forever" in the promo card turns the change into a trust moment.
+
+## The master sequence (settled 2026-07-17)
+
+The build order across AI, subscription, store, and gamification. Each step
+becomes its own feature doc when picked up:
+
+1. **Edge Function proxy + `entitlements` table** — the shared foundation.
+   The AI key can never live in the client, so every AI call routes through
+   this function; the same function/table is where entitlement checks and
+   metering live. Small, and it unblocks everything after it.
+2. **AI categorisation, then receipt scan** — through the proxy, in that
+   order (per `IDEAS.md` 3a/3b: categorisation is zero-friction and touches
+   every transaction; scan's real value is the cash blind spot).
+3. **Pricing research from real AI costs** — Pro can't be priced until the
+   AI unit cost per user is measured (model, tokens per call, calls/month).
+   Then Play Console products + RevenueCat setup. (Payment-integration
+   mechanics deliberately not recorded here — walked through in conversation
+   2026-07-17; RevenueCat is the assumed rail, Play Billing is mandatory for
+   digital goods incl. UPI, which Play itself provides.)
+4. **Sub screens** — paywall sheet (existing bottom-sheet pattern), the three
+   create-time limit gates, report-extras gating. Data Safety form gains the
+   AI disclosure (transaction text/images leave the device).
+5. **Store-readiness checklist (Part 1) → launch `lite` with the split live.**
+6. **Gamification quick wins** post-launch — trophy room → promo card →
+   coins/freeze, per `IDEAS-gamification.md`'s flow. Retention pays
+   proportionally to user count, which is why it follows launch — and don't
+   let the trophy room's cheapness pull it earlier.
+7. **Mascot skins / avatar bundles** whenever Koban art lands.
