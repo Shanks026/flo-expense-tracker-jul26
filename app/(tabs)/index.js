@@ -21,6 +21,8 @@ import useTransactions from '../../hooks/useTransactions';
 import useSpendingTrend from '../../hooks/useSpendingTrend';
 import useProfile from '../../hooks/useProfile';
 import useBills, { billStatus } from '../../hooks/useBills';
+import useEntitlement from '../../hooks/useEntitlement';
+import ProBadge from '../../components/ProBadge';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useMenuSheet } from '../../components/MenuSheet';
 import { usePayBillSheet } from '../../components/PayBillSheet';
@@ -65,6 +67,7 @@ export default function Home() {
   const { bills, loading: billsLoading } = useBills();
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
+  const { isPro } = useEntitlement();
 
   // Lit only when there IS a streak. The muted flame on a zero streak is not a
   // failure state — it's the invitation.
@@ -92,7 +95,7 @@ export default function Home() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Pressable onPress={openMenu}>
+            <Pressable onPress={openMenu} style={styles.avatarWrap}>
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
               ) : (
@@ -100,6 +103,7 @@ export default function Home() {
                   <Text style={styles.avatarText}>{initial}</Text>
                 </View>
               )}
+              {isPro && <ProBadge variant="overlay" />}
             </Pressable>
             <View>
               <Text style={styles.greetingLabel}>{greeting()}</Text>
@@ -332,6 +336,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+  },
+  avatarWrap: {
+    position: 'relative',
   },
   avatar: {
     width: 46,

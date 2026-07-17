@@ -23,6 +23,8 @@ import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/
 import { scanReceipt } from '../lib/ai';
 import { uploadReceipt, receiptSignedUrl } from '../lib/receipts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from './ProUpsellSheet';
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -115,6 +117,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
+  const { isPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
 
   const [editingId, setEditingId] = useState(null);
   const [editingTransferId, setEditingTransferId] = useState(null);
@@ -264,6 +268,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // blocks or replaces manual entry: on any failure the sheet is left exactly
   // as it was, ready for the user to fill in by hand.
   function handleScanReceipt() {
+    if (!isPro) {
+      openProUpsell('Receipt scanning is a Pro feature');
+      return;
+    }
     Alert.alert('Scan Receipt', 'Where is the photo?', [
       { text: 'Take Photo', onPress: () => captureAndScan('camera') },
       { text: 'Choose from Gallery', onPress: () => captureAndScan('library') },

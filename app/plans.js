@@ -13,6 +13,10 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import { useAddPlanSheet } from '../components/AddPlanSheet';
+import { supabase } from '../lib/supabase';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from '../components/ProUpsellSheet';
+import { FREE_LIMITS } from '../lib/pro';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -27,6 +31,19 @@ export default function Plans() {
   const { plans, loading } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
   const { openAddPlan } = useAddPlanSheet();
+  const { isPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
+
+  async function handleNewPlan() {
+    if (!isPro) {
+      const { count } = await supabase.from('plans').select('id', { count: 'exact', head: true });
+      if ((count ?? 0) >= FREE_LIMITS.plans) {
+        openProUpsell('Free includes 1 plan');
+        return;
+      }
+    }
+    openAddPlan();
+  }
 
   return (
     // Pushed from the Menu sheet now, not a tab (2026-07-14) — so it needs its
@@ -39,7 +56,7 @@ export default function Plans() {
           </Pressable>
           <Text style={styles.title}>Plans</Text>
         </View>
-        <Pressable style={styles.newButton} onPress={() => openAddPlan()}>
+        <Pressable style={styles.newButton} onPress={handleNewPlan}>
           <Plus size={15} color={colors.brand} strokeWidth={3} />
           <Text style={styles.newButtonText}>New Plan</Text>
         </Pressable>

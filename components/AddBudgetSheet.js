@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Trash2 } from 'lucide-react-native';
+import { X, Trash2, Crown } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { addDays, format, isBefore, parseISO, startOfDay } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
@@ -14,6 +14,8 @@ import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from './ProUpsellSheet';
 
 const AddBudgetSheetContext = createContext(null);
 
@@ -68,6 +70,8 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const { activeAccountId } = useAccount();
   const { showToast } = useToast();
   const { expenseCategories } = useCategories();
+  const { isPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
   const [editingId, setEditingId] = useState(null);
   const [amount, setAmount] = useState('');
   const [periodType, setPeriodType] = useState('calendar_month');
@@ -151,6 +155,17 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     showToast({ message: editingId ? 'Budget updated' : 'Budget created', variant: 'success' });
   }
 
+  // Only gates the transition INTO custom while free — re-selecting an
+  // already-custom period (editing an existing custom budget, e.g. after a
+  // downgrade) is a no-op, not a new gate, per the create-time-only rule.
+  function handleSelectPeriod(value) {
+    if (value === 'custom' && !isPro && periodType !== 'custom') {
+      openProUpsell('Custom periods are a Pro feature');
+      return;
+    }
+    setPeriodType(value);
+  }
+
   async function handleDelete() {
     if (!editingId) return;
     setSaving(true);
@@ -207,8 +222,11 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
             <Pressable
               key={value}
               style={[styles.segment, periodType === value && styles.segmentActive]}
-              onPress={() => setPeriodType(value)}
+              onPress={() => handleSelectPeriod(value)}
             >
+              {value === 'custom' && !isPro && (
+                <Crown size={11} color={colors.mutedMid} strokeWidth={2.4} style={styles.segmentCrown} />
+              )}
               <Text style={[styles.segmentText, periodType === value && styles.segmentTextActive]}>{label}</Text>
             </Pressable>
           ))}
@@ -399,9 +417,14 @@ const styles = StyleSheet.create({
   },
   segment: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 9,
     borderRadius: 9,
+  },
+  segmentCrown: {
+    marginRight: 4,
   },
   segmentActive: {
     backgroundColor: colors.brand,

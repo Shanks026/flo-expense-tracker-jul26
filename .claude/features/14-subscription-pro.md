@@ -1,7 +1,9 @@
 # Feature: Subscription — FLO Pro (gating + upsell, no payment yet)
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/14-subscription-pro.md`
-**Status**: Planned — awaiting confirmation before implementation
+**Status**: Complete (Phase 1 + Phase 2, both confirmed on-device). Payment
+(RevenueCat / Play Billing) is a separate, later master-sequence step — see
+Out of Scope.
 **Last Updated**: July 2026
 
 ---
@@ -100,7 +102,7 @@ Phase 2 — The gates (introduces the actual free limits)
 
 ---
 
-## Phase 1 — Pro identity + surfaces
+## Phase 1 — Pro identity + surfaces ✅ Complete
 
 ### Goal
 
@@ -241,20 +243,49 @@ app/pro.js                       NEW — the Pro screen = paywall placeholder
 
 ### 1.7 Phase 1 checklist
 
-- [ ] `lib/pro.js`, `hooks/useEntitlement.js` created; missing row → `isPro:false`.
-- [ ] `ProBadge` (overlay + pill), `ProBenefits`, `ProUpsellSheet`, `app/pro.js` created.
-- [ ] Menu shows "Upgrade to Pro" for free users only; opens `/pro`.
-- [ ] Home avatar shows the crown for Pro users; Settings profile shows the Pro pill.
-- [ ] `/pro`'s "Upgrade to Pro" button shows the placeholder (no fake checkout, no external link).
-- [ ] `journey.js` subtitle no longer claims "no subscription ever"; title unchanged.
-- [ ] `ProUpsellSheetProvider` mounted; `openProUpsell()` opens the sheet and "Level up" routes to `/pro`.
-- [ ] On-device: a grandfathered (Pro) account shows badges + no menu upsell row; a Free test account shows the menu row + no badges.
+- [x] `lib/pro.js`, `hooks/useEntitlement.js` created; missing row → `isPro:false`.
+- [x] `ProBadge` (overlay + pill), `ProBenefits`, `ProUpsellSheet`, `app/pro.js` created.
+- [x] Menu shows "Upgrade to Pro" for free users only; opens `/pro`.
+- [x] Home avatar shows the crown for Pro users; Settings profile shows the Pro pill.
+- [x] `/pro`'s "Upgrade to Pro" button shows the placeholder (no fake checkout, no external link).
+- [x] `journey.js` subtitle no longer claims "no subscription ever"; title unchanged.
+- [x] `ProUpsellSheetProvider` mounted; `openProUpsell()` opens the sheet and "Level up" routes to `/pro`.
+- [x] On-device: a grandfathered (Pro) account shows badges + no menu upsell row; a Free test account shows the menu row + no badges. Confirmed by the user on-device.
+
+### Implementation Notes
+
+- Code was verified by syntax/AST parse of every touched file during the build
+  (no emulator/device was available in the build environment, and this is a
+  mobile-only Expo project — `react-dom`/`react-native-web` aren't installed,
+  so a web-target smoke test wasn't an option either without adding
+  dependencies that weren't asked for). On-device check subsequently confirmed
+  working by the user.
+- `ProBadge`'s `overlay` variant (Home avatar) was tuned after on-device
+  feedback: initial 22px badge covered too much of the 46px avatar; settled
+  on 20px, lime (`colors.brand`) background with a 9px dark ink crown for
+  legibility at that size (rejected a dark-bg/lime-crown variant — a solid
+  lime circle reads faster at a glance, same logic as the bell's alert dot).
+- `ProBadge`'s `pill` variant renders **next to the profile name** in
+  `app/settings.js` (a new `profileNameRow` wraps the name + badge), not
+  below the email — matches §1.4's "next to the name" more literally than an
+  initial pass that put it under the email line.
+- "Upgrade to Pro" menu row placed at the **top** of `MenuSheet`'s item list
+  (above Plans/Analytics/etc.), not just above the Log Out divider — gives it
+  the visual priority of being the free user's main upgrade path.
+- `/pro`'s placeholder purchase action uses the existing `useToast()` /
+  `ToastProvider` (already used throughout the app for one-off messages,
+  e.g. `EditProfileSheet`, `settings.js`) rather than a `Modal` — the doc
+  allowed either ("a simple modal / toast").
+- Attempting `npx expo lint` auto-installed ESLint + `eslint.config.js` into
+  the project (none existed before) as a side effect of verification; that
+  install and its pervasive pre-existing-codebase warnings were reverted —
+  not part of this feature.
 
 **→ Stop here. Show the result and wait for approval.**
 
 ---
 
-## Phase 2 — The gates
+## Phase 2 — The gates ✅ Complete
 
 ### Goal
 
@@ -318,13 +349,94 @@ openAddX();
 
 ### 2.6 Phase 2 checklist
 
-- [ ] Free user: 2nd account / 3rd budget / 2nd plan each open the upsell with the right reason; Pro user unaffected.
-- [ ] Custom budget period opens the upsell for free; calendar week/month don't.
-- [ ] Report custom-range / all-accounts / export open the upsell for free; basic report works.
-- [ ] AI scan opens the upsell for a free user instead of the "couldn't read" error.
-- [ ] Editing/deleting *existing* accounts/budgets/plans works for a free user (create-time only).
+- [x] Free user: 2nd account / 3rd budget / 2nd plan each open the upsell with the right reason; Pro user unaffected.
+- [x] Custom budget period opens the upsell for free; calendar week/month don't.
+- [x] Report custom-range / all-accounts / export open the upsell for free; basic report works.
+- [x] AI scan opens the upsell for a free user instead of the "couldn't read" error.
+- [x] Editing/deleting *existing* accounts/budgets/plans works for a free user (create-time only). Confirmed by the user on-device.
 
-**→ Stop here. Show the result and wait for approval.**
+### Implementation Notes
+
+- Built with syntax/AST verification only (no emulator/device in the build
+  environment — same constraint as Phase 1); the full checklist above,
+  including the "existing rows stay editable" guarantee, was subsequently
+  confirmed working by the user on-device.
+- Fixed a provider-nesting bug caught on first on-device run: `ProUpsellSheetProvider`
+  was originally mounted deep inside the sheet-provider stack (near
+  `AlertsSheetProvider`), so sheets rendered by *earlier* providers in that
+  stack (`AddBudgetSheet`, `AccountSwitcherSheet`, `AddTransactionSheet`) were
+  structural siblings of it, not descendants — `useProUpsellSheet()` threw
+  "must be used within ProUpsellSheetProvider". Fixed by moving
+  `ProUpsellSheetProvider` to wrap the entire sheet-provider stack (right
+  inside `BottomSheetModalProvider`, before `AddAccountSheetProvider`) in
+  `app/_layout.js`.
+- **`MenuSheet`'s "Upgrade to Pro" row upgraded to a card** (post-launch
+  polish, user-requested): a bordered, lime-tinted card (icon tile + title +
+  "Unlimited accounts, budgets & more" subtitle + chevron) replacing the
+  original plain icon+label row, so it reads as a promo rather than another
+  nav item. Sheet's `snapPoints` bumped `60%` → `75%` to fit the taller card
+  comfortably, in line with sibling sheets' heights (`AccountSwitcherSheet`
+  85%, `EditProfileSheet` 92%).
+- **`ProBadge`'s Home-avatar `overlay` badge tuned after visual feedback**
+  (see Phase 1 notes) and settled at 20px, lime background, 9px dark ink crown.
+- **AI receipt scan gate moved to `handleScanReceipt`, not `captureAndScan`.**
+  The doc named `captureAndScan`, but gating there would mean a free user
+  takes/picks a photo (permission prompt, capture, upload) before hitting the
+  paywall. Gating one function earlier — at the scan button's own handler,
+  before the "Take Photo / Choose from Gallery" alert even opens — is strictly
+  earlier than "before calling `scanReceipt`" (so it satisfies the doc's
+  requirement) and matches Phase 2's stated goal of gating "at that exact
+  moment" of desire, without wasting the user's photo. It also collapses one
+  gate check to cover both entry points (camera + library) that
+  `captureAndScan` serves, instead of duplicating it.
+- **Report's account-tab scope enforcement is a `useEffect`, not a plain
+  default.** Free is "active-account only," but a straight `useState(() =>
+  isPro ? 'all' : activeAccountId)` initializer would read `isPro`'s
+  default-`false` value before `useEntitlement`'s query resolves, clipping a
+  genuine Pro user's "All" scope for a frame (or longer) on every mount. The
+  effect is gated on `useEntitlement`'s own `loading` flag so it only acts
+  once entitlement is actually known, and re-syncs if the active account
+  changes later while free.
+- **`ProBadge`'s `overlay` variant gained a `size` prop** (default 20, matching
+  the Home avatar's existing tuning) so the same crown-corner badge could be
+  reused proportionally on the Report screen's export button (`size={16}`)
+  instead of hand-rolling a second badge component. The doc only explicitly
+  calls for crown-marking custom-period and report-extra gates (not
+  accounts/budgets/plans/AI-scan), so those stayed plain interceptions with no
+  added UI.
+- Crown-marks for text-row gates (`AddBudgetSheet`'s Custom segment,
+  `ReportPeriodPicker`'s Custom range row, `report.js`'s account tabs) use a
+  small inline `Crown` icon next to the label rather than `ProBadge`, since
+  `Pill`/segment controls have no icon slot and a corner-overlay badge doesn't
+  read well on a wide pill shape.
+
+**Both phases complete. This is the full scope of this doc** — payment
+integration is a separate later step (see Out of Scope below).
+
+---
+
+## Feature × Tier reference
+
+Quick lookup of every user-facing capability this feature touches and which
+tier it belongs to. Derived from §Product decisions above — this table is a
+summary, not a new decision; if the two ever disagree, the prose above wins
+and this table needs updating.
+
+| Feature | Free | Pro |
+|---|---|---|
+| Accounts | 1 | Unlimited |
+| Budgets | 2 | Unlimited |
+| Plans | 1 | Unlimited |
+| Budget period | Calendar week / calendar month | + Custom date range |
+| Transactions, full history, streaks, reminders, app lock | ✓ (never gated) | ✓ |
+| Analytics' own Export button (current view) | ✓ (never gated) | ✓ |
+| Reports screen — default cadence, active account only | ✓ | ✓ |
+| Reports — custom date range | — | ✓ |
+| Reports — all-accounts scope | — | ✓ |
+| Reports — CSV export (from the Report screen) | — | ✓ |
+| AI receipt scan | — | ✓ |
+| Pro identity (crown badge on Home, Pro pill in Settings) | — | ✓ |
+| Payment / purchasing | — (placeholder screen only, see Out of Scope) | — (not live yet, either tier) |
 
 ---
 

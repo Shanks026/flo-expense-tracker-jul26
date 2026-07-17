@@ -11,8 +11,10 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
 import useBills from '../hooks/useBills';
+import useEntitlement from '../hooks/useEntitlement';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
+import ProBadge from '../components/ProBadge';
 import {
   getNotificationSettings,
   setNotificationEnabled,
@@ -79,6 +81,7 @@ export default function Settings() {
   const { profile, avatarUrl } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
   const { bills } = useBills();
+  const { isPro } = useEntitlement();
   const { showToast } = useToast();
 
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -303,9 +306,12 @@ export default function Settings() {
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.profileName} numberOfLines={1}>
-                {fullName || 'Add your name'}
-              </Text>
+              <View style={styles.profileNameRow}>
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {fullName || 'Add your name'}
+                </Text>
+                {isPro && <ProBadge variant="pill" />}
+              </View>
               <Text style={styles.profileEmail} numberOfLines={1}>
                 {session?.user?.email}
               </Text>
@@ -663,7 +669,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: colors.ink,
   },
+  profileNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   profileName: {
+    flexShrink: 1,
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.heading,
     color: colors.surface,

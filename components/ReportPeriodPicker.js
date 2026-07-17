@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Check, X } from 'lucide-react-native';
+import { Check, X, Crown } from 'lucide-react-native';
 import { format, startOfWeek, isBefore } from 'date-fns';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { reportPeriodPresets, matchPeriodPreset, formatPeriodLabel } from '../lib/reports';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from './ProUpsellSheet';
 
 // The period switcher that makes every report a custom report. A centred
 // dialog (RN's Modal, transparent + fade — the same shape app/settings.js
@@ -16,6 +18,8 @@ import { reportPeriodPresets, matchPeriodPreset, formatPeriodLabel } from '../li
 // an inline-expanding panel either — that pushed the cards below it up and
 // down every time it opened, which read as broken layout.
 export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
+  const { isPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
   const [customOpen, setCustomOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [customTo, setCustomTo] = useState(() => new Date());
@@ -29,6 +33,15 @@ export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
   function handleClose() {
     setCustomOpen(false);
     onClose();
+  }
+
+  function handleCustomToggle() {
+    if (!isPro) {
+      handleClose();
+      openProUpsell('Full reports are a Pro feature');
+      return;
+    }
+    setCustomOpen((v) => !v);
   }
 
   function selectPreset(opt) {
@@ -69,8 +82,11 @@ export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
             );
           })}
 
-          <Pressable style={[styles.optionRow, styles.customToggleRow]} onPress={() => setCustomOpen((v) => !v)}>
-            <Text style={[styles.optionText, isCustomActive && styles.optionTextActive]}>Custom range</Text>
+          <Pressable style={[styles.optionRow, styles.customToggleRow]} onPress={handleCustomToggle}>
+            <View style={styles.customToggleLeft}>
+              {!isPro && <Crown size={13} color={colors.mutedDarker} strokeWidth={2.4} />}
+              <Text style={[styles.optionText, isCustomActive && styles.optionTextActive]}>Custom range</Text>
+            </View>
             {isCustomActive && <Check size={18} color={colors.income} strokeWidth={2.8} />}
           </Pressable>
 
@@ -166,6 +182,11 @@ const styles = StyleSheet.create({
   },
   customToggleRow: {
     borderBottomWidth: 0,
+  },
+  customToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   optionText: {
     fontFamily: fontFamily.bold,

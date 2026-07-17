@@ -13,6 +13,10 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens
 import useBudgets, { budgetStatus } from '../../hooks/useBudgets';
 import { formatPeriodLabel, isBudgetEnded } from '../../lib/budgets';
 import { useAddBudgetSheet } from '../../components/AddBudgetSheet';
+import { supabase } from '../../lib/supabase';
+import useEntitlement from '../../hooks/useEntitlement';
+import { useProUpsellSheet } from '../../components/ProUpsellSheet';
+import { FREE_LIMITS } from '../../lib/pro';
 
 const STATUS_STYLES = {
   healthy: { cardVariant: 'default', iconTone: 'income', pill: null, remainingColor: colors.income, trackColor: colors.brand },
@@ -24,12 +28,25 @@ export default function Budgets() {
   const router = useRouter();
   const { budgets, loading } = useBudgets();
   const { openAddBudget } = useAddBudgetSheet();
+  const { isPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
+
+  async function handleNewBudget() {
+    if (!isPro) {
+      const { count } = await supabase.from('budgets').select('id', { count: 'exact', head: true });
+      if ((count ?? 0) >= FREE_LIMITS.budgets) {
+        openProUpsell('Free includes 2 budgets');
+        return;
+      }
+    }
+    openAddBudget();
+  }
 
   return (
     <Screen>
       <View style={styles.header}>
         <Text style={styles.title}>Budgets</Text>
-        <Pressable style={styles.newButton} onPress={() => openAddBudget()}>
+        <Pressable style={styles.newButton} onPress={handleNewBudget}>
           <Plus size={15} color={colors.brand} strokeWidth={3} />
           <Text style={styles.newButtonText}>New Budget</Text>
         </Pressable>

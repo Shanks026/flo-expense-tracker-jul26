@@ -2,10 +2,11 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { ChartColumn, FileText, Flag, Receipt, Settings, LogOut, X } from 'lucide-react-native';
+import { ChartColumn, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight } from 'lucide-react-native';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useEntitlement from '../hooks/useEntitlement';
 
 const MenuSheetContext = createContext(null);
 
@@ -44,6 +45,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
   const { signOut } = useAuth();
+  const { isPro } = useEntitlement();
 
   useImperativeHandle(ref, () => ({
     open() {
@@ -70,7 +72,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['60%'], [])}
+      snapPoints={useMemo(() => ['75%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
@@ -83,6 +85,19 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
             <X size={16} color={colors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
+
+        {!isPro && (
+          <Pressable style={styles.upgradeCard} onPress={() => handlePress('/pro')}>
+            <View style={styles.upgradeIconTile}>
+              <Crown size={20} color={colors.ink} strokeWidth={2.2} fill={colors.ink} />
+            </View>
+            <View style={styles.upgradeTextWrap}>
+              <Text style={styles.upgradeTitle}>Upgrade to Pro</Text>
+              <Text style={styles.upgradeSubtitle}>Unlimited accounts, budgets & more</Text>
+            </View>
+            <ChevronRight size={18} color={colors.ink} strokeWidth={2.4} />
+          </Pressable>
+        )}
 
         {ITEMS.map((item) => {
           const Icon = item.icon;
@@ -146,6 +161,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  upgradeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.brand,
+    borderRadius: radii.card,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  upgradeIconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.iconTileLg,
+    backgroundColor: 'rgba(16, 16, 16, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upgradeTextWrap: {
+    flex: 1,
+  },
+  upgradeTitle: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    color: colors.ink,
+  },
+  upgradeSubtitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: 'rgba(16, 16, 16, 0.65)',
+    marginTop: 1,
   },
   rowLabel: {
     fontFamily: fontFamily.bold,

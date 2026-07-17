@@ -10,6 +10,9 @@ import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import { useAddAccountSheet } from './AddAccountSheet';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from './ProUpsellSheet';
+import { FREE_LIMITS } from '../lib/pro';
 
 const AccountSwitcherSheetContext = createContext(null);
 
@@ -94,6 +97,8 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
   const { summaries } = useAllAccountSummaries();
   const { openAddAccount } = useAddAccountSheet();
   const { showToast } = useToast();
+  const { isPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
 
   const orderedAccounts = useMemo(() => {
     const active = accounts.find((a) => a.id === activeAccountId);
@@ -121,6 +126,10 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
 
   function handleNewAccount() {
     modalRef.current?.dismiss();
+    if (!isPro && accounts.length >= FREE_LIMITS.accounts) {
+      openProUpsell('Free includes 1 account');
+      return;
+    }
     openAddAccount();
   }
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronDown, TrendingUp, TrendingDown, Download } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, TrendingUp, TrendingDown, Download, Crown } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
@@ -18,6 +18,9 @@ import useAnalyticsData from '../hooks/useAnalyticsData';
 import { useAccount } from '../lib/AccountContext';
 import { useAuth } from '../lib/AuthContext';
 import { buildTransactionsCsv, shareCsv } from '../lib/export';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from '../components/ProUpsellSheet';
+import ProBadge from '../components/ProBadge';
 import {
   computeDelta,
   computeSavingsRate,
@@ -49,8 +52,10 @@ export default function Report() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { session } = useAuth();
-  const { accounts } = useAccount();
+  const { accounts, activeAccountId } = useAccount();
   const { showToast } = useToast();
+  const { isPro, loading: entitlementLoading } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
   const userId = session?.user?.id ?? null;
 
   const [period, setPeriod] = useState(null);
@@ -60,6 +65,26 @@ export default function Report() {
   // that's already fetched for every account (allAccounts: true below), so
   // switching tabs never triggers a new query.
   const [accountFilter, setAccountFilter] = useState('all');
+
+  // Free is active-account-only (§ report extras) — once entitlement resolves,
+  // snap a free user's scope back to their active account whenever it drifts
+  // (a downgrade with an "All"/other-account scope still selected, or the
+  // active account itself changing elsewhere). Gated on entitlementLoading so
+  // this never fires against isPro's default-false value before the real
+  // entitlement is known, which would otherwise clip a genuine Pro user's
+  // "All" scope for a frame on every mount.
+  useEffect(() => {
+    if (entitlementLoading || isPro || !activeAccountId) return;
+    if (accountFilter !== activeAccountId) setAccountFilter(activeAccountId);
+  }, [entitlementLoading, isPro, activeAccountId, accountFilter]);
+
+  function handleAccountFilterSelect(id) {
+    if (!isPro && id !== activeAccountId) {
+      openProUpsell('Full reports are a Pro feature');
+      return;
+    }
+    setAccountFilter(id);
+  }
 
   // Resolve the initial period once at open time. Route params (from the Home
   // card / a future notification tap) win if present; otherwise fall back to
@@ -128,6 +153,10 @@ export default function Report() {
   // every account's transactions for the period, a specific tab exports just
   // that account's, matching what the report is actually showing.
   async function handleExport() {
+    if (!isPro) {
+      openProUpsell('Full reports are a Pro feature');
+      return;
+    }
     setExporting(true);
     try {
       const csv = buildTransactionsCsv(scopedCurrent, accounts);
@@ -189,6 +218,7 @@ export default function Report() {
           ) : (
             <Download size={18} color={colors.ink} strokeWidth={2.2} />
           )}
+          {!isPro && <ProBadge variant="overlay" size={16} />}
         </Pressable>
       </View>
 
@@ -215,11 +245,13 @@ export default function Report() {
             contentContainerStyle={styles.accountTabsRow}
             style={styles.accountTabsScroll}
           >
-            <Pressable onPress={() => setAccountFilter('all')}>
+            <Pressable style={styles.accountTab} onPress={() => handleAccountFilterSelect('all')}>
+              {!isPro && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
               <Pill label="All" tone={accountFilter === 'all' ? 'dark' : 'neutral'} />
             </Pressable>
             {accounts.map((a) => (
-              <Pressable key={a.id} onPress={() => setAccountFilter(a.id)}>
+              <Pressable key={a.id} style={styles.accountTab} onPress={() => handleAccountFilterSelect(a.id)}>
+                {!isPro && a.id !== activeAccountId && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
                 <Pill label={a.name} tone={accountFilter === a.id ? 'dark' : 'neutral'} />
               </Pressable>
             ))}
@@ -485,6 +517,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     paddingHorizontal: spacing.xl,
+  },
+  accountTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   scroll: {
     paddingHorizontal: spacing.xl,

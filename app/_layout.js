@@ -29,6 +29,7 @@ import { AddAccountSheetProvider } from '../components/AddAccountSheet';
 import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet';
 import { MenuSheetProvider } from '../components/MenuSheet';
 import { AlertsSheetProvider } from '../components/AlertsSheet';
+import { ProUpsellSheetProvider } from '../components/ProUpsellSheet';
 import useIncomingShare from '../hooks/useIncomingShare';
 import useProfile from '../hooks/useProfile';
 import { parseTransactionSms } from '../lib/smsParser';
@@ -216,35 +217,37 @@ function RootNavigator() {
       <AccountProvider>
         <ToastProvider>
           <BottomSheetModalProvider>
-            <AddAccountSheetProvider>
-              <AccountSwitcherSheetProvider>
-                <AddTransactionSheetProvider>
-                  <AddBudgetSheetProvider>
-                    <AddPlanSheetProvider>
-                      <AddBillSheetProvider>
-                        <PayBillSheetProvider>
-                          <EditProfileSheetProvider>
-                            <AddCategorySheetProvider>
-                              <MenuSheetProvider>
-                                <AlertsSheetProvider>
-                                  <OnboardingGate />
-                                  <ShareIntentHandler />
-                                  <NotificationSync />
-                                  <DetectedTransactionHandler />
-                                  <DueBillsModal />
-                                  <StreakCelebration />
-                                  <Stack screenOptions={{ headerShown: false }} />
-                                </AlertsSheetProvider>
-                              </MenuSheetProvider>
-                            </AddCategorySheetProvider>
-                          </EditProfileSheetProvider>
-                        </PayBillSheetProvider>
-                      </AddBillSheetProvider>
-                    </AddPlanSheetProvider>
-                  </AddBudgetSheetProvider>
-                </AddTransactionSheetProvider>
-              </AccountSwitcherSheetProvider>
-            </AddAccountSheetProvider>
+            <ProUpsellSheetProvider>
+              <AddAccountSheetProvider>
+                <AccountSwitcherSheetProvider>
+                  <AddTransactionSheetProvider>
+                    <AddBudgetSheetProvider>
+                      <AddPlanSheetProvider>
+                        <AddBillSheetProvider>
+                          <PayBillSheetProvider>
+                            <EditProfileSheetProvider>
+                              <AddCategorySheetProvider>
+                                <MenuSheetProvider>
+                                  <AlertsSheetProvider>
+                                    <OnboardingGate />
+                                    <ShareIntentHandler />
+                                    <NotificationSync />
+                                    <DetectedTransactionHandler />
+                                    <DueBillsModal />
+                                    <StreakCelebration />
+                                    <Stack screenOptions={{ headerShown: false }} />
+                                  </AlertsSheetProvider>
+                                </MenuSheetProvider>
+                              </AddCategorySheetProvider>
+                            </EditProfileSheetProvider>
+                          </PayBillSheetProvider>
+                        </AddBillSheetProvider>
+                      </AddPlanSheetProvider>
+                    </AddBudgetSheetProvider>
+                  </AddTransactionSheetProvider>
+                </AccountSwitcherSheetProvider>
+              </AddAccountSheetProvider>
+            </ProUpsellSheetProvider>
           </BottomSheetModalProvider>
         </ToastProvider>
       </AccountProvider>
