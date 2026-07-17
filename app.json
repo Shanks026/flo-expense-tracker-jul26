@@ -53,6 +53,14 @@
           "icon": "./assets/notification-icon.png",
           "color": "#BBDC12"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow FLO to access your photos to attach a receipt.",
+          "cameraPermission": "Allow FLO to use your camera to scan a receipt.",
+          "microphonePermission": false
+        }
       ]
     ],
     "extra": {

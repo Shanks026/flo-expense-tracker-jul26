@@ -18,6 +18,13 @@ import {
   Smartphone,
   Dumbbell,
   PiggyBank,
+  Repeat,
+  Shield,
+  PawPrint,
+  Baby,
+  Zap,
+  Landmark,
+  TrendingUp,
 } from 'lucide-react-native';
 
 const ICONS = {
@@ -39,6 +46,15 @@ const ICONS = {
   phone: Smartphone,
   fitness: Dumbbell,
   savings: PiggyBank,
+  // 13-ai-features.md Phase 2 (category-onboarding revamp) — added for the
+  // curated optional-category bank (lib/categoryBank.js).
+  subscriptions: Repeat,
+  insurance: Shield,
+  pets: PawPrint,
+  kids: Baby,
+  utilities: Zap,
+  business: Landmark,
+  investment: TrendingUp,
 };
 
 export const CATEGORY_ICON_KEYS = Object.keys(ICONS);

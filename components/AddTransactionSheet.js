@@ -1,10 +1,12 @@
-import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo, useCallback, createContext, useContext } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { X, Trash2, ChevronDown } from 'lucide-react-native';
-import { format, isToday, isYesterday } from 'date-fns';
+import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { X, Trash2, ChevronDown, Camera } from 'lucide-react-native';
+import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
@@ -18,6 +20,8 @@ import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
+import { scanReceipt } from '../lib/ai';
+import { uploadReceipt, receiptSignedUrl } from '../lib/receipts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
 const AddTransactionSheetContext = createContext(null);
@@ -44,6 +48,24 @@ function formatDateLabel(date) {
   if (isToday(date)) return 'Today';
   if (isYesterday(date)) return 'Yesterday';
   return format(date, 'd MMM yyyy');
+}
+
+// Receipt scan (13-ai-features.md Phase 3) — downscale before sending to
+// Gemini. A raw phone-camera photo (often 3000-4000px on the long edge) made
+// the model call take 84+ seconds in testing, well past whatever the client's
+// own network stack tolerates before treating the request as failed. Capping
+// the long edge at 1600px (plenty for a receipt to stay legible) keeps the
+// base64 payload — and Gemini's per-call image-token cost — small.
+const RECEIPT_MAX_DIMENSION = 1600;
+
+async function prepareReceiptImage(asset) {
+  const isLandscape = asset.width > asset.height;
+  const size = isLandscape
+    ? { width: Math.min(asset.width, RECEIPT_MAX_DIMENSION) }
+    : { height: Math.min(asset.height, RECEIPT_MAX_DIMENSION) };
+
+  const rendered = await ImageManipulator.manipulate(asset.uri).resize(size).renderAsync();
+  return rendered.saveAsync({ compress: 0.6, format: SaveFormat.JPEG, base64: true });
 }
 
 // A From/To account picker for Transfer mode. `exclude` is the account chosen in
@@ -111,9 +133,36 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  // Receipt scan (13-ai-features.md Phase 3). receiptImageUri is a freshly
+  // scanned image's LOCAL uri, pending upload on save — it always supersedes
+  // whatever's shown from an existing row. existingReceiptPath is the
+  // already-saved path when editing a transaction that already has one;
+  // existingReceiptUrl is its signed-URL projection for display (private
+  // bucket, same pattern as avatars). pendingReceiptDraft is the raw model
+  // output, stashed for receipt_data at save time.
+  const [receiptImageUri, setReceiptImageUri] = useState(null);
+  const [pendingReceiptDraft, setPendingReceiptDraft] = useState(null);
+  const [existingReceiptPath, setExistingReceiptPath] = useState(null);
+  const [existingReceiptUrl, setExistingReceiptUrl] = useState(null);
+  const [scanning, setScanning] = useState(false);
+
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   const selectedPlan = activePlans.find((p) => p.id === planId);
   const canTransfer = accounts.length >= 2;
+
+  useEffect(() => {
+    if (!existingReceiptPath) {
+      setExistingReceiptUrl(null);
+      return;
+    }
+    let cancelled = false;
+    receiptSignedUrl(existingReceiptPath).then((url) => {
+      if (!cancelled) setExistingReceiptUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [existingReceiptPath]);
 
   useImperativeHandle(ref, () => ({
     open(payload) {
@@ -130,6 +179,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // category chips below it, and is especially jarring right after a
       // notification tap, before the user has even seen the sheet.
       const isBlankEntry = !payload?.id && !payload?.amount;
+
+      // A fresh open never carries over a pending unsaved scan from a
+      // previous session; existingReceiptPath is set below per-branch.
+      setReceiptImageUri(null);
+      setPendingReceiptDraft(null);
 
       if (payload?.id && isTransfer(payload)) {
         // Editing a transfer: recover From/To from whichever leg was tapped.
@@ -149,6 +203,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         }
         setDate(new Date(tx.occurred_at));
         setNote(tx.note ?? '');
+        setExistingReceiptPath(null); // transfers never have receipts
       } else if (payload?.id) {
         const tx = payload;
         setEditingId(tx.id);
@@ -159,6 +214,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setPlanId(tx.plan_id);
         setDate(new Date(tx.occurred_at));
         setNote(tx.note ?? '');
+        setExistingReceiptPath(tx.receipt_path ?? null);
       } else {
         const prefillType = payload?.type ?? 'expense';
         setEditingId(null);
@@ -180,6 +236,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setPlanId(payload?.plan_id ?? collectingPlan?.id ?? null);
         setDate(new Date());
         setNote(payload?.note ?? '');
+        setExistingReceiptPath(null);
       }
       modalRef.current?.present();
 
@@ -201,6 +258,88 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     if (nextType === 'transfer') return; // transfers have no category
     const list = nextType === 'expense' ? expenseCategories : incomeCategories;
     setCategoryId(list[0]?.id ?? null);
+  }
+
+  // Receipt scan (13-ai-features.md Phase 3) — the cash blind spot. Never
+  // blocks or replaces manual entry: on any failure the sheet is left exactly
+  // as it was, ready for the user to fill in by hand.
+  function handleScanReceipt() {
+    Alert.alert('Scan Receipt', 'Where is the photo?', [
+      { text: 'Take Photo', onPress: () => captureAndScan('camera') },
+      { text: 'Choose from Gallery', onPress: () => captureAndScan('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  async function captureAndScan(source) {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showToast({ message: `${source === 'camera' ? 'Camera' : 'Photo library'} permission is required`, variant: 'error' });
+      return;
+    }
+
+    // No base64 requested here — a full-resolution phone photo's base64 is
+    // large enough to make the model call take a minute or more (found via a
+    // real 84.5s Edge Function log during testing). prepareReceiptImage below
+    // downscales first and provides the base64 for the (much smaller) result.
+    const launch = source === 'camera' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+    const result = await launch({ mediaTypes: ['images'], quality: 0.6 });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setScanning(true);
+    let prepared;
+    try {
+      prepared = await prepareReceiptImage(result.assets[0]);
+    } catch (err) {
+      setScanning(false);
+      showToast({ message: 'Could not process that image', variant: 'error' });
+      return;
+    }
+
+    // A fresh scan always supersedes whatever receipt was previously shown
+    // (an existing one being edited, or nothing) — set it immediately so the
+    // thumbnail appears right away, before the model call returns. Uses the
+    // downscaled image's own uri (smaller, faster upload later too), not the
+    // original full-resolution capture.
+    setReceiptImageUri(prepared.uri);
+    setExistingReceiptPath(null);
+
+    // Receipts are almost always expenses — scan against the expense list
+    // regardless of the sheet's current segment, and switch the segment to
+    // match once a result comes back.
+    const draft = await scanReceipt({
+      imageBase64: prepared.base64,
+      categories: expenseCategories.map((c) => ({ id: c.id, name: c.name, type: c.type })),
+    });
+    setScanning(false);
+
+    if (!draft) {
+      showToast({ message: "Couldn't read that receipt — fill it in manually", variant: 'error' });
+      return;
+    }
+
+    setPendingReceiptDraft(draft);
+    setType('expense');
+    if (draft.amount && draft.amount > 0) setAmount(String(Math.round(draft.amount)));
+    if (draft.occurred_at) {
+      try {
+        setDate(parseISO(draft.occurred_at));
+      } catch {
+        // an unparsable date from the model just leaves the existing date field alone
+      }
+    }
+    if (draft.category_id && expenseCategories.some((c) => c.id === draft.category_id)) {
+      setCategoryId(draft.category_id);
+    }
+    if (draft.merchant && !note.trim()) setNote(draft.merchant);
+
+    showToast({
+      message: draft.confidence >= 0.6 ? 'Receipt scanned' : 'Scanned — please double-check the details',
+      variant: draft.confidence >= 0.6 ? 'success' : 'warn',
+    });
   }
 
   async function handleSaveTransfer() {
@@ -260,9 +399,20 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       note: note.trim() || null,
     };
 
-    const { error: saveError } = editingId
-      ? await supabase.from('transactions').update(payload).eq('id', editingId)
-      : await supabase.from('transactions').insert({ ...payload, account_id: activeAccountId });
+    let savedId = editingId;
+    let saveError;
+    if (editingId) {
+      ({ error: saveError } = await supabase.from('transactions').update(payload).eq('id', editingId));
+    } else {
+      // .select('id') so a freshly scanned receipt (below) has a row to attach to.
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({ ...payload, account_id: activeAccountId })
+        .select('id')
+        .single();
+      saveError = error;
+      savedId = data?.id ?? null;
+    }
 
     setSaving(false);
     if (saveError) {
@@ -272,6 +422,27 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     notifyChanged();
     modalRef.current?.dismiss();
     showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
+
+    // Attach a freshly scanned receipt, if any — after the transaction row
+    // exists, so receipt_path has something to point at. Never blocking: the
+    // transaction is already saved by this point regardless of what happens
+    // here, and a failure is surfaced as its own toast, not an error state.
+    if (receiptImageUri && savedId) {
+      const { path, error: uploadError } = await uploadReceipt(receiptImageUri);
+      if (uploadError) {
+        showToast({ message: `Saved, but the receipt image failed to attach: ${uploadError.message}`, variant: 'warn' });
+      } else {
+        const { error: attachError } = await supabase
+          .from('transactions')
+          .update({ receipt_path: path, receipt_data: pendingReceiptDraft })
+          .eq('id', savedId);
+        if (attachError) {
+          showToast({ message: `Saved, but the receipt image failed to attach: ${attachError.message}`, variant: 'warn' });
+        } else {
+          notifyChanged();
+        }
+      }
+    }
 
     if (!editingId && type === 'expense') {
       const budgetMsg = await budgetToastForSave({ categoryId, accountId: activeAccountId });
@@ -329,9 +500,20 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                 ? 'Edit Transaction'
                 : 'Add Transaction'}
           </Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            {type !== 'transfer' && (
+              <Pressable style={styles.scanButton} onPress={handleScanReceipt} disabled={scanning}>
+                {scanning ? (
+                  <ActivityIndicator size="small" color={colors.ink} />
+                ) : (
+                  <Camera size={16} color={colors.ink} strokeWidth={2.2} />
+                )}
+              </Pressable>
+            )}
+            <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
+              <X size={16} color={colors.ink} strokeWidth={2.6} />
+            </Pressable>
+          </View>
         </View>
 
         {activeAccount && type !== 'transfer' && (
@@ -387,6 +569,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             />
           </View>
         </View>
+
+        {type !== 'transfer' && (receiptImageUri || existingReceiptUrl) && (
+          <View style={styles.receiptRow}>
+            <Image source={{ uri: receiptImageUri ?? existingReceiptUrl }} style={styles.receiptThumb} />
+            <Text style={styles.receiptLabel}>Receipt attached</Text>
+          </View>
+        )}
 
         {type === 'transfer' ? (
           <>
@@ -544,6 +733,35 @@ const styles = StyleSheet.create({
     fontSize: fontSize.title,
     letterSpacing: -0.3,
     color: colors.ink,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  scanButton: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.pill,
+    backgroundColor: colors.chipBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  receiptThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  receiptLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.muted,
   },
   closeButton: {
     width: 32,

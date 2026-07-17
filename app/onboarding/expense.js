@@ -102,8 +102,8 @@ export default function OnboardingExpense() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
-      title="Add a transaction"
-      subtitle="Optional. Try it now to see how fast it feels."
+      title="Remember your most recent transaction?"
+      subtitle="Optional. Log it now and see how fast it feels."
       scrollable
       primaryLabel="Add & Continue"
       onPrimary={handleSave}
