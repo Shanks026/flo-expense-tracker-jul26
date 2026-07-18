@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, AccessibilityInfo } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, AccessibilityInfo } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withDelay, withSpring } from 'react-native-reanimated';
@@ -176,8 +176,16 @@ export default function Reflection() {
       <View style={styles.content}>
         {/* Cards centre within this flexible top region; title/subtitle/button
             flow normally after it, which pins them to the bottom exactly like
-            the rest of onboarding's screens — only the cards float free. */}
-        <View style={styles.cardsWrap}>
+            the rest of onboarding's screens — only the cards float free.
+            ScrollView (not a plain View) so three tall cards on a short
+            device (iPhone SE-class) scroll instead of visually overlapping
+            the text block below — RN's default overflow:visible means a
+            plain View here would let overflow spill rather than clip. */}
+        <ScrollView
+          style={styles.cardsWrap}
+          contentContainerStyle={styles.cardsWrapContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.cards}>
             {cards.map((c, i) => (
               // Alternating tilt (-1deg / +1deg by index) — a small, deliberate
@@ -193,7 +201,7 @@ export default function Reflection() {
               </FallingCard>
             ))}
           </View>
-        </View>
+        </ScrollView>
 
         <OnboardingReveal delay={cards.length * FALL_STAGGER_MS + 200} style={styles.textBlock}>
           <Text style={styles.title}>We heard you{name ? `, ${name}` : ''}!</Text>
@@ -222,6 +230,9 @@ const styles = StyleSheet.create({
   // flow (unaffected by this), same as every other onboarding screen.
   cardsWrap: {
     flex: 1,
+  },
+  cardsWrapContent: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   cards: {

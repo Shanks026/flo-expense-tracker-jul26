@@ -280,14 +280,24 @@ function makeStyles(colors) {
     heroBalance: {
       marginTop: 0,
     },
+    // flexWrap lets Expenses drop to its own line below Income on narrow
+    // screens instead of overflowing the card's right edge — confirmed via
+    // real pixel math that two stats plus icons/gaps can exceed a 320px
+    // card's content width. Deliberately NOT solved with numberOfLines/
+    // truncation on the amount itself — a clipped money figure ("₹45,2…")
+    // is actively misleading, not just a cosmetic miss, so wrapping to a
+    // second row (or, worst case, the value text wrapping within its own
+    // block via flexShrink below) is the only acceptable fallback here.
     heroStatsRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: spacing.lg,
       marginTop: spacing.xl,
     },
     heroStat: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexShrink: 1,
       gap: 7,
     },
     heroStatValue: {
@@ -295,11 +305,13 @@ function makeStyles(colors) {
       fontSize: fontSize.md,
       letterSpacing: -0.2,
       color: staticColors.surface,
+      flexShrink: 1,
     },
     heroStatLabel: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.sm,
       color: staticColors.mutedMid,
+      flexShrink: 1,
     },
     // Fills the slot's full stretched height (matched to the real hero
     // card next to it, the row's tallest natural child) rather than

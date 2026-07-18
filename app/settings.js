@@ -976,8 +976,18 @@ function makeStyles(colors) {
     paddingLeft: 52,
     gap: spacing.sm,
   },
+  // flexShrink lets this take only the width subRow's space-between layout
+  // actually leaves after the "Day" label (rather than overflowing past
+  // it), and flexWrap lets the 7 fixed-width chips reflow onto a second
+  // line once that constrained width can't fit them all on one — at 320
+  // and even 375px, 7×36px chips plus gaps genuinely don't fit on one
+  // line next to the label, and without this they were rendering off the
+  // right edge, unwrapped and untappable.
   weekdayRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    justifyContent: 'flex-end',
     gap: 6,
   },
   weekdayChip: {
@@ -1022,8 +1032,14 @@ function makeStyles(colors) {
     color: colors.muted,
     lineHeight: 18,
   },
+  // Same fix as weekdayRow above — content-width chips with no
+  // flexShrink/flexWrap were overflowing subRow's available width on
+  // narrow-to-mid screens once paired with the "Remind me" label.
   daysBeforeGroup: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    justifyContent: 'flex-end',
     gap: spacing.sm,
   },
   dayChip: {
