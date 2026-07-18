@@ -48,7 +48,7 @@ function makeStyles(colors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      marginTop: spacing.xxl,
+      marginTop: spacing.lg,
     },
     // Sits on Card's `dark` prop — pinned so it doesn't invert under Dark theme.
     iconTile: {

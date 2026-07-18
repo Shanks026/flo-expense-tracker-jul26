@@ -58,6 +58,15 @@ export const colors = {
   warnBg: '#FBEFD3',
   warnBorder: '#F5E4C0',
 
+  // Gamification placeholders (see app/(tabs)/index.js's header chips and
+  // IDEAS-gamification.md) — coins and streak-freezes. A true gold and a
+  // literal ice blue: kept clear of `warn` (#C98A12/#E8A317, "budget's
+  // tight") and `streak` (#FF6B2C, "you showed up") since coins reward a
+  // different feeling from either, and nothing else in this palette lives
+  // in blue at all, so no collision risk there.
+  coinGold: '#E0A930',
+  iceBlue: '#4FC3E8',
+
   completedBg: '#F1F2ED',
   completedBorder: '#E7E8E2',
   completedTrack: '#E3E4DE',

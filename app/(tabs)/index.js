@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Menu, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
+import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -35,6 +35,7 @@ import { isTransfer, transferLabel } from '../../lib/transfers';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
+import { getGreeting } from '../../lib/greetings';
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
@@ -42,12 +43,14 @@ const UPCOMING_BILL_STYLES = {
 };
 const MAX_UPCOMING_BILLS = 4;
 
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
+// Structural placeholders for the gamification economy (IDEAS-gamification.md
+// — coins, streak freezes). Static, not wired to any hook: there's no
+// `reward_events`/`v_coin_balance` yet (see that doc's "Data model sketch"),
+// this is just reserving the header's left slot and its visual shape ahead
+// of the real numbers landing. Replace with a real balance hook once that
+// ledger exists — don't let these linger as "temporary" past that point.
+const PLACEHOLDER_COINS = 240;
+const PLACEHOLDER_FREEZES = 1;
 
 export default function Home() {
   const { colors } = useTheme();
@@ -77,6 +80,11 @@ export default function Home() {
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
+  // Recomputed on every render rather than cached in state — this is a
+  // pure function of the current time, and Home re-renders often enough
+  // (focus, data refetches) that it never gets stuck showing a stale
+  // time-of-day bucket for long. No need for a live-updating clock.
+  const { title: greetingTitle, subtitle: greetingSubtitle } = getGreeting(new Date(), firstName);
 
   // Global (not account-scoped, per useBills) — overdue/due-soon only, the
   // same billStatus() threshold the Bills tab and DueBillsModal already use,
@@ -97,19 +105,20 @@ export default function Home() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Pressable onPress={openMenu} style={styles.avatarWrap}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initial}</Text>
-                </View>
-              )}
-              {isPro && <ProBadge variant="overlay" />}
-            </Pressable>
-            <View>
-              <Text style={styles.greetingLabel}>{greeting()}</Text>
-              <Text style={styles.greetingName}>Hi, {firstName}</Text>
+            {/* Placeholders — see PLACEHOLDER_COINS/PLACEHOLDER_FREEZES above.
+                Not pressable yet: nothing to open until a shop/economy exists. */}
+            <View style={styles.gamiChip}>
+              <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+              <Text style={styles.gamiChipText}>{PLACEHOLDER_COINS}</Text>
+            </View>
+            <View style={styles.gamiChip}>
+              {/* Snowflake has no closed/fillable region (just radiating
+                  strokes) — `fill` is a harmless no-op here; a bolder
+                  strokeWidth is what actually reads as "filled/solid" for
+                  a line-only glyph like this, vs. CircleDollarSign's real
+                  fill above. */}
+              <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
+              <Text style={styles.gamiChipText}>{PLACEHOLDER_FREEZES}</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -140,9 +149,23 @@ export default function Home() {
               <Bell size={20} color={colors.ink} strokeWidth={2} />
               {alertCount > 0 && <View style={styles.bellDot} />}
             </Pressable>
-            <Pressable style={styles.menuButton} onPress={openMenu}>
-              <Menu size={20} color={colors.ink} strokeWidth={2} />
-            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.welcomeRow}>
+          <Pressable onPress={openMenu} style={styles.avatarWrap}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+            )}
+            {isPro && <ProBadge variant="overlay" />}
+          </Pressable>
+          <View style={styles.welcomeTextGroup}>
+            <Text style={styles.welcomeTitle}>{greetingTitle}</Text>
+            <Text style={styles.welcomeSubtitle}>{greetingSubtitle}</Text>
           </View>
         </View>
 
@@ -295,12 +318,33 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  // Static placeholders — see PLACEHOLDER_COINS/PLACEHOLDER_FREEZES. Same
+  // chip language as streakChip/bellButton (44-tall, bordered surface) so
+  // the row reads as one consistent set of counters, not a mismatched
+  // temporary widget bolted on.
+  gamiChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  gamiChipText: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    letterSpacing: -0.2,
+    color: colors.ink,
   },
   avatarWrap: {
     position: 'relative',
@@ -325,16 +369,31 @@ function makeStyles(colors) {
     fontSize: fontSize.xl,
     color: staticColors.ink,
   },
-  greetingLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.muted,
+  // Avatar lives here now, not in headerRow — freeing headerRow's left slot
+  // for the gamification chips above. Carries a real headline + a subtitle
+  // line (currently static; will become dynamic gamification content once
+  // there's data to drive it) rather than the old fixed-size "Good morning"
+  // + name pairing that had to fit avatar-height.
+  welcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
-  greetingName: {
+  welcomeTextGroup: {
+    flexShrink: 1,
+  },
+  welcomeTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.heading,
     letterSpacing: -0.2,
     color: colors.ink,
+  },
+  welcomeSubtitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.base,
+    color: colors.muted,
+    marginTop: 2,
   },
   headerRight: {
     flexDirection: 'row',
@@ -371,16 +430,6 @@ function makeStyles(colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   bellDot: {
     position: 'absolute',
     top: 9,
@@ -395,13 +444,13 @@ function makeStyles(colors) {
     borderColor: colors.surface,
   },
   chartCard: {
-    marginTop: spacing.xxl,
+    marginTop: spacing.lg,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.xxl,
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
   sectionTitle: {
