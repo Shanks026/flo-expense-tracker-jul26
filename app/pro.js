@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Crown, Check } from 'lucide-react-native';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { PRO_PRICING } from '../lib/pro';
 import useEntitlement from '../hooks/useEntitlement';
 import ProBenefits from '../components/ProBenefits';
@@ -15,6 +16,8 @@ const PLAN_ORDER = ['monthly', 'annual', 'lifetime'];
 // 14-subscription-pro.md). Reached from the menu's "Upgrade to Pro" row and
 // from ProUpsellSheet's "Level up" button.
 export default function Pro() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { isPro } = useEntitlement();
   const { showToast } = useToast();
@@ -32,14 +35,14 @@ export default function Pro() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.surface} strokeWidth={2.4} />
+          <ChevronLeft size={20} color={staticColors.surface} strokeWidth={2.4} />
         </Pressable>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <View style={styles.crownTile}>
-            <Crown size={28} color={colors.ink} strokeWidth={2.2} fill={colors.ink} />
+            <Crown size={28} color={staticColors.ink} strokeWidth={2.2} fill={staticColors.ink} />
           </View>
           {isPro ? (
             <>
@@ -70,7 +73,7 @@ export default function Pro() {
                   >
                     <View style={styles.planLeft}>
                       <View style={[styles.radio, selected && styles.radioSelected]}>
-                        {selected && <Check size={12} color={colors.ink} strokeWidth={3} />}
+                        {selected && <Check size={12} color={staticColors.ink} strokeWidth={3} />}
                       </View>
                       <View>
                         <Text style={styles.planLabel}>{plan.label}</Text>
@@ -100,10 +103,11 @@ export default function Pro() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.ink,
+    backgroundColor: staticColors.ink,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -114,7 +118,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -140,13 +144,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.hero,
     letterSpacing: -0.3,
-    color: colors.surface,
+    color: staticColors.surface,
     textAlign: 'center',
   },
   subtitle: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     textAlign: 'center',
     marginTop: spacing.sm,
     lineHeight: 20,
@@ -164,8 +168,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: radii.card,
     borderWidth: 1.5,
-    borderColor: colors.inkCard,
-    backgroundColor: colors.inkCard,
+    borderColor: staticColors.inkCard,
+    backgroundColor: staticColors.inkCard,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: radii.pill,
     borderWidth: 1.5,
-    borderColor: colors.mutedDarker,
+    borderColor: staticColors.mutedDarker,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -193,12 +197,12 @@ const styles = StyleSheet.create({
   planLabel: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   planSub: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginTop: 1,
   },
   planPriceWrap: {
@@ -209,7 +213,7 @@ const styles = StyleSheet.create({
   planPrice: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   savingsBadge: {
     backgroundColor: colors.brand,
@@ -220,7 +224,7 @@ const styles = StyleSheet.create({
   savingsBadgeText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.xs,
-    color: colors.ink,
+    color: staticColors.ink,
   },
   cta: {
     height: 56,
@@ -232,6 +236,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.ink,
+    color: staticColors.ink,
   },
-});
+  });
+}

@@ -37,14 +37,29 @@ export default function useProfile() {
     refetch();
   }, [refetch, version]);
 
-  async function updateProfile(fields) {
+  // `silent` skips notifyChanged() — for fields like theme_accent/theme_mode
+  // that no fetched data (transactions, budgets, etc.) depends on. Without
+  // it, every theme toggle bumps DataRefreshContext's global version and
+  // every data hook in the app refetches at the same instant as the color
+  // change — visible as a flicker shortly after the toggle, not from the
+  // color swap itself but from every screen's data re-loading underneath it.
+  // Still patches the local `profile` cache directly (optimistic, no
+  // network round trip) so it doesn't go stale — ThemeProfileSync compares
+  // profile.theme_accent/theme_mode against the live context on every
+  // render, and a stale cached value would make it think the DB disagrees
+  // with the change just made and revert it right back.
+  async function updateProfile(fields, { silent = false } = {}) {
     if (!userId) return { error: new Error('Not signed in') };
     const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
     if (!error) {
       if (fields.full_name !== undefined) {
         await supabase.auth.updateUser({ data: { full_name: fields.full_name } });
       }
-      notifyChanged();
+      if (silent) {
+        setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
+      } else {
+        notifyChanged();
+      }
     }
     return { error };
   }

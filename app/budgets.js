@@ -1,32 +1,43 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Wallet } from 'lucide-react-native';
-import Screen from '../../components/Screen';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import ProgressBar from '../../components/ProgressBar';
-import Pill from '../../components/Pill';
-import CategoryIcon from '../../components/CategoryIcon';
-import Skeleton from '../../components/Skeleton';
-import FadeIn from '../../components/FadeIn';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import useBudgets, { budgetStatus } from '../../hooks/useBudgets';
-import { formatPeriodLabel, isBudgetEnded } from '../../lib/budgets';
-import { useAddBudgetSheet } from '../../components/AddBudgetSheet';
-import { supabase } from '../../lib/supabase';
-import useEntitlement from '../../hooks/useEntitlement';
-import { useProUpsellSheet } from '../../components/ProUpsellSheet';
-import { FREE_LIMITS } from '../../lib/pro';
-import { formatMoney } from '../../lib/currency';
-import useCurrency from '../../hooks/useCurrency';
-
-const STATUS_STYLES = {
-  healthy: { cardVariant: 'default', iconTone: 'income', pill: null, remainingColor: colors.income, trackColor: colors.brand },
-  warn: { cardVariant: 'warn', iconTone: 'warn', pill: { label: 'Almost out', tone: 'warn' }, remainingColor: colors.warn, trackColor: colors.warnStrong },
-  over: { cardVariant: 'danger', iconTone: 'danger', pill: { label: 'Over budget', tone: 'danger' }, remainingColor: colors.danger, trackColor: colors.dangerStrong },
-};
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, Wallet } from 'lucide-react-native';
+import Card from '../components/Card';
+import Button from '../components/Button';
+import IconTile from '../components/IconTile';
+import ProgressBar from '../components/ProgressBar';
+import Pill from '../components/Pill';
+import CategoryIcon from '../components/CategoryIcon';
+import Skeleton from '../components/Skeleton';
+import FadeIn from '../components/FadeIn';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import useBudgets, { budgetStatus } from '../hooks/useBudgets';
+import { formatPeriodLabel, isBudgetEnded } from '../lib/budgets';
+import { useAddBudgetSheet } from '../components/AddBudgetSheet';
+import { supabase } from '../lib/supabase';
+import useEntitlement from '../hooks/useEntitlement';
+import { useProUpsellSheet } from '../components/ProUpsellSheet';
+import { FREE_LIMITS } from '../lib/pro';
+import { formatMoney } from '../lib/currency';
+import useCurrency from '../hooks/useCurrency';
 
 export default function Budgets() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  // Healthy uses the active theme's accent (not the income green) — same
+  // pattern Plans' active-plan card already uses (tone="brand"), so a
+  // healthy budget's icon/bg/remaining-amount and its progress bar (which
+  // was already colors.brand, see ProgressBar.js) read as one consistent
+  // color instead of green text next to a lime bar. Can't live at module
+  // scope since it needs the active theme's colors.
+  const STATUS_STYLES = {
+    healthy: { cardVariant: 'default', iconTone: 'brand', pill: null, remainingColor: colors.brand, trackColor: colors.brand },
+    warn: { cardVariant: 'warn', iconTone: 'warn', pill: { label: 'Almost out', tone: 'warn' }, remainingColor: staticColors.warn, trackColor: staticColors.warnStrong },
+    over: { cardVariant: 'danger', iconTone: 'danger', pill: { label: 'Over budget', tone: 'danger' }, remainingColor: staticColors.danger, trackColor: staticColors.dangerStrong },
+  };
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { budgets, loading } = useBudgets();
   const { openAddBudget } = useAddBudgetSheet();
@@ -46,13 +57,16 @@ export default function Budgets() {
   }
 
   return (
-    <Screen>
+    // Pushed from the Menu sheet now, not a tab (2026-07-18 — swapped with
+    // Analytics so the tab bar carries the more-frequently-used screen) — so
+    // it needs its own back button and SafeAreaView, the same shape as
+    // Plans/Bills/Settings.
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Budgets</Text>
-        <Pressable style={styles.newButton} onPress={handleNewBudget}>
-          <Plus size={15} color={colors.brand} strokeWidth={3} />
-          <Text style={styles.newButtonText}>New Budget</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
         </Pressable>
+        <Text style={styles.title}>Budgets</Text>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -148,19 +162,44 @@ export default function Budgets() {
           </FadeIn>
         )}
       </ScrollView>
-    </Screen>
+
+      {/* Fixed at the bottom, thumb-reachable. No tab bar here (Budgets is a
+          pushed screen), so the bottom safe area is handled explicitly —
+          extra spacing.lg beyond the raw inset so it doesn't sit flush
+          against the device's gesture bar (matches Plans' own footer). */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button title="New Budget" onPress={handleNewBudget} />
+      </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   budgetCardEnded: {
     opacity: 0.6,
   },
   header: {
     paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: fontFamily.extrabold,
@@ -168,23 +207,16 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     color: colors.ink,
   },
-  newButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.ink,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: radii.pill,
-  },
-  newButtonText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.surface,
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
   },
   scroll: {
+    // Screen used to supply the horizontal padding; a bare SafeAreaView
+    // doesn't (same migration note as bills.js's own).
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
-    paddingBottom: 120,
+    paddingBottom: 60,
     gap: spacing.md,
   },
   emptyText: {
@@ -234,4 +266,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
   },
-});
+  });
+}

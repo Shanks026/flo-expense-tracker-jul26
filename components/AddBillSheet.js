@@ -7,7 +7,8 @@ import { X, Trash2 } from 'lucide-react-native';
 import { format, addWeeks, addMonths, addYears } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, DEFAULT_CURRENCY, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -44,6 +45,8 @@ const CADENCES = [
 ];
 
 const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -170,14 +173,14 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{editingId ? 'Edit Bill' : 'New Bill'}</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -186,7 +189,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
           value={name}
           onChangeText={setName}
           placeholder="e.g. Netflix"
-          placeholderTextColor={colors.mutedDarker}
+          placeholderTextColor={staticColors.mutedDarker}
           style={styles.textInput}
         />
 
@@ -197,7 +200,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
             value={amount}
             onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
-            placeholderTextColor={colors.mutedDarker}
+            placeholderTextColor={staticColors.mutedDarker}
             keyboardType="number-pad"
             style={styles.amountInput}
           />
@@ -277,7 +280,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
                 }}
               >
                 <View style={[styles.chipIcon, cat.id === categoryId && styles.chipIconSelected]}>
-                  <CategoryIcon icon={cat.icon} size={20} color={colors.surface} strokeWidth={2} />
+                  <CategoryIcon icon={cat.icon} size={20} color={staticColors.surface} strokeWidth={2} />
                 </View>
                 <Text style={styles.chipLabel} numberOfLines={1}>
                   {cat.name}
@@ -298,7 +301,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
         />
         {editingId && (
           <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-            <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
+            <Trash2 size={16} color={staticColors.dangerStrong} strokeWidth={2} />
             <Text style={styles.deleteText}>Delete Bill</Text>
           </Pressable>
         )}
@@ -307,7 +310,8 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -321,33 +325,33 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginBottom: spacing.sm,
   },
   textInput: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   amountBox: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -358,18 +362,18 @@ const styles = StyleSheet.create({
   amountCurrency: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.title,
-    color: colors.mutedDarker,
+    color: staticColors.mutedDarker,
   },
   amountInput: {
     fontFamily: fontFamily.extrabold,
     fontSize: 26,
     letterSpacing: -0.3,
-    color: colors.surface,
+    color: staticColors.surface,
     flex: 1,
   },
   segmentWrap: {
     flexDirection: 'row',
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     padding: 4,
     marginBottom: spacing.md,
@@ -386,14 +390,14 @@ const styles = StyleSheet.create({
   segmentText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   segmentTextActive: {
     fontFamily: fontFamily.extrabold,
-    color: colors.ink,
+    color: staticColors.ink,
   },
   dateRow: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -402,16 +406,16 @@ const styles = StyleSheet.create({
   fieldLabelInline: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.xs,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   dateValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: staticColors.surface,
     marginTop: 2,
   },
   row: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -422,11 +426,11 @@ const styles = StyleSheet.create({
   rowHint: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.xs,
-    color: colors.mutedDarker,
+    color: staticColors.mutedDarker,
     marginTop: 2,
   },
   categoryRow: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -438,7 +442,7 @@ const styles = StyleSheet.create({
   categoryValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   chipGrid: {
     flexDirection: 'row',
@@ -455,7 +459,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 15,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -465,18 +469,18 @@ const styles = StyleSheet.create({
   chipOverallText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xs,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   chipLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.xs,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     textAlign: 'center',
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.dangerStrong,
+    color: staticColors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.sm,
   },
@@ -491,6 +495,7 @@ const styles = StyleSheet.create({
   deleteText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: colors.dangerStrong,
+    color: staticColors.dangerStrong,
   },
-});
+  });
+}

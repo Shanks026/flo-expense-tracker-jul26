@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FileText, ChevronRight } from 'lucide-react-native';
 import Card from './Card';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import useReportDue from '../hooks/useReportDue';
 
 const CADENCE_TITLE = { weekly: 'Your weekly report is ready', monthly: 'Your monthly report is ready' };
@@ -13,6 +15,8 @@ const CADENCE_TITLE = { weekly: 'Your weekly report is ready', monthly: 'Your mo
 // time + seen-state, not a fired notification) is what's actually guaranteed
 // to surface a due report. Renders nothing when no report is due.
 export default function ReportReadyCard() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { due } = useReportDue();
 
@@ -38,30 +42,33 @@ export default function ReportReadyCard() {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.xxl,
-  },
-  iconTile: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.inkCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.surface,
-  },
-  sub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
-});
+function makeStyles(colors) {
+  return StyleSheet.create({
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.xxl,
+    },
+    // Sits on Card's `dark` prop — pinned so it doesn't invert under Dark theme.
+    iconTile: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: staticColors.inkCard,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.lg,
+      color: staticColors.surface,
+    },
+    sub: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.sm,
+      color: staticColors.mutedMid,
+      marginTop: 1,
+    },
+  });
+}

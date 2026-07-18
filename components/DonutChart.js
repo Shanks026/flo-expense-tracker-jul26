@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { colors, fontFamily, fontSize, spacing } from '../theme/tokens';
+import { fontFamily, fontSize, spacing } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { formatMoney } from '../lib/currency';
 
 const SIZE = 160;
@@ -19,6 +21,8 @@ function formatAmount(n, currency) {
 }
 
 export default function DonutChart({ segments, total, currency = 'INR' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   let cumulative = 0;
 
   return (
@@ -62,7 +66,8 @@ export default function DonutChart({ segments, total, currency = 'INR' }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -89,4 +94,5 @@ const styles = StyleSheet.create({
     color: colors.mutedMid,
     marginTop: 2,
   },
-});
+  });
+}

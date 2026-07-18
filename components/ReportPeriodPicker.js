@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Check, X, Crown } from 'lucide-react-native';
 import { format, startOfWeek, isBefore } from 'date-fns';
 import Button from './Button';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { reportPeriodPresets, matchPeriodPreset, formatPeriodLabel } from '../lib/reports';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
@@ -18,6 +19,8 @@ import { useProUpsellSheet } from './ProUpsellSheet';
 // an inline-expanding panel either — that pushed the cards below it up and
 // down every time it opened, which read as broken layout.
 export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const [customOpen, setCustomOpen] = useState(false);
@@ -139,7 +142,8 @@ export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -227,4 +231,5 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginTop: 2,
   },
-});
+  });
+}

@@ -1,17 +1,11 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, TriangleAlert, Info, X } from 'lucide-react-native';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const MAX_VISIBLE = 3;
-
-const VARIANTS = {
-  success: { icon: Check, iconColor: colors.income, bg: colors.incomeBg },
-  error: { icon: X, iconColor: colors.danger, bg: colors.dangerBg },
-  warn: { icon: TriangleAlert, iconColor: colors.warn, bg: colors.warnBg },
-  info: { icon: Info, iconColor: colors.surface, bg: colors.ink },
-};
 
 const ToastContext = createContext(null);
 
@@ -48,6 +42,8 @@ export function useToast() {
 }
 
 function ToastHost({ toasts, onDismiss }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
   if (toasts.length === 0) return null;
@@ -62,7 +58,20 @@ function ToastHost({ toasts, onDismiss }) {
 }
 
 function ToastItem({ toast, onDismiss }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const progress = useRef(new Animated.Value(0)).current;
+
+  // One consistent card (theme surface + ink text) for every toast — the
+  // icon alone, in its own soft-tinted circle (same pattern IconTile's
+  // status tones already use), carries the success/error/warn/info signal,
+  // instead of the whole toast filling with that color.
+  const VARIANTS = {
+    success: { icon: Check, iconColor: colors.income, iconBg: colors.incomeBg },
+    error: { icon: X, iconColor: colors.danger, iconBg: colors.dangerBg },
+    warn: { icon: TriangleAlert, iconColor: colors.warn, iconBg: colors.warnBg },
+    info: { icon: Info, iconColor: colors.brand, iconBg: colors.brandBg },
+  };
   const v = VARIANTS[toast.variant] ?? VARIANTS.info;
   const Icon = v.icon;
 
@@ -82,12 +91,12 @@ function ToastItem({ toast, onDismiss }) {
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });
 
   return (
-    <Animated.View style={[styles.item, { backgroundColor: v.bg, opacity: progress, transform: [{ translateY }] }]}>
+    <Animated.View style={[styles.item, { opacity: progress, transform: [{ translateY }] }]}>
       <Pressable style={styles.itemPressable} onPress={handleDismiss}>
-        <View style={[styles.iconWrap, toast.variant === 'info' && styles.iconWrapOnDark]}>
+        <View style={[styles.iconWrap, { backgroundColor: v.iconBg }]}>
           <Icon size={16} color={v.iconColor} strokeWidth={2.6} />
         </View>
-        <Text style={[styles.message, toast.variant === 'info' && styles.messageOnDark]} numberOfLines={2}>
+        <Text style={styles.message} numberOfLines={2}>
           {toast.message}
         </Text>
         {toast.actionLabel && (
@@ -98,7 +107,7 @@ function ToastItem({ toast, onDismiss }) {
               handleDismiss();
             }}
           >
-            <Text style={[styles.actionText, toast.variant === 'info' && styles.actionTextOnDark]}>{toast.actionLabel}</Text>
+            <Text style={styles.actionText}>{toast.actionLabel}</Text>
           </Pressable>
         )}
       </Pressable>
@@ -106,60 +115,55 @@ function ToastItem({ toast, onDismiss }) {
   );
 }
 
-const styles = StyleSheet.create({
-  host: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    zIndex: 999,
-    elevation: 999,
-    gap: spacing.sm,
-  },
-  item: {
-    borderRadius: radii.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  itemPressable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  iconWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconWrapOnDark: {
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
-  message: {
-    flex: 1,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-  },
-  messageOnDark: {
-    color: colors.surface,
-  },
-  actionButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  actionText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-  },
-  actionTextOnDark: {
-    color: colors.brand,
-  },
-});
+function makeStyles(colors) {
+  return StyleSheet.create({
+    host: {
+      position: 'absolute',
+      left: spacing.lg,
+      right: spacing.lg,
+      zIndex: 999,
+      elevation: 999,
+      gap: spacing.sm,
+    },
+    item: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 6,
+    },
+    itemPressable: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+    },
+    iconWrap: {
+      width: 26,
+      height: 26,
+      borderRadius: radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    message: {
+      flex: 1,
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.base,
+      color: colors.ink,
+    },
+    actionButton: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+    },
+    actionText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.base,
+      color: colors.brand,
+    },
+  });
+}

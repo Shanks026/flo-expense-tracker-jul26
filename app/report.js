@@ -13,7 +13,8 @@ import ProgressBar from '../components/ProgressBar';
 import DonutChart from '../components/DonutChart';
 import ReportPeriodPicker from '../components/ReportPeriodPicker';
 import { useToast } from '../components/Toast';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import useAnalyticsData from '../hooks/useAnalyticsData';
 import { useAccount } from '../lib/AccountContext';
 import { useAuth } from '../lib/AuthContext';
@@ -41,7 +42,6 @@ import {
   matchPeriodPreset,
 } from '../lib/reports';
 
-const STATUS_COLOR = { healthy: colors.income, warn: colors.warn, over: colors.danger };
 const PACE_LABEL = { on_track: 'On track', over_pace: 'Over pace', under_pace: 'Under pace' };
 const PACE_TONE = { on_track: 'income', under_pace: 'neutral', over_pace: 'danger' };
 
@@ -50,6 +50,14 @@ function sumByType(transactions, type) {
 }
 
 export default function Report() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  // Healthy uses the active theme's accent, not the income green — matches
+  // Budgets tab and Plans' active-plan card, so "healthy" reads as one
+  // consistent color with the progress bar (ProgressBar.js's healthy fill
+  // is already colors.brand). Can't live at module scope since it needs the
+  // active theme's colors.
+  const STATUS_COLOR = { healthy: colors.brand, warn: staticColors.warn, over: staticColors.danger };
   const router = useRouter();
   const params = useLocalSearchParams();
   const { session } = useAuth();
@@ -477,7 +485,8 @@ export default function Report() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -580,7 +589,8 @@ const styles = StyleSheet.create({
   headlineLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    // Sits on Card's `dark` prop (permanently-dark surface) — pinned.
+    color: staticColors.mutedMid,
   },
   headlineDeltaRow: {
     flexDirection: 'row',
@@ -591,7 +601,7 @@ const styles = StyleSheet.create({
   headlineDeltaText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     flexShrink: 1,
   },
   statsCard: {
@@ -746,4 +756,5 @@ const styles = StyleSheet.create({
     color: colors.mutedMid,
     marginTop: 1,
   },
-});
+  });
+}

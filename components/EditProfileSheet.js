@@ -4,7 +4,8 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import * as ImagePicker from 'expo-image-picker';
 import { X, Camera } from 'lucide-react-native';
 import Button from './Button';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
@@ -32,6 +33,8 @@ export function useEditProfileSheet() {
 }
 
 const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { session } = useAuth();
@@ -122,14 +125,14 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -142,7 +145,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
             </View>
           )}
           <View style={styles.cameraBadge}>
-            <Camera size={14} color={colors.ink} strokeWidth={2.2} />
+            <Camera size={14} color={staticColors.ink} strokeWidth={2.2} />
           </View>
         </Pressable>
 
@@ -151,7 +154,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
           value={fullName}
           onChangeText={setFullName}
           placeholder="Your name"
-          placeholderTextColor={colors.mutedDarker}
+          placeholderTextColor={staticColors.mutedDarker}
           style={styles.textInput}
         />
 
@@ -163,7 +166,8 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -178,13 +182,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -208,7 +212,7 @@ const styles = StyleSheet.create({
   avatarInitial: {
     fontFamily: fontFamily.extrabold,
     fontSize: 32,
-    color: colors.ink,
+    color: staticColors.ink,
   },
   cameraBadge: {
     position: 'absolute',
@@ -219,30 +223,31 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.brand,
     borderWidth: 3,
-    borderColor: colors.ink,
+    borderColor: staticColors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginBottom: spacing.sm,
   },
   textInput: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.dangerStrong,
+    color: staticColors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.md,
   },
-});
+  });
+}

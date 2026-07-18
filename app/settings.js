@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Linking, AppState, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
 import useBills from '../hooks/useBills';
@@ -17,6 +17,9 @@ import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
 import { DEFAULT_CURRENCY } from '../lib/currency';
 import ProBadge from '../components/ProBadge';
+import ColorPicker from '../components/ColorPicker';
+import AppearanceToggle from '../components/AppearanceToggle';
+import { useTheme } from '../theme/ThemeContext';
 import {
   getNotificationSettings,
   setNotificationEnabled,
@@ -83,6 +86,8 @@ export default function Settings() {
   const { profile, avatarUrl, updateProfile } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
   const { bills } = useBills();
+  const { accentId, modeId, setAccent, setMode, colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPro } = useEntitlement();
   const { showToast } = useToast();
 
@@ -286,6 +291,32 @@ export default function Settings() {
     showToast({ message: 'Default currency updated', variant: 'success' });
   }
 
+  // Same dual-write shape onboarding/currency.js uses: instant local
+  // application via setAccent()/setMode() (AsyncStorage-backed, no network
+  // round trip needed to see the change) plus the durable profile write so
+  // it follows the user across devices/reinstalls. Two independent fields
+  // (profiles.theme_accent/theme_mode) now, not one — see 16-app-themes.md's
+  // 2026-07-18 restructuring.
+  async function handleAccentChange(id) {
+    setAccent(id);
+    const { error } = await updateProfile({ theme_accent: id }, { silent: true });
+    if (error) {
+      showToast({ message: error.message, variant: 'error' });
+      return;
+    }
+    showToast({ message: 'Color updated', variant: 'success' });
+  }
+
+  async function handleModeChange(id) {
+    setMode(id);
+    const { error } = await updateProfile({ theme_mode: id }, { silent: true });
+    if (error) {
+      showToast({ message: error.message, variant: 'error' });
+      return;
+    }
+    showToast({ message: 'Appearance updated', variant: 'success' });
+  }
+
   async function handleDelete() {
     setDeleting(true);
     setDeleteError(null);
@@ -361,12 +392,26 @@ export default function Settings() {
             <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
           </Pressable>
 
+          <ColorPicker
+            value={accentId}
+            onChange={handleAccentChange}
+            renderTrigger={(selected, toggle) => (
+              <Pressable style={[styles.row, styles.rowBorder]} onPress={toggle}>
+                <View style={styles.rowIcon}>
+                  <Palette size={20} color={colors.ink} strokeWidth={2} />
+                </View>
+                <Text style={styles.rowTitle}>Primary Color</Text>
+                <Text style={styles.rowValue}>{selected.name}</Text>
+              </Pressable>
+            )}
+          />
+
           <View style={styles.row}>
             <View style={styles.rowIcon}>
               <SunMedium size={20} color={colors.ink} strokeWidth={2} />
             </View>
             <Text style={styles.rowTitle}>Appearance</Text>
-            <Text style={styles.rowValue}>Light</Text>
+            <AppearanceToggle value={modeId} onChange={handleModeChange} />
           </View>
         </Card>
 
@@ -616,7 +661,7 @@ export default function Settings() {
               disabled={deleting}
             >
               {deleting ? (
-                <ActivityIndicator color={colors.surface} />
+                <ActivityIndicator color={staticColors.surface} />
               ) : (
                 <Text style={styles.modalDeleteText}>Delete Everything</Text>
               )}
@@ -635,7 +680,8 @@ export default function Settings() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -692,7 +738,9 @@ const styles = StyleSheet.create({
   avatarInitial: {
     fontFamily: fontFamily.extrabold,
     fontSize: 24,
-    color: colors.ink,
+    // Sits on the theme-accent avatar bg — pinned dark, same assumption as
+    // Button's primary-text pin (every accent is light enough for dark text).
+    color: staticColors.ink,
   },
   profileNameRow: {
     flexDirection: 'row',
@@ -703,12 +751,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.heading,
-    color: colors.surface,
+    // Sits on Card's `dark` prop (permanently-dark surface) — pinned so it
+    // doesn't invert under Dark theme.
+    color: staticColors.surface,
   },
   profileEmail: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginTop: 2,
   },
   rowsCard: {
@@ -968,7 +1018,8 @@ const styles = StyleSheet.create({
   modalDeleteText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
-    color: colors.surface,
+    // Sits on the pinned-red delete button — always white.
+    color: staticColors.surface,
   },
   modalCancel: {
     width: '100%',
@@ -989,4 +1040,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xl,
   },
-});
+  });
+}

@@ -3,7 +3,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { X, ChevronRight } from 'lucide-react-native';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import ProBenefits from './ProBenefits';
 import { PRO_MONTHLY_EQUIVALENT } from '../lib/pro';
@@ -31,6 +32,8 @@ export function useProUpsellSheet() {
 }
 
 const ProUpsellSheet = forwardRef(function ProUpsellSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
@@ -60,13 +63,13 @@ const ProUpsellSheet = forwardRef(function ProUpsellSheet(_props, ref) {
       snapPoints={useMemo(() => ['58%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetView style={styles.sheet}>
         <View style={styles.headerRow}>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -77,14 +80,15 @@ const ProUpsellSheet = forwardRef(function ProUpsellSheet(_props, ref) {
 
         <Pressable style={styles.cta} onPress={handleLevelUp}>
           <Text style={styles.ctaText}>Level up for {PRO_MONTHLY_EQUIVALENT}/mo</Text>
-          <ChevronRight size={18} color={colors.ink} strokeWidth={2.6} />
+          <ChevronRight size={18} color={staticColors.ink} strokeWidth={2.6} />
         </Pressable>
       </BottomSheetView>
     </BottomSheetModal>
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     flex: 1,
     paddingHorizontal: spacing.xl,
@@ -98,7 +102,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -106,12 +110,12 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.hero,
     letterSpacing: -0.3,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   subtitle: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
     lineHeight: 19,
@@ -131,6 +135,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.ink,
+    color: staticColors.ink,
   },
-});
+  });
+}

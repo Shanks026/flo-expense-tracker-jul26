@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
-import { colors, radii } from '../theme/tokens';
+import { radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 // A neutral placeholder block for content that hasn't loaded yet — replacing
 // what would otherwise flash on screen: a real hook's default/empty value
@@ -10,6 +11,7 @@ import { colors, radii } from '../theme/tokens';
 // signals "this is loading", not "this is broken" or "this is really empty" —
 // skipped under reduce-motion (a static block instead of a pulse).
 export default function Skeleton({ width = '100%', height = 16, radius = radii.iconTile, style }) {
+  const { colors } = useTheme();
   const p = useSharedValue(0.5);
   const [reduce, setReduce] = useState(false);
 

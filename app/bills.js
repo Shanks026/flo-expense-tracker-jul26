@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,7 +10,8 @@ import Pill from '../components/Pill';
 import CategoryIcon from '../components/CategoryIcon';
 import Skeleton from '../components/Skeleton';
 import FadeIn from '../components/FadeIn';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import useBills, { billStatus } from '../hooks/useBills';
 import { useAddBillSheet } from '../components/AddBillSheet';
 import { usePayBillSheet } from '../components/PayBillSheet';
@@ -17,16 +19,17 @@ import { formatMoney } from '../lib/currency';
 
 const CADENCE_LABELS = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
 
-const STATUS_STYLES = {
-  overdue: { iconTone: 'danger', amountColor: colors.danger, pill: { label: 'Overdue', tone: 'danger' } },
-  due_soon: { iconTone: 'warn', amountColor: colors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
-  scheduled: { iconTone: 'neutral', amountColor: colors.ink, pill: null },
-  // A paused bill isn't being tracked for payment, so it shouldn't show
-  // overdue/due-soon styling even if its stored next_due_date has passed.
-  paused: { iconTone: 'neutral', amountColor: colors.muted, pill: { label: 'Paused', tone: 'neutral' } },
-};
-
 export default function Bills() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const STATUS_STYLES = {
+    overdue: { iconTone: 'danger', amountColor: colors.danger, pill: { label: 'Overdue', tone: 'danger' } },
+    due_soon: { iconTone: 'warn', amountColor: colors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
+    scheduled: { iconTone: 'neutral', amountColor: colors.ink, pill: null },
+    // A paused bill isn't being tracked for payment, so it shouldn't show
+    // overdue/due-soon styling even if its stored next_due_date has passed.
+    paused: { iconTone: 'neutral', amountColor: colors.muted, pill: { label: 'Paused', tone: 'neutral' } },
+  };
   const router = useRouter();
   const { bills, loading } = useBills();
   const { openAddBill } = useAddBillSheet();
@@ -128,7 +131,8 @@ export default function Bills() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -166,7 +170,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.ink,
+    // Permanently-emphasized chip (same role as Card's `dark` prop) — reads
+    // colors.emphasisBg so it doesn't blend into Dark theme's own near-black
+    // screen the way a pinned near-black chip would.
+    backgroundColor: colors.emphasisBg,
     paddingHorizontal: 15,
     paddingVertical: 9,
     borderRadius: radii.pill,
@@ -174,7 +181,7 @@ const styles = StyleSheet.create({
   newButtonText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   scroll: {
     // Screen used to supply the horizontal padding; a bare SafeAreaView
@@ -233,7 +240,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   payButton: {
-    backgroundColor: colors.ink,
+    // Permanently-emphasized chip, same convention as newButton above.
+    backgroundColor: colors.emphasisBg,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: 7,
@@ -241,6 +249,7 @@ const styles = StyleSheet.create({
   payButtonText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xs,
-    color: colors.surface,
+    color: staticColors.surface,
   },
-});
+  });
+}

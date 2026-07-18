@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { formatMoney } from '../lib/currency';
 
 const BAR_MAX_HEIGHT = 90;
@@ -10,6 +12,8 @@ function formatAmount(n, currency) {
 }
 
 export default function DayOfWeekChart({ data, currency = 'INR' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const maxValue = Math.max(...data.map((d) => d.amount), 1);
   const peak = data.reduce((max, d) => (d.amount > max.amount ? d : max), data[0]);
   const hasData = peak.amount > 0;
@@ -40,7 +44,8 @@ export default function DayOfWeekChart({ data, currency = 'INR' }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   title: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
@@ -92,4 +97,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     color: colors.ink,
   },
-});
+  });
+}

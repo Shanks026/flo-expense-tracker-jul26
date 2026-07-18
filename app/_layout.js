@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +13,8 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
+import { ThemeProvider, useTheme } from '../theme/ThemeContext';
+import { DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider } from '../lib/AccountContext';
 import { ToastProvider, useToast } from '../components/Toast';
@@ -156,8 +158,70 @@ function OnboardingGate() {
   return null;
 }
 
+// Sibling of <Stack>, same placement/reason as OnboardingGate (needs
+// useProfile(), which needs useDataRefresh(), which RootNavigator defines
+// but doesn't consume). Reconciles the DB's durable theme choice into the
+// (device-local, AsyncStorage-only) ThemeContext once a profile is
+// available — this is what makes a theme picked on one device follow the
+// user to another, or survive a reinstall. Two independent fields now
+// (profiles.theme_accent/theme_mode), reconciled separately since a user
+// could in principle have one synced and not the other (e.g. a write that
+// partially failed).
+//
+// useProfile() is NOT a shared/context hook — this component's `profile` is
+// its OWN independent copy, separate from Settings.js's own useProfile()
+// call. Settings' accent/mode writes go through updateProfile's `silent`
+// path specifically to avoid the app-wide refetch notifyChanged() would
+// otherwise trigger (see 16-app-themes.md §3.7) — which means THIS copy of
+// `profile` never refreshes when the user picks a new accent/mode here.
+// `accentId`/`modeId` are deliberately NOT in the effect's deps for exactly
+// that reason: if they were, this effect would re-run on every local
+// selection, compare the just-picked value against this stale, never-
+// refetched `profile`, see a "disagreement", and immediately revert the
+// selection back — which is exactly what "the choice doesn't stick until I
+// restart the app" was. Depending only on `profile` means this only ever
+// reconciles when a genuine refetch happens (cold start, sign-in, or some
+// other action's notifyChanged — e.g. syncing a change made on another
+// device), not in reaction to the very state it's trying not to fight.
+//
+// ThemeContext's AsyncStorage cache is device-local, not per-user — same
+// reasoning AccountContext's own activeAccountId cache uses, and the same
+// gap it has to guard against: two different people signing into the same
+// device see whoever most recently used it. AccountContext already solves
+// this (resets activeAccountId to null the instant `userId` changes, then
+// re-resolves against the newly-signed-in user's own accounts) — this does
+// the equivalent for theme: the instant the signed-in user changes (sign
+// out, sign in, or switching accounts on the same device), reset to the
+// default accent/mode immediately, rather than let account A's cached
+// choice flash on screen while account B's profile is still loading. The
+// reconciliation effect above then takes over once B's own profile arrives.
+function ThemeProfileSync() {
+  const { session } = useAuth();
+  const { profile } = useProfile();
+  const { accentId, modeId, setAccent, setMode } = useTheme();
+  const userId = session?.user?.id ?? null;
+  const prevUserIdRef = useRef(userId);
+
+  useEffect(() => {
+    if (prevUserIdRef.current !== userId) {
+      prevUserIdRef.current = userId;
+      setAccent(DEFAULT_ACCENT_ID);
+      setMode(DEFAULT_MODE_ID);
+    }
+  }, [userId, setAccent, setMode]);
+
+  useEffect(() => {
+    if (profile?.theme_accent && profile.theme_accent !== accentId) setAccent(profile.theme_accent);
+    if (profile?.theme_mode && profile.theme_mode !== modeId) setMode(profile.theme_mode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, setAccent, setMode]);
+
+  return null;
+}
+
 function RootNavigator() {
   const { session, loading } = useAuth();
+  const { colors } = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const [introSeen, setIntroSeen] = useState(null); // null = still reading the flag
@@ -230,12 +294,19 @@ function RootNavigator() {
                                 <MenuSheetProvider>
                                   <AlertsSheetProvider>
                                     <OnboardingGate />
+                                    <ThemeProfileSync />
                                     <ShareIntentHandler />
                                     <NotificationSync />
                                     <DetectedTransactionHandler />
                                     <DueBillsModal />
                                     <StreakCelebration />
-                                    <Stack screenOptions={{ headerShown: false }} />
+                                    {/* contentStyle matches the active theme's screen bg —
+                                        without it, React Navigation's native-stack default
+                                        (always white) paints for a frame during every push
+                                        transition before the destination screen's own themed
+                                        background takes over. Invisible on Brand (already
+                                        near-white) but a visible white flash on Dark. */}
+                                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
                                   </AlertsSheetProvider>
                                 </MenuSheetProvider>
                               </AddCategorySheetProvider>
@@ -277,9 +348,11 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

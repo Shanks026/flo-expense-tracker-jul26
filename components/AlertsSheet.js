@@ -3,7 +3,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { X, Receipt, Wallet, Flag, FileText, ChevronRight, CircleCheck } from 'lucide-react-native';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import useAlerts from '../hooks/useAlerts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 
@@ -29,13 +30,16 @@ export function useAlertsSheet() {
 
 const KIND_ICON = { bill: Receipt, budget: Wallet, plan: Flag, report: FileText };
 
-const SEVERITY_TONE = {
-  danger: { icon: colors.dangerStrong, bg: colors.dangerBg },
-  warn: { icon: colors.warnStrong, bg: colors.warnBg },
-  info: { icon: colors.brand, bg: colors.inkCard },
-};
-
 const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  // `info`'s icon color follows the active theme's accent, so this can't
+  // live at module scope anymore — it needs the active theme's colors.
+  const SEVERITY_TONE = {
+    danger: { icon: staticColors.dangerStrong, bg: staticColors.dangerBg },
+    warn: { icon: staticColors.warnStrong, bg: staticColors.warnBg },
+    info: { icon: colors.brand, bg: staticColors.inkCard },
+  };
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
@@ -64,14 +68,14 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
       snapPoints={useMemo(() => ['55%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Alerts</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -103,7 +107,7 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
                     {alert.subtitle}
                   </Text>
                 </View>
-                <ChevronRight size={16} color={colors.mutedMid} strokeWidth={2.4} />
+                <ChevronRight size={16} color={staticColors.mutedMid} strokeWidth={2.4} />
               </Pressable>
             );
           })
@@ -113,7 +117,8 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -127,13 +132,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -156,12 +161,12 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   rowSubtitle: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginTop: 1,
   },
   emptyState: {
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -180,6 +185,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
-});
+  });
+}

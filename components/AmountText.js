@@ -1,7 +1,13 @@
 import { Text, StyleSheet } from 'react-native';
-import { colors, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { formatAmountNumber, currencySymbol } from '../lib/currency';
 
+// `dark={true}` means "rendered on a pinned-dark surface" (inside Card's
+// dark=true variant, or a permanently-dark sheet) — those branches stay on
+// static colors matching that surface's own pinned darkness, not the active
+// theme. The light-mode branches (the default) follow the active theme, same
+// split as Button.js/Pill.js.
 export default function AmountText({
   value,
   type = 'neutral',
@@ -12,21 +18,22 @@ export default function AmountText({
   currency = 'INR',
   style,
 }) {
+  const { colors } = useTheme();
   const isNegative = value < 0;
 
   const color = isNegative
     ? dark
-      ? colors.dangerStrong
+      ? staticColors.dangerStrong
       : colors.danger
     : {
         income: colors.income,
-        expense: dark ? colors.surface : colors.ink,
+        expense: dark ? staticColors.surface : colors.ink,
         danger: colors.danger,
-        neutral: dark ? colors.surface : colors.ink,
+        neutral: dark ? staticColors.surface : colors.ink,
         // A transfer is neither a gain nor a loss — a muted tone keeps it clearly
         // apart from income-green and expense-ink. Direction shows via the ± sign.
-        transfer_in: dark ? colors.mutedLight : colors.mutedDarker,
-        transfer_out: dark ? colors.mutedLight : colors.mutedDarker,
+        transfer_in: dark ? staticColors.mutedLight : colors.mutedDarker,
+        transfer_out: dark ? staticColors.mutedLight : colors.mutedDarker,
       }[type];
 
   let prefix = '';
@@ -37,7 +44,7 @@ export default function AmountText({
   // one it fought the number it belongs to, leaving a grey ₹ glued to a red
   // amount. A negative reading should be red all the way through, so the
   // currency simply takes the amount's own colour.
-  const currencyColor = isNegative ? color : dark ? colors.mutedDarker : colors.mutedLight;
+  const currencyColor = isNegative ? color : dark ? staticColors.mutedDarker : colors.mutedLight;
 
   return (
     <Text style={[styles.text, { color, fontSize: size }, style]}>

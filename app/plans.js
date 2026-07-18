@@ -1,15 +1,18 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Plus, Flag, Check } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, Flag, Check } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
 import ProgressBar from '../components/ProgressBar';
 import Pill from '../components/Pill';
+import Button from '../components/Button';
 import Skeleton from '../components/Skeleton';
 import FadeIn from '../components/FadeIn';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import { useAddPlanSheet } from '../components/AddPlanSheet';
@@ -29,6 +32,9 @@ function dateRangeLabel(plan) {
 }
 
 export default function Plans() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { plans, loading } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
@@ -53,16 +59,10 @@ export default function Plans() {
     // own back button and SafeAreaView, the same shape as Bills/Settings/Analytics.
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-          <Text style={styles.title}>Plans</Text>
-        </View>
-        <Pressable style={styles.newButton} onPress={handleNewPlan}>
-          <Plus size={15} color={colors.brand} strokeWidth={3} />
-          <Text style={styles.newButtonText}>New Plan</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
         </Pressable>
+        <Text style={styles.title}>Plans</Text>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -158,7 +158,7 @@ export default function Plans() {
                 <Card dark style={styles.planCard}>
                   <View style={styles.rowBetween}>
                     <View style={styles.rowLeft}>
-                      <IconTile tone="brand" size={44} radius={13}>
+                      <IconTile tone="brand" onDark size={44} radius={13}>
                         <Flag size={21} color={colors.brand} strokeWidth={2} />
                       </IconTile>
                       <View>
@@ -185,11 +185,21 @@ export default function Plans() {
           </FadeIn>
         )}
       </ScrollView>
+
+      {/* Fixed at the bottom, thumb-reachable — was a small header chip
+          before, which meant reaching across the top of the screen. No tab
+          bar here (Plans is a pushed screen), so the bottom safe area is
+          handled explicitly — extra spacing.lg beyond the raw inset so it
+          doesn't sit flush against the device's gesture bar. */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button title="New Plan" onPress={handleNewPlan} />
+      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -200,12 +210,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.md,
+  },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
   },
   backButton: {
     width: 40,
@@ -222,20 +231,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.display,
     letterSpacing: -0.3,
     color: colors.ink,
-  },
-  newButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.ink,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: radii.pill,
-  },
-  newButtonText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.brand,
   },
   scroll: {
     // Screen used to supply the horizontal padding; a bare SafeAreaView
@@ -277,7 +272,8 @@ const styles = StyleSheet.create({
   planNameDark: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xxl,
-    color: colors.surface,
+    // Sits on Card's `dark` prop — pinned.
+    color: staticColors.surface,
   },
   planSub: {
     fontFamily: fontFamily.semibold,
@@ -288,7 +284,7 @@ const styles = StyleSheet.create({
   planSubDark: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginTop: 1,
   },
   progressWrap: {
@@ -308,7 +304,7 @@ const styles = StyleSheet.create({
   },
   spentValueDark: {
     fontFamily: fontFamily.extrabold,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   remainingDark: {
     fontFamily: fontFamily.extrabold,
@@ -324,4 +320,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     color: colors.mutedDarker,
   },
-});
+  });
+}

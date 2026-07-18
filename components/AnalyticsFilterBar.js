@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { addMonths, subMonths, format } from 'date-fns';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function AnalyticsFilterBar({
   mode,
@@ -15,6 +16,8 @@ export default function AnalyticsFilterBar({
   onCustomFromChange,
   onCustomToChange,
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
 
@@ -81,7 +84,8 @@ export default function AnalyticsFilterBar({
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   segmentWrap: {
     flexDirection: 'row',
     backgroundColor: colors.chipBg,
@@ -149,4 +153,5 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginTop: 1,
   },
-});
+  });
+}

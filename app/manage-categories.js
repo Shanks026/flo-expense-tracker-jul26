@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +6,8 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react-native';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
 import CategoryIcon from '../components/CategoryIcon';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import useCategories from '../hooks/useCategories';
@@ -14,6 +15,8 @@ import { useAddCategorySheet } from '../components/AddCategorySheet';
 import { useToast } from '../components/Toast';
 
 export default function ManageCategories() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { expenseCategories, incomeCategories } = useCategories();
   const { openAddCategory } = useAddCategorySheet();
@@ -58,7 +61,7 @@ export default function ManageCategories() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{title}</Text>
           <Pressable style={styles.addButton} onPress={() => openAddCategory(defaultType)}>
-            <Plus size={14} color={colors.surface} strokeWidth={3} />
+            <Plus size={14} color={staticColors.surface} strokeWidth={3} />
           </Pressable>
         </View>
         <Card style={styles.listCard}>
@@ -95,7 +98,8 @@ export default function ManageCategories() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -144,7 +148,8 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: radii.pill,
-    backgroundColor: colors.ink,
+    // Permanently-emphasized chip (same role as Card's `dark` prop).
+    backgroundColor: colors.emphasisBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -171,4 +176,5 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: spacing.xs,
   },
-});
+  });
+}

@@ -10,7 +10,8 @@ import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import useTransactions from '../../hooks/useTransactions';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
@@ -55,6 +56,8 @@ function formatAmount(n, currency) {
 }
 
 export default function Transactions() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [month, setMonth] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState('all');
   const { transactions, loading } = useTransactions({ month, type: typeFilter });
@@ -206,7 +209,8 @@ export default function Transactions() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   header: {
     paddingTop: spacing.sm,
     marginBottom: spacing.md,
@@ -247,7 +251,10 @@ const styles = StyleSheet.create({
   },
   summaryDark: {
     flex: 1,
-    backgroundColor: colors.ink,
+    // Permanently-emphasized surface (same role as Card's `dark` prop) —
+    // reads colors.emphasisBg so it doesn't blend into Dark theme's own
+    // near-black screen the way a pinned near-black card would.
+    backgroundColor: colors.emphasisBg,
     borderRadius: 16,
     padding: spacing.md,
   },
@@ -260,7 +267,7 @@ const styles = StyleSheet.create({
   summaryLabelDark: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.xs,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginBottom: 2,
   },
   summaryLabelLight: {
@@ -344,4 +351,5 @@ const styles = StyleSheet.create({
     color: colors.mutedMid,
     marginTop: 1,
   },
-});
+  });
+}

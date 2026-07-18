@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarClock } from 'lucide-react-native';
 import { format } from 'date-fns';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import { useAccount } from '../lib/AccountContext';
 import useBills from '../hooks/useBills';
@@ -16,6 +17,8 @@ const STORAGE_KEY = 'flo.dueBills.lastShown';
 // needs useBills/usePayBillSheet/account context, which RootNavigator itself
 // can't consume since it defines those providers.
 export default function DueBillsModal() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const { activeAccountId } = useAccount();
   const { bills, loading } = useBills();
@@ -84,7 +87,8 @@ export default function DueBillsModal() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -148,7 +152,8 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   payButton: {
-    backgroundColor: colors.ink,
+    // Permanently-emphasized chip (same role as Card's `dark` prop).
+    backgroundColor: colors.emphasisBg,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -156,7 +161,7 @@ const styles = StyleSheet.create({
   payButtonText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   later: {
     width: '100%',
@@ -169,4 +174,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.muted,
   },
-});
+  });
+}

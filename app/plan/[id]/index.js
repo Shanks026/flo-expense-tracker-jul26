@@ -13,7 +13,8 @@ import Button from '../../../components/Button';
 import CategoryIcon from '../../../components/CategoryIcon';
 import Switch from '../../../components/Switch';
 import DonutChart from '../../../components/DonutChart';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
 import { usePlan } from '../../../hooks/usePlans';
 import useTransactions from '../../../hooks/useTransactions';
 import useCollectingPlan from '../../../hooks/useCollectingPlan';
@@ -36,6 +37,8 @@ function dateRangeLabel(plan) {
 }
 
 export default function PlanDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { plan, loading } = usePlan(id);
@@ -235,7 +238,8 @@ export default function PlanDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -309,7 +313,8 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    // Sits on Card's `dark` prop — pinned.
+    color: staticColors.mutedMid,
   },
   summaryAmountRow: {
     flexDirection: 'row',
@@ -320,7 +325,7 @@ const styles = StyleSheet.create({
   targetText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.lg,
-    color: colors.mutedDarker,
+    color: staticColors.mutedDarker,
   },
   progressWrap: {
     marginVertical: spacing.lg,
@@ -333,7 +338,7 @@ const styles = StyleSheet.create({
   progressPercent: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   remainingText: {
     fontFamily: fontFamily.extrabold,
@@ -452,4 +457,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.muted,
   },
-});
+  });
+}

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { format } from 'date-fns';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { formatMoney } from '../lib/currency';
 
 const BAR_MAX_HEIGHT = 110;
@@ -46,6 +47,8 @@ export default function IncomeExpenseChart({
   defaultVisible = { expense: true, income: true },
   currency = 'INR',
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [visible, setVisible] = useState(defaultVisible);
 
@@ -179,7 +182,8 @@ export default function IncomeExpenseChart({
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -282,4 +286,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: spacing.xl,
   },
-});
+  });
+}

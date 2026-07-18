@@ -2,8 +2,9 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { ChartColumn, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight } from 'lucide-react-native';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight } from 'lucide-react-native';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
@@ -32,15 +33,22 @@ export function useMenuSheet() {
 // action button in TabBar.js, since the menu itself was only reachable via
 // Home's header, hard to get to from other tabs. Same icon (Flag) it's always
 // had, on whichever surface it lives.
+//
+// Budgets joined it here (2026-07-18), swapped with Analytics for the tab
+// bar's slot — Plans and Budgets now sit consistently next to each other
+// (both pushed screens with the same thumb-reachable bottom "New X" button),
+// rather than one being a tab and the other buried in this sheet.
 const ITEMS = [
   { key: 'plans', label: 'Plans', route: '/plans', icon: Flag },
-  { key: 'analytics', label: 'Analytics', route: '/analytics', icon: ChartColumn },
+  { key: 'budgets', label: 'Budgets', route: '/budgets', icon: Wallet },
   { key: 'reports', label: 'Reports', route: '/report', icon: FileText },
   { key: 'bills', label: 'Bills', route: '/bills', icon: Receipt },
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
 
 const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
@@ -75,27 +83,27 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
       snapPoints={useMemo(() => ['75%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetView style={styles.sheet}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Menu</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
         {!isPro && (
           <Pressable style={styles.upgradeCard} onPress={() => handlePress('/pro')}>
             <View style={styles.upgradeIconTile}>
-              <Crown size={20} color={colors.ink} strokeWidth={2.2} fill={colors.ink} />
+              <Crown size={20} color={staticColors.ink} strokeWidth={2.2} fill={staticColors.ink} />
             </View>
             <View style={styles.upgradeTextWrap}>
               <Text style={styles.upgradeTitle}>Upgrade to Pro</Text>
               <Text style={styles.upgradeSubtitle}>Unlimited accounts, budgets & more</Text>
             </View>
-            <ChevronRight size={18} color={colors.ink} strokeWidth={2.4} />
+            <ChevronRight size={18} color={staticColors.ink} strokeWidth={2.4} />
           </Pressable>
         )}
 
@@ -104,7 +112,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
           return (
             <Pressable key={item.key} style={styles.row} onPress={() => handlePress(item.route)}>
               <View style={styles.rowIcon}>
-                <Icon size={19} color={colors.surface} strokeWidth={2} />
+                <Icon size={19} color={staticColors.surface} strokeWidth={2} />
               </View>
               <Text style={styles.rowLabel}>{item.label}</Text>
             </Pressable>
@@ -115,7 +123,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
 
         <Pressable style={styles.row} onPress={handleLogout}>
           <View style={styles.rowIcon}>
-            <LogOut size={19} color={colors.dangerStrong} strokeWidth={2} />
+            <LogOut size={19} color={staticColors.dangerStrong} strokeWidth={2} />
           </View>
           <Text style={[styles.rowLabel, styles.logoutLabel]}>Log Out</Text>
         </Pressable>
@@ -124,7 +132,8 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     flex: 1,
     paddingHorizontal: spacing.xl,
@@ -138,13 +147,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -158,7 +167,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -186,7 +195,7 @@ const styles = StyleSheet.create({
   upgradeTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
-    color: colors.ink,
+    color: staticColors.ink,
   },
   upgradeSubtitle: {
     fontFamily: fontFamily.semibold,
@@ -197,14 +206,15 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   logoutLabel: {
-    color: colors.dangerStrong,
+    color: staticColors.dangerStrong,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     marginVertical: spacing.sm,
   },
-});
+  });
+}

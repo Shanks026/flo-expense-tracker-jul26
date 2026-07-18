@@ -1,29 +1,29 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, TrendingUp, TrendingDown, Download } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, Download } from 'lucide-react-native';
 import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, format } from 'date-fns';
-import Card from '../components/Card';
-import IconTile from '../components/IconTile';
-import AmountText from '../components/AmountText';
-import CategoryIcon from '../components/CategoryIcon';
-import Pill from '../components/Pill';
-import ProgressBar from '../components/ProgressBar';
-import AnalyticsFilterBar from '../components/AnalyticsFilterBar';
-import AnalyticsSegmentTabs from '../components/AnalyticsSegmentTabs';
-import IncomeExpenseChart from '../components/IncomeExpenseChart';
-import DayOfWeekChart from '../components/DayOfWeekChart';
-import DonutChart from '../components/DonutChart';
-import Skeleton from '../components/Skeleton';
-import FadeIn from '../components/FadeIn';
-import { useToast } from '../components/Toast';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import useAnalyticsData from '../hooks/useAnalyticsData';
-import { useAccount } from '../lib/AccountContext';
-import { buildTransactionsCsv, shareCsv } from '../lib/export';
-import { formatMoney } from '../lib/currency';
-import useCurrency from '../hooks/useCurrency';
+import Screen from '../../components/Screen';
+import Card from '../../components/Card';
+import IconTile from '../../components/IconTile';
+import AmountText from '../../components/AmountText';
+import CategoryIcon from '../../components/CategoryIcon';
+import Pill from '../../components/Pill';
+import ProgressBar from '../../components/ProgressBar';
+import AnalyticsFilterBar from '../../components/AnalyticsFilterBar';
+import AnalyticsSegmentTabs from '../../components/AnalyticsSegmentTabs';
+import IncomeExpenseChart from '../../components/IncomeExpenseChart';
+import DayOfWeekChart from '../../components/DayOfWeekChart';
+import DonutChart from '../../components/DonutChart';
+import Skeleton from '../../components/Skeleton';
+import FadeIn from '../../components/FadeIn';
+import { useToast } from '../../components/Toast';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
+import useAnalyticsData from '../../hooks/useAnalyticsData';
+import { useAccount } from '../../lib/AccountContext';
+import { buildTransactionsCsv, shareCsv } from '../../lib/export';
+import { formatMoney } from '../../lib/currency';
+import useCurrency from '../../hooks/useCurrency';
 import {
   computeTrend,
   computeDelta,
@@ -37,9 +37,8 @@ import {
   computeConsistencyFlag,
   computeRangeSpentByPlan,
   computePlanPace,
-} from '../lib/analytics';
+} from '../../lib/analytics';
 
-const STATUS_COLOR = { healthy: colors.income, warn: colors.warn, over: colors.danger };
 const PACE_LABEL = { on_track: 'On track', over_pace: 'Over pace', under_pace: 'Under pace' };
 const PACE_TONE = { on_track: 'income', under_pace: 'neutral', over_pace: 'danger' };
 
@@ -48,6 +47,8 @@ function sumByType(transactions, type) {
 }
 
 function DeltaBadge({ delta, goodDirection = 'up' }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   if (delta.direction === 'flat') {
     return <Text style={styles.deltaFlat}>No change</Text>;
   }
@@ -66,7 +67,14 @@ function DeltaBadge({ delta, goodDirection = 'up' }) {
 }
 
 export default function Analytics() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  // Healthy uses the active theme's accent, not the income green — matches
+  // Budgets and Plans' active-plan card, so "healthy" reads as one
+  // consistent color with the progress bar (ProgressBar.js's healthy fill
+  // is already colors.brand). Can't live at module scope since it needs the
+  // active theme's colors.
+  const STATUS_COLOR = { healthy: colors.brand, warn: staticColors.warn, over: staticColors.danger };
   const { activeAccount, accounts } = useAccount();
   const { showToast } = useToast();
   const currency = useCurrency();
@@ -150,16 +158,13 @@ export default function Analytics() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <Screen padded={false}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Analytics</Text>
           {activeAccount && <Text style={styles.headerSubtitle}>{activeAccount.name}</Text>}
         </View>
-        <Pressable style={styles.backButton} onPress={handleExport} disabled={exporting}>
+        <Pressable style={styles.exportButton} onPress={handleExport} disabled={exporting}>
           {exporting ? (
             <ActivityIndicator size="small" color={colors.ink} />
           ) : (
@@ -439,15 +444,12 @@ export default function Analytics() {
         </FadeIn>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
+function makeStyles(colors) {
+  return StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
   },
-  backButton: {
+  exportButton: {
     width: 40,
     height: 40,
     borderRadius: 12,
@@ -480,7 +482,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 60,
+    paddingBottom: 120,
   },
   heroCard: {
     marginBottom: spacing.md,
@@ -677,4 +679,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
   },
-});
+  });
+}

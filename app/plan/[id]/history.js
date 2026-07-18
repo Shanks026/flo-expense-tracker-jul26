@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +11,8 @@ import CategoryIcon from '../../../components/CategoryIcon';
 import AmountText from '../../../components/AmountText';
 import Pill from '../../../components/Pill';
 import Button from '../../../components/Button';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
 import { formatMoney } from '../../../lib/currency';
 import { usePlan } from '../../../hooks/usePlans';
 import useCurrency from '../../../hooks/useCurrency';
@@ -22,6 +23,8 @@ import { useDataRefresh } from '../../../lib/DataRefreshContext';
 import { useToast } from '../../../components/Toast';
 
 export default function PlanHistory() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -217,7 +220,7 @@ export default function PlanHistory() {
               </View>
               <AmountText value={item.amount} type="neutral" currency={currency} />
               <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                {isSelected && <Check size={15} color={colors.ink} strokeWidth={3} />}
+                {isSelected && <Check size={15} color={staticColors.ink} strokeWidth={3} />}
               </View>
             </Pressable>
           );
@@ -241,17 +244,20 @@ export default function PlanHistory() {
 }
 
 function CategoryChip({ label, icon, active, onPress }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
       {icon && (
-        <CategoryIcon icon={icon} size={15} color={active ? colors.ink : colors.mutedDarker} strokeWidth={2} />
+        <CategoryIcon icon={icon} size={15} color={active ? staticColors.ink : colors.mutedDarker} strokeWidth={2} />
       )}
       <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -337,7 +343,9 @@ const styles = StyleSheet.create({
     color: colors.mutedDarker,
   },
   chipLabelActive: {
-    color: colors.ink,
+    // Sits on the theme-accent chip bg — pinned dark, same assumption as
+    // Button's primary-text pin.
+    color: staticColors.ink,
   },
   listContent: {
     paddingHorizontal: spacing.xl,
@@ -409,4 +417,5 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.bg,
   },
-});
+  });
+}

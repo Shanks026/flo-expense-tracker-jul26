@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import Button from '../components/Button';
 import ArrowMark from '../components/ArrowMark';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import { getDraft } from '../lib/onboardingDraft';
 
@@ -26,6 +27,8 @@ import { getDraft } from '../lib/onboardingDraft';
 // opens straight into sign-up, framed as "save your progress" rather than
 // re-asking "create account" cold.
 export default function SignIn() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { signIn, signUp } = useAuth();
   const params = useLocalSearchParams();
   const [mode, setMode] = useState(params.mode === 'signup' ? 'signup' : 'signin');
@@ -234,7 +237,8 @@ function GoogleIcon() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -372,4 +376,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     color: colors.ink,
   },
-});
+  });
+}

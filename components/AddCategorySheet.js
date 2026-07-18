@@ -4,7 +4,8 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import { X } from 'lucide-react-native';
 import Button from './Button';
 import CategoryIcon, { CATEGORY_ICON_KEYS, CATEGORY_COLORS } from './CategoryIcon';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
@@ -31,6 +32,8 @@ export function useAddCategorySheet() {
 }
 
 const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -92,14 +95,14 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>New Category</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -108,7 +111,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
           value={name}
           onChangeText={setName}
           placeholder="e.g. Subscriptions"
-          placeholderTextColor={colors.mutedDarker}
+          placeholderTextColor={staticColors.mutedDarker}
           style={styles.textInput}
         />
 
@@ -128,7 +131,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
             const selected = key === icon;
             return (
               <Pressable key={key} style={[styles.iconOption, selected && styles.iconOptionSelected]} onPress={() => setIcon(key)}>
-                <CategoryIcon icon={key} size={20} color={selected ? colors.ink : colors.surface} strokeWidth={2} />
+                <CategoryIcon icon={key} size={20} color={selected ? staticColors.ink : staticColors.surface} strokeWidth={2} />
               </Pressable>
             );
           })}
@@ -156,7 +159,8 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -170,35 +174,35 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginBottom: spacing.sm,
     marginTop: spacing.md,
   },
   textInput: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   segmentWrap: {
     flexDirection: 'row',
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     padding: 4,
   },
@@ -214,11 +218,11 @@ const styles = StyleSheet.create({
   segmentText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   segmentTextActive: {
     fontFamily: fontFamily.extrabold,
-    color: colors.ink,
+    color: staticColors.ink,
   },
   iconGrid: {
     flexDirection: 'row',
@@ -229,7 +233,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -248,13 +252,14 @@ const styles = StyleSheet.create({
   },
   colorOptionSelected: {
     borderWidth: 3,
-    borderColor: colors.surface,
+    borderColor: staticColors.surface,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.dangerStrong,
+    color: staticColors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.md,
   },
-});
+  });
+}

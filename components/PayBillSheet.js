@@ -5,7 +5,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, SkipForward } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Button from './Button';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -35,6 +36,8 @@ export function usePayBillSheet() {
 }
 
 const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -119,7 +122,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
@@ -128,7 +131,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
             Pay {bill?.name ?? ''}
           </Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -139,7 +142,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
             value={amount}
             onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
-            placeholderTextColor={colors.mutedDarker}
+            placeholderTextColor={staticColors.mutedDarker}
             keyboardType="number-pad"
             style={styles.amountInput}
             autoFocus
@@ -198,7 +201,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
 
         <Button title="Mark as Paid" variant="primary" onPress={handleMarkPaid} loading={saving} style={{ marginTop: spacing.lg }} />
         <Pressable style={styles.skipRow} onPress={handleSkip} disabled={saving}>
-          <SkipForward size={16} color={colors.mutedMid} strokeWidth={2} />
+          <SkipForward size={16} color={staticColors.mutedMid} strokeWidth={2} />
           <Text style={styles.skipText}>Skip this cycle</Text>
         </Pressable>
       </BottomSheetScrollView>
@@ -206,7 +209,8 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -222,24 +226,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginBottom: spacing.sm,
   },
   amountBox: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -250,17 +254,17 @@ const styles = StyleSheet.create({
   amountCurrency: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.title,
-    color: colors.mutedDarker,
+    color: staticColors.mutedDarker,
   },
   amountInput: {
     fontFamily: fontFamily.extrabold,
     fontSize: 26,
     letterSpacing: -0.3,
-    color: colors.surface,
+    color: staticColors.surface,
     flex: 1,
   },
   row: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -271,12 +275,12 @@ const styles = StyleSheet.create({
   fieldLabelInline: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   rowValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   accountValueRow: {
     flexDirection: 'row',
@@ -296,7 +300,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -307,16 +311,16 @@ const styles = StyleSheet.create({
   accountOptionText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: staticColors.surface,
     flexShrink: 1,
   },
   accountOptionTextSelected: {
-    color: colors.ink,
+    color: staticColors.ink,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.dangerStrong,
+    color: staticColors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.md,
   },
@@ -331,6 +335,7 @@ const styles = StyleSheet.create({
   skipText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
-});
+  });
+}

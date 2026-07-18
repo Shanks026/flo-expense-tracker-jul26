@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { Check, Pencil, X, TrendingUp, TrendingDown } from 'lucide-react-native';
 import Button from './Button';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { useAccount } from '../lib/AccountContext';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import { useAddAccountSheet } from './AddAccountSheet';
@@ -44,7 +45,7 @@ function formatBalance(value, currency) {
   return { sign: value < 0 ? '−' : '', number: formatAmountNumber(value, currency) };
 }
 
-function AccountCard({ account, summary, active, onSelect, onEdit }) {
+function AccountCard({ account, summary, active, onSelect, onEdit, styles }) {
   const currency = account.currency ?? 'INR';
   const balance = formatBalance(summary?.in_hand_balance ?? 0, currency);
 
@@ -58,12 +59,12 @@ function AccountCard({ account, summary, active, onSelect, onEdit }) {
           </Text>
           {active && (
             <View style={styles.activePill}>
-              <Check size={10} color={colors.ink} strokeWidth={3} />
+              <Check size={10} color={staticColors.ink} strokeWidth={3} />
             </View>
           )}
         </View>
         <Pressable style={styles.editButton} onPress={onEdit} hitSlop={8}>
-          <Pencil size={14} color={colors.mutedMid} strokeWidth={2} />
+          <Pencil size={14} color={staticColors.mutedMid} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -76,12 +77,12 @@ function AccountCard({ account, summary, active, onSelect, onEdit }) {
 
       <View style={styles.cardStatsRow}>
         <View style={styles.statLine}>
-          <TrendingUp size={12} color={colors.mutedMid} strokeWidth={2.6} />
+          <TrendingUp size={12} color={staticColors.mutedMid} strokeWidth={2.6} />
           <Text style={styles.statValue}>{formatAmount(summary?.month_income ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Income</Text>
         </View>
         <View style={styles.statLine}>
-          <TrendingDown size={12} color={colors.mutedMid} strokeWidth={2.6} />
+          <TrendingDown size={12} color={staticColors.mutedMid} strokeWidth={2.6} />
           <Text style={styles.statValue}>{formatAmount(summary?.month_expense ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Expenses</Text>
         </View>
@@ -91,6 +92,8 @@ function AccountCard({ account, summary, active, onSelect, onEdit }) {
 }
 
 const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const insets = useSafeAreaInsets();
@@ -146,7 +149,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
       snapPoints={useMemo(() => ['85%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
     >
       <BottomSheetScrollView
@@ -157,13 +160,14 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Accounts</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
           </Pressable>
         </View>
 
         {orderedAccounts.map((account) => (
           <AccountCard
             key={account.id}
+            styles={styles}
             account={account}
             summary={summaries[account.id]}
             active={account.id === activeAccountId}
@@ -178,7 +182,8 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -192,18 +197,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: staticColors.inkCard,
     borderRadius: radii.cardLg,
     padding: spacing.xxl,
     marginBottom: spacing.md,
@@ -231,7 +236,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     letterSpacing: -0.1,
     lineHeight: fontSize.lg,
-    color: colors.surface,
+    color: staticColors.surface,
     flexShrink: 1,
   },
   activePill: {
@@ -252,17 +257,17 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   cardBalance: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.hero,
     letterSpacing: -0.4,
-    color: colors.surface,
+    color: staticColors.surface,
     marginTop: 0,
   },
   cardBalanceCurrency: {
-    color: colors.mutedDarker,
+    color: staticColors.mutedDarker,
   },
   cardStatsRow: {
     flexDirection: 'row',
@@ -278,11 +283,12 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
     letterSpacing: -0.2,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   statLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
-});
+  });
+}

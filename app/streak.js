@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +22,8 @@ import StreakFlameIcon from '../components/StreakFlameIcon';
 import { StreakFlame } from '../components/StreakDays';
 import useStreak from '../hooks/useStreak';
 import { streakHeadline } from '../lib/koban';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const BADGE_SIZE = 92;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -33,6 +35,8 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // streak, and a real month calendar. A header chip with nowhere to go would be
 // decoration; this is what makes it a door.
 export default function StreakScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { current, longest, breaks, loggedToday, isNewStreak, history, loading } = useStreak();
 
@@ -157,7 +161,8 @@ export default function StreakScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -306,4 +311,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.lg,
   },
-});
+  });
+}

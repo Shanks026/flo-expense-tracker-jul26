@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
@@ -14,7 +14,8 @@ import ReportReadyCard from '../../components/ReportReadyCard';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import useStreak from '../../hooks/useStreak';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../../lib/AuthContext';
 import useGlobalSummary from '../../hooks/useGlobalSummary';
 import useTransactions from '../../hooks/useTransactions';
@@ -35,8 +36,8 @@ import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
 
 const UPCOMING_BILL_STYLES = {
-  overdue: { iconTone: 'danger', amountColor: colors.danger, pill: { label: 'Overdue', tone: 'danger' } },
-  due_soon: { iconTone: 'warn', amountColor: colors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
+  overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
+  due_soon: { iconTone: 'warn', amountColor: staticColors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
 };
 const MAX_UPCOMING_BILLS = 4;
 
@@ -53,6 +54,8 @@ function greeting() {
 }
 
 export default function Home() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const router = useRouter();
   const { summary, loading: summaryLoading } = useGlobalSummary();
@@ -162,7 +165,7 @@ export default function Home() {
           </View>
           <Text style={styles.heroLabel}>In Hand</Text>
           {summaryLoading ? (
-            <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: colors.inkCard }} />
+            <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: staticColors.inkCard }} />
           ) : (
             <FadeIn>
               <AmountText
@@ -178,8 +181,8 @@ export default function Home() {
           )}
           {summaryLoading ? (
             <View style={styles.heroStatsRow}>
-              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: colors.inkCard }} />
-              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: colors.inkCard }} />
+              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: staticColors.inkCard }} />
+              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: staticColors.inkCard }} />
             </View>
           ) : (
             <FadeIn style={styles.heroStatsRow}>
@@ -325,7 +328,8 @@ export default function Home() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
@@ -358,10 +362,12 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 15,
   },
+  // Sits on the theme-accent avatar bg (colors.brand) — pinned dark, same
+  // assumption as Button's primary-text pin.
   avatarText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.ink,
+    color: staticColors.ink,
   },
   greetingLabel: {
     fontFamily: fontFamily.semibold,
@@ -454,26 +460,32 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: radii.pill,
-    backgroundColor: colors.mutedLight,
+    backgroundColor: staticColors.mutedLight,
   },
+  // Sits on the heroCard, a permanently-emphasized Card `dark` surface —
+  // pinned so it doesn't invert/blend under Dark theme (this was the actual
+  // camouflage bug: colors.surface resolves to a dark gray under Dark theme,
+  // rendering as near-invisible dark text on the dark card).
   accountName: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
     lineHeight: fontSize.lg,
     letterSpacing: -0.1,
-    color: colors.surface,
+    color: staticColors.surface,
     flexShrink: 1,
   },
   heroLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   heroPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.inkCard,
+    // Pinned — colors.inkCard now equals Dark theme's own emphasisBg value,
+    // which would make this pill invisible against the hero card.
+    backgroundColor: staticColors.inkCard,
     paddingHorizontal: 13,
     paddingVertical: 7,
     borderRadius: radii.pill,
@@ -500,16 +512,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
+  // The reported camouflage bug — this is the income/expense value text on
+  // the hero card, previously reading colors.surface (dark under Dark
+  // theme) instead of a pinned light color.
   heroStatValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
     letterSpacing: -0.2,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   heroStatLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -581,4 +596,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     letterSpacing: -0.2,
   },
-});
+  });
+}

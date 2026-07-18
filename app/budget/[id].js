@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +10,8 @@ import ProgressBar from '../../components/ProgressBar';
 import AmountText from '../../components/AmountText';
 import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import useBudgetDetail from '../../hooks/useBudgetDetail';
 import { budgetStatus } from '../../hooks/useBudgets';
 import { formatPeriodLabel, isBudgetEnded, daysLeftInPeriod, computeBudgetPace } from '../../lib/budgets';
@@ -28,6 +29,8 @@ const PACE_COPY = {
 };
 
 export default function BudgetDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { budget, transactions, loading } = useBudgetDetail(id);
@@ -182,7 +185,8 @@ export default function BudgetDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -262,12 +266,13 @@ const styles = StyleSheet.create({
   summaryCategory: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
-    color: colors.mutedMid,
+    // Sits on Card's `dark` prop — pinned.
+    color: staticColors.mutedMid,
   },
   summaryLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   progressWrap: {
     marginVertical: spacing.lg,
@@ -280,12 +285,12 @@ const styles = StyleSheet.create({
   spentText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
   },
   daysText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: staticColors.surface,
   },
   paceCard: {
     paddingVertical: spacing.md,
@@ -349,4 +354,5 @@ const styles = StyleSheet.create({
     color: colors.mutedMid,
     marginTop: 1,
   },
-});
+  });
+}

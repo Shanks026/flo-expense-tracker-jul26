@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Check, X } from 'lucide-react-native';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { CURRENCY_LIST, currencyMeta } from '../lib/currency';
 
 // Reused by AddAccountSheet, AddBillSheet (dark sheets) and app/settings.js (a
@@ -32,6 +33,13 @@ export default function CurrencyPicker({
   variant = 'inline',
   style,
 }) {
+  // Only the dialog variant (Settings, a theme-reactive light screen) reads
+  // the active theme. The inline variant is only ever used inside AddAccount/
+  // AddBillSheet's permanently-dark chrome (`dark` is always true there), so
+  // its colors stay pinned to the static tokens — same reasoning as Card's
+  // `dark` prop.
+  const { colors } = useTheme();
+  const dialogStyles = useMemo(() => makeDialogStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const selected = currencyMeta(value);
   const toggle = () => !disabled && setOpen((v) => !v);
@@ -42,9 +50,9 @@ export default function CurrencyPicker({
     close();
   }
 
-  const rowBg = dark ? colors.inkCard : colors.iconTileBg;
-  const valueColor = dark ? colors.surface : colors.ink;
-  const labelColor = colors.mutedMid;
+  const rowBg = dark ? staticColors.inkCard : staticColors.iconTileBg;
+  const valueColor = dark ? staticColors.surface : staticColors.ink;
+  const labelColor = staticColors.mutedMid;
 
   const trigger = renderTrigger ? (
     renderTrigger(selected, toggle)
@@ -159,7 +167,7 @@ const styles = StyleSheet.create({
   hint: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.xs,
-    color: colors.mutedLight,
+    color: staticColors.mutedLight,
     marginTop: spacing.xs,
     paddingHorizontal: 2,
   },
@@ -191,14 +199,17 @@ const styles = StyleSheet.create({
   optionName: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.xs,
-    color: colors.mutedMid,
+    color: staticColors.mutedMid,
     marginTop: 1,
   },
 });
 
 // Mirrors ReportPeriodPicker's dialog styles exactly (light surface, centred,
 // transparent+fade) — the established "this is a dialog, not a sheet" shape.
-const dialogStyles = StyleSheet.create({
+// Only this half is theme-reactive (Settings' variant="dialog" usage); the
+// inline variant above is only ever rendered inside permanently-dark sheets.
+function makeDialogStyles(colors) {
+  return StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -262,4 +273,5 @@ const dialogStyles = StyleSheet.create({
     color: colors.mutedMid,
     marginTop: 2,
   },
-});
+  });
+}
