@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Menu, ChevronRight, TrendingUp, TrendingDown, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
+import { Bell, Menu, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -13,11 +13,12 @@ import Pill from '../../components/Pill';
 import ReportReadyCard from '../../components/ReportReadyCard';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
+import AccountHeroCarousel from '../../components/AccountHeroCarousel';
 import useStreak from '../../hooks/useStreak';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../../lib/AuthContext';
-import useGlobalSummary from '../../hooks/useGlobalSummary';
+import useAllAccountSummaries from '../../hooks/useAllAccountSummaries';
 import useTransactions from '../../hooks/useTransactions';
 import useSpendingTrend from '../../hooks/useSpendingTrend';
 import useProfile from '../../hooks/useProfile';
@@ -41,11 +42,6 @@ const UPCOMING_BILL_STYLES = {
 };
 const MAX_UPCOMING_BILLS = 4;
 
-function formatAmount(value, currency) {
-  const rounded = Math.round(Math.abs(value));
-  return `${value < 0 ? '−' : ''}${formatMoney(rounded, currency)}`;
-}
-
 function greeting() {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -58,14 +54,14 @@ export default function Home() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const router = useRouter();
-  const { summary, loading: summaryLoading } = useGlobalSummary();
   const { transactions, loading: transactionsLoading } = useTransactions({ limit: 4 });
   const [trendRange, setTrendRange] = useState('7d');
   const { data: trendData, loading: trendLoading } = useSpendingTrend(trendRange);
   const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
-  const { activeAccount, accounts } = useAccount();
+  const { activeAccount, accounts, setActiveAccount } = useAccount();
+  const { summaries, loading: summariesLoading } = useAllAccountSummaries();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
   const { count: alertCount } = useAlerts();
@@ -150,55 +146,15 @@ export default function Home() {
           </View>
         </View>
 
-        <Card dark style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.accountHeading}>
-              <View style={[styles.accountDot, activeAccount && { backgroundColor: activeAccount.color }]} />
-              <Text style={styles.accountName} numberOfLines={1}>
-                {activeAccount?.name ?? '—'}
-              </Text>
-            </View>
-            <Pressable style={styles.heroPill} onPress={openAccountSwitcher}>
-              <Text style={styles.heroPillText}>Manage</Text>
-              <ChevronRight size={12} color={colors.brand} strokeWidth={2.6} />
-            </Pressable>
-          </View>
-          <Text style={styles.heroLabel}>In Hand</Text>
-          {summaryLoading ? (
-            <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: staticColors.inkCard }} />
-          ) : (
-            <FadeIn>
-              <AmountText
-                value={summary.in_hand_balance}
-                type="neutral"
-                dark
-                muteCurrency
-                currency={currency}
-                size={fontSize.amountLg}
-                style={styles.heroBalance}
-              />
-            </FadeIn>
-          )}
-          {summaryLoading ? (
-            <View style={styles.heroStatsRow}>
-              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: staticColors.inkCard }} />
-              <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: staticColors.inkCard }} />
-            </View>
-          ) : (
-            <FadeIn style={styles.heroStatsRow}>
-              <View style={styles.heroStat}>
-                <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
-                <Text style={styles.heroStatValue}>{formatAmount(summary.month_income, currency)}</Text>
-                <Text style={styles.heroStatLabel}>Income</Text>
-              </View>
-              <View style={styles.heroStat}>
-                <TrendingDown size={12} color={colors.dangerStrong} strokeWidth={2.6} />
-                <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense, currency)}</Text>
-                <Text style={styles.heroStatLabel}>Expenses</Text>
-              </View>
-            </FadeIn>
-          )}
-        </Card>
+        <AccountHeroCarousel
+          accounts={accounts}
+          activeAccountId={activeAccount?.id ?? null}
+          onSwitchAccount={setActiveAccount}
+          onOpenSwitcher={openAccountSwitcher}
+          summaries={summaries}
+          summariesLoading={summariesLoading}
+          currency={currency}
+        />
 
         <Card style={styles.chartCard}>
           {trendLoading ? (
@@ -438,93 +394,8 @@ function makeStyles(colors) {
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  heroCard: {
-    borderRadius: radii.cardLg,
-    paddingVertical: 22,
-    paddingHorizontal: 24,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  accountHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    flexShrink: 1,
-    paddingRight: spacing.sm,
-  },
-  accountDot: {
-    width: 8,
-    height: 8,
-    borderRadius: radii.pill,
-    backgroundColor: staticColors.mutedLight,
-  },
-  // Sits on the heroCard, a permanently-emphasized Card `dark` surface —
-  // pinned so it doesn't invert/blend under Dark theme (this was the actual
-  // camouflage bug: colors.surface resolves to a dark gray under Dark theme,
-  // rendering as near-invisible dark text on the dark card).
-  accountName: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    lineHeight: fontSize.lg,
-    letterSpacing: -0.1,
-    color: staticColors.surface,
-    flexShrink: 1,
-  },
-  heroLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: staticColors.mutedMid,
-  },
-  heroPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    // Pinned — colors.inkCard now equals Dark theme's own emphasisBg value,
-    // which would make this pill invisible against the hero card.
-    backgroundColor: staticColors.inkCard,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: radii.pill,
-    flexShrink: 0,
-  },
-  heroPillText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xs,
-    color: colors.brand,
-  },
-  heroBalance: {
-    marginTop: 0,
-  },
   chartCard: {
     marginTop: spacing.xxl,
-  },
-  heroStatsRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginTop: spacing.xl,
-  },
-  heroStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  // The reported camouflage bug — this is the income/expense value text on
-  // the hero card, previously reading colors.surface (dark under Dark
-  // theme) instead of a pinned light color.
-  heroStatValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    letterSpacing: -0.2,
-    color: staticColors.surface,
-  },
-  heroStatLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
