@@ -36,6 +36,7 @@ import useIncomingShare from '../hooks/useIncomingShare';
 import useProfile from '../hooks/useProfile';
 import { parseTransactionSms } from '../lib/smsParser';
 import { useNotificationSync } from '../lib/notifications';
+import { usePushTokenSync } from '../lib/pushToken';
 import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
 import { getIntroSeen, setIntroSeen as persistIntroSeen } from '../lib/onboardingDraft';
 
@@ -62,6 +63,17 @@ function ShareIntentHandler() {
 // notifications in sync with live bills/settings and handles tap routing.
 function NotificationSync() {
   useNotificationSync();
+  return null;
+}
+
+// Sibling of <Stack>, same placement/reason as NotificationSync —
+// registers this device's Expo push token (17-server-push-notifications.md
+// Phase 1). Deliberately separate from NotificationSync/lib/notifications.js:
+// that file is local-scheduling only, this is the new server-push path, and
+// keeping them in different files means Phase 2 can delete the local nudge
+// scheduling later without touching push-token registration at all.
+function PushTokenSync() {
+  usePushTokenSync();
   return null;
 }
 
@@ -297,6 +309,7 @@ function RootNavigator() {
                                     <ThemeProfileSync />
                                     <ShareIntentHandler />
                                     <NotificationSync />
+                                    <PushTokenSync />
                                     <DetectedTransactionHandler />
                                     <DueBillsModal />
                                     <StreakCelebration />

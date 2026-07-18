@@ -22,6 +22,7 @@
         "backgroundColor": "#BBDC12"
       },
       "package": "com.anonymous.flo",
+      "googleServicesFile": "./google-services.json",
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.RECORD_AUDIO"
