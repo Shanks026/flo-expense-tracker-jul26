@@ -23,6 +23,8 @@ import useProfile from '../../hooks/useProfile';
 import useBills, { billStatus } from '../../hooks/useBills';
 import useEntitlement from '../../hooks/useEntitlement';
 import ProBadge from '../../components/ProBadge';
+import { formatMoney } from '../../lib/currency';
+import useCurrency from '../../hooks/useCurrency';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useMenuSheet } from '../../components/MenuSheet';
 import { usePayBillSheet } from '../../components/PayBillSheet';
@@ -38,9 +40,9 @@ const UPCOMING_BILL_STYLES = {
 };
 const MAX_UPCOMING_BILLS = 4;
 
-function formatAmount(value) {
+function formatAmount(value, currency) {
   const rounded = Math.round(Math.abs(value));
-  return `${value < 0 ? '−' : ''}₹${rounded.toLocaleString('en-IN')}`;
+  return `${value < 0 ? '−' : ''}${formatMoney(rounded, currency)}`;
 }
 
 function greeting() {
@@ -68,6 +70,7 @@ export default function Home() {
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
   const { isPro } = useEntitlement();
+  const currency = useCurrency();
 
   // Lit only when there IS a streak. The muted flame on a zero streak is not a
   // failure state — it's the invitation.
@@ -167,6 +170,7 @@ export default function Home() {
                 type="neutral"
                 dark
                 muteCurrency
+                currency={currency}
                 size={fontSize.amountLg}
                 style={styles.heroBalance}
               />
@@ -181,12 +185,12 @@ export default function Home() {
             <FadeIn style={styles.heroStatsRow}>
               <View style={styles.heroStat}>
                 <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
-                <Text style={styles.heroStatValue}>{formatAmount(summary.month_income)}</Text>
+                <Text style={styles.heroStatValue}>{formatAmount(summary.month_income, currency)}</Text>
                 <Text style={styles.heroStatLabel}>Income</Text>
               </View>
               <View style={styles.heroStat}>
                 <TrendingDown size={12} color={colors.dangerStrong} strokeWidth={2.6} />
-                <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense)}</Text>
+                <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense, currency)}</Text>
                 <Text style={styles.heroStatLabel}>Expenses</Text>
               </View>
             </FadeIn>
@@ -203,6 +207,7 @@ export default function Home() {
                 range={trendRange}
                 onRangeChange={setTrendRange}
                 defaultVisible={{ expense: true, income: false }}
+                currency={currency}
               />
             </FadeIn>
           )}
@@ -242,7 +247,7 @@ export default function Home() {
                     </View>
                     <View style={styles.billRowRight}>
                       <Text style={[styles.billAmount, { color: s.amountColor }]}>
-                        ₹{Math.round(bill.amount).toLocaleString('en-IN')}
+                        {formatMoney(bill.amount, bill.currency)}
                       </Text>
                       <Pill label={s.pill.label} tone={s.pill.tone} />
                     </View>
@@ -308,7 +313,7 @@ export default function Home() {
                         {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
                       </Text>
                     </View>
-                    <AmountText value={tx.amount} type={tx.type} signed />
+                    <AmountText value={tx.amount} type={tx.type} signed currency={currency} />
                   </Pressable>
                 );
               })}

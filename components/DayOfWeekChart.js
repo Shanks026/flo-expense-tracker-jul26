@@ -1,14 +1,15 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { formatMoney } from '../lib/currency';
 
 const BAR_MAX_HEIGHT = 90;
 const MIN_BAR_HEIGHT = 3;
 
-function formatAmount(n) {
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+function formatAmount(n, currency) {
+  return formatMoney(n, currency);
 }
 
-export default function DayOfWeekChart({ data }) {
+export default function DayOfWeekChart({ data, currency = 'INR' }) {
   const maxValue = Math.max(...data.map((d) => d.amount), 1);
   const peak = data.reduce((max, d) => (d.amount > max.amount ? d : max), data[0]);
   const hasData = peak.amount > 0;
@@ -32,7 +33,7 @@ export default function DayOfWeekChart({ data }) {
       </View>
       {hasData && (
         <Text style={styles.peakText}>
-          Most spending: <Text style={styles.peakValue}>{peak.day}</Text> · {formatAmount(peak.amount)}
+          Most spending: <Text style={styles.peakValue}>{peak.day}</Text> · {formatAmount(peak.amount, currency)}
         </Text>
       )}
     </View>

@@ -10,6 +10,7 @@ import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -197,7 +198,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setEditingId(tx.id);
         setEditingTransferId(tx.transfer_id);
         setType('transfer');
-        setAmount(String(Math.round(tx.amount)));
+        setAmount(String(tx.amount));
         if (tx.type === 'transfer_out') {
           setFromAccountId(tx.account_id);
           setToAccountId(tx.transfer_account_id);
@@ -213,7 +214,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setEditingId(tx.id);
         setEditingTransferId(null);
         setType(tx.type);
-        setAmount(String(Math.round(tx.amount)));
+        setAmount(String(tx.amount));
         setCategoryId(tx.category_id);
         setPlanId(tx.plan_id);
         setDate(new Date(tx.occurred_at));
@@ -331,7 +332,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
     setPendingReceiptDraft(draft);
     setType('expense');
-    if (draft.amount && draft.amount > 0) setAmount(String(Math.round(draft.amount)));
+    if (draft.amount && draft.amount > 0) setAmount(String(draft.amount));
     if (draft.occurred_at) {
       try {
         setDate(parseISO(draft.occurred_at));
@@ -565,11 +566,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         <View style={styles.amountWrap}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
-            <Text style={styles.amountCurrency}>₹</Text>
+            <Text style={styles.amountCurrency}>{currencySymbol(activeAccount?.currency)}</Text>
             <TextInput
               ref={amountInputRef}
               value={amount}
-              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
+              onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
               placeholder="0"
               placeholderTextColor={colors.mutedLight}
               keyboardType="number-pad"

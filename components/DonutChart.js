@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, fontFamily, fontSize, spacing } from '../theme/tokens';
+import { formatMoney } from '../lib/currency';
 
 const SIZE = 160;
 const STROKE_WIDTH = 22;
@@ -13,11 +14,11 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 // positioned relative to their neighbors.
 const SEGMENT_GAP = 3;
 
-function formatAmount(n) {
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+function formatAmount(n, currency) {
+  return formatMoney(n, currency);
 }
 
-export default function DonutChart({ segments, total }) {
+export default function DonutChart({ segments, total, currency = 'INR' }) {
   let cumulative = 0;
 
   return (
@@ -52,7 +53,7 @@ export default function DonutChart({ segments, total }) {
       {total !== undefined && (
         <View style={styles.centerLabel} pointerEvents="none">
           <Text style={styles.centerAmount} numberOfLines={1} adjustsFontSizeToFit>
-            {formatAmount(total)}
+            {formatAmount(total, currency)}
           </Text>
           <Text style={styles.centerCaption}>Total</Text>
         </View>

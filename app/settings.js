@@ -14,6 +14,8 @@ import useBills from '../hooks/useBills';
 import useEntitlement from '../hooks/useEntitlement';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
+import CurrencyPicker from '../components/CurrencyPicker';
+import { DEFAULT_CURRENCY } from '../lib/currency';
 import ProBadge from '../components/ProBadge';
 import {
   getNotificationSettings,
@@ -78,7 +80,7 @@ function timeOnToday(hour, minute) {
 export default function Settings() {
   const router = useRouter();
   const { session, deleteAccount } = useAuth();
-  const { profile, avatarUrl } = useProfile();
+  const { profile, avatarUrl, updateProfile } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
   const { bills } = useBills();
   const { isPro } = useEntitlement();
@@ -273,6 +275,17 @@ export default function Settings() {
     await sync();
   }
 
+  // Only the default for NEW accounts — existing accounts keep their own
+  // currency (immutable once they have transactions; see AddAccountSheet).
+  async function handleCurrencyChange(code) {
+    const { error } = await updateProfile({ currency: code });
+    if (error) {
+      showToast({ message: error.message, variant: 'error' });
+      return;
+    }
+    showToast({ message: 'Default currency updated', variant: 'success' });
+  }
+
   async function handleDelete() {
     setDeleting(true);
     setDeleteError(null);
@@ -320,13 +333,25 @@ export default function Settings() {
         </Pressable>
 
         <Card style={styles.rowsCard}>
-          <View style={[styles.row, styles.rowBorder]}>
-            <View style={styles.rowIcon}>
-              <CircleDollarSign size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Currency</Text>
-            <Text style={styles.rowValue}>₹ INR</Text>
-          </View>
+          <CurrencyPicker
+            value={profile?.currency ?? DEFAULT_CURRENCY}
+            onChange={handleCurrencyChange}
+            variant="dialog"
+            renderTrigger={(selected, toggle) => (
+              <Pressable style={[styles.row, styles.rowBorder]} onPress={toggle}>
+                <View style={styles.rowIcon}>
+                  <CircleDollarSign size={20} color={colors.ink} strokeWidth={2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>Currency</Text>
+                  <Text style={styles.rowHint}>Default for new accounts</Text>
+                </View>
+                <Text style={styles.rowValue}>
+                  {selected.symbol} {selected.code}
+                </Text>
+              </Pressable>
+            )}
+          />
 
           <Pressable style={[styles.row, styles.rowBorder]} onPress={() => router.push('/manage-categories')}>
             <View style={styles.rowIcon}>

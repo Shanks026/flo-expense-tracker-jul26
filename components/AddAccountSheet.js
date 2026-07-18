@@ -4,12 +4,15 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import { X, Trash2 } from 'lucide-react-native';
 import Button from './Button';
 import { CATEGORY_COLORS } from './CategoryIcon';
+import CurrencyPicker from './CurrencyPicker';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useProfile from '../hooks/useProfile';
+import { DEFAULT_CURRENCY } from '../lib/currency';
 
 const AddAccountSheetContext = createContext(null);
 
@@ -37,29 +40,49 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   const { notifyChanged } = useDataRefresh();
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
   const { showToast } = useToast();
+  const { profile } = useProfile();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  // An account's currency is immutable once it has transactions (15-currency-
+  // going-global.md §Product decisions) — relabeling would invent money,
+  // converting would destroy history. Defaults locked=true while editing an
+  // existing account (safe default until the count resolves), then flips to
+  // the real answer — briefly disabling an actually-empty account's picker is
+  // a harmless flicker; briefly allowing an in-use account's currency to be
+  // edited is not.
+  const [currencyLocked, setCurrencyLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useImperativeHandle(ref, () => ({
-    open(account) {
+    async open(account) {
       setError(null);
       if (account) {
         setEditingId(account.id);
         setName(account.name);
         setDescription(account.description ?? '');
         setColor(account.color);
+        setCurrency(account.currency ?? DEFAULT_CURRENCY);
+        setCurrencyLocked(true);
+        modalRef.current?.present();
+        const { count } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', account.id);
+        setCurrencyLocked((count ?? 0) > 0);
       } else {
         setEditingId(null);
         setName('');
         setDescription('');
         setColor(CATEGORY_COLORS[0]);
+        setCurrency(profile?.currency ?? DEFAULT_CURRENCY);
+        setCurrencyLocked(false);
+        modalRef.current?.present();
       }
-      modalRef.current?.present();
     },
   }));
 
@@ -71,7 +94,7 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
     setSaving(true);
     setError(null);
 
-    const payload = { name: name.trim(), description: description.trim() || null, color };
+    const payload = { name: name.trim(), description: description.trim() || null, color, currency };
 
     const { data, error: saveError } = editingId
       ? await supabase.from('accounts').update(payload).eq('id', editingId).select().single()
@@ -192,6 +215,15 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
             );
           })}
         </View>
+
+        <CurrencyPicker
+          value={currency}
+          onChange={setCurrency}
+          dark
+          disabled={currencyLocked}
+          disabledReason="Currency can't change once an account has transactions — create a new account instead"
+          style={{ marginTop: spacing.md }}
+        />
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 

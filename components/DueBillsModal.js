@@ -8,6 +8,7 @@ import { useAuth } from '../lib/AuthContext';
 import { useAccount } from '../lib/AccountContext';
 import useBills from '../hooks/useBills';
 import { usePayBillSheet } from './PayBillSheet';
+import { formatMoney } from '../lib/currency';
 
 const STORAGE_KEY = 'flo.dueBills.lastShown';
 
@@ -65,7 +66,7 @@ export default function DueBillsModal() {
                   <Text style={styles.rowName} numberOfLines={1}>
                     {bill.name}
                   </Text>
-                  <Text style={styles.rowAmount}>₹{Math.round(bill.amount).toLocaleString('en-IN')}</Text>
+                  <Text style={styles.rowAmount}>{formatMoney(bill.amount, bill.currency)}</Text>
                 </View>
                 <Pressable style={styles.payButton} onPress={() => handleMarkPaid(bill)}>
                   <Text style={styles.payButtonText}>Mark Paid</Text>

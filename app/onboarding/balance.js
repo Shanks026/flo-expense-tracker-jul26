@@ -6,10 +6,12 @@ import OnboardingScreen from '../../components/OnboardingScreen';
 import { useToast } from '../../components/Toast';
 import useCategories from '../../hooks/useCategories';
 import { colors, spacing, fontFamily, fontSize } from '../../theme/tokens';
+import { currencySymbol, sanitizeAmountInput } from '../../lib/currency';
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
+import useCurrency from '../../hooks/useCurrency';
 
 // Sits between account.js and expense.js on purpose: without this, the demo
 // expense the very next screen invites is the account's first-ever row, so
@@ -26,6 +28,7 @@ export default function OnboardingBalance() {
   const { incomeCategories } = useCategories();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
+  const currency = useCurrency();
 
   const [amount, setAmount] = useState('');
   const [saving, setSaving] = useState(false);
@@ -72,10 +75,10 @@ export default function OnboardingBalance() {
       <View style={styles.amountWrap}>
         <Text style={styles.amountLabel}>Current balance</Text>
         <View style={styles.amountRow}>
-          <Text style={styles.amountCurrency}>₹</Text>
+          <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
           <TextInput
             value={amount}
-            onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
             placeholderTextColor={colors.mutedLight}
             keyboardType="number-pad"

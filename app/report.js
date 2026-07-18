@@ -21,6 +21,7 @@ import { buildTransactionsCsv, shareCsv } from '../lib/export';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import ProBadge from '../components/ProBadge';
+import { formatMoney } from '../lib/currency';
 import {
   computeDelta,
   computeSavingsRate,
@@ -127,6 +128,17 @@ export default function Report() {
     allAccounts: true,
   });
 
+  function accountFor(accountId) {
+    return accounts.find((a) => a.id === accountId) ?? null;
+  }
+
+  // The one place FLO ever sums across accounts (the Pro all-accounts scope)
+  // — and summing ₹ + $ is meaningless, so this is the one place currency has
+  // to be actively guarded rather than just displayed. See
+  // 15-currency-going-global.md §The all-accounts edge.
+  const isMultiCurrency = useMemo(() => new Set(accounts.map((a) => a.currency ?? 'INR')).size > 1, [accounts]);
+  const reportCurrency = accountFor(activeAccountId)?.currency ?? 'INR';
+
   // The account tabs are a view filter over the already-fetched all-accounts
   // data — never a second query. "All" passes everything through unchanged.
   const scopedCurrent = useMemo(
@@ -148,6 +160,24 @@ export default function Report() {
   // Account tags on each row (name/colour dot) only add information in "All"
   // mode — once scoped to one account, every row already belongs to it.
   const showAccountTags = accountFilter === 'all';
+
+  // The SUMMED figures below (headline spent, Received/Net, the donut +
+  // breakdown, biggest transaction) must never blend currencies. In the
+  // common single-currency case this is a no-op. Only when "All" is active
+  // AND the user's accounts genuinely span more than one currency does this
+  // narrow the aggregate to the active account's currency, excluding
+  // other-currency accounts from the SUMS only — the Budgets/Plans lists
+  // below are untouched, since each of those rows already renders in its own
+  // account's currency (nothing there is summed across accounts).
+  const currencyScopedCurrent = useMemo(() => {
+    if (!(accountFilter === 'all' && isMultiCurrency)) return scopedCurrent;
+    return scopedCurrent.filter((tx) => (accountFor(tx.account_id)?.currency ?? 'INR') === reportCurrency);
+  }, [scopedCurrent, accountFilter, isMultiCurrency, reportCurrency, accounts]);
+  const currencyScopedPrior = useMemo(() => {
+    if (!(accountFilter === 'all' && isMultiCurrency)) return scopedPrior;
+    return scopedPrior.filter((tx) => (accountFor(tx.account_id)?.currency ?? 'INR') === reportCurrency);
+  }, [scopedPrior, accountFilter, isMultiCurrency, reportCurrency, accounts]);
+  const showMultiCurrencyNote = accountFilter === 'all' && isMultiCurrency;
 
   // Export follows the account-tab scope currently on screen — "All" exports
   // every account's transactions for the period, a specific tab exports just
@@ -172,15 +202,15 @@ export default function Report() {
     }
   }
 
-  const totalIncome = useMemo(() => sumByType(scopedCurrent, 'income'), [scopedCurrent]);
-  const totalExpense = useMemo(() => sumByType(scopedCurrent, 'expense'), [scopedCurrent]);
+  const totalIncome = useMemo(() => sumByType(currencyScopedCurrent, 'income'), [currencyScopedCurrent]);
+  const totalExpense = useMemo(() => sumByType(currencyScopedCurrent, 'expense'), [currencyScopedCurrent]);
   const netSaved = totalIncome - totalExpense;
-  const priorExpense = useMemo(() => sumByType(scopedPrior, 'expense'), [scopedPrior]);
+  const priorExpense = useMemo(() => sumByType(currencyScopedPrior, 'expense'), [currencyScopedPrior]);
   const expenseDelta = computeDelta(totalExpense, priorExpense);
   const savingsRate = computeSavingsRate(totalIncome, totalExpense);
-  const biggest = computeBiggestTransaction(scopedCurrent);
+  const biggest = computeBiggestTransaction(currencyScopedCurrent);
 
-  const categoryBreakdown = useMemo(() => computeCategoryBreakdown(scopedCurrent, 'expense'), [scopedCurrent]);
+  const categoryBreakdown = useMemo(() => computeCategoryBreakdown(currencyScopedCurrent, 'expense'), [currencyScopedCurrent]);
   const donutSegments = useMemo(
     () => categoryBreakdown.map((entry) => ({ pct: entry.pct, color: getCategoryColor(entry.category) ?? colors.mutedLight })),
     [categoryBreakdown]
@@ -191,10 +221,6 @@ export default function Report() {
   const activePreset = period ? matchPeriodPreset(period, presets) : null;
   const periodTriggerLabel = activePreset ? activePreset.label : period ? 'Custom' : '';
 
-  function accountFor(accountId) {
-    return accounts.find((a) => a.id === accountId) ?? null;
-  }
-
   if (!period) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -203,7 +229,7 @@ export default function Report() {
     );
   }
 
-  const isQuiet = !loading && scopedCurrent.length === 0 && scopedPrior.length === 0;
+  const isQuiet = !loading && currencyScopedCurrent.length === 0 && currencyScopedPrior.length === 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -258,9 +284,15 @@ export default function Report() {
           </ScrollView>
         )}
 
+        {showMultiCurrencyNote && (
+          <Text style={styles.multiCurrencyNote}>
+            Totals shown in {reportCurrency}; accounts in other currencies are excluded.
+          </Text>
+        )}
+
         <Card dark style={styles.headlineCard}>
           <Text style={styles.headlineLabel}>Spent this period</Text>
-          <AmountText value={totalExpense} type="neutral" dark size={fontSize.amountLg} />
+          <AmountText value={totalExpense} type="neutral" dark size={fontSize.amountLg} currency={reportCurrency} />
           <View style={styles.headlineDeltaRow}>
             {isQuiet ? (
               <Text style={styles.headlineDeltaText}>A quiet period — nothing logged</Text>
@@ -288,11 +320,11 @@ export default function Report() {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Received</Text>
-              <AmountText value={totalIncome} type="income" size={fontSize.xl} />
+              <AmountText value={totalIncome} type="income" size={fontSize.xl} currency={reportCurrency} />
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Net</Text>
-              <AmountText value={netSaved} type={netSaved < 0 ? 'danger' : 'neutral'} size={fontSize.xl} />
+              <AmountText value={netSaved} type={netSaved < 0 ? 'danger' : 'neutral'} size={fontSize.xl} currency={reportCurrency} />
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Savings Rate</Text>
@@ -307,7 +339,7 @@ export default function Report() {
               <Text style={styles.sectionTitle}>Where it went</Text>
             </View>
             <Card style={styles.chartCard}>
-              <DonutChart segments={donutSegments} total={totalExpense} />
+              <DonutChart segments={donutSegments} total={totalExpense} currency={reportCurrency} />
             </Card>
             <Card style={styles.breakdownCard}>
               {categoryBreakdown.map((entry, idx) => (
@@ -320,7 +352,7 @@ export default function Report() {
                     <Text style={styles.rowTitle}>{entry.category?.name ?? 'Uncategorized'}</Text>
                     <Text style={styles.rowSub}>{entry.pct.toFixed(0)}% of total</Text>
                   </View>
-                  <AmountText value={entry.amount} type="neutral" />
+                  <AmountText value={entry.amount} type="neutral" currency={reportCurrency} />
                 </View>
               ))}
             </Card>
@@ -359,7 +391,7 @@ export default function Report() {
                   return (
                     <View key={p.periodStart.toISOString()} style={styles.periodRow}>
                       <Text style={[styles.periodAmount, { color: STATUS_COLOR[p.status] }]}>
-                        ₹{Math.round(p.spent).toLocaleString('en-IN')} / ₹{Math.round(p.limit).toLocaleString('en-IN')}
+                        {formatMoney(p.spent, acc?.currency)} / {formatMoney(p.limit, acc?.currency)}
                       </Text>
                       <View style={{ marginTop: 6 }}>
                         <ProgressBar progress={progress} status={p.status} />
@@ -400,7 +432,7 @@ export default function Report() {
                   )}
                   <View style={styles.planRangeRow}>
                     <Text style={styles.periodLabelMuted}>Spent in this period</Text>
-                    <AmountText value={rangeSpent} type="neutral" size={fontSize.md} />
+                    <AmountText value={rangeSpent} type="neutral" size={fontSize.md} currency={acc?.currency} />
                   </View>
                 </Card>
               );
@@ -429,7 +461,13 @@ export default function Report() {
                     {showAccountTags && accountFor(biggest.account_id) ? ` · ${accountFor(biggest.account_id).name}` : ''}
                   </Text>
                 </View>
-                <AmountText value={biggest.amount} type={biggest.type} signed size={fontSize.lg} />
+                <AmountText
+                  value={biggest.amount}
+                  type={biggest.type}
+                  signed
+                  size={fontSize.lg}
+                  currency={accountFor(biggest.account_id)?.currency}
+                />
               </View>
             </Card>
           </>
@@ -522,6 +560,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  multiCurrencyNote: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.xs,
+    color: colors.mutedLight,
+    marginBottom: spacing.md,
   },
   scroll: {
     paddingHorizontal: spacing.xl,

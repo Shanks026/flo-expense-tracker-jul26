@@ -18,6 +18,8 @@ import { usePlan } from '../../../hooks/usePlans';
 import useTransactions from '../../../hooks/useTransactions';
 import useCollectingPlan from '../../../hooks/useCollectingPlan';
 import { useAddTransactionSheet } from '../../../components/AddTransactionSheet';
+import { formatMoney } from '../../../lib/currency';
+import useCurrency from '../../../hooks/useCurrency';
 import { useAddPlanSheet } from '../../../components/AddPlanSheet';
 import { supabase } from '../../../lib/supabase';
 import { setPlanCollecting } from '../../../lib/plans';
@@ -43,6 +45,7 @@ export default function PlanDetail() {
   const { openAddPlan } = useAddPlanSheet();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
+  const currency = useCurrency();
 
   // Pure client-side compute from the transactions the screen already holds —
   // no new query. A one-slice donut is a circle, not information (same reason
@@ -138,8 +141,8 @@ export default function PlanDetail() {
         <Card dark style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total spent</Text>
           <View style={styles.summaryAmountRow}>
-            <AmountText value={plan.total_spent} type="neutral" dark size={40} />
-            {hasTarget && <Text style={styles.targetText}> / ₹{Math.round(plan.target_amount).toLocaleString('en-IN')}</Text>}
+            <AmountText value={plan.total_spent} type="neutral" dark size={40} currency={currency} />
+            {hasTarget && <Text style={styles.targetText}> / {formatMoney(plan.target_amount, currency)}</Text>}
           </View>
           {hasTarget && (
             <>
@@ -148,7 +151,7 @@ export default function PlanDetail() {
               </View>
               <View style={styles.rowBetween}>
                 <Text style={styles.progressPercent}>{Math.round(progress * 100)}% of target</Text>
-                <Text style={styles.remainingText}>₹{Math.round(plan.remaining).toLocaleString('en-IN')} remaining</Text>
+                <Text style={styles.remainingText}>{formatMoney(plan.remaining, currency)} remaining</Text>
               </View>
             </>
           )}
@@ -160,7 +163,7 @@ export default function PlanDetail() {
               <Text style={styles.sectionTitle}>Where it went</Text>
             </View>
             <Card style={styles.chartCard}>
-              <DonutChart segments={donutSegments} total={plan.total_spent} />
+              <DonutChart segments={donutSegments} total={plan.total_spent} currency={currency} />
             </Card>
             <Card style={styles.breakdownCard}>
               {categoryBreakdown.map((entry, idx) => (
@@ -173,7 +176,7 @@ export default function PlanDetail() {
                     <Text style={styles.rowTitle}>{entry.category?.name ?? 'Uncategorized'}</Text>
                     <Text style={styles.rowSub}>{entry.pct.toFixed(0)}% of total</Text>
                   </View>
-                  <AmountText value={entry.amount} type="neutral" />
+                  <AmountText value={entry.amount} type="neutral" currency={currency} />
                 </View>
               ))}
             </Card>
@@ -204,7 +207,7 @@ export default function PlanDetail() {
                   <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
                   <Text style={styles.rowSub}>{format(new Date(tx.occurred_at), 'd MMM')}</Text>
                 </View>
-                <AmountText value={tx.amount} type={tx.type} signed />
+                <AmountText value={tx.amount} type={tx.type} signed currency={currency} />
               </Pressable>
             ))}
           </Card>

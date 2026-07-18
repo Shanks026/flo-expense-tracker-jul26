@@ -8,11 +8,14 @@ import { format, addWeeks, addMonths, addYears } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { currencySymbol, DEFAULT_CURRENCY, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import useProfile from '../hooks/useProfile';
+import CurrencyPicker from './CurrencyPicker';
 
 const AddBillSheetContext = createContext(null);
 
@@ -46,10 +49,12 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { expenseCategories } = useCategories();
+  const { profile } = useProfile();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [cadence, setCadence] = useState('monthly');
   const [nextDueDate, setNextDueDate] = useState(new Date());
   const [dateTouched, setDateTouched] = useState(false);
@@ -70,7 +75,8 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
       if (bill) {
         setEditingId(bill.id);
         setName(bill.name);
-        setAmount(String(Math.round(bill.amount)));
+        setAmount(String(bill.amount));
+        setCurrency(bill.currency ?? DEFAULT_CURRENCY);
         setCadence(bill.cadence);
         setNextDueDate(new Date(bill.next_due_date));
         setDateTouched(true);
@@ -80,6 +86,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
         setEditingId(null);
         setName('');
         setAmount('');
+        setCurrency(profile?.currency ?? DEFAULT_CURRENCY);
         setCadence('monthly');
         setNextDueDate(new Date());
         setDateTouched(false);
@@ -116,6 +123,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     const payload = {
       name: name.trim(),
       amount: numericAmount,
+      currency,
       cadence,
       next_due_date: format(nextDueDate, 'yyyy-MM-dd'),
       category_id: categoryId,
@@ -184,16 +192,18 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
 
         <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Amount</Text>
         <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>₹</Text>
+          <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
           <TextInput
             value={amount}
-            onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
             placeholderTextColor={colors.mutedDarker}
             keyboardType="number-pad"
             style={styles.amountInput}
           />
         </View>
+
+        <CurrencyPicker value={currency} onChange={setCurrency} dark style={{ marginTop: spacing.md }} />
 
         <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Repeats</Text>
         <View style={styles.segmentWrap}>

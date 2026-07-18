@@ -279,7 +279,31 @@ The work is everywhere else:
 - **Recurring income** (salary) — bills cover recurring *payments*; recurring
   income isn't modelled.
 - **Lending / IOU tracking** — common need in India (splitting with friends), but
-  it's a whole second ledger concept.
+  it's a whole second ledger concept. The single-player version (I record
+  who owes me what for a shared expense, entirely inside my own ledger — no
+  other user accounts, no invites, no acceptance flow) stays true to FLO's
+  single-user grain and is the buildable version of this idea.
+- **Multi-user bill splitting** (raised 2026-07-18) — search for other FLO
+  users, invite them to a split, money deducts from their account once they
+  accept and pay (the "Splitwise-shaped" version, seen in a Play Store money
+  tracker with a maneki-neko icon). **Deliberately parked, not rejected** —
+  the blocker is timing, not the idea. Two reasons it's not now:
+  (1) **architecture** — every table in FLO is `RLS auth.uid() = user_id`;
+  every balance/budget/plan is derived from *only your own* `transactions`.
+  A split needs shared mutable state one user's app can read/act on that
+  another user wrote (a group/split/members model, an accept→pay→settle
+  state machine) — that's a different RLS model and a real distributed-state
+  problem (disputes, edited-after-accept, accepted-but-never-paid), not an
+  incremental feature. (2) **network effect** — a social feature's entire
+  value is other people using it; FLO has ~1 real user today, so there's no
+  network to unlock yet. Building it now would be the single hardest feature
+  in the codebase serving a user base that doesn't exist. Note this is
+  *not* unlocked by the anonymous-percentile idea in `IDEAS-gamification.md`
+  (leaderboards themselves were rejected outright there) — a percentile is a
+  read-only server-side aggregate with zero cross-user visibility, so it
+  shares no real infrastructure with splitting. **Revisit trigger**: real
+  DAU, the same threshold the gamification doc uses for external ads —
+  before that, there's no "friends who use FLO" to split with anyway.
 - **Multi-currency** — see idea 9. Probably never.
 
 ---

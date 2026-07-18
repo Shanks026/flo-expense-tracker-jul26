@@ -17,6 +17,8 @@ import { supabase } from '../lib/supabase';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
+import { formatMoney } from '../lib/currency';
+import useCurrency from '../hooks/useCurrency';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -33,6 +35,7 @@ export default function Plans() {
   const { openAddPlan } = useAddPlanSheet();
   const { isPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
+  const currency = useCurrency();
 
   async function handleNewPlan() {
     if (!isPro) {
@@ -117,8 +120,8 @@ export default function Plans() {
                       <ProgressBar progress={1} status="completed" />
                     </View>
                     <Text style={styles.completedSpent}>
-                      Spent <Text style={styles.completedSpentValue}>₹{Math.round(plan.total_spent).toLocaleString('en-IN')}</Text>
-                      {hasTarget ? ` of ₹${Math.round(plan.target_amount).toLocaleString('en-IN')}` : ''}
+                      Spent <Text style={styles.completedSpentValue}>{formatMoney(plan.total_spent, currency)}</Text>
+                      {hasTarget ? ` of ${formatMoney(plan.target_amount, currency)}` : ''}
                     </Text>
                   </Card>
                 </Pressable>
@@ -143,7 +146,7 @@ export default function Plans() {
                     </View>
                     <View style={styles.noTargetRow}>
                       <Text style={styles.planSub}>Total spent</Text>
-                      <Text style={styles.noTargetAmount}>₹{Math.round(plan.total_spent).toLocaleString('en-IN')}</Text>
+                      <Text style={styles.noTargetAmount}>{formatMoney(plan.total_spent, currency)}</Text>
                     </View>
                   </Card>
                 </Pressable>
@@ -170,10 +173,10 @@ export default function Plans() {
                   </View>
                   <View style={styles.rowBetween}>
                     <Text style={styles.planSubDark}>
-                      Spent <Text style={styles.spentValueDark}>₹{Math.round(plan.total_spent).toLocaleString('en-IN')}</Text> of ₹
-                      {Math.round(plan.target_amount).toLocaleString('en-IN')}
+                      Spent <Text style={styles.spentValueDark}>{formatMoney(plan.total_spent, currency)}</Text> of{' '}
+                      {formatMoney(plan.target_amount, currency)}
                     </Text>
-                    <Text style={styles.remainingDark}>₹{Math.round(plan.remaining).toLocaleString('en-IN')} left</Text>
+                    <Text style={styles.remainingDark}>{formatMoney(plan.remaining, currency)} left</Text>
                   </View>
                 </Card>
               </Pressable>

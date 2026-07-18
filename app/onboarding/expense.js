@@ -10,6 +10,7 @@ import { useToast } from '../../components/Toast';
 import useCategories from '../../hooks/useCategories';
 import usePlans from '../../hooks/usePlans';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
+import { currencySymbol, sanitizeAmountInput } from '../../lib/currency';
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
@@ -139,10 +140,10 @@ export default function OnboardingExpense() {
       <View style={styles.amountWrap}>
         <Text style={styles.amountLabel}>Amount</Text>
         <View style={styles.amountRow}>
-          <Text style={styles.amountCurrency}>₹</Text>
+          <Text style={styles.amountCurrency}>{currencySymbol(activeAccount?.currency)}</Text>
           <TextInput
             value={amount}
-            onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
             placeholderTextColor={colors.mutedLight}
             keyboardType="number-pad"

@@ -6,6 +6,7 @@ import { X, Trash2 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -13,6 +14,7 @@ import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import Switch from './Switch';
+import useCurrency from '../hooks/useCurrency';
 
 const AddPlanSheetContext = createContext(null);
 
@@ -41,6 +43,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
   const { activeAccountId } = useAccount();
   const { showToast } = useToast();
   const { plan: collectingPlan } = useCollectingPlan();
+  const currency = useCurrency();
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
@@ -60,7 +63,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
       if (plan) {
         setEditingId(plan.id);
         setName(plan.name);
-        setTargetAmount(plan.target_amount ? String(Math.round(plan.target_amount)) : '');
+        setTargetAmount(plan.target_amount ? String(plan.target_amount) : '');
         setStartDate(plan.start_date ? new Date(plan.start_date) : null);
         setEndDate(plan.end_date ? new Date(plan.end_date) : null);
         setAccountId(plan.account_id ?? activeAccountId);
@@ -176,10 +179,10 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
 
         <Text style={styles.fieldLabel}>Target amount (optional)</Text>
         <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>₹</Text>
+          <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
           <TextInput
             value={targetAmount}
-            onChangeText={(v) => setTargetAmount(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => setTargetAmount(sanitizeAmountInput(v))}
             placeholder="No target"
             placeholderTextColor={colors.mutedDarker}
             keyboardType="number-pad"

@@ -13,6 +13,7 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import useBills, { billStatus } from '../hooks/useBills';
 import { useAddBillSheet } from '../components/AddBillSheet';
 import { usePayBillSheet } from '../components/PayBillSheet';
+import { formatMoney } from '../lib/currency';
 
 const CADENCE_LABELS = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
 
@@ -107,7 +108,7 @@ export default function Bills() {
                     </Text>
                     <View style={styles.actionsRow}>
                       <Text style={[styles.amountText, { color: s.amountColor }]}>
-                        ₹{Math.round(bill.amount).toLocaleString('en-IN')}
+                        {formatMoney(bill.amount, bill.currency)}
                       </Text>
                       {bill.is_active && (
                         <Pressable style={styles.payButton} onPress={() => openPayBill(bill)}>

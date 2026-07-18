@@ -7,6 +7,7 @@ import { addDays, format, isBefore, parseISO, startOfDay } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { previewPeriodDates } from '../lib/budgets';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -16,6 +17,7 @@ import useCategories from '../hooks/useCategories';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
+import useCurrency from '../hooks/useCurrency';
 
 const AddBudgetSheetContext = createContext(null);
 
@@ -68,6 +70,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId } = useAccount();
+  const currency = useCurrency();
   const { showToast } = useToast();
   const { expenseCategories } = useCategories();
   const { isPro } = useEntitlement();
@@ -93,7 +96,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
       setShowPicker(null);
       if (budget) {
         setEditingId(budget.id);
-        setAmount(String(Math.round(budget.amount)));
+        setAmount(String(budget.amount));
         setPeriodType(budget.period_type);
         setCategoryId(budget.category_id);
         // A calendar budget carries no dates; seed the custom fields with a
@@ -205,10 +208,10 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
 
         <Text style={styles.fieldLabel}>Amount</Text>
         <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>₹</Text>
+          <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
           <TextInput
             value={amount}
-            onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
             placeholderTextColor={colors.mutedDarker}
             keyboardType="number-pad"

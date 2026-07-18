@@ -1,9 +1,6 @@
 import { Text, StyleSheet } from 'react-native';
 import { colors, fontFamily, fontSize } from '../theme/tokens';
-
-function formatNumber(value) {
-  return Math.round(Math.abs(value)).toLocaleString('en-IN');
-}
+import { formatAmountNumber, currencySymbol } from '../lib/currency';
 
 export default function AmountText({
   value,
@@ -12,6 +9,7 @@ export default function AmountText({
   size = fontSize.lg,
   dark = false,
   muteCurrency = false,
+  currency = 'INR',
   style,
 }) {
   const isNegative = value < 0;
@@ -44,8 +42,8 @@ export default function AmountText({
   return (
     <Text style={[styles.text, { color, fontSize: size }, style]}>
       {prefix}
-      <Text style={muteCurrency ? { color: currencyColor } : null}>₹</Text>
-      {formatNumber(value)}
+      <Text style={muteCurrency ? { color: currencyColor } : null}>{currencySymbol(currency)}</Text>
+      {formatAmountNumber(value, currency)}
     </Text>
   );
 }

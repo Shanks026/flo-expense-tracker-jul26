@@ -12,6 +12,8 @@ import { useAccount } from '../../lib/AccountContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../lib/onboardingDraft';
+import { formatMoney } from '../../lib/currency';
+import useCurrency from '../../hooks/useCurrency';
 
 // 12-personal-onboarding.md Phase 2, screen 17 — the receipt. The leak answer
 // (intro screen 10) pre-creates a REAL budget here; this is what makes the
@@ -43,6 +45,7 @@ export default function OnboardingBudget() {
   const { categories, loading: categoriesLoading } = useCategories();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
+  const currency = useCurrency();
 
   const [phase, setPhase] = useState('loading'); // loading | created | unknown | error
   const [leak, setLeak] = useState(null);
@@ -148,10 +151,10 @@ export default function OnboardingBudget() {
               <Text style={styles.cardName}>{created.category.name} budget</Text>
               <Text style={styles.cardPeriod}>This month</Text>
             </View>
-            <Text style={styles.cardAmount}>₹{created.amount.toLocaleString('en-IN')}</Text>
+            <Text style={styles.cardAmount}>{formatMoney(created.amount, currency)}</Text>
           </View>
           <ProgressBar progress={0} status="healthy" />
-          <Text style={styles.cardSpent}>₹0 spent so far</Text>
+          <Text style={styles.cardSpent}>{formatMoney(0, currency)} spent so far</Text>
         </View>
       </OnboardingScreen>
     );

@@ -16,6 +16,8 @@ import { budgetStatus } from '../../hooks/useBudgets';
 import { formatPeriodLabel, isBudgetEnded, daysLeftInPeriod, computeBudgetPace } from '../../lib/budgets';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAddBudgetSheet } from '../../components/AddBudgetSheet';
+import { formatMoney } from '../../lib/currency';
+import useCurrency from '../../hooks/useCurrency';
 
 // Same vocabulary as computePlanPace's (00-index.md) — a budget is a spending
 // cap, so "ahead"/"behind" would read ambiguously.
@@ -31,6 +33,7 @@ export default function BudgetDetail() {
   const { budget, transactions, loading } = useBudgetDetail(id);
   const { openAdd } = useAddTransactionSheet();
   const { openAddBudget } = useAddBudgetSheet();
+  const currency = useCurrency();
 
   // Deleting the budget from the edit sheet leaves this screen pointing at a
   // dead id — the refetch returns nothing, and we'd otherwise sit on an empty
@@ -108,7 +111,7 @@ export default function BudgetDetail() {
           </View>
 
           <Text style={styles.summaryLabel}>{isOver ? 'Over budget by' : 'Left to spend'}</Text>
-          <AmountText value={budget.remaining} type="neutral" dark size={40} muteCurrency />
+          <AmountText value={budget.remaining} type="neutral" dark size={40} muteCurrency currency={currency} />
 
           <View style={styles.progressWrap}>
             <ProgressBar progress={progress} dark status={status} />
@@ -116,8 +119,8 @@ export default function BudgetDetail() {
 
           <View style={styles.rowBetween}>
             <Text style={styles.spentText}>
-              ₹{Math.round(budget.spent).toLocaleString('en-IN')} spent of ₹
-              {Math.round(budget.amount).toLocaleString('en-IN')}
+              {formatMoney(budget.spent, currency)} spent of{' '}
+              {formatMoney(budget.amount, currency)}
             </Text>
             <Text style={styles.daysText}>
               {ended ? 'Period ended' : daysLeft === 1 ? '1 day left' : `${daysLeft} days left`}
@@ -169,7 +172,7 @@ export default function BudgetDetail() {
                     {tx.note ? ` · ${tx.note}` : ''}
                   </Text>
                 </View>
-                <AmountText value={tx.amount} type="expense" />
+                <AmountText value={tx.amount} type="expense" currency={currency} />
               </Pressable>
             ))}
           </Card>

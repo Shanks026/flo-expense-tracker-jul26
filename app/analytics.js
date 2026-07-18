@@ -22,6 +22,8 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import useAnalyticsData from '../hooks/useAnalyticsData';
 import { useAccount } from '../lib/AccountContext';
 import { buildTransactionsCsv, shareCsv } from '../lib/export';
+import { formatMoney } from '../lib/currency';
+import useCurrency from '../hooks/useCurrency';
 import {
   computeTrend,
   computeDelta,
@@ -67,6 +69,7 @@ export default function Analytics() {
   const router = useRouter();
   const { activeAccount, accounts } = useAccount();
   const { showToast } = useToast();
+  const currency = useCurrency();
   const [segment, setSegment] = useState('overview');
   const [categoryType, setCategoryType] = useState('expense');
   const [mode, setMode] = useState('month');
@@ -205,17 +208,17 @@ export default function Analytics() {
               <View style={styles.heroRow}>
                 <View style={styles.heroItem}>
                   <Text style={styles.heroLabel}>Income</Text>
-                  <AmountText value={totalIncome} type="income" size={fontSize.xl} />
+                  <AmountText value={totalIncome} type="income" size={fontSize.xl} currency={currency} />
                   <DeltaBadge delta={incomeDelta} goodDirection="up" />
                 </View>
                 <View style={styles.heroItem}>
                   <Text style={styles.heroLabel}>Expense</Text>
-                  <AmountText value={totalExpense} type="neutral" size={fontSize.xl} />
+                  <AmountText value={totalExpense} type="neutral" size={fontSize.xl} currency={currency} />
                   <DeltaBadge delta={expenseDelta} goodDirection="down" />
                 </View>
                 <View style={styles.heroItem}>
                   <Text style={styles.heroLabel}>Net Saved</Text>
-                  <AmountText value={netSaved} type={netSaved < 0 ? 'danger' : 'neutral'} size={fontSize.xl} />
+                  <AmountText value={netSaved} type={netSaved < 0 ? 'danger' : 'neutral'} size={fontSize.xl} currency={currency} />
                   <DeltaBadge delta={netDelta} goodDirection="up" />
                 </View>
               </View>
@@ -233,6 +236,7 @@ export default function Analytics() {
                 granularity={granularity}
                 showPeriodLabel
                 emptyMessage="No transactions in this period."
+                currency={currency}
               />
             </Card>
 
@@ -251,7 +255,7 @@ export default function Analytics() {
                     <Text style={styles.biggestName}>{biggest.category?.name ?? 'Uncategorized'}</Text>
                     <Text style={styles.biggestDate}>{format(new Date(biggest.occurred_at), 'd MMM yyyy')}</Text>
                   </View>
-                  <AmountText value={biggest.amount} type={biggest.type} signed size={fontSize.lg} />
+                  <AmountText value={biggest.amount} type={biggest.type} signed size={fontSize.lg} currency={currency} />
                 </View>
               </Card>
             )}
@@ -266,16 +270,17 @@ export default function Analytics() {
                 granularity={granularity}
                 showPeriodLabel
                 emptyMessage="No transactions in this period."
+                currency={currency}
               />
             </Card>
             <Card style={styles.chartCard}>
-              <DayOfWeekChart data={dayOfWeekData} />
+              <DayOfWeekChart data={dayOfWeekData} currency={currency} />
             </Card>
             <Card style={styles.statsCard}>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Text style={styles.heroLabel}>Avg. Expense</Text>
-                  <AmountText value={avgExpense} type="neutral" size={fontSize.xl} />
+                  <AmountText value={avgExpense} type="neutral" size={fontSize.xl} currency={currency} />
                 </View>
                 <View style={styles.statItem}>
                   <Text style={styles.heroLabel}>Transactions</Text>
@@ -314,7 +319,11 @@ export default function Analytics() {
             ) : (
               <>
                 <Card style={styles.chartCard}>
-                  <DonutChart segments={donutSegments} total={categoryType === 'expense' ? totalExpense : totalIncome} />
+                  <DonutChart
+                    segments={donutSegments}
+                    total={categoryType === 'expense' ? totalExpense : totalIncome}
+                    currency={currency}
+                  />
                 </Card>
                 <Card style={styles.rankedCard}>
                   {categoryDeltas.map((entry, idx) => (
@@ -330,7 +339,7 @@ export default function Analytics() {
                         <Text style={styles.rankedPct}>{entry.pct.toFixed(0)}% of total</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <AmountText value={entry.amount} type="neutral" size={fontSize.md} />
+                        <AmountText value={entry.amount} type="neutral" size={fontSize.md} currency={currency} />
                         <DeltaBadge delta={entry.delta} goodDirection={categoryType === 'expense' ? 'down' : 'up'} />
                       </View>
                     </View>
@@ -370,7 +379,7 @@ export default function Analytics() {
                           <View style={styles.rowBetween}>
                             <Text style={styles.periodLabel}>{periodLabel}</Text>
                             <Text style={[styles.periodAmount, { color: STATUS_COLOR[p.status] }]}>
-                              ₹{Math.round(p.spent).toLocaleString('en-IN')} / ₹{Math.round(p.limit).toLocaleString('en-IN')}
+                              {formatMoney(p.spent, currency)} / {formatMoney(p.limit, currency)}
                             </Text>
                           </View>
                           <View style={{ marginTop: 6 }}>
@@ -411,15 +420,15 @@ export default function Analytics() {
                         <View style={[styles.rowBetween, { marginTop: 6 }]}>
                           <Text style={styles.periodLabel}>{Math.round(progress * 100)}% of target</Text>
                           <Text style={styles.periodLabel}>
-                            ₹{Math.round(plan.total_spent).toLocaleString('en-IN')} / ₹
-                            {Math.round(plan.target_amount).toLocaleString('en-IN')}
+                            {formatMoney(plan.total_spent, currency)} /{' '}
+                            {formatMoney(plan.target_amount, currency)}
                           </Text>
                         </View>
                       </View>
                     )}
                     <View style={styles.planRangeRow}>
                       <Text style={styles.periodLabel}>Spent in this period</Text>
-                      <AmountText value={rangeSpent} type="neutral" size={fontSize.md} />
+                      <AmountText value={rangeSpent} type="neutral" size={fontSize.md} currency={currency} />
                     </View>
                   </Card>
                 );

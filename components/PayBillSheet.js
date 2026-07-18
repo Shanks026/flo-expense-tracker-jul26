@@ -6,6 +6,7 @@ import { X, SkipForward } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Button from './Button';
 import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
@@ -57,7 +58,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
       setAccountPickerOpen(false);
       setShowDatePicker(false);
       setBill(nextBill);
-      setAmount(String(Math.round(nextBill.amount)));
+      setAmount(String(nextBill.amount));
       setPaidDate(new Date());
       // Bills are global (not account-scoped) — default the pay-from account
       // to whichever is currently active, since that's the most predictable
@@ -133,10 +134,10 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
 
         <Text style={styles.fieldLabel}>Amount</Text>
         <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>₹</Text>
+          <Text style={styles.amountCurrency}>{currencySymbol(bill?.currency)}</Text>
           <TextInput
             value={amount}
-            onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
             placeholderTextColor={colors.mutedDarker}
             keyboardType="number-pad"

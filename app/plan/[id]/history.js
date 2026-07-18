@@ -12,8 +12,9 @@ import AmountText from '../../../components/AmountText';
 import Pill from '../../../components/Pill';
 import Button from '../../../components/Button';
 import { colors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
-import { formatMoney } from '../../../lib/money';
+import { formatMoney } from '../../../lib/currency';
 import { usePlan } from '../../../hooks/usePlans';
+import useCurrency from '../../../hooks/useCurrency';
 import usePlanCandidates from '../../../hooks/usePlanCandidates';
 import useCategories from '../../../hooks/useCategories';
 import { supabase } from '../../../lib/supabase';
@@ -28,6 +29,7 @@ export default function PlanHistory() {
   const { showToast } = useToast();
   const { plan, loading: planLoading } = usePlan(id);
   const { expenseCategories } = useCategories();
+  const currency = useCurrency();
 
   const [from, setFrom] = useState(() => subDays(startOfDay(new Date()), 30));
   const [to, setTo] = useState(() => startOfDay(new Date()));
@@ -213,7 +215,7 @@ export default function PlanHistory() {
                 </View>
                 {otherPlan && <Pill label={otherPlan.name} tone="completed" style={styles.otherPlanPill} />}
               </View>
-              <AmountText value={item.amount} type="neutral" />
+              <AmountText value={item.amount} type="neutral" currency={currency} />
               <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
                 {isSelected && <Check size={15} color={colors.ink} strokeWidth={3} />}
               </View>
@@ -227,7 +229,7 @@ export default function PlanHistory() {
           title={
             selectedCount === 0
               ? 'Select transactions'
-              : `Add ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'} · ${formatMoney(selectedTotal)}`
+              : `Add ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'} · ${formatMoney(selectedTotal, currency)}`
           }
           onPress={handleSave}
           disabled={selectedCount === 0}

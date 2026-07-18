@@ -13,6 +13,7 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
+import { formatMoney, formatAmountNumber, currencySymbol } from '../lib/currency';
 
 const AccountSwitcherSheetContext = createContext(null);
 
@@ -34,18 +35,18 @@ export function useAccountSwitcherSheet() {
   return ctx;
 }
 
-function formatAmount(value) {
+function formatAmount(value, currency) {
   const rounded = Math.round(Math.abs(value));
-  return `${value < 0 ? '−' : ''}₹${rounded.toLocaleString('en-IN')}`;
+  return `${value < 0 ? '−' : ''}${formatMoney(rounded, currency)}`;
 }
 
-function formatBalance(value) {
-  const rounded = Math.round(Math.abs(value));
-  return { sign: value < 0 ? '−' : '', number: rounded.toLocaleString('en-IN') };
+function formatBalance(value, currency) {
+  return { sign: value < 0 ? '−' : '', number: formatAmountNumber(value, currency) };
 }
 
 function AccountCard({ account, summary, active, onSelect, onEdit }) {
-  const balance = formatBalance(summary?.in_hand_balance ?? 0);
+  const currency = account.currency ?? 'INR';
+  const balance = formatBalance(summary?.in_hand_balance ?? 0, currency);
 
   return (
     <Pressable style={styles.card} onPress={onSelect}>
@@ -69,19 +70,19 @@ function AccountCard({ account, summary, active, onSelect, onEdit }) {
       <Text style={styles.cardLabel}>In Hand</Text>
       <Text style={styles.cardBalance}>
         {balance.sign}
-        <Text style={styles.cardBalanceCurrency}>₹</Text>
+        <Text style={styles.cardBalanceCurrency}>{currencySymbol(currency)}</Text>
         {balance.number}
       </Text>
 
       <View style={styles.cardStatsRow}>
         <View style={styles.statLine}>
           <TrendingUp size={12} color={colors.mutedMid} strokeWidth={2.6} />
-          <Text style={styles.statValue}>{formatAmount(summary?.month_income ?? 0)}</Text>
+          <Text style={styles.statValue}>{formatAmount(summary?.month_income ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Income</Text>
         </View>
         <View style={styles.statLine}>
           <TrendingDown size={12} color={colors.mutedMid} strokeWidth={2.6} />
-          <Text style={styles.statValue}>{formatAmount(summary?.month_expense ?? 0)}</Text>
+          <Text style={styles.statValue}>{formatAmount(summary?.month_expense ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Expenses</Text>
         </View>
       </View>

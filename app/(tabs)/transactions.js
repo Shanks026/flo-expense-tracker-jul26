@@ -15,6 +15,8 @@ import useTransactions from '../../hooks/useTransactions';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
+import { formatMoney } from '../../lib/currency';
+import useCurrency from '../../hooks/useCurrency';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -48,8 +50,8 @@ function groupByDay(transactions) {
   return groups;
 }
 
-function formatAmount(n) {
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+function formatAmount(n, currency) {
+  return formatMoney(n, currency);
 }
 
 export default function Transactions() {
@@ -58,6 +60,7 @@ export default function Transactions() {
   const { transactions, loading } = useTransactions({ month, type: typeFilter });
   const { openAdd } = useAddTransactionSheet();
   const { accounts } = useAccount();
+  const currency = useCurrency();
 
   const groups = useMemo(() => groupByDay(transactions), [transactions]);
 
@@ -104,7 +107,7 @@ export default function Transactions() {
             <Skeleton width={80} height={fontSize.xxl} radius={6} style={{ marginTop: 4, backgroundColor: colors.inkCard }} />
           ) : (
             <FadeIn>
-              <AmountText value={totals.spent} type="neutral" dark size={fontSize.xxl} />
+              <AmountText value={totals.spent} type="neutral" dark size={fontSize.xxl} currency={currency} />
             </FadeIn>
           )}
         </View>
@@ -114,7 +117,7 @@ export default function Transactions() {
             <Skeleton width={80} height={fontSize.xxl} radius={6} style={{ marginTop: 4 }} />
           ) : (
             <FadeIn>
-              <AmountText value={totals.received} type="income" size={fontSize.xxl} />
+              <AmountText value={totals.received} type="income" size={fontSize.xxl} currency={currency} />
             </FadeIn>
           )}
         </View>
@@ -149,13 +152,13 @@ export default function Transactions() {
                     {group.expense > 0 && (
                       <View style={styles.dayTotalItem}>
                         <TrendingDown size={11} color={colors.dangerStrong} strokeWidth={2.6} />
-                        <Text style={styles.dayTotalValue}>{formatAmount(group.expense)}</Text>
+                        <Text style={styles.dayTotalValue}>{formatAmount(group.expense, currency)}</Text>
                       </View>
                     )}
                     {group.income > 0 && (
                       <View style={styles.dayTotalItem}>
                         <TrendingUp size={11} color={colors.income} strokeWidth={2.6} />
-                        <Text style={styles.dayTotalValue}>{formatAmount(group.income)}</Text>
+                        <Text style={styles.dayTotalValue}>{formatAmount(group.income, currency)}</Text>
                       </View>
                     )}
                   </View>
@@ -190,7 +193,7 @@ export default function Transactions() {
                           {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
                         </Text>
                       </View>
-                      <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} />
+                      <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} currency={currency} />
                     </Pressable>
                   );
                 })}

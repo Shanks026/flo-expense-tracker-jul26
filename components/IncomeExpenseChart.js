@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { format } from 'date-fns';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { formatMoney } from '../lib/currency';
 
 const BAR_MAX_HEIGHT = 110;
 const MIN_BAR_HEIGHT = 4;
@@ -18,8 +19,8 @@ const RANGES = [
   { key: '3m', label: '3M' },
 ];
 
-function formatAmount(n) {
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+function formatAmount(n, currency) {
+  return formatMoney(n, currency);
 }
 
 // Two call sites, two header shapes:
@@ -43,6 +44,7 @@ export default function IncomeExpenseChart({
   // tool where showing both by default is still the right call. The default
   // here preserves Analytics' existing behavior unchanged.
   defaultVisible = { expense: true, income: true },
+  currency = 'INR',
 }) {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [visible, setVisible] = useState(defaultVisible);
@@ -155,11 +157,11 @@ export default function IncomeExpenseChart({
         <View style={styles.totalsRow}>
           <Pressable style={styles.totalItem} onPress={() => toggleVisible('expense')} hitSlop={6}>
             <View style={[styles.legendDot, { backgroundColor: visible.expense ? colors.brand : colors.mutedLight }]} />
-            <Text style={[styles.totalValue, !visible.expense && styles.totalValueDimmed]}>{formatAmount(displayExpense)}</Text>
+            <Text style={[styles.totalValue, !visible.expense && styles.totalValueDimmed]}>{formatAmount(displayExpense, currency)}</Text>
           </Pressable>
           <Pressable style={styles.totalItem} onPress={() => toggleVisible('income')} hitSlop={6}>
             <View style={[styles.legendDot, { backgroundColor: visible.income ? colors.incomeAccent : colors.mutedLight }]} />
-            <Text style={[styles.totalValue, !visible.income && styles.totalValueDimmed]}>{formatAmount(displayIncome)}</Text>
+            <Text style={[styles.totalValue, !visible.income && styles.totalValueDimmed]}>{formatAmount(displayIncome, currency)}</Text>
           </Pressable>
         </View>
       </View>

@@ -17,6 +17,8 @@ import { supabase } from '../../lib/supabase';
 import useEntitlement from '../../hooks/useEntitlement';
 import { useProUpsellSheet } from '../../components/ProUpsellSheet';
 import { FREE_LIMITS } from '../../lib/pro';
+import { formatMoney } from '../../lib/currency';
+import useCurrency from '../../hooks/useCurrency';
 
 const STATUS_STYLES = {
   healthy: { cardVariant: 'default', iconTone: 'income', pill: null, remainingColor: colors.income, trackColor: colors.brand },
@@ -30,6 +32,7 @@ export default function Budgets() {
   const { openAddBudget } = useAddBudgetSheet();
   const { isPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
+  const currency = useCurrency();
 
   async function handleNewBudget() {
     if (!isPro) {
@@ -125,16 +128,16 @@ export default function Budgets() {
 
                   <View style={styles.rowBetween}>
                     <Text style={styles.spentText}>
-                      Spent <Text style={styles.spentValue}>₹{Math.round(b.spent).toLocaleString('en-IN')}</Text> of ₹
-                      {Math.round(b.amount).toLocaleString('en-IN')}
+                      Spent <Text style={styles.spentValue}>{formatMoney(b.spent, currency)}</Text> of{' '}
+                      {formatMoney(b.amount, currency)}
                     </Text>
                     {status === 'over' ? (
                       <Text style={[styles.remainingText, { color: s.remainingColor }]}>
-                        −₹{Math.round(Math.abs(b.remaining)).toLocaleString('en-IN')}
+                        −{formatMoney(Math.abs(b.remaining), currency)}
                       </Text>
                     ) : (
                       <Text style={[styles.remainingText, { color: s.remainingColor }]}>
-                        ₹{Math.round(b.remaining).toLocaleString('en-IN')} left
+                        {formatMoney(b.remaining, currency)} left
                       </Text>
                     )}
                   </View>
