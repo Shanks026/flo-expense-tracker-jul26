@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
 import CategoryIcon from '../../components/CategoryIcon';
+import Skeleton from '../../components/Skeleton';
 import { useToast } from '../../components/Toast';
 import useCategories from '../../hooks/useCategories';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
@@ -25,6 +26,14 @@ import { CATEGORY_BANK } from '../../lib/categoryBank';
 // guards re-mounts: anything already in `categories` renders locked, so
 // revisiting this screen after already picking some never double-inserts —
 // it just shows more chips as "already included".
+
+// Fixed-width mock-ups of a real chip row while categories are loading —
+// varied widths (not one uniform block) so it actually reads as "a row of
+// pill-shaped chips about to appear," matching the real ChipGrid's own
+// mixed label lengths, same convention as Home's own Skeleton usage.
+const EXPENSE_CHIP_WIDTHS = [88, 64, 100, 76, 92, 68];
+const INCOME_CHIP_WIDTHS = [72, 96, 64];
+
 function ChipGrid({ items, selected, locked, onToggle }) {
   return (
     <View style={styles.chipGrid}>
@@ -105,8 +114,15 @@ export default function OnboardingCategories() {
     router.replace(next);
   }
 
-  if (loading) return null;
-
+  // The screen chrome (progress bar, title, subtitle, footer buttons) never
+  // depended on `loading` — only the chip grids do, since they need
+  // expenseCategories/incomeCategories to know what's already locked in.
+  // Rendering OnboardingScreen unconditionally and swapping just the body
+  // for a spinner (previously `if (loading) return null`, a genuinely
+  // blank page for the ~2-3s this fetch can take) means the user sees the
+  // real screen immediately and only the interactive part below it takes
+  // a beat to arrive — the same "don't swap the whole screen for a
+  // spinner" fix as account.js, applied to a slower fetch.
   return (
     <OnboardingScreen
       bg="light"
@@ -116,15 +132,36 @@ export default function OnboardingCategories() {
       subtitle="We've already added the basics. Pick any others you'll actually use — you can always add more later from Settings."
       primaryLabel="Continue"
       onPrimary={handleContinue}
+      primaryDisabled={loading}
       primaryLoading={saving}
       secondaryLabel="Just the basics for now"
       onSecondary={() => router.replace(next)}
     >
-      <Text style={styles.sectionLabel}>EXPENSE</Text>
-      <ChipGrid items={[...expenseCategories, ...bankExpense]} selected={selectedExpense} locked={lockedExpense} onToggle={(n) => toggle(setSelectedExpense, n)} />
+      {loading ? (
+        <>
+          <Skeleton width={70} height={12} radius={4} />
+          <View style={[styles.chipGrid, styles.skeletonGrid]}>
+            {EXPENSE_CHIP_WIDTHS.map((w, i) => (
+              <Skeleton key={i} width={w} height={34} radius={radii.pill} />
+            ))}
+          </View>
 
-      <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>INCOME</Text>
-      <ChipGrid items={[...incomeCategories, ...bankIncome]} selected={selectedIncome} locked={lockedIncome} onToggle={(n) => toggle(setSelectedIncome, n)} />
+          <Skeleton width={62} height={12} radius={4} style={styles.sectionLabelSpaced} />
+          <View style={[styles.chipGrid, styles.skeletonGrid]}>
+            {INCOME_CHIP_WIDTHS.map((w, i) => (
+              <Skeleton key={i} width={w} height={34} radius={radii.pill} />
+            ))}
+          </View>
+        </>
+      ) : (
+        <>
+          <Text style={styles.sectionLabel}>EXPENSE</Text>
+          <ChipGrid items={[...expenseCategories, ...bankExpense]} selected={selectedExpense} locked={lockedExpense} onToggle={(n) => toggle(setSelectedExpense, n)} />
+
+          <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>INCOME</Text>
+          <ChipGrid items={[...incomeCategories, ...bankIncome]} selected={selectedIncome} locked={lockedIncome} onToggle={(n) => toggle(setSelectedIncome, n)} />
+        </>
+      )}
     </OnboardingScreen>
   );
 }
@@ -138,6 +175,13 @@ const styles = StyleSheet.create({
   },
   sectionLabelSpaced: {
     marginTop: spacing.xl,
+  },
+  // Grid gap matches sectionLabel's own marginBottom (spacing.sm) — the
+  // skeleton label block doesn't carry that spacing itself the way the
+  // real Text does, so this makes up the difference between it and the
+  // grid below it.
+  skeletonGrid: {
+    marginTop: spacing.sm,
   },
   chipGrid: {
     flexDirection: 'row',

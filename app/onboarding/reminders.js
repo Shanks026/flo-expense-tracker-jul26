@@ -5,18 +5,13 @@ import { useRouter } from 'expo-router';
 import { Bell, Receipt, Flame } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
 import { useToast } from '../../components/Toast';
-import useBills from '../../hooks/useBills';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
 import { useAuth } from '../../lib/AuthContext';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 import { getDraft } from '../../lib/onboardingDraft';
-import {
-  requestPermission,
-  setNotificationEnabled,
-  setDailyReminderSettings,
-  setBillReminderSettings,
-  rescheduleAll,
-} from '../../lib/notifications';
+import useProfile from '../../hooks/useProfile';
+import { requestPermission, setNotificationEnabled, setBillReminderSettings } from '../../lib/notifications';
+import { registerPushToken } from '../../lib/pushToken';
 
 // Design 04, plus the framing the design couldn't have: the nightly nudge
 // exists to serve the streak (05-koban-engagement.md). Without saying that,
@@ -28,24 +23,22 @@ import {
 // The framing line varies by the intro's tracking-habit answer (screen 11) —
 // the nudge itself always defaults on, but WHY it matters differs by what the
 // user already told us about their habits.
-const DEFAULT_HOUR = 20;
-const DEFAULT_MINUTE = 0;
 const DEFAULT_DAYS_BEFORE = 2;
 
 const STREAK_NOTE_BY_HABIT = {
-  daily: 'You already check in often. The nightly nudge just makes sure the streak never breaks.',
-  weekly: 'Log something every day and your streak grows. The nightly nudge is what keeps it from slipping between check-ins.',
-  when_off: 'The nudge means you won’t need to wait until something feels off. You’ll just know.',
-  never: 'This is the fix. One ping a day, and you’ll never lose track again. Miss a day and the streak resets to zero.',
+  daily: 'You already check in often. The daily reminders just make sure the streak never breaks.',
+  weekly: 'Log something every day and your streak grows. The daily reminders are what keep it from slipping between check-ins.',
+  when_off: 'The reminders mean you won’t need to wait until something feels off. You’ll just know.',
+  never: 'This is the fix. A couple of pings a day, and you’ll never lose track again. Miss a day and the streak resets to zero.',
 };
 const DEFAULT_STREAK_NOTE =
-  'Log something every day and your streak grows. The nightly nudge is what keeps it alive. Miss a day and it resets to zero.';
+  'Log something every day and your streak grows. The daily reminders are what keep it alive. Miss a day and it resets to zero.';
 
 export default function OnboardingReminders() {
   const router = useRouter();
   const { session } = useAuth();
-  const { bills } = useBills();
   const { showToast } = useToast();
+  const { updateProfile } = useProfile();
 
   const [billsOn, setBillsOn] = useState(true);
   const [nudgeOn, setNudgeOn] = useState(true);
@@ -84,14 +77,25 @@ export default function OnboardingReminders() {
 
     setBlocked(false);
 
-    // Persist BEFORE rescheduling — rescheduleAll reads settings straight from
-    // AsyncStorage and cancels everything first, so calling it against
-    // not-yet-written settings silently schedules nothing. This ordering is a
-    // documented requirement in lib/notifications.js, not a preference.
-    await setDailyReminderSettings({ enabled: nudgeOn, hour: DEFAULT_HOUR, minute: DEFAULT_MINUTE });
+    // Both reminders are server-sent now (17-server-push-notifications.md
+    // Phases 2–3) — nudge flips profiles.reminders_enabled directly; bill
+    // reminders go through setBillReminderSettings, which mirrors to
+    // profiles itself. The DB's own column defaults already match what
+    // this screen has always promised, so there's nothing else to set here
+    // and no local reschedule call needed anymore.
+    await updateProfile({ reminders_enabled: nudgeOn }, { silent: true });
     await setBillReminderSettings({ enabled: billsOn, daysBefore: DEFAULT_DAYS_BEFORE });
     await setNotificationEnabled(true);
-    await rescheduleAll({ bills, userId: session?.user?.id ?? null });
+
+    // Real gap this screen had until now: usePushTokenSync (app/_layout.js)
+    // only registers a push token when the session's userId CHANGES — it
+    // ran once already at mount, before permission existed, so it silently
+    // no-opped. Nothing re-triggered a retry after requestPermission()
+    // above actually granted it, which meant a brand-new signup got zero
+    // server-sent reminders until the app happened to be fully restarted.
+    // Registering explicitly here, right after the grant, is the fix.
+    const userId = session?.user?.id ?? null;
+    if (userId) await registerPushToken(userId);
 
     setWorking(false);
     router.replace(next);
@@ -107,7 +111,7 @@ export default function OnboardingReminders() {
         </View>
       }
       title="Never miss a bill"
-      subtitle="A heads-up before bills are due, and a nightly nudge to log your day."
+      subtitle="A heads-up before bills are due, and daily reminders to log your day."
       primaryLabel="Enable Notifications"
       onPrimary={handleEnable}
       primaryLoading={working}
@@ -131,8 +135,8 @@ export default function OnboardingReminders() {
             <Flame size={21} color={colors.incomeAccent} strokeWidth={2} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Nightly nudge</Text>
-            <Text style={styles.cardBody}>8:00 PM</Text>
+            <Text style={styles.cardTitle}>Daily reminders</Text>
+            <Text style={styles.cardBody}>8:00 AM & 9:00 PM — customizable later</Text>
           </View>
           <Switch value={nudgeOn} onValueChange={setNudgeOn} />
         </View>

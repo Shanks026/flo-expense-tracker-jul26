@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
@@ -15,7 +15,7 @@ import { getDraft, pickDurableAnswers } from '../../lib/onboardingDraft';
 
 export default function OnboardingAccount() {
   const router = useRouter();
-  const { activeAccount, activeAccountId, loading } = useAccount();
+  const { activeAccount, activeAccountId } = useAccount();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { profile, updateProfile } = useProfile();
@@ -70,14 +70,15 @@ export default function OnboardingAccount() {
     router.replace(next);
   }
 
-  if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.ink} />
-      </View>
-    );
-  }
-
+  // No more full-screen spinner-then-swap here — that's what read as a
+  // flicker (a blank/spinner frame, then the real screen popping in a beat
+  // later, right as OnboardingReveal's own entrance animation should be
+  // the only thing moving). Render the real screen immediately with its
+  // default field values; the account-resolved useEffect above fills in
+  // the real name/color a moment later if `loading` was ever true, which
+  // in practice resolves fast enough to be invisible. `primaryDisabled`
+  // covers the one real risk this removes protection for — tapping
+  // Continue before activeAccountId has resolved.
   return (
     <OnboardingScreen
       bg="light"
@@ -86,7 +87,7 @@ export default function OnboardingAccount() {
       subtitle="Track separate spaces later, like Personal or Business. Start with one."
       primaryLabel="Continue"
       onPrimary={handleSave}
-      primaryDisabled={!name.trim()}
+      primaryDisabled={!name.trim() || !activeAccountId}
       primaryLoading={saving}
       secondaryLabel="Keep as Personal"
       onSecondary={() => router.replace(next)}
@@ -127,12 +128,6 @@ export default function OnboardingAccount() {
 }
 
 const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
-  },
   label: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,

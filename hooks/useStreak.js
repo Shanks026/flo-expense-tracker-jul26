@@ -12,14 +12,13 @@ const WINDOW_DAYS = 90;
 
 const EMPTY = computeStreak([], new Date());
 
-// Plain, non-hook fetch — the query logic lives here once, used by BOTH the
-// hook below AND lib/notifications.js's rescheduleAll(), which cannot call a
-// hook (it's a plain async function, not a component). rescheduleAll fetches
-// streak data fresh on every call rather than accepting it as a stale-prone
-// parameter — the exact same lesson as the settings-staleness bug documented
-// in lib/notifications.js: a scheduler that trusts a passed-in snapshot
-// instead of reading live state will eventually schedule against data that's
-// no longer true.
+// Plain, non-hook fetch — used by the hook below. Previously also used by
+// lib/notifications.js's rescheduleAll() (a plain async function, not a
+// component, so it couldn't call a hook) — that consumer was removed
+// 2026-07-19 when the daily reminder moved server-side
+// (17-server-push-notifications.md Phase 2). Kept as a standalone exported
+// function regardless: fetching fresh rather than accepting a possibly-stale
+// passed-in streak is still the right shape for any future non-hook caller.
 export async function fetchStreak(userId) {
   if (!userId) return computeStreak([], new Date());
 

@@ -12,7 +12,12 @@ import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 // coming into view rather than one more unlabelled question in the middle of
 // the flow. Writes `commitment` into onboarding_answers (merged, not
 // overwritten — account.js already flushed age_range/goal/leak_category/
-// tracking_habit) which sets Koban's nudge tone (lib/koban.js toneFromCommitment).
+// tracking_habit). Previously fed lib/koban.js's toneFromCommitment (the
+// local nudge's push/gentle tone split) — that consumer was removed
+// 2026-07-19 when the daily reminder moved server-side
+// (17-server-push-notifications.md). `commitment` is still captured (real
+// onboarding signal, worth keeping) but currently has no reader; a
+// server-side tone split is the natural place to reuse it if one gets built.
 const OPTIONS = [
   { key: 'all_in', emoji: '🔥', label: 'All in' },
   { key: 'committed', emoji: '👍', label: 'Pretty committed' },

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as SplashScreen from 'expo-splash-screen';
@@ -233,7 +234,7 @@ function ThemeProfileSync() {
 
 function RootNavigator() {
   const { session, loading } = useAuth();
-  const { colors } = useTheme();
+  const { colors, modeId } = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const [introSeen, setIntroSeen] = useState(null); // null = still reading the flag
@@ -289,8 +290,19 @@ function RootNavigator() {
   if (!session && introSeen === null) return null;
 
   return (
-    <DataRefreshProvider>
-      <AccountProvider>
+    <>
+      {/* Nothing ever set this before — expo-status-bar wasn't imported
+          anywhere in the app, so the OS fell back to app.json's
+          userInterfaceStyle ("light"), a static native setting that has no
+          idea FLO's own in-app Dark mode exists or reacts when it's
+          toggled. Result: dark-mode status bar icons could render
+          dark-on-dark (invisible) — worse right after a cold start, before
+          anything happened to override the native default. Tied directly
+          to modeId so it flips the instant the user switches modes, not
+          just on next launch. */}
+      <StatusBar style={modeId === 'dark' ? 'light' : 'dark'} />
+      <DataRefreshProvider>
+        <AccountProvider>
         <ToastProvider>
           <BottomSheetModalProvider>
             <ProUpsellSheetProvider>
@@ -336,6 +348,7 @@ function RootNavigator() {
         </ToastProvider>
       </AccountProvider>
     </DataRefreshProvider>
+    </>
   );
 }
 

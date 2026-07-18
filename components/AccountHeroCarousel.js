@@ -243,15 +243,20 @@ function makeStyles(colors) {
       marginBottom: spacing.md,
     },
     accountHeading: {
-      alignItems: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
       flexShrink: 1,
       paddingRight: spacing.sm,
     },
+    // A left-border accent beside the name instead of a bar stacked above
+    // it — same 3px thickness as before, just rotated into a vertical
+    // border and sized to the name's own line height so it reads as
+    // "attached to the text" rather than a separate floating element.
     accountColorLine: {
-      width: 22,
-      height: 3,
+      width: 3,
+      height: fontSize.lg,
       borderRadius: radii.pill,
-      marginBottom: 6,
     },
     accountNameRow: {
       flexDirection: 'row',

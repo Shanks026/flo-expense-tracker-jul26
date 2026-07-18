@@ -24,7 +24,7 @@ export default function Solution() {
           goes.
         </>
       }
-      titleSize={32}
+      titleSize={28}
       primaryLabel="Show me"
       onPrimary={() => router.replace(getIntroNext('solution'))}
     />

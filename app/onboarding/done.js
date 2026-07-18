@@ -26,7 +26,7 @@ export default function OnboardingDone() {
       <OnboardingScreen
         bg="brand"
         title={firstName ? `You're set,\n${firstName}.` : "You're set."}
-        titleSize={52}
+        titleSize={46}
         subtitle="Two minutes a day. That's the whole trick."
         primaryLabel="Go to my money"
         onPrimary={finish}

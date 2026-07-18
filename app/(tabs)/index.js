@@ -318,7 +318,7 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -378,7 +378,7 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   welcomeTextGroup: {
     flexShrink: 1,

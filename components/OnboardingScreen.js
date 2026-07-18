@@ -19,10 +19,26 @@ import { colors, spacing, radii, fontFamily, fontSize } from '../theme/tokens';
 // Vertical rhythm follows 07's hard-won v3 (see OnboardingScaffold): the whole
 // group centres as one unit above the pinned footer; `scrollable` centres while
 // short and scrolls once tall. The whole group animates in via OnboardingReveal.
+// `light`'s `secondary` was colors.muted — the same gray this app uses to
+// signal "disabled"/de-emphasized elsewhere, which made a genuinely
+// tappable secondary button ("Maybe later", "Keep as Personal", "Just the
+// basics for now") read as inert. It's plain text with no fill, so the
+// primary button's own solid background already carries the "this is the
+// main action" hierarchy — the secondary text itself doesn't need to be
+// muted on top of that to read as secondary.
 const PALETTES = {
-  light: { bg: colors.bg, title: colors.ink, subtitle: colors.muted, eyebrow: colors.income, primary: 'primary', secondary: colors.muted, track: colors.completedTrack, fill: colors.brand },
+  light: { bg: colors.bg, title: colors.ink, subtitle: colors.muted, eyebrow: colors.income, primary: 'primary', secondary: colors.ink, track: colors.completedTrack, fill: colors.brand },
   brand: { bg: colors.brand, title: colors.ink, subtitle: colors.ink, eyebrow: colors.ink, primary: 'dark', secondary: colors.ink, track: colors.ink, fill: colors.ink },
 };
+
+// The default question-page title size — was fontSize.hero (30) directly;
+// decoupled into its own constant so onboarding's titles can be tuned
+// independently of that shared token, which non-onboarding screens
+// (sign-in, ProUpsellSheet, StreakCelebration, AccountSwitcherSheet) also
+// read from. Same 1.25x lineHeight ratio the `titleSize` prop override
+// already uses below, for consistency between the default and any screen
+// that opts into a custom size.
+const DEFAULT_TITLE_SIZE = 27;
 
 export default function OnboardingScreen({
   bg = 'light',
@@ -207,9 +223,9 @@ const styles = StyleSheet.create({
     // subtitle only" hero screens (problem/solution/ready/journey) opt UP via
     // the `titleSize` prop instead — the enlargement is deliberately scoped to
     // those, not applied globally.
-    fontSize: fontSize.hero,
+    fontSize: DEFAULT_TITLE_SIZE,
     letterSpacing: -0.5,
-    lineHeight: 38,
+    lineHeight: DEFAULT_TITLE_SIZE * 1.25,
   },
   subtitle: {
     fontFamily: fontFamily.medium,

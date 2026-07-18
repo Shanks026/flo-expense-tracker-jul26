@@ -3,14 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert, Send } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
-import useBills from '../hooks/useBills';
 import useEntitlement from '../hooks/useEntitlement';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
@@ -23,11 +22,9 @@ import { useTheme } from '../theme/ThemeContext';
 import {
   getNotificationSettings,
   setNotificationEnabled,
-  setDailyReminderSettings,
   setBillReminderSettings,
   requestPermission,
   getPermissionStatus,
-  rescheduleAll,
 } from '../lib/notifications';
 import {
   isSupported as isDetectSupported,
@@ -43,6 +40,7 @@ import {
   WATCHED_APP_LABELS,
 } from '../lib/detect';
 import { getReportSettings, setReportSettings, DEFAULT_REPORT_SETTINGS } from '../lib/reports';
+import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 
@@ -80,12 +78,20 @@ function timeOnToday(hour, minute) {
   return d;
 }
 
+// profiles.morning_reminder_time/evening_reminder_time come back from
+// Postgres as "HH:MM:SS" strings (the `time` column type) — parsed into a
+// Date the same way DateTimePicker/timeOnToday already expect.
+function timeOnTodayFromString(timeStr, fallbackHour, fallbackMinute) {
+  if (!timeStr) return timeOnToday(fallbackHour, fallbackMinute);
+  const [h, m] = timeStr.split(':').map(Number);
+  return timeOnToday(h, m);
+}
+
 export default function Settings() {
   const router = useRouter();
   const { session, deleteAccount } = useAuth();
   const { profile, avatarUrl, updateProfile } = useProfile();
   const { openEditProfile } = useEditProfileSheet();
-  const { bills } = useBills();
   const { accentId, modeId, setAccent, setMode, colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPro } = useEntitlement();
@@ -96,10 +102,13 @@ export default function Settings() {
   const [deleteError, setDeleteError] = useState(null);
 
   const [notifEnabled, setNotifEnabled] = useState(false);
-  const [dailyReminder, setDailyReminder] = useState({ enabled: false, hour: 20, minute: 0 });
   const [billReminders, setBillReminders] = useState({ enabled: true, daysBefore: 2 });
   const [permissionBlocked, setPermissionBlocked] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  // Which daily-reminder time picker is open, if any — 'morning' | 'evening'
+  // | null. Two separate times now (17-server-push-notifications.md Phase
+  // 2), not one, so a single boolean can't distinguish which field a
+  // DateTimePicker result should write back to.
+  const [timePickerField, setTimePickerField] = useState(null);
 
   const [reportSettings, setReportSettingsState] = useState(DEFAULT_REPORT_SETTINGS);
   const [showReportTimePicker, setShowReportTimePicker] = useState(false);
@@ -114,6 +123,13 @@ export default function Settings() {
   const [detectAccess, setDetectAccess] = useState(false);
   const [detectEnabled, setDetectEnabled] = useState(false);
 
+  // Push status (17-server-push-notifications.md Phase 4) — the
+  // confidence-building row: is this device actually registered, and a
+  // button to fire a REAL push through send-push end to end rather than
+  // waiting for the next scheduled cron window.
+  const [pushStatus, setPushStatus] = useState({ checking: true, registered: false });
+  const [sendingTestPush, setSendingTestPush] = useState(false);
+
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
 
@@ -124,17 +140,13 @@ export default function Settings() {
   async function persistReportSettings(partial) {
     const next = await setReportSettings(partial);
     setReportSettingsState(next);
-    // Without this, a cadence/day/time change only takes effect in the
-    // schedule on the next cold start (whenever useNotificationSync's effect
-    // happens to re-run) — the same stale-settings bug class already fixed
-    // once for the daily reminder (see rescheduleAll's own comment). Calling
-    // sync() here mirrors handleToggleDaily/handleTimeChange exactly.
-    await sync();
+    // No local reschedule needed — setReportSettings mirrors to `profiles`
+    // itself (17-server-push-notifications.md Phase 3), and the server
+    // reads that directly on its own cron tick.
   }
 
   useEffect(() => {
     getNotificationSettings().then(async (s) => {
-      setDailyReminder(s.dailyReminder);
       setBillReminders(s.billReminders);
       if (s.enabled) {
         // The OS permission can be revoked from outside the app (system
@@ -166,6 +178,37 @@ export default function Settings() {
     });
     return () => subscription.remove();
   }, [refreshDetectStatus]);
+
+  // Re-checked the same way (mount + every foreground) — registration
+  // happens fire-and-forget at app boot (usePushTokenSync), so it may
+  // genuinely still be in flight the first time this screen is opened.
+  const refreshPushStatus = useCallback(async () => {
+    const userId = session?.user?.id ?? null;
+    setPushStatus((prev) => ({ ...prev, checking: true }));
+    const status = await getPushTokenStatus(userId);
+    setPushStatus({ checking: false, ...status });
+  }, [session]);
+
+  useEffect(() => {
+    refreshPushStatus();
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refreshPushStatus();
+    });
+    return () => subscription.remove();
+  }, [refreshPushStatus]);
+
+  async function handleSendTestPush() {
+    setSendingTestPush(true);
+    const result = await sendTestPush(session?.user?.id ?? null);
+    setSendingTestPush(false);
+    if (result.sent) {
+      showToast({ message: 'Test push sent — check your notification shade', variant: 'success' });
+    } else if (result.error) {
+      showToast({ message: 'Could not send test push', variant: 'error' });
+    } else {
+      showToast({ message: 'No push token registered on this device yet', variant: 'error' });
+    }
+  }
 
   function handleToggleDetect(value) {
     if (value) {
@@ -202,15 +245,6 @@ export default function Settings() {
     ]);
   }
 
-  // Every caller below persists to AsyncStorage BEFORE calling this —
-  // rescheduleAll reads settings straight from storage (it no longer accepts
-  // them as a param, deliberately; see its comment in lib/notifications.js for
-  // the stale-settings bug that forced this). So persist-then-sync is the
-  // required order, not an incidental one.
-  async function sync() {
-    await rescheduleAll({ bills, userId: session?.user?.id ?? null });
-  }
-
   async function handleToggleNotifications(value) {
     if (value) {
       const permission = await requestPermission();
@@ -227,10 +261,22 @@ export default function Settings() {
         return;
       }
       setPermissionBlocked(false);
+      // Same gap onboarding's equivalent handler had: usePushTokenSync only
+      // registers on a userId change, which already happened (before
+      // permission existed) if notifications were off at sign-in. Without
+      // this, granting permission here wouldn't actually get a token
+      // registered until the app restarts.
+      const userId = session?.user?.id ?? null;
+      if (userId) {
+        const result = await registerPushToken(userId);
+        refreshPushStatus();
+        if (!result.registered && !result.unsupported) {
+          showToast({ message: 'Permission granted, but push registration failed — try again shortly', variant: 'error' });
+        }
+      }
     }
     setNotifEnabled(value);
     await setNotificationEnabled(value);
-    await sync();
   }
 
   // Deep-links to the OS battery-optimization LIST — not a direct
@@ -250,34 +296,39 @@ export default function Settings() {
     });
   }
 
-  async function handleToggleDaily(value) {
-    const next = { ...dailyReminder, enabled: value };
-    setDailyReminder(next);
-    await setDailyReminderSettings(next);
-    await sync();
+  // Daily reminders are now server-sent (17-server-push-notifications.md
+  // Phase 2), not locally scheduled — these write straight to `profiles`
+  // (via `silent: true`, same reasoning as the theme picker's writes: no
+  // fetched screen data depends on a reminder time, so there's no reason to
+  // pay the app-wide refetch a non-silent notifyChanged() would trigger).
+  // No sync()/rescheduleAll() call needed anymore; the server reads
+  // `profiles` directly on its own cron tick.
+  async function handleToggleDailyReminders(value) {
+    await updateProfile({ reminders_enabled: value }, { silent: true });
   }
 
-  async function handleTimeChange(_event, selected) {
-    setShowTimePicker(false);
-    if (!selected) return;
-    const next = { ...dailyReminder, hour: selected.getHours(), minute: selected.getMinutes() };
-    setDailyReminder(next);
-    await setDailyReminderSettings(next);
-    await sync();
+  async function handleReminderTimeChange(_event, selected) {
+    const field = timePickerField;
+    setTimePickerField(null);
+    if (!selected || !field) return;
+    const hh = String(selected.getHours()).padStart(2, '0');
+    const mm = String(selected.getMinutes()).padStart(2, '0');
+    const column = field === 'morning' ? 'morning_reminder_time' : 'evening_reminder_time';
+    await updateProfile({ [column]: `${hh}:${mm}:00` }, { silent: true });
   }
 
+  // No local reschedule needed — setBillReminderSettings mirrors to
+  // `profiles` itself (17-server-push-notifications.md Phase 3).
   async function handleToggleBillReminders(value) {
     const next = { ...billReminders, enabled: value };
     setBillReminders(next);
     await setBillReminderSettings(next);
-    await sync();
   }
 
   async function handleDaysBeforeChange(daysBefore) {
     const next = { ...billReminders, daysBefore };
     setBillReminders(next);
     await setBillReminderSettings(next);
-    await sync();
   }
 
   // Only the default for NEW accounts — existing accounts keep their own
@@ -449,19 +500,31 @@ export default function Settings() {
             <View style={styles.rowIcon}>
               <SunMedium size={20} color={colors.ink} strokeWidth={2} />
             </View>
-            <Text style={styles.rowTitle}>Daily Reminder</Text>
-            <Switch value={dailyReminder.enabled} onValueChange={handleToggleDaily} disabled={!notifEnabled} />
+            <Text style={styles.rowTitle}>Daily Reminders</Text>
+            <Switch
+              value={profile?.reminders_enabled ?? true}
+              onValueChange={handleToggleDailyReminders}
+              disabled={!notifEnabled}
+            />
           </View>
-          {notifEnabled && dailyReminder.enabled && (
-            <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setShowTimePicker(true)}>
-              <Text style={styles.subRowLabel}>Remind me at</Text>
-              <Text style={styles.subRowValue}>
-                {format(timeOnToday(dailyReminder.hour, dailyReminder.minute), 'h:mm a')}
-              </Text>
-            </Pressable>
+          {notifEnabled && (profile?.reminders_enabled ?? true) && (
+            <>
+              <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setTimePickerField('morning')}>
+                <Text style={styles.subRowLabel}>Morning</Text>
+                <Text style={styles.subRowValue}>
+                  {format(timeOnTodayFromString(profile?.morning_reminder_time, 8, 0), 'h:mm a')}
+                </Text>
+              </Pressable>
+              <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setTimePickerField('evening')}>
+                <Text style={styles.subRowLabel}>Evening</Text>
+                <Text style={styles.subRowValue}>
+                  {format(timeOnTodayFromString(profile?.evening_reminder_time, 21, 0), 'h:mm a')}
+                </Text>
+              </Pressable>
+            </>
           )}
 
-          <View style={[styles.row, !notifEnabled && styles.rowDisabled]}>
+          <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
             <View style={styles.rowIcon}>
               <Receipt size={20} color={colors.ink} strokeWidth={2} />
             </View>
@@ -469,7 +532,7 @@ export default function Settings() {
             <Switch value={billReminders.enabled} onValueChange={handleToggleBillReminders} disabled={!notifEnabled} />
           </View>
           {notifEnabled && billReminders.enabled && (
-            <View style={styles.subRow}>
+            <View style={[styles.subRow, styles.rowBorder]}>
               <Text style={styles.subRowLabel}>Remind me</Text>
               <View style={styles.daysBeforeGroup}>
                 {DAYS_BEFORE_OPTIONS.map((days) => {
@@ -487,13 +550,42 @@ export default function Settings() {
               </View>
             </View>
           )}
+
+          {notifEnabled && (
+            <View style={styles.row}>
+              <View style={styles.rowIcon}>
+                <Send size={20} color={colors.ink} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Push notifications</Text>
+                <Text style={styles.rowHint}>
+                  {pushStatus.checking
+                    ? 'Checking…'
+                    : pushStatus.unsupported
+                      ? 'Needs a development build, not Expo Go.'
+                      : pushStatus.registered
+                        ? 'This device is registered.'
+                        : 'Not registered yet — reopen the app, or check your connection.'}
+                </Text>
+              </View>
+              <Pressable onPress={handleSendTestPush} disabled={sendingTestPush || !pushStatus.registered} hitSlop={8}>
+                <Text style={[styles.pushTestLink, (sendingTestPush || !pushStatus.registered) && styles.pushTestLinkDisabled]}>
+                  {sendingTestPush ? 'Sending…' : 'Send test'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </Card>
-        {showTimePicker && (
+        {timePickerField && (
           <DateTimePicker
-            value={timeOnToday(dailyReminder.hour, dailyReminder.minute)}
+            value={
+              timePickerField === 'morning'
+                ? timeOnTodayFromString(profile?.morning_reminder_time, 8, 0)
+                : timeOnTodayFromString(profile?.evening_reminder_time, 21, 0)
+            }
             mode="time"
             display="default"
-            onChange={handleTimeChange}
+            onChange={handleReminderTimeChange}
           />
         )}
 
@@ -803,6 +895,14 @@ function makeStyles(colors) {
   },
   rowDisabled: {
     opacity: 0.45,
+  },
+  pushTestLink: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.sm,
+    color: colors.brand,
+  },
+  pushTestLinkDisabled: {
+    color: colors.mutedMid,
   },
   sectionLabel: {
     fontFamily: fontFamily.bold,

@@ -46,7 +46,7 @@ export default function OnboardingJourney() {
           {firstName ? `, ${firstName}` : ''}.
         </>
       }
-      titleSize={32}
+      titleSize={28}
       subtitle="No card to start. No catch."
       primaryLabel="Almost there"
       onPrimary={() => router.replace(next)}

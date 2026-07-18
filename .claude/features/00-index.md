@@ -760,6 +760,29 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   `expense.js`'s title changed from "Add your first transaction" → "Add a
   transaction" since it's no longer necessarily the first row once this
   screen is used.
+- **Standing gotcha: Reanimated v4's Babel plugin moved packages** (found
+  2026-07-19, via `17-server-push-notifications.md`'s adjacent onboarding
+  testing — not itself a push-notifications bug). `react-native-reanimated`
+  is on v4.x in this project (see the Confetti.js note above), which split
+  its worklets compiler out into a separate `react-native-worklets`
+  package — `babel.config.js` must reference
+  `plugins: ['react-native-worklets/plugin']`, **not** the old
+  `'react-native-reanimated/plugin'`. With the stale path, worklets
+  (`useAnimatedStyle`/`useSharedValue` callbacks) silently fail to compile:
+  shared values still update, but the derived animated *style* never
+  reflects it, so the affected component sits frozen on its initial frame
+  (often invisible — opacity 0, or translated off-screen). Symptom on this
+  project: `app/onboarding/intro/reflection.js`'s falling-card entrance and
+  `OnboardingReveal`'s pop-in both rendered nothing but the plain Button
+  until fixed. **This is a project-wide Babel config**, not scoped to one
+  screen — every Reanimated-driven animation in the app (the account hero
+  carousel's swipe, `Switch`, `AccountDots`, `StreakCelebration`, etc.) was
+  reading the same stale plugin, so if a similarly "just doesn't animate"
+  bug turns up anywhere else, check this file first before assuming the
+  individual component's logic is wrong. Fixed by pointing at
+  `react-native-worklets/plugin`; confirmed the package actually exports a
+  `plugin` entry before making the change, not just going on the upstream
+  GitHub issue describing the same migration gap.
 
 ---
 

@@ -25,7 +25,7 @@ export default function Problem() {
           Ever reach month-end and wonder… <Text style={styles.emphasis}>where did it all go?</Text>
         </>
       }
-      titleSize={36}
+      titleSize={32}
       subtitle={
         <>
           You're not bad with money. You just <Text style={styles.subtitleEmphasis}>never had it all in one place</Text>
