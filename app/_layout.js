@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as SplashScreen from 'expo-splash-screen';
@@ -242,6 +243,21 @@ function RootNavigator() {
   useEffect(() => {
     getIntroSeen().then(setIntroSeen);
   }, []);
+
+  // Android's 3-button nav bar never followed dark mode — nothing had ever
+  // called any nav-bar API, so its icon contrast was left to the OS's own
+  // edge-to-edge scrim, which app.json's `androidNavigationBar.enforceContrast:
+  // false` (native config, needs a rebuild) hands control of back to us.
+  // setButtonStyleAsync is a no-op on gesture-nav devices (no native API to
+  // even detect that mode exists — Expo's own docs note this) and on iOS, so
+  // this only ever affects Android 3-button-nav phones, which is exactly the
+  // "sometimes" in the reported bug: gesture-nav devices were never the
+  // problem, 3-button ones were. Same modeId-driven pattern as the StatusBar
+  // fix right below.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    NavigationBar.setButtonStyleAsync(modeId === 'dark' ? 'light' : 'dark').catch(() => {});
+  }, [modeId]);
 
   // Once any session exists (sign-in, sign-up, or a restored session), the intro
   // has served its purpose on this device — remember it, so a later signed-out

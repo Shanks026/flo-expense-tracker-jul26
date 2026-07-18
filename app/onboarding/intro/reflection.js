@@ -264,12 +264,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fontFamily.extrabold,
-    // Matches the bumped default main-title size used everywhere else in
-    // onboarding (OnboardingScreen's own `title` style) — this screen has a
-    // bespoke layout, so it doesn't inherit that automatically.
-    fontSize: 34,
+    // Matches the reduced main-title size used everywhere else in onboarding
+    // (OnboardingScreen's own `title`/`titleSize` — see journey.js/solution.js/
+    // problem.js's own 32→28/36→32 reductions) — this screen has a bespoke
+    // layout, so it doesn't inherit that automatically and had to be updated
+    // by hand when the rest of onboarding's titles were sized down.
+    fontSize: 30,
     letterSpacing: -0.5,
-    lineHeight: 42,
+    lineHeight: 38,
     color: colors.ink,
   },
   subtitle: {

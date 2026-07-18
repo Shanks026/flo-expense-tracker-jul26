@@ -27,7 +27,10 @@
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 2
+      "versionCode": 2,
+      "androidNavigationBar": {
+        "enforceContrast": false
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

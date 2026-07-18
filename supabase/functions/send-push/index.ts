@@ -179,7 +179,20 @@ async function sendPushToUser(
     console.error('send-push: Expo push API error:', res.status, await res.text());
     return false;
   }
-  return true;
+
+  // Expo's push endpoint returns HTTP 200 even when an individual ticket
+  // failed (e.g. FCM credentials misconfigured on the Expo/EAS project) —
+  // res.ok alone was reporting every send as successful regardless of
+  // whether the device actually received anything. Found via a real device
+  // test where "sent" showed true but nothing arrived; the ticket itself
+  // said `{"status":"error","details":{"error":"InvalidCredentials"}}`.
+  const result = await res.json();
+  const tickets = Array.isArray(result?.data) ? result.data : [];
+  const errors = tickets.filter((t: { status?: string }) => t?.status === 'error');
+  if (errors.length > 0) {
+    console.error('send-push: Expo push ticket error(s):', JSON.stringify(errors));
+  }
+  return tickets.some((t: { status?: string }) => t?.status === 'ok');
 }
 
 // data.type: 'nudge' — categoryId registers this against the
@@ -399,5 +412,16 @@ Deno.serve(async (req: Request) => {
   }
 
   const pushResult = await pushRes.json();
-  return json({ sent: messages.length, pushResult });
+  // Same res.ok-isn't-enough gap as sendPushToUser (see its comment) — the
+  // manual test-send path is exactly what surfaced this: Settings' "Send
+  // test" button was reading `sent: messages.length` (queued count) as
+  // proof of delivery, so a real FCM-credential failure showed as success
+  // with no notification ever arriving and no error anywhere to find.
+  const tickets = Array.isArray(pushResult?.data) ? pushResult.data : [];
+  const ticketErrors = tickets.filter((t: { status?: string }) => t?.status === 'error');
+  const okCount = tickets.filter((t: { status?: string }) => t?.status === 'ok').length;
+  if (ticketErrors.length > 0) {
+    console.error('send-push: Expo push ticket error(s):', JSON.stringify(ticketErrors));
+  }
+  return json({ sent: okCount, pushResult, ticketErrors });
 });

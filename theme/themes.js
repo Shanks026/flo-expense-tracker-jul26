@@ -114,7 +114,10 @@ export const ACCENTS = {
   ocean: {
     id: 'ocean',
     name: 'Ocean',
-    brand: '#4A90D9',
+    // Brightened from #4A90D9 — same hue (~211°), lightness bumped ~57%→64%
+    // and saturation nudged up to compensate, so it doesn't just look
+    // washed-out lighter, it reads as a livelier blue.
+    brand: '#65A3E2',
     brandBg: '#E2EDF9',
     brandBgDark: '#162636',
   },

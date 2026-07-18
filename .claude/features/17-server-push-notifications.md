@@ -654,6 +654,83 @@ compiler into a separate package) — see `00-index.md`'s Shared
 Infrastructure Notes for the full writeup, since this is a project-wide
 Babel config issue, not scoped to this feature.
 
+### Post-APK-testing: two more real bugs found on-device (2026-07-19)
+
+First real APK install + two-account test surfaced two independent,
+confirmed-via-DB-and-direct-curl bugs:
+
+**Bug 1 — cross-account token reassignment silently failed under RLS.**
+`push_tokens.token` is device-scoped, not account-scoped: the same phone
+produces the identical `ExponentPushToken[...]` string regardless of which
+FLO account is signed in on it. `registerPushToken` upserted with
+`onConflict: 'token'`, but `push_tokens`' only RLS policy is
+`auth.uid() = user_id`, checked against the row's *existing* owner. When a
+second account signed in on the same device, its upsert tried to update a
+row still owned by the first account — RLS's `USING` clause rejected it
+(`new row violates row-level security policy`), the error was only
+`console.error`'d, and the row never reassigned. Confirmed via the DB: one
+account showed "registered" (its `push_tokens` row existed, from the
+device's first-ever registration — a plain INSERT, so no conflict to
+reject), the second showed "not registered" (zero rows, upsert silently
+failed every time).
+
+Fixed with a `claim_push_token(p_token text)` RPC — `SECURITY DEFINER`,
+reassigning to `auth.uid()` server-side (never a client-supplied user id,
+so a caller can only ever claim a token for themselves):
+```sql
+create or replace function public.claim_push_token(p_token text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from push_tokens where token = p_token and user_id <> auth.uid();
+  insert into push_tokens (token, user_id)
+  values (p_token, auth.uid())
+  on conflict (token) do update set user_id = excluded.user_id;
+end;
+$$;
+
+revoke execute on function public.claim_push_token(text) from public, anon;
+grant execute on function public.claim_push_token(text) to authenticated;
+```
+`registerPushToken` (`lib/pushToken.js`) now calls
+`supabase.rpc('claim_push_token', { p_token: token })` instead of a raw
+upsert. Applied directly via the Supabase MCP `apply_migration` tool this
+session (migration `claim_push_token_rpc`) — this doc is the durable
+record per this repo's "no committed migration files" convention.
+
+**Bug 2 — "sent" push never arrived, and the pipeline reported success
+anyway.** Calling `send-push` directly for a token with a legitimate
+`push_tokens` row still returned an Expo push ticket of
+`{"status":"error","details":{"error":"InvalidCredentials","fault":"developer"}}`
+— *"Unable to retrieve the FCM server key for the recipient's app."* This
+is a real external setup gap: `google-services.json` only lets the
+*device* register with Firebase and mint a token; Expo's own push-relay
+servers separately need an FCM service-account credential uploaded to the
+EAS/Expo project to actually call FCM on your behalf, and that hasn't been
+done yet. **Needs your action, not a code fix** — in the Expo dashboard for
+this project (or via `eas credentials` → Android → push notifications),
+upload a Firebase service-account JSON key (Firebase console → Project
+Settings → Service Accounts → "Generate new private key") as the FCM V1
+credential. Until that's done, every push — cron and manual test alike —
+will queue successfully but never arrive.
+
+That gap was compounded by a real code bug: `send-push` only checked
+`res.ok` (the HTTP-level status of the call to Expo's API), never the
+per-ticket `status` field inside the response body — Expo's endpoint
+returns HTTP 200 even when a ticket individually failed. So Settings'
+"Send test" was reporting `sent: true` off a queued-count, not an actual
+delivery outcome — exactly why the test button showed success with
+nothing arriving, and nothing to go on. Fixed in both
+`sendPushToUser` (the cron path) and the manual test-send handler:
+both now inspect `pushResult.data[].status`, only count a `'ok'` ticket as
+delivered, and log/return any `'error'` tickets. `sendTestPush`
+(`lib/pushToken.js`) now surfaces a real error when a ticket fails, so
+Settings' toast reflects actual delivery status instead of a false
+positive. Deployed as `send-push` v5.
+
 ---
 
 ## Data Model Summary (Final State After All Phases)
