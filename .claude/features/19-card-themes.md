@@ -582,6 +582,44 @@ phases.**
   before fading out, closer to the original "prismatic edge glow" concept
   (the actual animated sweep is still deferred, static rendering only).
 
+**Round 2 (post-APK-build review):**
+- **Real bug: Ink's trend-icon accent ignored the app's own selected
+  Primary Color.** Income/expense icons derive from the equipped theme's
+  `chipColor` — correct for a bought/equipped cosmetic, which should stay
+  fixed regardless of app settings. But Ink is the free DEFAULT (no theme
+  bought), and `lib/cardThemes.js` hardcodes its `chipColor` to lime — so
+  anyone who'd picked a different Primary Color in Settings
+  (`theme/ThemeContext.js`'s `ACCENTS`) still saw lime trend icons on the
+  default card. Fixed: for Ink specifically, the accent source is
+  `colors.brand` (the live, theme-aware selected accent) instead of
+  `theme.chipColor`. `colors.brand` already resolves independent of
+  light/dark app mode (`theme/themes.js`'s `resolveColors` sets it
+  unconditionally), so one change fixed both modes. Every other theme keeps
+  reading its own fixed `chipColor` — an equipped cosmetic shouldn't drift
+  when the app accent changes.
+- **`heroStat`/`previewStat` restructured** — bottom-aligning the whole row
+  (icon + value + label) made the icon look like it was "sinking" below the
+  text. Split into two nesting levels: the outer row (icon vs. a text
+  group) stays `alignItems: 'center'`; a new inner `heroStatTextGroup`/
+  `previewStatTextGroup` wraps just the value+label pair with `alignItems:
+  'flex-end'`, so only those two (the mismatched-font-size pair that
+  actually needed a shared baseline) bottom-align, and the icon centers
+  against the group's full height. Also caught `app/shop.js`'s preview
+  icons were still at size 13 from an earlier round — reverted to 11 to
+  match the confirmed-good size on the real hero card.
+- **Custom buy dialog replaces `Alert.alert`** (theme purchases only —
+  freeze purchase still uses `Alert.alert`, no visual "item" to show for
+  it) — a centered `Modal` (`dialogOverlay`/`dialogCard`, same shape as
+  Settings' delete-confirm dialog) showing a real `CardThemeSurface`
+  preview of the theme being bought. Two stages in one dialog, not two
+  separate flows: `confirm` (theme preview + "Spend N coins?" + Buy/Cancel)
+  transitions in place to `bought` (same preview + a small checkmark badge
+  + "You bought [name]" + Equip/Not now) after a successful purchase —
+  Equip is right there instead of requiring a second trip back into the
+  grid. `buyDialogStage` (`null | 'confirm' | 'bought'`) is the only new
+  state; both stages read `selected`, no separate "which theme" tracking
+  needed since the dialog is always about the currently previewed theme.
+
 ---
 
 ## Data Model Summary (Final State After All Phases)

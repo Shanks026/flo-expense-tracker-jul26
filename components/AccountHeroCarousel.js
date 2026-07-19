@@ -74,7 +74,19 @@ export default function AccountHeroCarousel({
   // theme's background, so both just use the one tint already confirmed to
   // work. Income/expense are still told apart by the trend direction (arrow
   // up/down) and the amount itself, not by icon hue.
-  const incomeIconColor = lighten(theme.chipColor, 0.65);
+  //
+  // Ink is the exception: it's the free DEFAULT (no theme bought/equipped),
+  // and lib/cardThemes.js hardcodes its chipColor to lime — which silently
+  // ignored the app's own selectable Primary Color (Settings' ColorPicker,
+  // theme/ThemeContext.js) for anyone who'd picked something other than
+  // lime. `colors.brand` already resolves to the selected accent
+  // independent of light/dark app mode (theme/themes.js's `resolveColors`
+  // sets `brand: accent.brand` unconditionally) — using it here for Ink
+  // specifically fixes both modes in one change, per direct feedback.
+  // Every OTHER card theme keeps reading its own fixed chipColor — a
+  // bought/equipped cosmetic shouldn't shift when the app accent changes.
+  const accentSource = theme.id === 'ink' ? colors.brand : theme.chipColor;
+  const incomeIconColor = lighten(accentSource, 0.65);
   const expenseIconColor = incomeIconColor;
   const styles = makeStyles(colors);
   const { isPro } = useEntitlement();
@@ -205,13 +217,17 @@ export default function AccountHeroCarousel({
                         <View style={styles.heroStatsRow}>
                           <View style={styles.heroStat}>
                             <TrendingUp size={11} color={incomeIconColor} strokeWidth={2.8} />
-                            <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_income, currency)}</Text>
-                            <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Income</Text>
+                            <View style={styles.heroStatTextGroup}>
+                              <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_income, currency)}</Text>
+                              <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Income</Text>
+                            </View>
                           </View>
                           <View style={styles.heroStat}>
                             <TrendingDown size={11} color={expenseIconColor} strokeWidth={2.8} />
-                            <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_expense, currency)}</Text>
-                            <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Expenses</Text>
+                            <View style={styles.heroStatTextGroup}>
+                              <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_expense, currency)}</Text>
+                              <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Expenses</Text>
+                            </View>
                           </View>
                         </View>
                       )}
@@ -336,12 +352,18 @@ function makeStyles(colors) {
     },
     heroStat: {
       flexDirection: 'row',
-      // flex-end, not center — per direct feedback: heroStatValue (md) and
-      // heroStatLabel (sm) are different font sizes, so center-aligning
-      // left them visually offset from each other instead of sharing a
-      // baseline. Bottom-aligning the row reads as one coherent line.
-      alignItems: 'flex-end',
+      // Centered — the icon sits against the text group's full height, not
+      // bottom-aligned with it (that read as the icon "sinking" below
+      // center). Per direct feedback: only the value/label pair (different
+      // font sizes) needs bottom-alignment for a shared baseline, not the
+      // icon too — see heroStatTextGroup below.
+      alignItems: 'center',
       flexShrink: 1,
+      gap: 7,
+    },
+    heroStatTextGroup: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
       gap: 7,
     },
     heroStatValue: {

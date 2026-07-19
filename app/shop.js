@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, CircleDollarSign, Check, Snowflake, Lock, TrendingUp, TrendingDown } from 'lucide-react-native';
@@ -56,6 +56,10 @@ export default function Shop() {
   const [selectedId, setSelectedId] = useState(null);
   const [working, setWorking] = useState(false);
   const [buyingFreeze, setBuyingFreeze] = useState(false);
+  // Custom buy dialog (replaces Alert.alert per direct feedback) —
+  // null | 'confirm' | 'bought'. Always about `selected` (the currently
+  // previewed theme), so no separate "which theme" state is needed.
+  const [buyDialogStage, setBuyDialogStage] = useState(null);
 
   const selected = getTheme(selectedId ?? equippedId);
   const selectedOwned = ownedIds.has(selected.id);
@@ -66,9 +70,12 @@ export default function Shop() {
   // Same derivation as AccountHeroCarousel — both trend icons share one
   // lightened tint from the theme's own accent (chipColor); darkening
   // expense separately was tried and dropped per direct feedback (it never
-  // read as reliably legible across every theme). See that file's own
-  // comment for the full history.
-  const previewIncomeColor = lighten(selected.chipColor, 0.65);
+  // read as reliably legible across every theme). Ink is the exception —
+  // its chipColor is hardcoded lime, ignoring the app's selected Primary
+  // Color; `colors.brand` fixes that for both light/dark app mode at once.
+  // See AccountHeroCarousel's own comment for the full history.
+  const previewAccentSource = selected.id === 'ink' ? colors.brand : selected.chipColor;
+  const previewIncomeColor = lighten(previewAccentSource, 0.65);
   const previewExpenseColor = previewIncomeColor;
 
   async function handleEquip() {
@@ -83,11 +90,12 @@ export default function Shop() {
     showToast({ message: `${selected.name} equipped`, variant: 'success' });
   }
 
+  // Custom dialog, not Alert.alert — per direct feedback, shows the theme
+  // itself (a real CardThemeSurface preview), and stays open across the
+  // purchase to become the "you bought it" confirmation instead of a
+  // separate toast, with Equip as the natural next action right there.
   function handleBuyPress() {
-    Alert.alert(selected.name, `Spend ${selected.cost.toLocaleString('en-IN')} coins to buy this theme?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Buy', onPress: confirmBuy },
-    ]);
+    setBuyDialogStage('confirm');
   }
 
   async function confirmBuy() {
@@ -96,11 +104,21 @@ export default function Shop() {
     setWorking(false);
     if (error) {
       showToast({ message: 'Could not buy theme', variant: 'error' });
+      setBuyDialogStage(null);
       return;
     }
     notifyChanged();
     refetch();
-    showToast({ message: `${selected.name} bought`, variant: 'success' });
+    setBuyDialogStage('bought');
+  }
+
+  function handleDialogClose() {
+    setBuyDialogStage(null);
+  }
+
+  async function handleDialogEquip() {
+    setBuyDialogStage(null);
+    await handleEquip();
   }
 
   function handleBuyFreezePress() {
@@ -242,14 +260,18 @@ export default function Shop() {
                     what the theme looks like on the real Home card. */}
                 <View style={styles.previewStatsRow}>
                   <View style={styles.previewStat}>
-                    <TrendingUp size={13} color={previewIncomeColor} strokeWidth={2.8} />
-                    <Text style={[styles.previewStatValue, { color: selected.textColor }]}>{formatMoney(PREVIEW_INCOME, 'INR')}</Text>
-                    <Text style={[styles.previewStatLabel, { color: selected.mutedColor }]}>Income</Text>
+                    <TrendingUp size={11} color={previewIncomeColor} strokeWidth={2.8} />
+                    <View style={styles.previewStatTextGroup}>
+                      <Text style={[styles.previewStatValue, { color: selected.textColor }]}>{formatMoney(PREVIEW_INCOME, 'INR')}</Text>
+                      <Text style={[styles.previewStatLabel, { color: selected.mutedColor }]}>Income</Text>
+                    </View>
                   </View>
                   <View style={styles.previewStat}>
-                    <TrendingDown size={13} color={previewExpenseColor} strokeWidth={2.8} />
-                    <Text style={[styles.previewStatValue, { color: selected.textColor }]}>{formatMoney(PREVIEW_EXPENSE, 'INR')}</Text>
-                    <Text style={[styles.previewStatLabel, { color: selected.mutedColor }]}>Expenses</Text>
+                    <TrendingDown size={11} color={previewExpenseColor} strokeWidth={2.8} />
+                    <View style={styles.previewStatTextGroup}>
+                      <Text style={[styles.previewStatValue, { color: selected.textColor }]}>{formatMoney(PREVIEW_EXPENSE, 'INR')}</Text>
+                      <Text style={[styles.previewStatLabel, { color: selected.mutedColor }]}>Expenses</Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -330,6 +352,57 @@ export default function Shop() {
           )}
         </View>
       )}
+
+      <Modal visible={!!buyDialogStage} transparent animationType="fade" onRequestClose={handleDialogClose}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <CardThemeSurface theme={selected} style={styles.dialogPreviewShape}>
+              <View style={styles.dialogPreviewContent}>
+                <Text style={[styles.previewName, { color: selected.textColor }]}>Flo</Text>
+                {buyDialogStage === 'bought' && (
+                  <View style={styles.dialogBoughtBadge}>
+                    <Check size={12} color={staticColors.ink} strokeWidth={3} />
+                  </View>
+                )}
+              </View>
+            </CardThemeSurface>
+
+            {buyDialogStage === 'confirm' ? (
+              <>
+                <Text style={styles.dialogTitle}>{selected.name}</Text>
+                <Text style={styles.dialogBody}>
+                  Spend {selected.cost?.toLocaleString('en-IN')} coins to buy this theme?
+                </Text>
+                <Pressable style={styles.dialogPrimaryButton} onPress={confirmBuy} disabled={working}>
+                  {working ? (
+                    <ActivityIndicator size="small" color={staticColors.ink} />
+                  ) : (
+                    <View style={styles.actionButtonRow}>
+                      <Text style={styles.dialogPrimaryButtonText}>Buy for </Text>
+                      <CircleDollarSign size={13} color={colors.ink} fill={colors.ink} strokeWidth={1.5} />
+                      <Text style={styles.dialogPrimaryButtonText}> {selected.cost?.toLocaleString('en-IN')}</Text>
+                    </View>
+                  )}
+                </Pressable>
+                <Pressable style={styles.dialogSecondaryButton} onPress={handleDialogClose} disabled={working}>
+                  <Text style={styles.dialogSecondaryButtonText}>Cancel</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.dialogTitle}>You bought {selected.name}</Text>
+                <Text style={styles.dialogBody}>Equip it now, or do it later from the shop.</Text>
+                <Pressable style={styles.dialogPrimaryButton} onPress={handleDialogEquip}>
+                  <Text style={styles.dialogPrimaryButtonText}>Equip</Text>
+                </Pressable>
+                <Pressable style={styles.dialogSecondaryButton} onPress={handleDialogClose}>
+                  <Text style={styles.dialogSecondaryButtonText}>Not now</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -490,8 +563,13 @@ function makeStyles(colors) {
     },
     previewStat: {
       flexDirection: 'row',
-      // flex-end, not center — same fix as AccountHeroCarousel's heroStat
-      // (different font sizes read offset when center-aligned).
+      // Centered against the text group — same fix as AccountHeroCarousel's
+      // heroStat (bottom-aligning the icon too made it read as "sinking").
+      alignItems: 'center',
+      gap: 7,
+    },
+    previewStatTextGroup: {
+      flexDirection: 'row',
       alignItems: 'flex-end',
       gap: 7,
     },
@@ -631,6 +709,85 @@ function makeStyles(colors) {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
       color: colors.mutedMid,
+    },
+    // Custom buy dialog (replaces Alert.alert) — same centered-overlay
+    // shape as Settings' delete-confirm Modal, but shows the actual themed
+    // card instead of a generic warning icon, and stays open across the
+    // purchase to become the "bought" confirmation (Equip/Not now) instead
+    // of handing off to a separate toast.
+    dialogOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xl,
+    },
+    dialogCard: {
+      width: '100%',
+      backgroundColor: colors.surface,
+      borderRadius: radii.cardLg,
+      padding: spacing.xl,
+      alignItems: 'center',
+    },
+    dialogPreviewShape: {
+      width: '100%',
+      height: 110,
+      marginBottom: spacing.lg,
+    },
+    dialogPreviewContent: {
+      flex: 1,
+      padding: spacing.md,
+    },
+    dialogBoughtBadge: {
+      position: 'absolute',
+      top: spacing.md,
+      right: spacing.md,
+      width: 24,
+      height: 24,
+      borderRadius: radii.pill,
+      backgroundColor: colors.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dialogTitle: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.title,
+      color: colors.ink,
+      textAlign: 'center',
+      marginBottom: spacing.sm,
+    },
+    dialogBody: {
+      fontFamily: fontFamily.medium,
+      fontSize: fontSize.base,
+      color: colors.muted,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: spacing.lg,
+    },
+    dialogPrimaryButton: {
+      width: '100%',
+      height: 52,
+      borderRadius: radii.buttonSm + 4,
+      backgroundColor: colors.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dialogPrimaryButtonText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.lg,
+      color: colors.ink,
+    },
+    dialogSecondaryButton: {
+      width: '100%',
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.xs,
+    },
+    dialogSecondaryButtonText: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.md,
+      color: colors.muted,
     },
   });
 }
