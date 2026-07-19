@@ -528,6 +528,60 @@ phases.**
   card left in place — two reachable surfaces, one mutation, no divergence
   risk).
 
+**Post-Phase-2 polish round, same session, real on-device review:**
+- **`mutedColor` (every theme's subtext + the muted ₹ currency symbol) is
+  now derived, not hand-picked** — `lib/color.js` gained `withOpacity(hex,
+  alpha)`; `lib/cardThemes.js` computes `mutedColor: withOpacity(textColor,
+  0.62)` once, for all 23 themes, instead of each theme carrying its own
+  separately-chosen muted hex. A hand-picked grey wasn't guaranteed to read
+  as "the same color, dimmer" — a genuine alpha composite is, against *any*
+  background (solid, gradient, or pattern) behind it. Verified at runtime
+  (not just Babel-parsed) that every theme's `mutedColor` is a real
+  `rgba(textColor, 0.62)` string.
+- **Income/expense trend icons, several iterations**: fixed colors
+  (`colors.income`/`colors.dangerStrong`) clashed with several card
+  backgrounds → derived from each theme's own `chipColor` via
+  `lighten`/`darken` behind a neutral scrim tile → the scrim itself started
+  reading as a clash/overlap, removed it → tried darkening expense harder
+  (0.4 → 0.6 → 0.75) to compensate → still didn't read reliably. Landed on:
+  **both icons share one `lighten(chipColor, 0.65)` tint**, no scrim, icon
+  size back to 11 (a size bump tried mid-way was reverted). Income/expense
+  are told apart by the arrow direction and the amount itself, not icon hue.
+- **`heroStat`/`previewStat` bottom-aligned, not centered** — the value
+  (`fontSize.md`) and label (`fontSize.sm`) are different sizes; `alignItems:
+  'center'` left them visually offset from each other and from the icon.
+  `flex-end` reads as one shared baseline.
+- **`weave` pattern was a real bug, not a taste call** — Carbon Fiber and
+  Denim's crosshatch was built from two PARALLEL vertical lines rotated
+  together, which only ever produces two lines going the SAME diagonal
+  direction, never a crossing weave. Fixed to one vertical + one horizontal
+  line per tile (a plain square grid) rotated 45° together — *that's* what
+  actually crosses into two directions.
+- **Marble redone** — was a pale base + a BLACK-tinted blotch overlay
+  (`accent: '#0000001a'`), which read grey/dirty, not polished stone.
+  Replaced with a warm 4-stop linear gradient (ivory → beige → light brown
+  → ivory), matching real cream/Botticino marble and reading as a sheen the
+  flat pattern didn't.
+- **Added Lava** (Rare, 850 coins) — built directly from FLO's own streak
+  colors (`theme/tokens.js`: `streak`/`streakDeep`), not an arbitrary fire
+  palette, per an explicit ask to match the app's existing "hot red." Dark
+  charred-to-ember gradient, deliberately stops short of the brightest
+  streak orange as a full stop so white text stays legible throughout.
+  `chipColor` is literally the app's `streak` orange.
+- **`blotch` pattern gained `accent3`** (optional, Aurora only so far) and
+  a general rework: colors were originally too close together (Aurora's new
+  third blob landed directly between the other two, muddying into an
+  overlap) — repositioned all three blobs to separate corners, widened
+  radii, and added a softer 3-stop opacity falloff (full → half →
+  transparent, not a hard cliff) for a diffuse-blur look instead of
+  sharp-edged discs. Applies to Marble too (2-blob case), not just Aurora.
+- **`glow` pattern gained an optional `colors` array** (multi-stop radial,
+  falls back to the original single-`accent` shape when omitted — Ember
+  unaffected) — used to redo **Onyx**: was a flat white corner glow that
+  "didn't sit tight"; now a prismatic sweep (white → violet → cyan → gold)
+  before fading out, closer to the original "prismatic edge glow" concept
+  (the actual animated sweep is still deferred, static rendering only).
+
 ---
 
 ## Data Model Summary (Final State After All Phases)
