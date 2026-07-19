@@ -22,6 +22,8 @@ import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
+import { claimDailyLog } from '../lib/rewardsMutations';
+import { useRewardBurst } from './RewardBurst';
 import { scanReceipt } from '../lib/ai';
 import { uploadReceipt, receiptSignedUrl } from '../lib/receipts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
@@ -118,6 +120,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const { activeAccountId, activeAccount, accounts } = useAccount();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { showToast } = useToast();
+  const { showRewardBurst } = useRewardBurst();
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
@@ -413,6 +416,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
     let savedId = editingId;
     let saveError;
+    let isNewEntry = false;
     if (editingId) {
       ({ error: saveError } = await supabase.from('transactions').update(payload).eq('id', editingId));
     } else {
@@ -424,6 +428,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         .single();
       saveError = error;
       savedId = data?.id ?? null;
+      isNewEntry = !error;
     }
 
     setSaving(false);
@@ -431,6 +436,30 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       showToast({ message: saveError.message, variant: 'error' });
       return;
     }
+
+    // Gamification (18-gamification-ritual-and-ledger.md Phase 2) — the daily
+    // coin+XP earn, claimed once per LOCAL day regardless of how many
+    // transactions get logged today (an idempotent upsert on reward_events;
+    // see lib/rewardsMutations.js). Only on a genuine NEW entry, never an
+    // edit — editing an old transaction isn't "showing up today". Uses
+    // `new Date()` (today, real device clock), not the `date` field state,
+    // which may be backdated — same created_at-not-occurred_at discipline
+    // lib/streak.js's own streak already follows, for the same reason: a
+    // backfilled past-dated entry still counts as logging TODAY. Never fails
+    // the save if the claim errors — the transaction itself already
+    // succeeded by this point.
+    if (isNewEntry) {
+      const { error: rewardError, isNewClaim, coins: earnedCoins, xp: earnedXp } = await claimDailyLog(
+        format(new Date(), 'yyyy-MM-dd')
+      );
+      if (rewardError) console.error('claimDailyLog failed:', rewardError.message);
+      // Only the FIRST log of the day is a genuine new claim (the daily coin/
+      // XP earn is flat per day, not per transaction) — the celebration is
+      // for that moment, not for every subsequent transaction logged the same
+      // day, which would cheapen it into background noise.
+      else if (isNewClaim) showRewardBurst({ coins: earnedCoins, xp: earnedXp });
+    }
+
     notifyChanged();
     modalRef.current?.dismiss();
     showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });

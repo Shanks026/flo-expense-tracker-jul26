@@ -7,8 +7,12 @@ import { Flame } from 'lucide-react-native';
 import Button from './Button';
 import StreakDays from './StreakDays';
 import useStreak from '../hooks/useStreak';
+import { useRewardBurst } from './RewardBurst';
 import { useAuth } from '../lib/AuthContext';
+import { useDataRefresh } from '../lib/DataRefreshContext';
 import { pickRecap, recapEyebrow, recapCta } from '../lib/koban';
+import { claimMilestone } from '../lib/rewardsMutations';
+import MilestoneChest, { chestPoolFor } from './MilestoneChest';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 
 // Keyed BY USER, not per-device. It used to be a bare 'flo.streak.lastCelebrated',
@@ -32,7 +36,15 @@ const storageKey = (userId) => `flo.streak.lastCelebrated.${userId}`;
 export default function StreakCelebration() {
   const { session } = useAuth();
   const { current, loading, loggedToday, isNewStreak, isMilestone, history } = useStreak();
+  const { isBursting } = useRewardBurst();
+  const { notifyChanged } = useDataRefresh();
   const [visible, setVisible] = useState(false);
+  // Separate from `visible` (19-card-themes.md Phase 2) — set at the same
+  // moment as the celebration, but only actually SHOWN once the celebration
+  // is dismissed (see the CTA's onPress below), so the two full-screen
+  // Modals present sequentially, not stacked.
+  const [chestDay, setChestDay] = useState(null);
+  const [chestVisible, setChestVisible] = useState(false);
   const contentRef = useRef(null);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -52,13 +64,39 @@ export default function StreakCelebration() {
   useEffect(() => {
     if (!session || !userId || loading || !loggedToday) return;
     if (!worthCelebrating) return;
+    // Ordering fix (18-gamification-ritual-and-ledger.md Phase 3, found on-
+    // device): this is a full-screen Modal, which renders in its own native
+    // layer above regular views regardless of JS-side z-index — if it showed
+    // while RewardBurst's coins/XP overlay was still animating, it silently
+    // covered the burst instead of the two coexisting. Deferring here (not
+    // marking "already celebrated" until this check actually passes) means
+    // the effect just re-evaluates once isBursting flips false, showing the
+    // streak takeover right after the burst finishes rather than racing it.
+    if (isBursting) return;
 
     const key = storageKey(userId);
     AsyncStorage.getItem(key)
       .catch(() => null)
-      .then((lastCelebrated) => {
+      .then(async (lastCelebrated) => {
         if (lastCelebrated === todayStr) return;
         AsyncStorage.setItem(key, todayStr).catch(() => {});
+
+        // Milestone payout (18-gamification-ritual-and-ledger.md Phase 5) —
+        // isNewStreak (day 1) is never a MILESTONES tier, so this only ever
+        // fires for a genuine milestone. claimMilestone's own `ref:
+        // 'milestone:<day>'` is what actually prevents a double-pay (idempotent
+        // forever, not just "already celebrated today") — this AsyncStorage
+        // check above is a separate, purely presentational guard against
+        // re-showing the SCREEN, not the source of payout correctness.
+        let reward = null;
+        if (isMilestone) {
+          const { error, isNewClaim, coins, freezes } = await claimMilestone(current);
+          if (!error && isNewClaim && (coins > 0 || freezes > 0)) {
+            reward = { coins, freezes };
+            notifyChanged();
+          }
+        }
+
         // Snapshot the content at the moment it's decided to show — streak
         // state could in principle keep changing (another transaction saved
         // right after this one) while the modal is animating in; freezing it
@@ -68,15 +106,36 @@ export default function StreakCelebration() {
           ...pickRecap({ streak: current, isNewStreak, isMilestone }),
           eyebrow: recapEyebrow({ streak: current, isNewStreak }),
           cta: recapCta(),
+          reward,
         };
+        // Day 30/50 chain into MilestoneChest right after this screen is
+        // dismissed (see the CTA's onPress below) — set now, alongside the
+        // celebration's own content, so both screens describe the same
+        // milestone snapshot rather than re-reading `current` a beat later.
+        setChestDay(isMilestone && chestPoolFor(current) ? current : null);
         setVisible(true);
       });
-  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr]);
+  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting]);
 
-  if (!visible || !contentRef.current) return null;
+  // Dismissing the celebration hands off to the chest (day 30/50 only,
+  // chestDay is null otherwise) instead of just closing — two sequential
+  // full-screen Modals, not stacked; see chestDay's own comment above.
+  function handleCelebrationDismiss() {
+    setVisible(false);
+    if (chestDay) setChestVisible(true);
+  }
+
+  function handleChestDone() {
+    setChestVisible(false);
+    setChestDay(null);
+  }
+
+  if (!visible && !chestVisible) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={() => setVisible(false)}>
+    <>
+    {visible && contentRef.current && (
+    <Modal visible={visible} animationType="fade" onRequestClose={handleCelebrationDismiss}>
       <View style={styles.screen}>
         <Animated.View entering={ZoomIn.duration(400)} style={styles.iconTile}>
           <Flame size={40} color={colors.streak} fill={colors.streak} strokeWidth={2} />
@@ -107,11 +166,26 @@ export default function StreakCelebration() {
           <StreakDays history={history} size={38} dark />
         </Animated.View>
 
+        {contentRef.current.reward && (
+          <Animated.View entering={FadeInDown.delay(650).duration(400)} style={styles.rewardPill}>
+            <Text style={styles.rewardText}>
+              +{contentRef.current.reward.coins} coins
+              {contentRef.current.reward.freezes > 0
+                ? ` · +${contentRef.current.reward.freezes} freeze${contentRef.current.reward.freezes === 1 ? '' : 's'}`
+                : ''}
+            </Text>
+          </Animated.View>
+        )}
+
         <Animated.View entering={FadeInDown.delay(900).duration(400)} style={styles.buttonWrap}>
-          <Button variant="primary" title={contentRef.current.cta} onPress={() => setVisible(false)} />
+          <Button variant="primary" title={contentRef.current.cta} onPress={handleCelebrationDismiss} />
         </Animated.View>
       </View>
     </Modal>
+    )}
+
+    {chestDay && <MilestoneChest day={chestDay} visible={chestVisible} onDone={handleChestDone} />}
+    </>
   );
 }
 
@@ -164,6 +238,19 @@ const styles = StyleSheet.create({
   },
   calendarRow: {
     marginBottom: spacing.xxl,
+  },
+  rewardPill: {
+    backgroundColor: 'rgba(224,169,48,0.16)', // coinGold wash, matching the eyebrow's own rgba-of-the-accent pattern
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+    marginTop: -spacing.lg,
+    marginBottom: spacing.xxl,
+  },
+  rewardText: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.md,
+    color: colors.coinGold,
   },
   buttonWrap: {
     width: '100%',

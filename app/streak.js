@@ -52,11 +52,14 @@ export default function StreakScreen() {
 
   const lit = current > 0;
 
-  // history is a flat list of { date: 'yyyy-MM-dd', logged } for the last 42
-  // days. Index it so the calendar can ask about a given day directly — and so
-  // a day *outside* that window is `undefined` rather than `false`, which is the
-  // difference between "not logged" and "we don't know", and is rendered as such.
-  const loggedByDate = new Map(history.map((d) => [d.date, d.logged]));
+  // history is a flat list of { date: 'yyyy-MM-dd', logged, covered, type }
+  // for the last 42 days (18-gamification-ritual-and-ledger.md Phase 3 added
+  // covered/type — a declared no-spend day counts for the streak but must
+  // render distinctly, never as a fake logged flame). Indexed by date so the
+  // calendar can ask about a given day directly — and so a day *outside* that
+  // window is `undefined` rather than a real type, which is the difference
+  // between "not logged" and "we don't know", and is rendered as such.
+  const typeByDate = new Map(history.map((d) => [d.date, d.type]));
 
   const today = new Date();
   const monthStart = startOfMonth(today);
@@ -133,11 +136,11 @@ export default function StreakScreen() {
               const key = format(day, 'yyyy-MM-dd');
               const inMonth = isSameMonth(day, today);
               const future = isAfter(day, today);
-              const logged = loggedByDate.get(key) === true;
+              const type = typeByDate.get(key);
 
               return (
                 <View key={key} style={styles.gridCell}>
-                  <StreakFlame lit={logged} size={34} dimmed={!inMonth || future} />
+                  <StreakFlame type={type} size={34} dimmed={!inMonth || future} />
                   <Text
                     style={[
                       styles.dayNumber,

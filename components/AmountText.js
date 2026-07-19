@@ -16,6 +16,13 @@ export default function AmountText({
   dark = false,
   muteCurrency = false,
   currency = 'INR',
+  // Overrides the muted currency-symbol tint for a positive amount only —
+  // for AccountHeroCarousel's themed hero card (19-card-themes.md), whose
+  // background/text swap per equipped theme, so the fixed
+  // staticColors.mutedDarker/colors.mutedLight default clashes on several
+  // themes. Every other AmountText call site omits this and keeps the
+  // original computed tone.
+  currencyColor,
   style,
 }) {
   const { colors } = useTheme();
@@ -44,12 +51,12 @@ export default function AmountText({
   // one it fought the number it belongs to, leaving a grey ₹ glued to a red
   // amount. A negative reading should be red all the way through, so the
   // currency simply takes the amount's own colour.
-  const currencyColor = isNegative ? color : dark ? staticColors.mutedDarker : colors.mutedLight;
+  const resolvedCurrencyColor = isNegative ? color : (currencyColor ?? (dark ? staticColors.mutedDarker : colors.mutedLight));
 
   return (
     <Text style={[styles.text, { color, fontSize: size }, style]}>
       {prefix}
-      <Text style={muteCurrency ? { color: currencyColor } : null}>{currencySymbol(currency)}</Text>
+      <Text style={muteCurrency ? { color: resolvedCurrencyColor } : null}>{currencySymbol(currency)}</Text>
       {formatAmountNumber(value, currency)}
     </Text>
   );

@@ -200,7 +200,9 @@ async function sendPushToUser(
 // Notifications.setNotificationCategoryAsync (lib/pushToken.js's
 // ensureCategories), which is what makes the "Log now" action button show
 // up. useNotificationSync's tap listener routes a tap (button OR body)
-// straight into AddTransactionSheet for this type.
+// straight into AddTransactionSheet for the morning trigger; the evening one
+// routes to Home instead (data.trigger — see below), where TodayCard now
+// lives (18-gamification-ritual-and-ledger.md Phase 3).
 async function sendNudges(supabase: ReturnType<typeof createClient>) {
   const now = new Date();
   const { data: profiles, error } = await supabase
@@ -235,10 +237,15 @@ async function sendNudges(supabase: ReturnType<typeof createClient>) {
       // whether today's gap is breaking real momentum or not.
       const loggedYesterday = await hasLoggedOnRelativeDay(supabase, profile.id, timezone, 1);
       const copy = getReminderCopy(trigger, loggedYesterday, localNow.dayOfWeek, firstName);
+      // `trigger` added 18-gamification-ritual-and-ledger.md Phase 3 — lets
+      // the client (lib/notifications.js's useNotificationSync) route the
+      // evening nudge to Home (where TodayCard, the close-the-day ritual,
+      // now lives) instead of straight into AddTransactionSheet like the
+      // morning one.
       const ok = await sendPushToUser(supabase, profile.id, copy.title, copy.body, {
         channelId: 'flo.reminders.nudge',
         categoryId: 'reminder-nudge',
-        data: { type: 'nudge' },
+        data: { type: 'nudge', trigger },
       });
       if (ok) sent += 1;
     }

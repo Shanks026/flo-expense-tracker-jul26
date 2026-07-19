@@ -21,6 +21,7 @@ const SEMANTIC = {
   warnStrong: BRAND_COLORS.warnStrong,
   coinGold: BRAND_COLORS.coinGold,
   iceBlue: BRAND_COLORS.iceBlue,
+  iceBlueBg: BRAND_COLORS.iceBlueBg,
 };
 
 // Everything that ISN'T the accent: the full neutral scale (bg/surface/ink/

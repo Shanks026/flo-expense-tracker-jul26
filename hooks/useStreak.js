@@ -10,7 +10,7 @@ import { computeStreak } from '../lib/streak';
 // payload small; 90 days is more than enough for any streak worth showing.
 const WINDOW_DAYS = 90;
 
-const EMPTY = computeStreak([], new Date());
+const EMPTY = computeStreak([], new Map(), new Date());
 
 // Plain, non-hook fetch — used by the hook below. Previously also used by
 // lib/notifications.js's rescheduleAll() (a plain async function, not a
@@ -20,22 +20,49 @@ const EMPTY = computeStreak([], new Date());
 // function regardless: fetching fresh rather than accepting a possibly-stale
 // passed-in streak is still the right shape for any future non-hook caller.
 export async function fetchStreak(userId) {
-  if (!userId) return computeStreak([], new Date());
+  if (!userId) return computeStreak([], new Map(), new Date());
 
   // created_at, NOT occurred_at — see lib/streak.js's comment. occurred_at is
   // user-editable, so backfilling receipts would fabricate a streak.
   const since = format(subDays(new Date(), WINDOW_DAYS), 'yyyy-MM-dd');
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('created_at, type, amount')
-    // Transfers are bookkeeping between your own accounts, not "showing up and
-    // logging" — they must not count toward the streak or today's totals.
-    .in('type', ['income', 'expense'])
-    .gte('created_at', since)
-    .order('created_at', { ascending: false });
+  const [txnResult, noSpendResult, frozenResult] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('created_at, type, amount')
+      // Transfers are bookkeeping between your own accounts, not "showing up
+      // and logging" — they must not count toward the streak or today's totals.
+      .in('type', ['income', 'expense'])
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }),
+    // Declared no-spend days (18-gamification-ritual-and-ledger.md Phase 3) —
+    // `ref` holds the local date string for a 'no_spend' reward_events row,
+    // the same idempotency key claimNoSpend() writes.
+    supabase.from('reward_events').select('ref').eq('source', 'no_spend').gte('ref', since),
+    // Frozen days (Phase 4) — `ref` holds the local date string for each
+    // 'freeze_used' row useFreezeForDates() writes, one per covered day.
+    // RLS already scopes both queries to the caller, same as the
+    // transactions query above — no explicit .eq('user_id', ...) needed.
+    // String comparison on `ref` works for the >= since bound because
+    // zero-padded ISO dates sort lexicographically in chronological order.
+    supabase.from('reward_events').select('ref').eq('source', 'freeze_used').gte('ref', since),
+  ]);
 
-  if (error) return computeStreak([], new Date());
-  return computeStreak(data ?? [], new Date());
+  if (txnResult.error) return computeStreak([], new Map(), new Date());
+
+  // Map, not a Set — lib/streak.js's history needs to know WHICH kind of
+  // coverage a date has, not just that it's covered. Insertion order is the
+  // precedence: no-spend first, frozen second, so frozen wins on the rare
+  // date that's somehow both (matches lib/streak.js's own documented
+  // logged > frozen > nospend precedence).
+  const coveredDates = new Map();
+  if (!noSpendResult.error) {
+    for (const row of noSpendResult.data ?? []) coveredDates.set(row.ref, 'nospend');
+  }
+  if (!frozenResult.error) {
+    for (const row of frozenResult.data ?? []) coveredDates.set(row.ref, 'frozen');
+  }
+
+  return computeStreak(txnResult.data ?? [], coveredDates, new Date());
 }
 
 // A streak is a habit, not a ledger view — so this is GLOBAL, deliberately not

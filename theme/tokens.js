@@ -66,6 +66,7 @@ export const colors = {
   // in blue at all, so no collision risk there.
   coinGold: '#E0A930',
   iceBlue: '#4FC3E8',
+  iceBlueBg: '#DFF4FB', // pale wash, for tiles/cells behind a frozen-day glyph — same role as streakBg
 
   completedBg: '#F1F2ED',
   completedBorder: '#E7E8E2',

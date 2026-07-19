@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight } from 'lucide-react-native';
+import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Star } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -14,6 +14,7 @@ import ReportReadyCard from '../../components/ReportReadyCard';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import AccountHeroCarousel from '../../components/AccountHeroCarousel';
+import TodayCard from '../../components/TodayCard';
 import useStreak from '../../hooks/useStreak';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -23,8 +24,6 @@ import useTransactions from '../../hooks/useTransactions';
 import useSpendingTrend from '../../hooks/useSpendingTrend';
 import useProfile from '../../hooks/useProfile';
 import useBills, { billStatus } from '../../hooks/useBills';
-import useEntitlement from '../../hooks/useEntitlement';
-import ProBadge from '../../components/ProBadge';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
@@ -36,21 +35,15 @@ import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
 import { getGreeting } from '../../lib/greetings';
+import useRewards from '../../hooks/useRewards';
+import { useRewardsHistorySheet } from '../../components/RewardsHistorySheet';
+import useCardThemes from '../../hooks/useCardThemes';
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
   due_soon: { iconTone: 'warn', amountColor: staticColors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
 };
 const MAX_UPCOMING_BILLS = 4;
-
-// Structural placeholders for the gamification economy (IDEAS-gamification.md
-// — coins, streak freezes). Static, not wired to any hook: there's no
-// `reward_events`/`v_coin_balance` yet (see that doc's "Data model sketch"),
-// this is just reserving the header's left slot and its visual shape ahead
-// of the real numbers landing. Replace with a real balance hook once that
-// ledger exists — don't let these linger as "temporary" past that point.
-const PLACEHOLDER_COINS = 240;
-const PLACEHOLDER_FREEZES = 1;
 
 export default function Home() {
   const { colors } = useTheme();
@@ -71,8 +64,10 @@ export default function Home() {
   const { bills, loading: billsLoading } = useBills();
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
-  const { isPro } = useEntitlement();
   const currency = useCurrency();
+  const { coins, freezes, level } = useRewards();
+  const { openRewardsHistory } = useRewardsHistorySheet();
+  const { equippedTheme } = useCardThemes();
 
   // Lit only when there IS a streak. The muted flame on a zero streak is not a
   // failure state — it's the invitation.
@@ -105,21 +100,39 @@ export default function Home() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            {/* Placeholders — see PLACEHOLDER_COINS/PLACEHOLDER_FREEZES above.
-                Not pressable yet: nothing to open until a shop/economy exists. */}
-            <View style={styles.gamiChip}>
-              <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
-              <Text style={styles.gamiChipText}>{PLACEHOLDER_COINS}</Text>
-            </View>
-            <View style={styles.gamiChip}>
-              {/* Snowflake has no closed/fillable region (just radiating
-                  strokes) — `fill` is a harmless no-op here; a bolder
-                  strokeWidth is what actually reads as "filled/solid" for
-                  a line-only glyph like this, vs. CircleDollarSign's real
-                  fill above. */}
-              <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
-              <Text style={styles.gamiChipText}>{PLACEHOLDER_FREEZES}</Text>
-            </View>
+            {/* Item stats — coins + freezes, "your stuff". Level moved back
+                out to its own chip (18-gamification-ritual-and-ledger.md
+                Phase 5) — a bare "⭐ 10" folded in here read as unclear (icon
+                alone doesn't say what the number IS, unlike coins/freeze/
+                streak, whose icon already carries the meaning), and adding a
+                "LVL" label to disambiguate needed more room than fit as a
+                third entry in this chip. */}
+            <Pressable style={styles.itemStats} onPress={openRewardsHistory}>
+              <View style={styles.itemStatEntry}>
+                <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+                <Text style={styles.itemStatText}>{coins.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.itemStatDivider} />
+              <View style={styles.itemStatEntry}>
+                {/* Snowflake has no closed/fillable region (just radiating
+                    strokes) — `fill` is a harmless no-op here; a bolder
+                    strokeWidth is what actually reads as "filled/solid" for
+                    a line-only glyph like this, vs. CircleDollarSign's real
+                    fill above. */}
+                <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
+                <Text style={styles.itemStatText}>{freezes}</Text>
+              </View>
+            </Pressable>
+            {/* Level — its own chip, "LVL" label + number. Opens Menu, where
+                the fuller Rank/Level/XP card lives — same "compact here,
+                full detail one tap away" pattern as the streak chip → /streak. */}
+            <Pressable style={styles.levelChip} onPress={openMenu}>
+              <Star size={16} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
+              <Text style={styles.itemStatText}>
+                <Text style={styles.levelChipLabel}>LVL </Text>
+                {level}
+              </Text>
+            </Pressable>
           </View>
           <View style={styles.headerRight}>
             {/* Duolingo's model: the streak lives in the header, always visible,
@@ -161,7 +174,6 @@ export default function Home() {
                 <Text style={styles.avatarText}>{initial}</Text>
               </View>
             )}
-            {isPro && <ProBadge variant="overlay" />}
           </Pressable>
           <View style={styles.welcomeTextGroup}>
             <Text style={styles.welcomeTitle}>{greetingTitle}</Text>
@@ -177,7 +189,11 @@ export default function Home() {
           summaries={summaries}
           summariesLoading={summariesLoading}
           currency={currency}
+          cardTheme={equippedTheme}
         />
+
+        {/* Close-the-day ritual (18-gamification-ritual-and-ledger.md Phase 3) */}
+        <TodayCard />
 
         <Card style={styles.chartCard}>
           {trendLoading ? (
@@ -325,11 +341,42 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: spacing.sm,
   },
-  // Static placeholders — see PLACEHOLDER_COINS/PLACEHOLDER_FREEZES. Same
-  // chip language as streakChip/bellButton (44-tall, bordered surface) so
-  // the row reads as one consistent set of counters, not a mismatched
-  // temporary widget bolted on.
-  gamiChip: {
+  // One container for "your stuff" — coins + freeze count. Same
+  // streakChip/bellButton grammar (44-tall, bordered surface) so it reads as
+  // part of the same header counter language.
+  itemStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 10,
+  },
+  itemStatEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  itemStatDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: colors.border,
+  },
+  itemStatText: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    letterSpacing: -0.2,
+    color: colors.ink,
+  },
+  // Level's own chip (18-gamification-ritual-and-ledger.md Phase 5) — same
+  // grammar as itemStats, separate pill: a bare number folded into
+  // itemStats read as unclear (unlike coins/freeze, whose icon alone already
+  // says what the number is), and the "LVL" label needed to disambiguate it
+  // didn't fit as a third itemStats entry without cramping the row.
+  levelChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -340,11 +387,11 @@ function makeStyles(colors) {
     borderWidth: 1,
     borderColor: colors.border,
   },
-  gamiChipText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    letterSpacing: -0.2,
-    color: colors.ink,
+  levelChipLabel: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    letterSpacing: 0.2,
+    color: colors.mutedMid,
   },
   avatarWrap: {
     position: 'relative',
@@ -370,10 +417,10 @@ function makeStyles(colors) {
     color: staticColors.ink,
   },
   // Avatar lives here now, not in headerRow — freeing headerRow's left slot
-  // for the gamification chips above. Carries a real headline + a subtitle
-  // line (currently static; will become dynamic gamification content once
-  // there's data to drive it) rather than the old fixed-size "Good morning"
-  // + name pairing that had to fit avatar-height.
+  // for the item-stats/XP chips above. Subtitle is lib/greetings.js's real
+  // day/time-varied voice copy — the Money Level metric that once lived
+  // beneath it moved to the Menu sheet (18-gamification-ritual-and-ledger.md),
+  // so this stays exactly what it looks like: the greeting, nothing else.
   welcomeRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -5,6 +5,7 @@ import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-
 import { scheduleOnRN } from 'react-native-worklets';
 import { ChevronDown, ChevronRight, Plus, TrendingUp, TrendingDown } from 'lucide-react-native';
 import Card from './Card';
+import CardThemeSurface from './CardThemeSurface';
 import AmountText from './AmountText';
 import Skeleton from './Skeleton';
 import AccountDots from './AccountDots';
@@ -15,6 +16,8 @@ import { FREE_LIMITS } from '../lib/pro';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { formatMoney } from '../lib/currency';
+import { getTheme } from '../lib/cardThemes';
+import { lighten } from '../lib/color';
 
 // Gap between adjacent cards in the row — small enough that the neighbor
 // reads as "the next card," not a separate unrelated block.
@@ -49,8 +52,30 @@ function formatAmount(value, currency) {
 // teaser slide must NOT change which account is actually active. Swiping
 // onto a REAL account slide calls `onSwitchAccount`; swiping onto the
 // teaser slide doesn't touch the account at all.
-export default function AccountHeroCarousel({ accounts, activeAccountId, onSwitchAccount, onOpenSwitcher, summaries, summariesLoading, currency }) {
+export default function AccountHeroCarousel({
+  accounts,
+  activeAccountId,
+  onSwitchAccount,
+  onOpenSwitcher,
+  summaries,
+  summariesLoading,
+  currency,
+  cardTheme,
+}) {
   const { colors } = useTheme();
+  // Falls back to Ink (today's pre-feature look) if no theme is resolved
+  // yet — 19-card-themes.md Phase 1. Ink is the free default so this is
+  // never visibly wrong, just a safe placeholder during the first render.
+  const theme = cardTheme ?? getTheme('ink');
+  // Trend-icon colors derive from the card's own accent (chipColor), not a
+  // fixed semantic green/red. Both icons share the SAME lightened tint —
+  // per direct feedback (2026-07-20), darkening expense separately (tried
+  // at two different amounts) never read as reliably legible across every
+  // theme's background, so both just use the one tint already confirmed to
+  // work. Income/expense are still told apart by the trend direction (arrow
+  // up/down) and the amount itself, not by icon hue.
+  const incomeIconColor = lighten(theme.chipColor, 0.65);
+  const expenseIconColor = incomeIconColor;
   const styles = makeStyles(colors);
   const { isPro } = useEntitlement();
   const { openAddAccount } = useAddAccountSheet();
@@ -142,53 +167,56 @@ export default function AccountHeroCarousel({ accounts, activeAccountId, onSwitc
               const summary = summaries[account.id] ?? EMPTY_SUMMARY;
               return (
                 <View key={account.id} style={[styles.slot, { width: viewportWidth || undefined, marginRight: GAP }]}>
-                  <Card dark style={styles.heroCard}>
-                    <View style={styles.heroTopRow}>
-                      <Pressable style={styles.accountHeading} onPress={onOpenSwitcher} hitSlop={6}>
-                        <View style={[styles.accountColorLine, { backgroundColor: account.color }]} />
-                        <View style={styles.accountNameRow}>
-                          <Text style={styles.accountName} numberOfLines={1}>
-                            {account.name}
-                          </Text>
-                          <ChevronDown size={14} color={staticColors.mutedMid} strokeWidth={2.4} />
-                        </View>
-                      </Pressable>
-                    </View>
+                  <CardThemeSurface theme={theme} style={styles.heroCardShape}>
+                    <View style={styles.heroCardContent}>
+                      <View style={styles.heroTopRow}>
+                        <Pressable style={styles.accountHeading} onPress={onOpenSwitcher} hitSlop={6}>
+                          <View style={[styles.accountColorLine, { backgroundColor: account.color }]} />
+                          <View style={styles.accountNameRow}>
+                            <Text style={[styles.accountName, { color: theme.textColor }]} numberOfLines={1}>
+                              {account.name}
+                            </Text>
+                            <ChevronDown size={14} color={theme.mutedColor} strokeWidth={2.4} />
+                          </View>
+                        </Pressable>
+                      </View>
 
-                    <Text style={styles.heroLabel}>In Hand</Text>
-                    {summariesLoading ? (
-                      <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: staticColors.inkCard }} />
-                    ) : (
-                      <AmountText
-                        value={summary.in_hand_balance}
-                        type="neutral"
-                        dark
-                        muteCurrency
-                        currency={currency}
-                        size={fontSize.amountLg}
-                        style={styles.heroBalance}
-                      />
-                    )}
-                    {summariesLoading ? (
-                      <View style={styles.heroStatsRow}>
-                        <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: staticColors.inkCard }} />
-                        <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: staticColors.inkCard }} />
-                      </View>
-                    ) : (
-                      <View style={styles.heroStatsRow}>
-                        <View style={styles.heroStat}>
-                          <TrendingUp size={12} color={colors.income} strokeWidth={2.6} />
-                          <Text style={styles.heroStatValue}>{formatAmount(summary.month_income, currency)}</Text>
-                          <Text style={styles.heroStatLabel}>Income</Text>
+                      <Text style={[styles.heroLabel, { color: theme.mutedColor }]}>In Hand</Text>
+                      {summariesLoading ? (
+                        <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: 'rgba(128,128,128,0.25)' }} />
+                      ) : (
+                        <AmountText
+                          value={summary.in_hand_balance}
+                          type="neutral"
+                          dark
+                          muteCurrency
+                          currency={currency}
+                          currencyColor={theme.mutedColor}
+                          size={fontSize.amountLg}
+                          style={[styles.heroBalance, { color: theme.textColor }]}
+                        />
+                      )}
+                      {summariesLoading ? (
+                        <View style={styles.heroStatsRow}>
+                          <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: 'rgba(128,128,128,0.25)' }} />
+                          <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: 'rgba(128,128,128,0.25)' }} />
                         </View>
-                        <View style={styles.heroStat}>
-                          <TrendingDown size={12} color={colors.dangerStrong} strokeWidth={2.6} />
-                          <Text style={styles.heroStatValue}>{formatAmount(summary.month_expense, currency)}</Text>
-                          <Text style={styles.heroStatLabel}>Expenses</Text>
+                      ) : (
+                        <View style={styles.heroStatsRow}>
+                          <View style={styles.heroStat}>
+                            <TrendingUp size={11} color={incomeIconColor} strokeWidth={2.8} />
+                            <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_income, currency)}</Text>
+                            <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Income</Text>
+                          </View>
+                          <View style={styles.heroStat}>
+                            <TrendingDown size={11} color={expenseIconColor} strokeWidth={2.8} />
+                            <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_expense, currency)}</Text>
+                            <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Expenses</Text>
+                          </View>
                         </View>
-                      </View>
-                    )}
-                  </Card>
+                      )}
+                    </View>
+                  </CardThemeSurface>
                 </View>
               );
             })}
@@ -236,6 +264,18 @@ function makeStyles(colors) {
     },
     heroCard: {
       borderRadius: radii.cardLg,
+      paddingVertical: 22,
+      paddingHorizontal: 24,
+    },
+    // Themed hero cards (19-card-themes.md) split shape from content —
+    // CardThemeSurface's own `style` prop must carry no padding (see its
+    // comment on why), so the real padding lives on this inner wrapper
+    // instead. The "Add account" teaser slide is deliberately NOT themed
+    // and keeps using `heroCard` directly on `<Card dark>` above.
+    heroCardShape: {
+      borderRadius: radii.cardLg,
+    },
+    heroCardContent: {
       paddingVertical: 22,
       paddingHorizontal: 24,
     },
@@ -296,7 +336,11 @@ function makeStyles(colors) {
     },
     heroStat: {
       flexDirection: 'row',
-      alignItems: 'center',
+      // flex-end, not center — per direct feedback: heroStatValue (md) and
+      // heroStatLabel (sm) are different font sizes, so center-aligning
+      // left them visually offset from each other instead of sharing a
+      // baseline. Bottom-aligning the row reads as one coherent line.
+      alignItems: 'flex-end',
       flexShrink: 1,
       gap: 7,
     },

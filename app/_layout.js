@@ -20,6 +20,7 @@ import { DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider } from '../lib/AccountContext';
 import { ToastProvider, useToast } from '../components/Toast';
+import { RewardBurstProvider } from '../components/RewardBurst';
 import { AddTransactionSheetProvider, useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { AddBudgetSheetProvider } from '../components/AddBudgetSheet';
 import { AddPlanSheetProvider } from '../components/AddPlanSheet';
@@ -27,8 +28,11 @@ import { AddBillSheetProvider } from '../components/AddBillSheet';
 import { PayBillSheetProvider } from '../components/PayBillSheet';
 import DueBillsModal from '../components/DueBillsModal';
 import StreakCelebration from '../components/StreakCelebration';
+import FreezePrompt from '../components/FreezePrompt';
+import RankUpCelebration from '../components/RankUpCelebration';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
 import { AddCategorySheetProvider } from '../components/AddCategorySheet';
+import { RewardsHistorySheetProvider } from '../components/RewardsHistorySheet';
 import { AddAccountSheetProvider } from '../components/AddAccountSheet';
 import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet';
 import { MenuSheetProvider } from '../components/MenuSheet';
@@ -356,6 +360,7 @@ function RootNavigator() {
         <AccountProvider>
         <ToastProvider>
           <BottomSheetModalProvider>
+            <RewardBurstProvider>
             <ProUpsellSheetProvider>
               <AddAccountSheetProvider>
                 <AccountSwitcherSheetProvider>
@@ -366,6 +371,7 @@ function RootNavigator() {
                           <PayBillSheetProvider>
                             <EditProfileSheetProvider>
                               <AddCategorySheetProvider>
+                                <RewardsHistorySheetProvider>
                                 <MenuSheetProvider>
                                   <AlertsSheetProvider>
                                     <OnboardingGate />
@@ -377,6 +383,8 @@ function RootNavigator() {
                                     <DetectedTransactionHandler />
                                     <DueBillsModal />
                                     <StreakCelebration />
+                                    <FreezePrompt />
+                                    <RankUpCelebration />
                                     {/* contentStyle matches the active theme's screen bg —
                                         without it, React Navigation's native-stack default
                                         (always white) paints for a frame during every push
@@ -386,6 +394,7 @@ function RootNavigator() {
                                     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
                                   </AlertsSheetProvider>
                                 </MenuSheetProvider>
+                                </RewardsHistorySheetProvider>
                               </AddCategorySheetProvider>
                             </EditProfileSheetProvider>
                           </PayBillSheetProvider>
@@ -396,6 +405,7 @@ function RootNavigator() {
                 </AccountSwitcherSheetProvider>
               </AddAccountSheetProvider>
             </ProUpsellSheetProvider>
+            </RewardBurstProvider>
           </BottomSheetModalProvider>
         </ToastProvider>
       </AccountProvider>

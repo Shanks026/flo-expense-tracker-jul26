@@ -10,6 +10,161 @@ dual-track cosmetics, seasonal themes, where skins actually display, and the
 promo-card/ads decision. The rejected ideas are recorded *with their
 reasoning* so they aren't re-litigated.
 
+**Updated 2026-07-19** with the reframe below — everything above rewards
+*logging*; this round asks the harder question (why open the app at all) and
+lands on the daily *ritual* as the missing retention primitive. User decision:
+start the build here. The reframe reorders the suggested flow (the ritual +
+ledger now come before the trophy room).
+
+---
+
+## The reframe that changes the goal: logging is a chore, closing the day is a ritual
+
+Everything below this section rewards **logging harder** — more coins, more
+milestones, more quests for the same act of recording a transaction. But
+logging is a *chore*, and gamifying a chore harder yields a better chore, not a
+hook. The uncomfortable asymmetry, stated plainly: Duolingo's core action **is**
+the reward (you learn something); FLO's core action produces no intrinsic payoff
+— nobody enjoys typing "₹40 chai." So the retention question the economy never
+quite answers is: **why open FLO on a day you have nothing to log?**
+
+The answer is a conscious end-of-day **close-the-day** moment. It doesn't
+replace logging or drive the streak — the streak still measures the real
+behavior (below) — it's the *wrapper* that gives the day a finish line (the way
+Apple's rings close) and, crucially, turns a gap-day from a silent failure into
+a *decision*: a no-spend win, or a freeze. The economy above doesn't change; it
+gets a daily home and an honest way to handle the days you have nothing to log.
+
+### The daily loop — four states, two currencies
+
+The streak measures **engaging with your money today**, which is one of two
+honest acts: you **logged a transaction**, or you consciously **declared a
+no-spend day**. Doing nothing at all is the only thing that breaks it (recovered
+by a freeze, below). Two currencies come off the day and do different jobs:
+
+- **Coins** — spendable (shop fuel), earned **only by logging**. Flat, once per
+  day (the doc's anti-fake-₹1 rule). **Never** earned by a no-spend day —
+  otherwise not-logging pays the same as logging, and the app is paying you to
+  stop tracking, which rots the one thing it exists to do.
+- **XP** — permanent progress, feeds **Money Level** (below). Earned for
+  *showing up* — a logged day OR a declared no-spend day. Fakeable, and that's
+  fine: it's a vanity ladder; faking only inflates your own number, leaks no
+  money data, and keeps people opening the app anyway.
+
+The four states (**amounts illustrative — "ratios, not gospel"**; the invariants
+under the table are what's actually fixed):
+
+| Day | Streak | XP | Coins |
+|---|---|---|---|
+| **Logged** | +1 | full (e.g. 1000) | full (e.g. 100) |
+| **No-spend (declared)** | +1 | partial (e.g. ~750) | **0** |
+| **Freeze-covered miss** | held | one-time (e.g. 500) | one-time (e.g. 25) |
+| **Start fresh (after a break)** | reset → 1 | full | full |
+
+Invariants at any tuning: **(1)** a logged day out-earns every other state in
+both currencies; **(2)** a no-spend day earns **zero coins**; **(3)** the freeze
+comeback is one-time and below a logged day; **(4)** coins stay scarce against
+shop sinks, XP inflates freely. Break (1) or (2) and not-logging becomes as good
+as logging — the failure mode the whole design exists to prevent. "Start fresh"
+is a normal logged day (full reward) that happens to be Day 1 — the penalty for
+breaking is the lost streak *length*, never a withheld daily reward on the
+comeback (that would double-punish the exact demoralized moment).
+
+### The acknowledgement — a receipt, not a toll
+
+An end-of-day notification brings the user back; what they see depends on the
+day, and a dialog is only *forced* when there's a decision to make:
+
+- **Logged day** — an **optional** recap ("₹450 across 3 logs · +100 coins · Day
+  12"). Coins/XP were already earned **by the log itself**; the dialog only
+  reveals them. A diligent logger who ignores the notification keeps everything
+  — never gate earned coins behind a second tap, or you nag your best users.
+- **No-spend day** — a **required** dialog ("Nothing logged — a no-spend day?").
+  The tap is the *only* place a no-spend day can be recorded (no transaction to
+  hang it on) → **+streak, +XP, 0 coins.**
+- **Missed day(s), on return** — a **required** prompt ("You missed [day]. Use a
+  freeze, or start over?"). Conscious, never silent auto-consume — hiding the
+  decision is wrong for an app about awareness.
+
+Every earn is an **idempotent `reward_events` row** keyed on the date (`UNIQUE
+(user_id, source, ref)`) so nothing double-claims. The logged-day earn is
+computed from the transaction; the no-spend and freeze earns are user-initiated
+claims — the cheapest kind to build correctly, because the tap *is* the claim.
+This makes `computeStreak` covered-dates-aware: it takes transaction days plus
+declared-no-spend days plus frozen days as the covered set, and stays pure.
+
+### Freezes — atomic, conscious, honest in the calendar
+
+- **1 freeze = 1 day.** Covering 3 missed days costs 3 freezes; a user holding 5
+  keeps 2. No "5-day mega-freeze" — a stack of single-day tokens is more legible
+  and doesn't silently forgive a whole week of not logging.
+- The **comeback reward is flat and one-time** (e.g. 500 XP / 25 coins) no
+  matter how many days were patched, so gaps aren't worth hoarding. The day you
+  return and actually log earns its normal logged-day reward *on top* — separate
+  event.
+- A frozen day renders as its **own ice tile** in the calendar, never a fake
+  flame (already the doc's standing freeze rule — the calendar must not lie).
+- Earned via achievements, which grant **quantity** (day-30 → 1, day-100 → 3),
+  not a fatter token. Reviving an *already-dead* streak stays out of this — that
+  is **repair**: rare, chest-exclusive per the shop section, never a routine
+  token. The only "bigger" protection worth ever building is a planned
+  **vacation/pause** declared *in advance* (honest because it can't be applied
+  reactively to paper over a break) — not a second earned "ultra freeze."
+
+### Money Level — the progress that never resets
+
+Streaks break and coins get spent; neither gives a **permanent identity**, and
+a broken 40-day streak is the exact demoralized moment that churns a user. So
+add a lifetime **Money Level** that only ever goes up — the safety net under the
+streak's tension. When the streak dies, "you're still Money Level 12" catches
+the fall instead of "back to zero."
+
+The elegant part: still **no new table.** XP is a second column on the same
+`reward_events` rows as coins (a logged-day row = `coins:100, xp:1000`; a
+no-spend row = `coins:0, xp:750`). Because XP is **only ever earned** — there is
+no XP sink, it's not spendable — `Σxp` is monotonic *by construction*, so it can
+never regress the way a spend-and-earn balance can. One ledger yields three
+numbers: spendable **coins** (`Σcoins_earn − Σcoins_spend`), lifetime **XP**
+(`Σxp`), and the **level** curve over it. The curve lives in `lib/rewards.js`,
+pure and testable like `lib/streak.js`. Home already reserves the spot: the
+`welcomeSubtitle` slot under the greeting is commented "will become dynamic
+gamification content" — this is that content.
+
+Because XP carries **no money data** — it's pure engagement — it's the one
+metric that could feed a *future* leaderboard without leaking anything personal,
+where a money ranking never could. It's still farmable (you can inflate it by
+just showing up), so the leaderboard itself stays **parked** per the Rejected
+section; XP is merely built leaderboard-*ready*, not leaderboard-*live*.
+
+### Supporting ideas recorded (from the 2026-07-19 brainstorm, not yet scheduled)
+
+These extend the ritual; parked here so they aren't lost, sequenced after the
+ritual + ledger land:
+
+- **Daily rings** — three tiny closable loops on Home (logged today · under
+  today's pace · everything categorized). A glanceable daily state; closing the
+  day is the master ring.
+- **Sunday Wrapped** — elevate the existing weekly report into a swipeable,
+  Koban-narrated, shareable recap. The *anticipation* of the weekly recap is a
+  retention hook independent of daily logging; it also gives the promo-card and
+  the parked anonymous-percentile idea a natural home.
+- **Compete with past-you, never other people** — "12-day streak, your personal
+  best"; "4 more logged days than last month." Self-comparison is safe under the
+  self-reported-data constraint where leaderboards are not.
+- **Home/lock-screen widget** — for a *habit* app the highest-frequency trigger
+  there is; a streak flame + "close today" beats a push. Already parked in
+  `IDEAS.md`; the ritual gives it its verb.
+- **Surprise timing, not surprise contents** — occasional "Koban left you +5 for
+  showing up" on a day you almost forgot. Variable-reward *delight* without a
+  gambling loop (the chest stays deterministic; this varies *when*, never
+  *what*).
+- **Front-loaded first week** — a guided first-7-days quest ladder from the
+  "one-time firsts," guaranteed early wins before the habit is real.
+- **Calm gamification as brand** — deliberately the anti-Robinhood-confetti:
+  celebrate discipline (a kept budget, a no-spend day), never manufacture money
+  anxiety. A dial set to ~6, not Duolingo's 11 — real stakes, but never
+  sold-back safety, never guilt.
+
 ---
 
 ## The constraint that decides everything: FLO's data is self-reported
@@ -332,14 +487,13 @@ derived balance**, mirroring `transactions` → `v_global_summary`.
 
 ## Open decisions before this graduates
 
-1. **The no-spend wrinkle.** The streak counts transaction rows by
-   `created_at` (`lib/streak.js`) — a genuinely frugal day with nothing to log
-   **breaks the streak today**. Any "no-spend day" quest collides with this.
-   Options: (a) an explicit "mark today no-spend" action that counts as the
-   day's engagement (probably a `reward_events` row doubling as a streak
-   marker — touches streak semantics, needs its own think), or (b) drop
-   no-spend quests and keep the streak purely log-based. Don't build quests
-   around no-spend until this is decided.
+1. **The no-spend wrinkle.** ~~The streak counts transaction rows by
+   `created_at`; a frugal no-spend day breaks it.~~ **Resolved 2026-07-19** —
+   see "The daily loop" above. A **declared** no-spend day (an explicit
+   acknowledgement tap → `reward_events` row, `source: 'no_spend'`) covers the
+   day for the streak and earns XP but **zero coins**; `computeStreak` stays
+   pure and takes covered dates (transactions + declared no-spend + freezes) as
+   a second input. No-spend quests are unblocked.
 2. **Launch before or after mascot art?** Recommendation: **before** — the
    freeze + trophies + card themes are a real item pool without a single new
    art asset. Mascot skins slot in whenever art exists.
@@ -362,6 +516,16 @@ AI/Edge-Function → pricing → sub screens → launch → *then* this track).
 Retention pays proportionally to user count — resist pulling the trophy room
 earlier just because it's cheap.
 
+0. **The ritual: "close the day" + `reward_events` + Money Level** — moved to
+   the front 2026-07-19 (see the reframe section). This is the piece that turns
+   FLO from a gamified chore into a daily ritual, and it builds the append-only
+   ledger every later step rides on. Slice = the close-the-day acknowledgement
+   (incl. the no-spend declaration), the ledger + `v_coin_balance` + XP column,
+   covered-dates-aware `computeStreak`, a `lib/rewards.js` level curve, and Home
+   wiring (real coin chip + Money Level in the reserved `welcomeSubtitle` slot).
+   No art, no cosmetics yet. The streak freeze (originally step 3) now rides the
+   *same* covered-dates pipe this builds, so it becomes a small follow-on rather
+   than its own lift.
 1. **Trophy room** — the highest selling-point-per-effort item in this doc.
    No economy, no new tables, no art (Lucide icons); everything derivable
    from existing streak/budget/plan data. A visible new screen in days, and
