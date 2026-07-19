@@ -311,7 +311,22 @@ export default function Settings() {
     const field = timePickerField;
     setTimePickerField(null);
     if (!selected || !field) return;
-    const hh = String(selected.getHours()).padStart(2, '0');
+
+    // Confining morning to the AM half and evening to the PM half — not just
+    // "must be before/after the other" — so the two can never collide (a
+    // user could otherwise set both to the same time, or "morning" later in
+    // the day than "evening") without needing a second cross-field check.
+    const hours = selected.getHours();
+    if (field === 'morning' && hours >= 12) {
+      showToast({ message: 'Morning reminder must be before 12 PM', variant: 'error' });
+      return;
+    }
+    if (field === 'evening' && hours < 12) {
+      showToast({ message: 'Evening reminder must be after 12 PM', variant: 'error' });
+      return;
+    }
+
+    const hh = String(hours).padStart(2, '0');
     const mm = String(selected.getMinutes()).padStart(2, '0');
     const column = field === 'morning' ? 'morning_reminder_time' : 'evening_reminder_time';
     await updateProfile({ [column]: `${hh}:${mm}:00` }, { silent: true });

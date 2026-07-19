@@ -209,6 +209,41 @@ function OnboardingGate() {
 // default accent/mode immediately, rather than let account A's cached
 // choice flash on screen while account B's profile is still loading. The
 // reconciliation effect above then takes over once B's own profile arrives.
+// Sibling of <Stack>, same placement/reason as ThemeProfileSync (needs
+// useProfile(), which needs useDataRefresh(), which RootNavigator defines
+// but doesn't consume) — and the same real gap that push-token registration
+// had: profiles.timezone has a DB column and a hardcoded default
+// ('Asia/Kolkata'), and send-push's cron reads it to decide when "morning"/
+// "evening" local time actually is, but nothing anywhere in the client ever
+// WROTE a real value into it. Every user, regardless of actual device
+// timezone, was silently being scheduled as if they were in India — found
+// via a real device test (VPN'd to Australia, a reminder set for a specific
+// local time never arrived, because "local time" was being computed against
+// a timezone the device was never in and the VPN doesn't change the OS
+// timezone either way).
+//
+// Compares the device's real IANA timezone against the last-synced value on
+// every profile refetch (cold start, and the many notifyChanged() calls
+// normal app use already triggers) — not a dedicated poll/interval, since
+// useProfile's own refetch cadence already gives this frequent-enough
+// chances to catch a real change (the user travelling, or the timezone
+// simply never having been set at all).
+function TimezoneSync() {
+  const { session } = useAuth();
+  const { profile, updateProfile } = useProfile();
+  const userId = session?.user?.id ?? null;
+
+  useEffect(() => {
+    if (!userId || !profile) return;
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (deviceTimezone && deviceTimezone !== profile.timezone) {
+      updateProfile({ timezone: deviceTimezone }, { silent: true });
+    }
+  }, [userId, profile, updateProfile]);
+
+  return null;
+}
+
 function ThemeProfileSync() {
   const { session } = useAuth();
   const { profile } = useProfile();
@@ -335,6 +370,7 @@ function RootNavigator() {
                                   <AlertsSheetProvider>
                                     <OnboardingGate />
                                     <ThemeProfileSync />
+                                    <TimezoneSync />
                                     <ShareIntentHandler />
                                     <NotificationSync />
                                     <PushTokenSync />
