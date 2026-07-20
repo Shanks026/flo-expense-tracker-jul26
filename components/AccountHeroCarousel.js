@@ -25,6 +25,18 @@ const GAP = 14;
 const SWIPE_THRESHOLD = 56;
 const EMPTY_SUMMARY = { in_hand_balance: 0, month_income: 0, month_expense: 0 };
 
+// The "In Hand"/"Income"/"Expenses" labels and the muted ₹ currency symbol
+// used theme.mutedColor (each theme's own textColor at reduced opacity) —
+// technically theme-aware, but per direct feedback it didn't actually read
+// right across the catalog. Simplified per direct instruction: a flat low-
+// opacity white, so it blends into each card's own background directly
+// instead of being derived from a per-theme color. Correct for the
+// large majority of themes (white textColor); the handful of pale/light-
+// background themes with dark textColor (Marble, Rose Gold, Copper, ...)
+// are the accepted exception — simplicity over per-theme correctness here,
+// per direct instruction.
+const MUTED_LABEL_COLOR = 'rgba(255,255,255,0.55)';
+
 function formatAmount(value, currency) {
   const rounded = Math.round(Math.abs(value));
   return `${value < 0 ? '−' : ''}${formatMoney(rounded, currency)}`;
@@ -61,6 +73,7 @@ export default function AccountHeroCarousel({
   summariesLoading,
   currency,
   cardTheme,
+  accountsLoading,
 }) {
   const { colors } = useTheme();
   // Falls back to Ink (today's pre-feature look) if no theme is resolved
@@ -170,6 +183,36 @@ export default function AccountHeroCarousel({
     transform: [{ translateX: translateX.value }],
   }));
 
+  // No accounts to show yet (AccountContext still resolving, or the active
+  // theme hasn't hydrated — see Home's own accountsLoading) — a real card
+  // shape in skeleton form, not an empty viewport. Without this, the whole
+  // hero section visibly vanished for the loading window (accounts.map over
+  // an empty array renders nothing), then popped in once data arrived.
+  if (accountsLoading) {
+    return (
+      <View>
+        <View style={styles.viewport}>
+          <View style={[styles.heroCardShape, styles.heroCardContent, styles.heroSkeletonCard]}>
+            <View style={styles.heroTopRow}>
+              <Skeleton width={120} height={fontSize.lg} radius={6} style={styles.heroSkeletonMuted} />
+            </View>
+            <Skeleton width={70} height={fontSize.base} radius={6} style={styles.heroSkeletonMuted} />
+            <Skeleton
+              width={160}
+              height={fontSize.amountLg}
+              radius={8}
+              style={[styles.heroSkeletonMuted, { marginTop: spacing.xs, marginBottom: spacing.xl }]}
+            />
+            <View style={styles.heroStatsRow}>
+              <Skeleton width={90} height={fontSize.md} radius={6} style={styles.heroSkeletonMuted} />
+              <Skeleton width={90} height={fontSize.md} radius={6} style={styles.heroSkeletonMuted} />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View>
       <View style={styles.viewport} onLayout={(e) => setViewportWidth(e.nativeEvent.layout.width)}>
@@ -193,7 +236,7 @@ export default function AccountHeroCarousel({
                         </Pressable>
                       </View>
 
-                      <Text style={[styles.heroLabel, { color: theme.mutedColor }]}>In Hand</Text>
+                      <Text style={[styles.heroLabel, { color: MUTED_LABEL_COLOR }]}>In Hand</Text>
                       {summariesLoading ? (
                         <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: 'rgba(128,128,128,0.25)' }} />
                       ) : (
@@ -203,7 +246,7 @@ export default function AccountHeroCarousel({
                           dark
                           muteCurrency
                           currency={currency}
-                          currencyColor={theme.mutedColor}
+                          currencyColor={MUTED_LABEL_COLOR}
                           size={fontSize.amountLg}
                           style={[styles.heroBalance, { color: theme.textColor }]}
                         />
@@ -219,14 +262,14 @@ export default function AccountHeroCarousel({
                             <TrendingUp size={11} color={incomeIconColor} strokeWidth={2.8} />
                             <View style={styles.heroStatTextGroup}>
                               <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_income, currency)}</Text>
-                              <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Income</Text>
+                              <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Income</Text>
                             </View>
                           </View>
                           <View style={styles.heroStat}>
                             <TrendingDown size={11} color={expenseIconColor} strokeWidth={2.8} />
                             <View style={styles.heroStatTextGroup}>
                               <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_expense, currency)}</Text>
-                              <Text style={[styles.heroStatLabel, { color: theme.mutedColor }]}>Expenses</Text>
+                              <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Expenses</Text>
                             </View>
                           </View>
                         </View>
@@ -295,8 +338,28 @@ function makeStyles(colors) {
       paddingVertical: 22,
       paddingHorizontal: 24,
     },
+    // The loading-state stand-in for heroCardContent — full width (no
+    // viewportWidth measurement needed, there's no carousel to swipe yet)
+    // and a neutral themed surface instead of a card theme's own colors
+    // (which the loading state, by definition, doesn't have yet either).
+    heroSkeletonCard: {
+      width: '100%',
+      backgroundColor: colors.chipBg,
+    },
+    // Matches the muted-on-card-theme override the real balance/stats
+    // Skeletons already use below (summariesLoading branch) — same visual
+    // language whether the account itself or just its summary is loading.
+    heroSkeletonMuted: {
+      backgroundColor: 'rgba(128,128,128,0.25)',
+    },
+    // spacing.lg (16), up from spacing.md (12) — deliberately groups the
+    // "which account" chrome (name + chevron) apart from the balance block
+    // below it, so the eye reads them as two units (identity, then the
+    // headline number) rather than one flat stack. The tighter label→balance
+    // coupling (heroLabel.marginBottom) reinforces the same grouping from the
+    // other side.
     heroTopRow: {
-      marginBottom: spacing.md,
+      marginBottom: spacing.lg,
     },
     accountHeading: {
       flexDirection: 'row',
@@ -328,13 +391,29 @@ function makeStyles(colors) {
       color: staticColors.surface,
       flexShrink: 1,
     },
+    // A refined micro-kicker for the balance — smaller and lightly tracked
+    // vs the old sentence-case 13px/no-tracking, which read as body text
+    // rather than a label belonging to the number under it. Kept in the
+    // label's OWN casing ("In Hand", capitalized, NOT uppercased) per direct
+    // instruction. marginBottom (not a margin on the balance) owns the small,
+    // deliberate gap that couples this label to the balance as one unit.
     heroLabel: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.base,
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      letterSpacing: 0.3,
       color: staticColors.mutedMid,
+      marginBottom: 1,
     },
     heroBalance: {
       marginTop: 0,
+      // Tighter than AmountText's shared -0.4 default. That default is an
+      // ABSOLUTE point value applied to every amount app-wide, so on the 44px
+      // hero balance it's proportionally almost nothing (~0.9%) — the big
+      // number ended up the LOOSEST-tracked amount relative to its own size.
+      // -1 (~2.3% of 44px) gives the tight, condensed set premium display
+      // numerals want. Overrides the default here only (last in AmountText's
+      // style array), leaving every smaller amount on -0.4.
+      letterSpacing: -1,
     },
     // flexWrap lets Expenses drop to its own line below Income on narrow
     // screens instead of overflowing the card's right edge — confirmed via
@@ -373,9 +452,15 @@ function makeStyles(colors) {
       color: staticColors.surface,
       flexShrink: 1,
     },
+    // Same micro-label family as heroLabel above (capitalized, lightly
+    // tracked), so "In Hand", "Income" and "Expenses" read as one consistent
+    // labeling system rather than three ad-hoc treatments. Same 0.3 tracking
+    // as heroLabel — matched, not a second value, since they're the same kind
+    // of label.
     heroStatLabel: {
       fontFamily: fontFamily.semibold,
-      fontSize: fontSize.sm,
+      fontSize: fontSize.xs,
+      letterSpacing: 0.3,
       color: staticColors.mutedMid,
       flexShrink: 1,
     },

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,6 +55,11 @@ export default function StreakScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { current, longest, breaks, loggedToday, isNewStreak, history, loading } = useStreak();
+  // Streak vs Milestones — two tabs, not one long scroll. The streak calendar
+  // is getting its own dedicated space so the planned calendar skins have room
+  // to live (they'd have nowhere to go crammed below the milestone road), and
+  // "what's next" (the road) reads as its own distinct view.
+  const [tab, setTab] = useState('streak');
 
   if (loading) {
     return (
@@ -95,56 +100,118 @@ export default function StreakScreen() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Number and label left, flame right — the reference's layout. The
-            count led with the flame before, which buried the one number the
-            screen exists to show. */}
-        <Card style={styles.hero}>
-          <View style={styles.heroText}>
-            <Text style={[styles.count, !lit && styles.countEmpty]}>{current}</Text>
-            {/* "day streak" regardless of count, as in the reference — "days
-                streak" is not English, and "1 day streak" reads fine. */}
-            <Text style={[styles.caption, !lit && styles.captionEmpty]}>day streak!</Text>
-          </View>
-          <StreakFlameIcon size={BADGE_SIZE} lit={lit} />
-        </Card>
-
-        <Text style={styles.headline}>
-          {streakHeadline({ current, loggedToday, isNewStreak })}
-        </Text>
-
-        {/* Longest and Breaks — NOT "Current", which is already the enormous
-            number at the top of this screen. Breaks is the gaps between streaks:
-            how many times you've let one go. One missed week is one break, not
-            seven. */}
-        <View style={styles.statsRow}>
-          <Card style={styles.statCard}>
-            <IconTile tone="streak" size={38} radius={12}>
-              <Trophy size={18} color={colors.streakDeep} strokeWidth={2.2} />
-            </IconTile>
-            <View>
-              <Text style={styles.statValue}>{longest}</Text>
-              <Text style={styles.statLabel}>Longest</Text>
-            </View>
-          </Card>
-          <Card style={styles.statCard}>
-            <IconTile tone="neutral" size={38} radius={12}>
-              <Unlink size={18} color={colors.muted} strokeWidth={2.2} />
-            </IconTile>
-            <View>
-              <Text style={styles.statValue}>{breaks}</Text>
-              <Text style={styles.statLabel}>Breaks</Text>
-            </View>
-          </Card>
+        {/* A real segmented control, same treatment as Analytics'
+            Month/Custom toggle (AnalyticsFilterBar) — a full-width track with
+            the active tab as a filled ink pill, not standalone filter chips
+            (which read as "filters", not "tabs"). */}
+        <View style={styles.segmentWrap}>
+          <Pressable
+            style={[styles.segment, tab === 'streak' && styles.segmentActive]}
+            onPress={() => setTab('streak')}
+          >
+            <Text style={[styles.segmentText, tab === 'streak' && styles.segmentTextActive]}>Streak</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segment, tab === 'milestones' && styles.segmentActive]}
+            onPress={() => setTab('milestones')}
+          >
+            <Text style={[styles.segmentText, tab === 'milestones' && styles.segmentTextActive]}>Milestones</Text>
+          </Pressable>
         </View>
 
-        {/* 21-achievement-rewards-and-milestone-road.md Phase 1 — a plain row
-            list, deliberately: the pure milestoneRoad() data is what needs to
-            be solid this phase, not a path/line graphic (deferred). Mirrors
-            app/trophies.js's Rank ladder row grammar (icon left, title+sub
-            stacked, trailing state) so the three states (earned/current/
-            locked) read the same way that screen's own three-state rows do. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Milestone Road</Text>
+        {tab === 'streak' ? (
+          <>
+            {/* Number and label left, flame right — the reference's layout. The
+                count led with the flame before, which buried the one number the
+                screen exists to show. */}
+            <Card style={styles.hero}>
+              <View style={styles.heroText}>
+                <Text style={[styles.count, !lit && styles.countEmpty]}>{current}</Text>
+                {/* "day streak" regardless of count, as in the reference — "days
+                    streak" is not English, and "1 day streak" reads fine. */}
+                <Text style={[styles.caption, !lit && styles.captionEmpty]}>day streak!</Text>
+              </View>
+              <StreakFlameIcon size={BADGE_SIZE} lit={lit} />
+            </Card>
+
+            <Text style={styles.headline}>
+              {streakHeadline({ current, loggedToday, isNewStreak })}
+            </Text>
+
+            {/* Longest and Breaks — NOT "Current", which is already the enormous
+                number at the top of this screen. Breaks is the gaps between streaks:
+                how many times you've let one go. One missed week is one break, not
+                seven. */}
+            <View style={styles.statsRow}>
+              <Card style={styles.statCard}>
+                <IconTile tone="streak" size={38} radius={12}>
+                  <Trophy size={18} color={colors.streakDeep} strokeWidth={2.2} />
+                </IconTile>
+                <View>
+                  <Text style={styles.statValue}>{longest}</Text>
+                  <Text style={styles.statLabel}>Longest</Text>
+                </View>
+              </Card>
+              <Card style={styles.statCard}>
+                <IconTile tone="neutral" size={38} radius={12}>
+                  <Unlink size={18} color={colors.muted} strokeWidth={2.2} />
+                </IconTile>
+                <View>
+                  <Text style={styles.statValue}>{breaks}</Text>
+                  <Text style={styles.statLabel}>Breaks</Text>
+                </View>
+              </Card>
+            </View>
+
+            {/* The calendar lives here, in the streak tab's own space — this is
+                where the planned calendar skins will hang. */}
+            <Card style={styles.calendarCard}>
+              <Text style={styles.monthLabel}>{format(today, 'MMMM yyyy')}</Text>
+
+              <View style={styles.weekdayRow}>
+                {WEEKDAYS.map((d, i) => (
+                  <Text key={i} style={styles.weekday}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
+
+              <View style={styles.grid}>
+                {gridDays.map((day) => {
+                  const key = format(day, 'yyyy-MM-dd');
+                  const inMonth = isSameMonth(day, today);
+                  const future = isAfter(day, today);
+                  const type = typeByDate.get(key);
+
+                  return (
+                    <View key={key} style={styles.gridCell}>
+                      <StreakFlame type={type} size={34} dimmed={!inMonth || future} />
+                      <Text
+                        style={[
+                          styles.dayNumber,
+                          isToday(day) && styles.dayNumberToday,
+                          (!inMonth || future) && styles.dayNumberDim,
+                        ]}
+                      >
+                        {format(day, 'd')}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </Card>
+
+            <Text style={styles.footnote}>
+              A day counts when you log a transaction. Miss a day and the streak resets.
+            </Text>
+          </>
+        ) : (
+          /* 21-achievement-rewards-and-milestone-road.md Phase 1 — a plain row
+             list, deliberately: the pure milestoneRoad() data is what needs to
+             be solid this phase, not a path/line graphic (deferred). Mirrors
+             app/trophies.js's Rank ladder row grammar (icon left, title+sub
+             stacked, trailing state) so the three states (earned/current/
+             locked) read the same way that screen's own three-state rows do. */
           <Card style={styles.listCard}>
             {road.map((entry, idx) => (
               <View key={entry.day} style={[styles.row, idx < road.length - 1 && styles.rowBorder]}>
@@ -171,47 +238,7 @@ export default function StreakScreen() {
               </View>
             ))}
           </Card>
-        </View>
-
-        <Card style={styles.calendarCard}>
-          <Text style={styles.monthLabel}>{format(today, 'MMMM yyyy')}</Text>
-
-          <View style={styles.weekdayRow}>
-            {WEEKDAYS.map((d, i) => (
-              <Text key={i} style={styles.weekday}>
-                {d}
-              </Text>
-            ))}
-          </View>
-
-          <View style={styles.grid}>
-            {gridDays.map((day) => {
-              const key = format(day, 'yyyy-MM-dd');
-              const inMonth = isSameMonth(day, today);
-              const future = isAfter(day, today);
-              const type = typeByDate.get(key);
-
-              return (
-                <View key={key} style={styles.gridCell}>
-                  <StreakFlame type={type} size={34} dimmed={!inMonth || future} />
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      isToday(day) && styles.dayNumberToday,
-                      (!inMonth || future) && styles.dayNumberDim,
-                    ]}
-                  >
-                    {format(day, 'd')}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </Card>
-
-        <Text style={styles.footnote}>
-          A day counts when you log a transaction. Miss a day and the streak resets.
-        </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -251,6 +278,36 @@ function makeStyles(colors) {
     fontSize: fontSize.title,
     letterSpacing: -0.3,
     color: colors.ink,
+  },
+  // Segmented control — same treatment as AnalyticsFilterBar's Month/Custom
+  // toggle (full-width chipBg track, active segment a filled ink pill), so it
+  // reads as tabs rather than filter chips.
+  segmentWrap: {
+    flexDirection: 'row',
+    backgroundColor: colors.chipBg,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: spacing.lg,
+    width: '100%',
+  },
+  segment: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 11,
+  },
+  segmentActive: {
+    backgroundColor: colors.ink,
+  },
+  segmentText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.base,
+    color: colors.muted,
+  },
+  segmentTextActive: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.surface,
   },
   scroll: {
     paddingHorizontal: spacing.xl,
@@ -319,16 +376,10 @@ function makeStyles(colors) {
   },
   // Milestone Road (21-achievement-rewards-and-milestone-road.md Phase 1) —
   // same row grammar as app/trophies.js's trophy/rank rows (icon left,
-  // title+subtitle stacked, trailing state right), reused verbatim here.
-  section: {
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-    marginBottom: spacing.sm,
-  },
+  // title+subtitle stacked, trailing state right), reused verbatim here. Its
+  // own section title/wrapper was dropped when it moved into the Milestones
+  // tab — the tab label already names it, so a "Milestone Road" heading right
+  // under it was redundant.
   listCard: {
     padding: 0,
     paddingHorizontal: spacing.lg,

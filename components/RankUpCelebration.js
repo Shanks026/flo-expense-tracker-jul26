@@ -1,21 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal } from 'react-native';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Award } from 'lucide-react-native';
 import Button from './Button';
 import Confetti from './Confetti';
 import useRewards from '../hooks/useRewards';
+import useProfile from '../hooks/useProfile';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
 import { RANKS, rankFromXp } from '../lib/rewards';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-
-// User-scoped, same standing rule as StreakCelebration/FreezePrompt's own
-// keys (00-index.md) — stores the highest rank id ever SEEN, not a per-day
-// flag, since a rank-up is a one-time-per-rank lifetime event, not something
-// that resets daily.
-const storageKey = (userId) => `flo.rank.lastSeen.${userId}`;
 
 // A small, root-mounted celebration for crossing a Rank threshold
 // (18-gamification-ritual-and-ledger.md Phase 5) — same light-card-on-dark-
@@ -24,11 +18,22 @@ const storageKey = (userId) => `flo.rank.lastSeen.${userId}`;
 // (the first threshold is 1500 XP, ~15 logged days minimum) and don't need
 // the same full-screen production every time XP quietly ticks up within the
 // same rank.
+//
+// "Highest rank seen" lives in profiles.highest_rank_seen (DB), not
+// AsyncStorage — it used to be device-local, which had two real problems: a
+// fire-and-forget AsyncStorage.setItem() issued right before showing the
+// dialog, never awaited, so a reload/kill shortly after a real celebration
+// could lose the write and replay it next launch; and being device-local at
+// all meant a reinstall (or a second device) could never remember a rank
+// already celebrated. Both are closed by making this account-scoped and
+// durable — the same fix already applied to theme_accent/theme_mode
+// (app/_layout.js's ThemeProfileSync) for the identical class of bug.
 export default function RankUpCelebration() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const { xp, loading } = useRewards();
+  const { profile, loading: profileLoading, updateProfile } = useProfile();
   const [visible, setVisible] = useState(false);
   const contentRef = useRef(null);
   // Tracks which rank.id this component has already resolved a check for, so
@@ -40,36 +45,45 @@ export default function RankUpCelebration() {
   const { current: rank } = rankFromXp(xp);
 
   useEffect(() => {
-    if (!session || !userId || loading) return;
+    if (!session || !userId || loading || profileLoading || !profile) return;
     if (checkedRankRef.current === rank.id) return;
     checkedRankRef.current = rank.id;
 
-    const key = storageKey(userId);
-    AsyncStorage.getItem(key)
-      .catch(() => null)
-      .then((lastSeenId) => {
-        // First-ever check for this user (no stored rank at all) — everyone
-        // starts at Saver by construction (minXp: 0), so this is "welcome",
-        // not a rank-UP. Record it silently and move on; nothing to celebrate.
-        if (!lastSeenId) {
-          AsyncStorage.setItem(key, rank.id).catch(() => {});
-          return;
-        }
-        if (lastSeenId === rank.id) return;
+    const lastSeenId = profile.highest_rank_seen;
 
-        const lastIndex = RANKS.findIndex((r) => r.id === lastSeenId);
-        const newIndex = RANKS.findIndex((r) => r.id === rank.id);
-        AsyncStorage.setItem(key, rank.id).catch(() => {});
-        // XP only ever rises (it's never spent — lib/rewards.js), so a rank
-        // moving backward shouldn't be reachable in practice; guarded anyway
-        // rather than trusted, since this reads from AsyncStorage, not a
-        // value this component fully controls.
-        if (newIndex <= lastIndex) return;
+    (async () => {
+      // First-ever check for this user (no stored rank at all) — everyone
+      // starts at Saver by construction (minXp: 0), so this is "welcome",
+      // not a rank-UP. Record it silently and move on; nothing to celebrate.
+      if (!lastSeenId) {
+        await updateProfile({ highest_rank_seen: rank.id }, { silent: true });
+        return;
+      }
+      if (lastSeenId === rank.id) return;
 
-        contentRef.current = rank;
-        setVisible(true);
-      });
-  }, [session, userId, loading, rank.id]);
+      const lastIndex = RANKS.findIndex((r) => r.id === lastSeenId);
+      const newIndex = RANKS.findIndex((r) => r.id === rank.id);
+      // Awaited, and written BEFORE the dialog shows — the write this
+      // replaces raced showing the dialog against persisting "seen", which
+      // is exactly how a rank-up could replay. Confirming the record landed
+      // first closes that gap.
+      await updateProfile({ highest_rank_seen: rank.id }, { silent: true });
+      // XP only ever rises (it's never spent — lib/rewards.js), so a rank
+      // moving backward shouldn't be reachable in practice; guarded anyway
+      // rather than trusted, since this reads from the DB, not a value this
+      // component fully controls.
+      if (newIndex <= lastIndex) return;
+
+      contentRef.current = rank;
+      setVisible(true);
+    })();
+    // updateProfile is a fresh function reference every render (useProfile
+    // isn't memoized) — omitted deliberately, same precedent as
+    // ThemeProfileSync's reconciliation effect in app/_layout.js. The
+    // checkedRankRef guard above is what actually controls re-entry, not
+    // this dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, userId, loading, profileLoading, profile, rank.id]);
 
   if (!visible || !contentRef.current) return null;
 

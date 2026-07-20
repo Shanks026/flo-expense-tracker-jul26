@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -39,7 +40,7 @@ export default function SignIn() {
   // the active accent for its fill — a single element, brief, acceptable.)
   const colors = useMemo(() => resolveColors(DEFAULT_ACCENT_ID, DEFAULT_MODE_ID), []);
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const params = useLocalSearchParams();
   const [mode, setMode] = useState(params.mode === 'signup' ? 'signup' : 'signin');
   const [draftName, setDraftName] = useState(null);
@@ -49,7 +50,12 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Disables BOTH entry points while either is in flight — without this,
+  // tapping "Sign In" while the Google browser sheet is still open (or vice
+  // versa) could kick off two concurrent auth attempts racing each other.
+  const busy = loading || googleLoading;
 
   useEffect(() => {
     getDraft().then((d) => {
@@ -76,6 +82,22 @@ export default function SignIn() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // A non-'success' result (user backed out of the browser sheet, or the OS
+  // dismissed it) is a silent cancel, not a failure — AuthContext's
+  // signInWithGoogle already returns normally in that case instead of
+  // throwing, so there's nothing to catch or show an error for here.
+  async function handleGoogleSignIn() {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGoogleLoading(false);
     }
   }
 
@@ -212,7 +234,7 @@ export default function SignIn() {
             title={isSignUp ? 'Create Account' : 'Sign In'}
             onPress={handleSubmit}
             loading={loading}
-            disabled={!canSubmit}
+            disabled={!canSubmit || busy}
             style={{ backgroundColor: colors.brand }}
           />
 
@@ -222,10 +244,24 @@ export default function SignIn() {
             <View style={styles.dividerLine} />
           </View>
 
-          <View style={[styles.googleButton, styles.googleButtonDisabled]}>
-            <GoogleIcon />
-            <Text style={styles.googleText}>Continue with Google</Text>
-          </View>
+          <Pressable
+            onPress={handleGoogleSignIn}
+            disabled={busy}
+            style={({ pressed }) => [
+              styles.googleButton,
+              busy && styles.googleButtonDisabled,
+              pressed && !busy && styles.googleButtonPressed,
+            ]}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color={colors.ink} />
+            ) : (
+              <>
+                <GoogleIcon />
+                <Text style={styles.googleText}>Continue with Google</Text>
+              </>
+            )}
+          </Pressable>
 
           <View style={{ flex: 1 }} />
           <Pressable
@@ -377,6 +413,9 @@ function makeStyles(colors) {
   },
   googleButtonDisabled: {
     opacity: 0.45,
+  },
+  googleButtonPressed: {
+    opacity: 0.7,
   },
   googleText: {
     fontFamily: fontFamily.bold,

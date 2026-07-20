@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { TrendingUp, TrendingDown, Download } from 'lucide-react-native';
-import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, format } from 'date-fns';
+import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, isAfter, format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import IconTile from '../../components/IconTile';
@@ -12,7 +12,7 @@ import ProgressBar from '../../components/ProgressBar';
 import AnalyticsFilterBar from '../../components/AnalyticsFilterBar';
 import AnalyticsSegmentTabs from '../../components/AnalyticsSegmentTabs';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
-import DayOfWeekChart from '../../components/DayOfWeekChart';
+import DailySpendingChart from '../../components/DailySpendingChart';
 import DonutChart from '../../components/DonutChart';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
@@ -30,7 +30,7 @@ import {
   computeDelta,
   computeSavingsRate,
   computeBiggestTransaction,
-  computeDayOfWeek,
+  computeDailySpending,
   computeCategoryBreakdown,
   computeCategoryDeltas,
   getCategoryColor,
@@ -130,8 +130,21 @@ export default function Analytics() {
   const savingsRate = computeSavingsRate(totalIncome, totalExpense);
   const biggest = computeBiggestTransaction(current);
 
-  const granularity = differenceInCalendarDays(to, from) + 1 <= 31 ? 'day' : 'week';
-  const trendData = useMemo(() => computeTrend(current, from, to), [current, from, to, granularity]);
+  // The trend chart ends at today for an in-progress period (current month, or
+  // a custom range extending to/past today) rather than the period's calendar
+  // end — otherwise the current month renders ~10 trailing empty future-day
+  // bars and today wouldn't sit at the chart's right edge. Past periods are
+  // unaffected (their `to` is already before today). Only the CHART end is
+  // clamped; `to` elsewhere (data fetch, totals, prior period, export) stays
+  // the full selected period.
+  // Memoized on `to` (not recomputed every render) — a bare `new Date()` here
+  // would be a fresh object each render and defeat trendData's own useMemo.
+  const chartEnd = useMemo(() => {
+    const now = new Date();
+    return isAfter(to, now) ? now : to;
+  }, [to]);
+  const granularity = differenceInCalendarDays(chartEnd, from) + 1 <= 31 ? 'day' : 'week';
+  const trendData = useMemo(() => computeTrend(current, from, chartEnd), [current, from, chartEnd]);
   // IncomeExpenseChart expects { date, income, expense }; computeTrend
   // returns { bucketStart, income, expense } — mapped here rather than
   // renaming computeTrend's own field, since lib/analytics.js is a shared
@@ -141,7 +154,10 @@ export default function Analytics() {
     [trendData]
   );
 
-  const dayOfWeekData = useMemo(() => computeDayOfWeek(current), [current]);
+  // Trailing 7-day per-date window ending on today (or the period's end for a
+  // past month) — see computeDailySpending. Depends on from/to too now, since
+  // the window is anchored to the selected period's bounds, not just the txns.
+  const dailySpendingData = useMemo(() => computeDailySpending(current, from, to), [current, from, to]);
   const expenseCount = useMemo(() => current.filter((tx) => tx.type === 'expense').length, [current]);
   const avgExpense = expenseCount > 0 ? totalExpense / expenseCount : 0;
 
@@ -286,7 +302,7 @@ export default function Analytics() {
               />
             </Card>
             <Card style={styles.chartCard}>
-              <DayOfWeekChart data={dayOfWeekData} currency={currency} />
+              <DailySpendingChart data={dailySpendingData} currency={currency} />
             </Card>
             <Card style={styles.statsCard}>
               <View style={styles.statsRow}>

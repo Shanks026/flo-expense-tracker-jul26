@@ -49,7 +49,7 @@ const UPCOMING_BILL_STYLES = {
 const MAX_UPCOMING_BILLS = 4;
 
 export default function Home() {
-  const { colors } = useTheme();
+  const { colors, hydrated: themeHydrated } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function Home() {
   const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
-  const { activeAccount, accounts, setActiveAccount } = useAccount();
+  const { activeAccount, accounts, setActiveAccount, loading: accountsLoading } = useAccount();
   const { summaries, loading: summariesLoading } = useAllAccountSummaries();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
@@ -68,7 +68,7 @@ export default function Home() {
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
   const currency = useCurrency();
-  const { coins, freezes, level } = useRewards();
+  const { coins, freezes, level, loading: rewardsLoading } = useRewards();
   const { openRewardsHistory } = useRewardsHistorySheet();
   const { equippedTheme } = useCardThemes();
   const { showRewardBurst } = useRewardBurst();
@@ -91,9 +91,33 @@ export default function Home() {
     });
   }, [session?.user?.id, showRewardBurst]);
 
+  // Signing out while Home is the focused screen sets `session` to null on
+  // this same render pass — RootNavigator's redirect to /sign-in is a
+  // separate effect that only fires afterward, so there's always at least
+  // one render of Home with no session before it unmounts. Every data hook
+  // above already resets to a safe empty default on session→null, but the
+  // greeting below reads session.user directly and had nothing to fall back
+  // to — getGreeting(name: undefined) stringifies straight into the title
+  // ("Tuesday, undefined"), which is the bug this was reported as. Bailing
+  // out here, all hooks already called, skips deriving from a session that's
+  // mid-teardown instead of papering over it with a fallback name.
+  if (!session) return null;
+
   // Lit only when there IS a streak. The muted flame on a zero streak is not a
   // failure state — it's the invitation.
   const streakLit = streakCurrent > 0;
+
+  // Every header chip (item stats, level, streak) and the hero carousel
+  // share this same "still loading" gate — folding in !themeHydrated too, not
+  // just each hook's own loading flag, so none of them paint a beat in the
+  // wrong (default, pre-reconciliation) theme colors right before flipping to
+  // the account's real ones. Chips render a Skeleton while true, then a
+  // one-time FadeIn once false — the same pairing everywhere, rather than the
+  // streak chip being the only one with an entrance animation and the others
+  // just popping in with default zero values.
+  const chipsLoading = rewardsLoading || !themeHydrated;
+  const streakChipLoading = streakLoading || !themeHydrated;
+  const heroLoading = accountsLoading || !themeHydrated;
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
@@ -134,39 +158,58 @@ export default function Home() {
                 streak, whose icon already carries the meaning), and adding a
                 "LVL" label to disambiguate needed more room than fit as a
                 third entry in this chip. */}
-            <Pressable style={styles.itemStats} onPress={openRewardsHistory}>
-              <View style={styles.itemStatEntry}>
-                <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
-                <Text style={styles.itemStatText}>{coins.toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={styles.itemStatDivider} />
-              <View style={styles.itemStatEntry}>
-                {/* Snowflake has no closed/fillable region (just radiating
-                    strokes) — `fill` is a harmless no-op here; a bolder
-                    strokeWidth is what actually reads as "filled/solid" for
-                    a line-only glyph like this, vs. CircleDollarSign's real
-                    fill above. */}
-                <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
-                <Text style={styles.itemStatText}>{freezes}</Text>
-              </View>
-            </Pressable>
+            {chipsLoading ? (
+              <Skeleton width={98} height={44} radius={14} />
+            ) : (
+              <FadeIn>
+                <Pressable style={styles.itemStats} onPress={openRewardsHistory}>
+                  <View style={styles.itemStatEntry}>
+                    <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+                    <Text style={styles.itemStatText}>{coins.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.itemStatDivider} />
+                  <View style={styles.itemStatEntry}>
+                    {/* Snowflake has no closed/fillable region (just radiating
+                        strokes) — `fill` is a harmless no-op here; a bolder
+                        strokeWidth is what actually reads as "filled/solid" for
+                        a line-only glyph like this, vs. CircleDollarSign's real
+                        fill above. */}
+                    <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
+                    <Text style={styles.itemStatText}>{freezes}</Text>
+                  </View>
+                </Pressable>
+              </FadeIn>
+            )}
             {/* Level — its own chip, "LVL" label + number. Opens Menu, where
                 the fuller Rank/Level/XP card lives — same "compact here,
                 full detail one tap away" pattern as the streak chip → /streak. */}
-            <Pressable style={styles.levelChip} onPress={openMenu}>
-              <Star size={16} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
-              <Text style={styles.itemStatText}>
-                <Text style={styles.levelChipLabel}>LVL </Text>
-                {level}
-              </Text>
-            </Pressable>
+            {chipsLoading ? (
+              <Skeleton width={66} height={44} radius={14} />
+            ) : (
+              <FadeIn>
+                <Pressable style={styles.levelChip} onPress={openMenu}>
+                  <Star size={16} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
+                  <Text style={styles.itemStatText}>
+                    <Text style={styles.levelChipLabel}>LVL </Text>
+                    {level}
+                  </Text>
+                </Pressable>
+              </FadeIn>
+            )}
           </View>
           <View style={styles.headerRight}>
             {/* Duolingo's model: the streak lives in the header, always visible,
                 and it is a DOOR — it opens /streak, where the calendar and the
                 history live. Unlit when today hasn't been logged: that muted
-                flame IS the nudge, and it costs no words. */}
-            {!streakLoading && (
+                flame IS the nudge, and it costs no words.
+                Same Skeleton-while-loading/FadeIn-once-ready pairing as the
+                item-stats and level chips beside it — this was previously the
+                ONLY header chip with an entrance animation (and even then, no
+                skeleton — just absent, shifting headerRight's layout once it
+                popped in). Now all three match. */}
+            {streakChipLoading ? (
+              <Skeleton width={58} height={44} radius={14} />
+            ) : (
               <FadeIn>
                 <Pressable style={styles.streakChip} onPress={() => router.push('/streak')}>
                   {/* Fire orange, not brand lime — see theme/tokens.js. Also the
@@ -217,6 +260,7 @@ export default function Home() {
           summariesLoading={summariesLoading}
           currency={currency}
           cardTheme={equippedTheme}
+          accountsLoading={heroLoading}
         />
 
         {/* Close-the-day ritual (18-gamification-ritual-and-ledger.md Phase 3) */}

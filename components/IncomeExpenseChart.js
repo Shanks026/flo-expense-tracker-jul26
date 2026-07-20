@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { format } from 'date-fns';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
@@ -52,8 +52,15 @@ export default function IncomeExpenseChart({
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [visible, setVisible] = useState(defaultVisible);
 
+  const scrollRef = useRef(null);
+
   const resolvedGranularity = range ? (range === '7d' ? 'day' : 'week') : granularity;
-  const dayLabelFormat = resolvedGranularity === 'day' ? 'EEE' : 'd MMM';
+  // Day-granularity bars: weekday name ('EEE') at Home's own call site (`range`
+  // set — its bounded 7D view, where "Mon/Tue" is unambiguous and more useful
+  // than a bare date), but the DATE number ('d') for Analytics (no `range`),
+  // where a full month of day bars labelled Mon-Sun-Mon-Sun... couldn't tell
+  // one week's Monday from another's. Week granularity is 'd MMM' either way.
+  const dayLabelFormat = resolvedGranularity === 'day' ? (range ? 'EEE' : 'd') : 'd MMM';
 
   // Scale bars off only the visible series — with one series hidden, the
   // remaining one should fill the chart height on its own, not stay capped
@@ -172,7 +179,18 @@ export default function IncomeExpenseChart({
       {data.length === 0 && emptyMessage ? (
         <Text style={styles.emptyText}>{emptyMessage}</Text>
       ) : data.length > SCROLL_THRESHOLD ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartAreaScroll}>
+        // Opens scrolled to the END (most recent) rather than day 1 — the
+        // current week / latest bar sits at the right edge on open, and the
+        // user scrolls LEFT to see earlier in the period. onContentSizeChange
+        // (not a mount effect) so it re-anchors to the newest whenever the
+        // period or its data changes underneath it.
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chartAreaScroll}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+        >
           {bars}
         </ScrollView>
       ) : (

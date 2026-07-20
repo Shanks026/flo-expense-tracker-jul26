@@ -155,7 +155,14 @@ export default function OnboardingScreen({
                 disabled={primaryDisabled}
                 loading={primaryLoading}
                 variant={p.primary}
-                style={styles.primary}
+                // Button's own `primary` variant fill reads the ACTIVE theme
+                // (useTheme()) — leaking whichever account's accent was last
+                // active on this device into a screen that's otherwise fully
+                // pinned to the static default palette (see PALETTES above).
+                // Same fix/reasoning as app/sign-in.js's own Button override.
+                // `dark` (the `brand` palette's primary) is already pinned to
+                // static ink internally, so this only needs to apply here.
+                style={p.primary === 'primary' ? [styles.primary, { backgroundColor: colors.brand }] : styles.primary}
               />
             ) : null}
             {secondaryLabel ? (

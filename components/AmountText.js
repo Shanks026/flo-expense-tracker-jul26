@@ -66,5 +66,10 @@ const styles = StyleSheet.create({
   text: {
     fontFamily: fontFamily.extrabold,
     letterSpacing: -0.4,
+    // Fixed-width digits — without this, proportional numerals (Manrope's
+    // default) shift the whole string's width as digits change, visible as a
+    // jitter on the hero balance when swiping between accounts or on any
+    // amount that updates in place.
+    fontVariant: ['tabular-nums'],
   },
 });
