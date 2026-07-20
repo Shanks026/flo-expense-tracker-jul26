@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { TrendingUp, TrendingDown, Download } from 'lucide-react-native';
 import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, format } from 'date-fns';
 import Screen from '../../components/Screen';
@@ -20,6 +20,7 @@ import { useToast } from '../../components/Toast';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import useAnalyticsData from '../../hooks/useAnalyticsData';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAccount } from '../../lib/AccountContext';
 import { buildTransactionsCsv, shareCsv } from '../../lib/export';
 import { formatMoney } from '../../lib/currency';
@@ -69,6 +70,7 @@ function DeltaBadge({ delta, goodDirection = 'up' }) {
 export default function Analytics() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { refreshing, onRefresh } = usePullToRefresh();
   // Healthy uses the active theme's accent, not the income green — matches
   // Budgets and Plans' active-plan card, so "healthy" reads as one
   // consistent color with the progress bar (ProgressBar.js's healthy fill
@@ -173,7 +175,12 @@ export default function Analytics() {
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
+      >
         <AnalyticsFilterBar
           mode={mode}
           onModeChange={setMode}

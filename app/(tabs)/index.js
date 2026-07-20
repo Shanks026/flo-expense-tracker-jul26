@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { useState, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Star } from 'lucide-react-native';
 import { format } from 'date-fns';
@@ -38,6 +38,9 @@ import { getGreeting } from '../../lib/greetings';
 import useRewards from '../../hooks/useRewards';
 import { useRewardsHistorySheet } from '../../components/RewardsHistorySheet';
 import useCardThemes from '../../hooks/useCardThemes';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
+import { useRewardBurst } from '../../components/RewardBurst';
+import { takePendingLoginReward } from '../../lib/pendingLoginReward';
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
@@ -68,6 +71,25 @@ export default function Home() {
   const { coins, freezes, level } = useRewards();
   const { openRewardsHistory } = useRewardsHistorySheet();
   const { equippedTheme } = useCardThemes();
+  const { showRewardBurst } = useRewardBurst();
+  const { refreshing, onRefresh } = usePullToRefresh();
+
+  // Surfaces the day-login coins/XP reward when it was earned somewhere
+  // that isn't AddTransactionSheet (onboarding's balance.js/expense.js, which
+  // insert transactions directly and persist the claim instead of bursting
+  // it immediately — see lib/pendingLoginReward.js). One-shot: the take
+  // call clears the flag as it reads it, so this is a no-op on every mount
+  // after the first that finds one. Deliberately NOT gated on anything else
+  // finishing first (the streak celebration/spin wheel this same first
+  // transaction already triggers are independent, root-mounted, and handle
+  // their own RewardBurst-vs-celebration sequencing already).
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    takePendingLoginReward(userId).then((reward) => {
+      if (reward) showRewardBurst(reward);
+    });
+  }, [session?.user?.id, showRewardBurst]);
 
   // Lit only when there IS a streak. The muted flame on a zero streak is not a
   // failure state — it's the invitation.
@@ -97,7 +119,12 @@ export default function Home() {
 
   return (
     <Screen padded={false}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
+      >
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             {/* Item stats — coins + freezes, "your stuff". Level moved back

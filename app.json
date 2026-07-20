@@ -19,7 +19,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#BBDC12"
+        "backgroundImage": "./assets/adaptive-icon-bg.png",
+        "backgroundColor": "#A1DC00"
       },
       "package": "com.anonymous.flo",
       "googleServicesFile": "./google-services.json",

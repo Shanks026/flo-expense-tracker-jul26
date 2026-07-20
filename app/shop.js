@@ -15,13 +15,17 @@ import useCardThemes from '../hooks/useCardThemes';
 import useRewards from '../hooks/useRewards';
 import { CARD_THEMES, TIERS, LOCKED_TIERS, TIER_LABELS, getTheme } from '../lib/cardThemes';
 import { FREEZE_COST, FREEZE_CAP } from '../lib/rewards';
+import { COIN_PACKS } from '../lib/coins';
 import { buyTheme, equipTheme } from '../lib/cardThemeMutations';
 import { buyFreeze } from '../lib/rewardsMutations';
 import { lighten } from '../lib/color';
 
+// 'freeze' tab renamed to 'general' (22-coin-store-and-reward-tiering.md
+// Phase 3) — it now holds coin packs AND the streak freeze, not just the
+// freeze.
 const TABS = [
   { key: 'cards', label: 'Cards' },
-  { key: 'freeze', label: 'Freeze' },
+  { key: 'general', label: 'General' },
 ];
 
 // Placeholder figures for the preview card only — the Shop isn't scoped to
@@ -33,12 +37,17 @@ const PREVIEW_BALANCE = 42500;
 const PREVIEW_INCOME = 18200;
 const PREVIEW_EXPENSE = 9650;
 
-// Legendary/chest-exclusive themes (Phase 2) have no `cost` — describes how
-// they're actually obtained, shown wherever a cost would otherwise go.
+// Legendary themes (Phase 2) have no `cost` — describes how they're actually
+// obtained, shown wherever a cost would otherwise go. The old 'chest' unlock
+// type was retired in 20-milestone-spin-wheel.md Phase 1 — every Legendary
+// theme is now a direct milestone grant.
 function unlockCaption(theme) {
   if (!theme.unlock) return null;
   if (theme.unlock.type === 'milestone') return `Day ${theme.unlock.day} streak`;
-  if (theme.unlock.type === 'chest') return `Day ${theme.unlock.day} chest`;
+  // 'trophy' unlock (22-coin-store-and-reward-tiering.md Phase 1) — an
+  // achievement-tier theme earned by claiming a specific trophy; `label` is a
+  // human name for it (e.g. "Perfect Month"), set on the theme's `unlock`.
+  if (theme.unlock.type === 'trophy') return `Earn: ${theme.unlock.label}`;
   return null;
 }
 
@@ -119,6 +128,17 @@ export default function Shop() {
   async function handleDialogEquip() {
     setBuyDialogStage(null);
     await handleEquip();
+  }
+
+  // Coin-pack Buy is STUBBED (22-coin-store-and-reward-tiering.md Phase 3) —
+  // same "no paywall yet" treatment as the Pro subscription (app/pro.js's
+  // handleUpgrade): an info toast, no real Play Billing / crediting. `pack` is
+  // accepted so the copy can name it later, but nothing is charged today.
+  function handleBuyCoins() {
+    showToast({
+      message: "Coin purchases aren't live yet. You'll be the first to know when they launch.",
+      variant: 'info',
+    });
   }
 
   function handleBuyFreezePress() {
@@ -210,8 +230,35 @@ export default function Shop() {
         })}
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {tab === 'freeze' ? (
+      {tab === 'general' ? (
+        // General tab (22-coin-store-and-reward-tiering.md Phase 3) — coin
+        // packs (default focus, first) + the streak freeze, in one scroll.
+        // Coin-pack Buy is stubbed to a toast (no payments yet); the freeze is
+        // a real coin spend and works normally.
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.generalScroll} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionLabel}>Coin Packs</Text>
+          <Text style={styles.generalHint}>Top up coins to unlock themes and more.</Text>
+          <View style={styles.packGrid}>
+            {COIN_PACKS.map((pack) => (
+              <Pressable key={pack.id} style={styles.packCard} onPress={() => handleBuyCoins(pack)}>
+                {pack.popular && (
+                  <View style={styles.packBadge}>
+                    <Text style={styles.packBadgeText}>Popular</Text>
+                  </View>
+                )}
+                {/* Placeholder icon — swap for pack illustrations later (one
+                    line here). */}
+                <CircleDollarSign size={26} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+                <Text style={styles.packCoins}>{pack.coins.toLocaleString('en-IN')}</Text>
+                <Text style={styles.packCoinsLabel}>coins</Text>
+                <View style={styles.packBuyBtn}>
+                  <Text style={styles.packBuyText}>{pack.price}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>Streak Freeze</Text>
           <View style={styles.freezeCard}>
             <View style={styles.freezeIconTile}>
               <Snowflake size={22} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.2} />
@@ -235,8 +282,14 @@ export default function Shop() {
               )}
             </Pressable>
           </View>
-        ) : (
-          <>
+        </ScrollView>
+      ) : (
+        <>
+          {/* Pinned — stays on screen while the grid below scrolls, per
+              direct feedback: picking a theme and previewing it shouldn't
+              need re-scrolling back up every time. Same pinned-top/
+              scroll-middle shape MenuSheet already uses. */}
+          <View style={styles.pinnedPreview}>
             <CardThemeSurface theme={selected} style={styles.previewShape}>
               <View style={styles.previewContent}>
                 <Text style={[styles.previewName, { color: selected.textColor }]}>Flo</Text>
@@ -281,7 +334,9 @@ export default function Shop() {
               <Text style={styles.previewTitle}>{selected.name}</Text>
               {selectedEquipped && <Check size={16} color={colors.brand} strokeWidth={2.8} />}
             </View>
+          </View>
 
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
             {TIERS.map((tier) => (
               <View key={tier}>
                 <Text style={styles.sectionLabel}>{TIER_LABELS[tier]}</Text>
@@ -304,15 +359,15 @@ export default function Shop() {
                 </View>
               </View>
             ))}
-          </>
-        )}
-      </ScrollView>
+          </ScrollView>
+        </>
+      )}
 
       {/* Floating, not inline under the preview card — per direct feedback,
           the buy/equip action reads better as a persistent bottom bar than
           competing with the preview/grid for scroll-top real estate. Only
-          on the Cards tab; Freeze's single always-visible card keeps its
-          own inline button. */}
+          on the Cards tab; the General tab's coin packs and freeze carry
+          their own inline Buy buttons. */}
       {tab === 'cards' && (
         <View style={[styles.floatingBar, { paddingBottom: spacing.md + insets.bottom }]}>
           <View style={styles.floatingNameWrap}>
@@ -346,9 +401,14 @@ export default function Shop() {
               )}
             </Pressable>
           ) : (
-            <View style={[styles.actionButton, styles.actionButtonDisabled]}>
-              <Text style={styles.actionButtonText}>Need {(selected.cost - coins).toLocaleString('en-IN')} more</Text>
-            </View>
+            // Not enough coins — instead of a dead "Need X more" label, a live
+            // Buy-coins shortcut that jumps to the General tab's packs
+            // (22-coin-store-and-reward-tiering.md Phase 3). Still shows the
+            // shortfall so the user knows how short they are.
+            <Pressable style={styles.actionButton} onPress={() => setTab('general')}>
+              <Text style={styles.actionButtonText}>Buy coins</Text>
+              <Text style={styles.buyCoinsHint}>Need {(selected.cost - coins).toLocaleString('en-IN')} more</Text>
+            </Pressable>
           )}
         </View>
       )}
@@ -494,6 +554,91 @@ function makeStyles(colors) {
       borderColor: colors.border,
       borderRadius: radii.card,
       padding: spacing.lg,
+      // No own horizontal margin — it now lives inside the General tab's
+      // padded ScrollView (22-coin-store-and-reward-tiering.md Phase 3), which
+      // supplies the horizontal inset via generalScroll's contentContainerStyle.
+    },
+    // General tab (coin packs + freeze) — its own scroll, horizontally padded
+    // like the Cards grid so both tabs sit at the same inset.
+    generalScroll: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: 60,
+    },
+    generalHint: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.sm,
+      color: colors.mutedMid,
+      marginBottom: spacing.md,
+    },
+    sectionLabelSpaced: {
+      marginTop: spacing.xl,
+    },
+    packGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.md,
+    },
+    packCard: {
+      width: '47%',
+      flexGrow: 1,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.card,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.md,
+      alignItems: 'center',
+      gap: 2,
+    },
+    packBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: colors.brand,
+      borderRadius: radii.pill,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    packBadgeText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: 9,
+      letterSpacing: 0.3,
+      color: colors.ink,
+      textTransform: 'uppercase',
+    },
+    packCoins: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.xl,
+      letterSpacing: -0.4,
+      color: colors.ink,
+      marginTop: 6,
+      fontVariant: ['tabular-nums'],
+    },
+    packCoinsLabel: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.xs,
+      color: colors.mutedMid,
+    },
+    packBuyBtn: {
+      marginTop: spacing.md,
+      backgroundColor: colors.brand,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: 8,
+      alignSelf: 'stretch',
+      alignItems: 'center',
+    },
+    packBuyText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.md,
+      color: colors.ink,
+    },
+    buyCoinsHint: {
+      fontFamily: fontFamily.semibold,
+      fontSize: 9,
+      color: colors.ink,
+      marginTop: 1,
+      opacity: 0.7,
     },
     freezeIconTile: {
       width: 44,
@@ -526,9 +671,15 @@ function makeStyles(colors) {
     scroll: {
       paddingHorizontal: spacing.xl,
       // Extra clearance under the floating bar (Cards tab only) so the last
-      // grid row never sits behind it — the Freeze tab has no floating bar
+      // grid row never sits behind it — the General tab has no floating bar
       // so its own content only needs the plain 60.
       paddingBottom: 110,
+    },
+    // Pinned wrapper (preview card + name row) — sits above the scrollable
+    // grid instead of scrolling with it. Own horizontal padding since it's
+    // no longer inside the ScrollView's contentContainerStyle.
+    pinnedPreview: {
+      paddingHorizontal: spacing.xl,
     },
     // No fixed height (was 150, clipped once the stats row was added) —
     // matches AccountHeroCarousel's own heroCard, which is never given an

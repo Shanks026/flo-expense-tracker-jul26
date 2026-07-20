@@ -13,8 +13,11 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens
 import { currencySymbol, sanitizeAmountInput } from '../../lib/currency';
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
+import { useAuth } from '../../lib/AuthContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
+import { claimDailyLog } from '../../lib/rewardsMutations';
+import { setPendingLoginReward } from '../../lib/pendingLoginReward';
 
 // Design 03, built as a real stepper screen rather than opening
 // AddTransactionSheet over the flow — the user's explicit call (a modal sheet
@@ -42,6 +45,7 @@ function formatDateLabel(date) {
 export default function OnboardingExpense() {
   const router = useRouter();
   const { activeAccount, activeAccountId } = useAccount();
+  const { session } = useAuth();
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
   const { notifyChanged } = useDataRefresh();
@@ -93,6 +97,22 @@ export default function OnboardingExpense() {
       showToast({ message: error.message, variant: 'error' });
       return;
     }
+
+    // Gamification — same daily coin/XP claim AddTransactionSheet's own
+    // handleSave makes, previously missing entirely here (see the identical
+    // comment in onboarding/balance.js for the full story and why the
+    // reward is persisted rather than burst immediately on this screen).
+    // Uses `new Date()` (today), NOT the user-editable `date` field this
+    // screen lets you backdate to "yesterday" — same discipline
+    // AddTransactionSheet's own claimDailyLog call documents: a backdated
+    // entry still counts as logging TODAY, not the date it's filed under.
+    const { error: rewardError, isNewClaim, coins: earnedCoins, xp: earnedXp } = await claimDailyLog(
+      format(new Date(), 'yyyy-MM-dd')
+    );
+    if (!rewardError && isNewClaim) {
+      await setPendingLoginReward(session?.user?.id, { coins: earnedCoins, xp: earnedXp });
+    }
+
     // Without this, Home/Budgets/the streak wouldn't see the row until some
     // later mutation happened to bump the version.
     notifyChanged();

@@ -12,7 +12,8 @@ import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { pickRecap, recapEyebrow, recapCta } from '../lib/koban';
 import { claimMilestone } from '../lib/rewardsMutations';
-import MilestoneChest, { chestPoolFor } from './MilestoneChest';
+import { spinWheelFor } from '../lib/rewards';
+import MilestoneSpinWheel from './MilestoneSpinWheel';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 
 // Keyed BY USER, not per-device. It used to be a bare 'flo.streak.lastCelebrated',
@@ -39,12 +40,13 @@ export default function StreakCelebration() {
   const { isBursting } = useRewardBurst();
   const { notifyChanged } = useDataRefresh();
   const [visible, setVisible] = useState(false);
-  // Separate from `visible` (19-card-themes.md Phase 2) — set at the same
+  // Separate from `visible` (originally 19-card-themes.md Phase 2's chest,
+  // now 20-milestone-spin-wheel.md Phase 1's bonus spin) — set at the same
   // moment as the celebration, but only actually SHOWN once the celebration
   // is dismissed (see the CTA's onPress below), so the two full-screen
   // Modals present sequentially, not stacked.
-  const [chestDay, setChestDay] = useState(null);
-  const [chestVisible, setChestVisible] = useState(false);
+  const [wheelDay, setWheelDay] = useState(null);
+  const [wheelVisible, setWheelVisible] = useState(false);
   const contentRef = useRef(null);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -108,29 +110,33 @@ export default function StreakCelebration() {
           cta: recapCta(),
           reward,
         };
-        // Day 30/50 chain into MilestoneChest right after this screen is
+        // Wheel days chain into MilestoneSpinWheel right after this screen is
         // dismissed (see the CTA's onPress below) — set now, alongside the
         // celebration's own content, so both screens describe the same
         // milestone snapshot rather than re-reading `current` a beat later.
-        setChestDay(isMilestone && chestPoolFor(current) ? current : null);
+        // Gated purely on spinWheelFor(current), NOT `isMilestone &&` (Phase 1
+        // required it since 30/50 were both milestones; Phase 2 added day 1,
+        // which is a NEW STREAK, never a MILESTONES entry — see SPIN_WHEELS'
+        // own comment in lib/rewards.js for why day 1 stays off that list).
+        setWheelDay(spinWheelFor(current) ? current : null);
         setVisible(true);
       });
   }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting]);
 
-  // Dismissing the celebration hands off to the chest (day 30/50 only,
-  // chestDay is null otherwise) instead of just closing — two sequential
-  // full-screen Modals, not stacked; see chestDay's own comment above.
+  // Dismissing the celebration hands off to the spin wheel (day 30/50 only,
+  // wheelDay is null otherwise) instead of just closing — two sequential
+  // full-screen Modals, not stacked; see wheelDay's own comment above.
   function handleCelebrationDismiss() {
     setVisible(false);
-    if (chestDay) setChestVisible(true);
+    if (wheelDay) setWheelVisible(true);
   }
 
-  function handleChestDone() {
-    setChestVisible(false);
-    setChestDay(null);
+  function handleWheelDone() {
+    setWheelVisible(false);
+    setWheelDay(null);
   }
 
-  if (!visible && !chestVisible) return null;
+  if (!visible && !wheelVisible) return null;
 
   return (
     <>
@@ -178,13 +184,24 @@ export default function StreakCelebration() {
         )}
 
         <Animated.View entering={FadeInDown.delay(900).duration(400)} style={styles.buttonWrap}>
-          <Button variant="primary" title={contentRef.current.cta} onPress={handleCelebrationDismiss} />
+          {/* Ghost, not primary — per direct feedback: this is a plain
+              acknowledge/dismiss, not a decision, so it shouldn't compete
+              visually with a real action button (e.g. the spin wheel's own
+              "Spin" CTA that can chain right after this screen). */}
+          <Button variant="ghost" title={contentRef.current.cta} onPress={handleCelebrationDismiss} />
         </Animated.View>
       </View>
     </Modal>
     )}
 
-    {chestDay && <MilestoneChest day={chestDay} visible={chestVisible} onDone={handleChestDone} />}
+    {wheelDay && (
+      <MilestoneSpinWheel
+        day={wheelDay}
+        segments={spinWheelFor(wheelDay).segments}
+        visible={wheelVisible}
+        onDone={handleWheelDone}
+      />
+    )}
     </>
   );
 }

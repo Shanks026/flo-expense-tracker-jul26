@@ -166,6 +166,39 @@ export const ACCENTS = {
     brandBg: '#FBE1DB',
     brandBgDark: '#3F170D',
   },
+
+  // Expanded palette (22-coin-store-and-reward-tiering.md, post-Phase-3) —
+  // colors drawn from the new card themes, spread around the wheel to fill
+  // gaps in the original 7. All available to everyone from day 1 (accents are
+  // never gated — see 16-app-themes.md). Tints (brandBg pale / brandBgDark
+  // dark) were generated to the same targets the original 7 use, so they read
+  // right on light and dark surfaces alike.
+  //
+  // `modes` (optional) — which screen modes an accent is legible in. Omitted =
+  // both (the default; the original 7 all work either way). A pale accent
+  // (Ash/Cream) can't be seen as brand-colored text/icons on a light screen,
+  // so it's marked dark-only; the picker locks it in the wrong mode, and
+  // resolveColors falls back to the default accent if one is ever active in an
+  // unsupported mode (see accentSupportsMode below).
+  crimson: { id: 'crimson', name: 'Crimson', brand: '#D42A4E', brandBg: '#F7E3E7', brandBgDark: '#39131B' },
+  merlot: { id: 'merlot', name: 'Merlot', brand: '#9E2749', brandBg: '#F7E3E9', brandBgDark: '#39131E' },
+  coral: { id: 'coral', name: 'Coral', brand: '#F0705A', brandBg: '#F7E6E3', brandBgDark: '#391913' },
+  tangerine: { id: 'tangerine', name: 'Tangerine', brand: '#F5842E', brandBg: '#F7ECE3', brandBgDark: '#392413' },
+  marigold: { id: 'marigold', name: 'Marigold', brand: '#F2B01F', brandBg: '#F7F1E3', brandBgDark: '#392D13' },
+  emerald: { id: 'emerald', name: 'Emerald', brand: '#22B26C', brandBg: '#E3F7ED', brandBgDark: '#133927' },
+  lagoon: { id: 'lagoon', name: 'Lagoon', brand: '#1FC2C4', brandBg: '#E3F7F7', brandBgDark: '#133939' },
+  glacier: { id: 'glacier', name: 'Glacier', brand: '#35B6E0', brandBg: '#E3F2F7', brandBgDark: '#133039' },
+  cobalt: { id: 'cobalt', name: 'Cobalt', brand: '#3F5FD9', brandBg: '#E3E7F7', brandBgDark: '#131B39' },
+  amethyst: { id: 'amethyst', name: 'Amethyst', brand: '#8E44D4', brandBg: '#EDE3F7', brandBgDark: '#271339' },
+  orchid: { id: 'orchid', name: 'Orchid', brand: '#C94F9E', brandBg: '#F7E4F0', brandBgDark: '#39132C' },
+  blossom: { id: 'blossom', name: 'Blossom', brand: '#D98FC9', brandBg: '#F6E4F2', brandBgDark: '#391331' },
+  rosewood: { id: 'rosewood', name: 'Rosewood', brand: '#C67C6E', brandBg: '#F5E8E5', brandBgDark: '#371B16' },
+  slate: { id: 'slate', name: 'Slate', brand: '#6E7C8C', brandBg: '#EBEDEF', brandBgDark: '#22262B' },
+
+  // Off-whites — pale by design, so they only read as an accent against a DARK
+  // screen. Marked dark-only; locked in the light-mode picker.
+  ash: { id: 'ash', name: 'Ash', brand: '#C4C8CE', brandBg: '#EEEFF1', brandBgDark: '#26282B', modes: ['dark'] },
+  cream: { id: 'cream', name: 'Cream', brand: '#E8DCC0', brandBg: '#F5F1E8', brandBgDark: '#2C2820', modes: ['dark'] },
 };
 
 export const DEFAULT_ACCENT_ID = 'lime';
@@ -184,6 +217,23 @@ export function modeMeta(id) {
   return MODES[id] ?? MODES[DEFAULT_MODE_ID];
 }
 
+// Which modes an accent is legible in — defaults to both when `modes` is
+// unspecified (every accent except the pale off-whites). Accepts an accent
+// object or an id.
+export function accentSupportsMode(accent, modeId) {
+  const a = typeof accent === 'string' ? accentMeta(accent) : accent;
+  return (a?.modes ?? ['light', 'dark']).includes(modeId);
+}
+
+// Human caption for a mode-restricted accent ("Dark mode only" / "Light mode
+// only"), or null when it works in both — the picker uses this to caption a
+// locked swatch.
+export function accentModeLabel(accent) {
+  const modes = accent?.modes;
+  if (!modes || modes.length >= 2) return null;
+  return modes[0] === 'dark' ? 'Dark mode only' : 'Light mode only';
+}
+
 // The actual resolved color set a screen reads via useTheme().colors — the
 // mode supplies everything, the accent overrides just the three brand keys
 // on top of it, and SEMANTIC is spread last so it can never be shadowed.
@@ -198,8 +248,17 @@ export function modeMeta(id) {
 // mode (IconTile's `onDark` prop, e.g. Plans' `Card dark` block, which is
 // dark under light mode too).
 export function resolveColors(accentId, modeId) {
-  const accent = accentMeta(accentId);
+  let accent = accentMeta(accentId);
   const mode = modeMeta(modeId);
+  // Safety net (22-coin-store-and-reward-tiering.md): a mode-restricted accent
+  // (Ash/Cream, dark-only) can end up ACTIVE in an unsupported mode — e.g. the
+  // user picks it in dark mode, then flips to light via the appearance toggle.
+  // Rather than paint unreadable pale brand-colored text/icons on a light
+  // screen, fall back to the default accent for that render. Fully reversible:
+  // switch back to the supported mode and the chosen accent returns (accentId
+  // itself is never mutated). The picker also locks such accents in the wrong
+  // mode, so this only fires for the toggle-after-picking path.
+  if (!accentSupportsMode(accent, mode.id)) accent = accentMeta(DEFAULT_ACCENT_ID);
   return {
     ...mode.colors,
     ...SEMANTIC,

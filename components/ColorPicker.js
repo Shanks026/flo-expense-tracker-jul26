@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
 import Svg, { Defs, ClipPath, Circle, G, Path } from 'react-native-svg';
-import { Check, X } from 'lucide-react-native';
+import { Check, X, Lock } from 'lucide-react-native';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
-import { ACCENT_LIST } from '../theme/themes';
+import { ACCENT_LIST, accentSupportsMode, accentModeLabel } from '../theme/themes';
 
 // The same palette-wheel swatch built for the old flat theme list, repointed
 // at what an accent actually IS now that it's decoupled from mode
@@ -17,7 +17,10 @@ import { ACCENT_LIST } from '../theme/themes';
 // `id` must be unique per rendered instance (not just per accent) — several
 // ClipPaths with the same id in one RN tree can bleed into each other on
 // Android, so it's namespaced with the option's own accent id.
-function ColorSwatch({ id, accent, size = 36 }) {
+// Exported (23-personalize-hub.md Phase 1) — the Personalize hub's inline
+// accent row reuses this exact swatch renderer rather than duplicating the
+// clip-path math.
+export function ColorSwatch({ id, accent, size = 36 }) {
   const r = size / 2;
   const clipId = `color-swatch-${id}`;
   const topHalf = `M0,${r} A${r},${r} 0 0,1 ${size},${r} Z`;
@@ -52,7 +55,7 @@ function ColorSwatch({ id, accent, size = 36 }) {
 // that's the whole point, showing what a not-currently-selected color
 // looks like.
 export default function ColorPicker({ value, onChange, renderTrigger, style }) {
-  const { colors } = useTheme();
+  const { colors, modeId } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
 
@@ -91,22 +94,41 @@ export default function ColorPicker({ value, onChange, renderTrigger, style }) {
               </Pressable>
             </View>
 
+            {/* Fixed-height scroll — the accent list grew to 23 (22-coin-store-
+                and-reward-tiering.md), well past what fits in a centered dialog,
+                so the list scrolls inside a capped height while the header stays
+                pinned above it. */}
+            <ScrollView style={s.list} showsVerticalScrollIndicator={false}>
             {ACCENT_LIST.map((a, idx) => {
               const isSelected = a.id === value;
+              // Locked when the accent can't be read in the CURRENT mode (pale
+              // off-whites in light mode) — dimmed, non-selectable, captioned
+              // with the mode it IS good for. Switching to that mode unlocks it.
+              const supported = accentSupportsMode(a, modeId);
+              const lockLabel = accentModeLabel(a);
               return (
                 <Pressable
                   key={a.id}
-                  style={[s.optionRow, idx < ACCENT_LIST.length - 1 && s.optionRowBorder]}
-                  onPress={() => selectAccent(a.id)}
+                  style={[s.optionRow, idx < ACCENT_LIST.length - 1 && s.optionRowBorder, !supported && s.optionRowLocked]}
+                  onPress={() => supported && selectAccent(a.id)}
+                  disabled={!supported}
                 >
                   <View style={[s.swatchRing, isSelected && s.swatchRingActive]}>
                     <ColorSwatch id={a.id} accent={a} />
                   </View>
-                  <Text style={[s.optionName, isSelected && s.optionNameActive]}>{a.name}</Text>
-                  {isSelected && <Check size={18} color={colors.income} strokeWidth={2.8} />}
+                  <View style={s.optionTextWrap}>
+                    <Text style={[s.optionName, isSelected && s.optionNameActive]}>{a.name}</Text>
+                    {!supported && lockLabel && <Text style={s.optionLockLabel}>{lockLabel}</Text>}
+                  </View>
+                  {isSelected ? (
+                    <Check size={18} color={colors.income} strokeWidth={2.8} />
+                  ) : !supported ? (
+                    <Lock size={15} color={colors.mutedLight} strokeWidth={2.4} />
+                  ) : null}
                 </Pressable>
               );
             })}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -171,6 +193,11 @@ function makeStyles(colors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    // Capped height so 23 accents scroll inside the dialog instead of pushing
+    // it past the screen edges.
+    list: {
+      maxHeight: 380,
+    },
     optionRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -180,6 +207,18 @@ function makeStyles(colors) {
     optionRowBorder: {
       borderBottomWidth: 1,
       borderBottomColor: colors.borderSoft,
+    },
+    optionRowLocked: {
+      opacity: 0.45,
+    },
+    optionTextWrap: {
+      flex: 1,
+    },
+    optionLockLabel: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.xs,
+      color: colors.mutedLight,
+      marginTop: 1,
     },
     swatchRing: {
       padding: 3,
@@ -191,7 +230,6 @@ function makeStyles(colors) {
       borderColor: colors.income,
     },
     optionName: {
-      flex: 1,
       fontFamily: fontFamily.bold,
       fontSize: fontSize.md,
       color: colors.ink,

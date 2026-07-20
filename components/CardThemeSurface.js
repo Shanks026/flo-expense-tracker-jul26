@@ -47,7 +47,7 @@ function buildLinearSvg({ angle, colors }) {
   `;
 }
 
-function buildPatternSvg({ kind, line, accent, accent2, accent3, colors }) {
+function buildPatternSvg({ kind, line, accent, accent2, accent3, colors, angle }) {
   const w = VIEWBOX_W;
   const h = VIEWBOX_H;
   let defs = '';
@@ -121,6 +121,32 @@ function buildPatternSvg({ kind, line, accent, accent2, accent3, colors }) {
       </radialGradient>`;
     }
     body = `<rect width="${w}" height="${h}" fill="url(#p)"/>`;
+  } else if (kind === 'grain') {
+    // Undertow (card-theme-ideas reference set, 2026-07-20) — a diagonal
+    // `colors` gradient (same stop-building as buildLinearSvg) with a fixed
+    // speckle of tiny low-opacity white dots layered over it to approximate
+    // film grain. SVG can't reproduce true photographic noise; this is the
+    // cheapest believable stand-in — literal, deterministic dot positions
+    // (not runtime randomness), so the theme renders identically for every
+    // user, every time, same discipline as every other pattern here.
+    // `angle` defaults to 140 (Undertow's own diagonal) — Crimson Shore
+    // (sky-reference set) overrides it to a near-vertical band instead,
+    // matching its photo's horizontal horizon-glow structure.
+    const { x1, y1, x2, y2 } = angleToCoords(angle ?? 140);
+    const stops = colors
+      .map((c, i) => `<stop offset="${((i / (colors.length - 1)) * 100).toFixed(1)}%" stop-color="${c}"/>`)
+      .join('');
+    defs = `<linearGradient id="p" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops}</linearGradient>`;
+    const grain = [
+      [12, 15, 0.1], [38, 42, 0.06], [64, 8, 0.08], [90, 55, 0.05], [118, 22, 0.09],
+      [145, 68, 0.06], [170, 12, 0.07], [198, 45, 0.05], [222, 78, 0.08], [250, 30, 0.06],
+      [275, 60, 0.09], [20, 95, 0.06], [55, 120, 0.08], [85, 100, 0.05], [112, 140, 0.07],
+      [140, 105, 0.06], [165, 150, 0.09], [190, 118, 0.05], [215, 135, 0.07], [245, 100, 0.06],
+      [270, 155, 0.08], [8, 165, 0.06], [48, 25, 0.05], [102, 75, 0.06], [160, 40, 0.08],
+      [205, 90, 0.05], [235, 20, 0.07], [8, 60, 0.06], [130, 165, 0.05], [260, 140, 0.07],
+    ];
+    const grainDots = grain.map(([gx, gy, op]) => `<circle cx="${gx}" cy="${gy}" r="1" fill="#ffffff" opacity="${op}"/>`).join('');
+    body = `<rect width="${w}" height="${h}" fill="url(#p)"/>${grainDots}`;
   }
 
   return `

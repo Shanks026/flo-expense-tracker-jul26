@@ -1001,3 +1001,26 @@ user's `profile` arrives, same as always.
 - **Mascot/avatar skins.** Blocked on Koban art existing at all (per
   `IDEAS-gamification.md`), unrelated to this token-level work.
 - **Any new art assets.** This feature is colors only.
+
+---
+
+## Addendum — accent expansion + mode-locking (2026-07-20, see `22-coin-store-and-reward-tiering.md`)
+
+`ACCENTS` grew from 7 → **23**: 14 chromatic accents drawn from the card-theme
+palettes (Crimson, Merlot, Coral, Tangerine, Marigold, Emerald, Lagoon,
+Glacier, Cobalt, Amethyst, Orchid, Blossom, Rosewood, Slate) plus two
+off-whites, **Ash** (light grey) and **Cream** (beige). Tints generated to the
+same targets the original 7 use. Still ungated.
+
+**New: per-accent mode support.** An accent may set `modes: ['dark']` /
+`['light']` (omitted = both). Ash/Cream are `['dark']` — pale accents are
+illegible as brand-colored text on a light screen. `accentSupportsMode()` +
+`accentModeLabel()` (this file) drive it: `ColorPicker.js` locks an unsupported
+accent in the wrong mode (dimmed + "Dark mode only" caption + lock icon), and
+`resolveColors()` falls back to the default accent if a mode-restricted accent
+is ever active in an unsupported mode (pick-in-dark-then-toggle-to-light) —
+reversible, `accentId` never mutated. Generalises to future light-only accents.
+
+`ColorPicker`'s dialog also gained a **fixed-height (`maxHeight: 380`)
+`ScrollView`** around the option list — 23 accents no longer fit a centered
+dialog, so the list scrolls under a pinned header.

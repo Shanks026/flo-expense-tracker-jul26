@@ -669,3 +669,356 @@ truth for every theme's identity/look/price — the DB only ever stores
   shop categories from `IDEAS-gamification.md`, each its own future feature.
 - Animated sheen/foil/aurora motion effects — static rendering only, in
   both phases.
+
+---
+
+## Post-Phase addendum: 6 new Rare themes (2026-07-20)
+
+Added directly to the Shop's purchasable Rare tier — **Borealis** (900),
+**Undertow** (850), **Supernova** (950), **Eclipse** (950), **Peacock**
+(900, renamed from "Golden Hour" per direct feedback — no purchases existed
+yet, confirmed via the live ledger, so the `id` was renamed too:
+`golden-hour` → `peacock`, matching the catalogue's own convention of `id`
+mirroring `name`), **Stargazer** (1000). Inspired by references dropped in
+`claude-design/cardthemeideas/` (6 reference images) — built as gradients/
+patterns matching the existing catalogue's shape, not the images themselves.
+That was a real question worth recording the reasoning for, since it sets
+precedent for any future "here's a reference image" request: using the actual
+photos would need (a) a new `image` background type in `CardThemeSurface.js`
+(currently only `solid`/`linear`/`pattern`), (b) an asset/storage pipeline
+this app doesn't have for card themes, and (c) per-region contrast detection
+to pick text color against an arbitrary photo (today every theme hand-picks
+one flat `textColor`, which only works because the theme author already knows
+the gradient won't have a sharp light/dark split under the actual text). None
+of that exists here, and a raster image also can't rescale cleanly across the
+hero card's different real sizes (Home vs. Shop preview) the way an SVG
+gradient does for free. Decided to build as gradients/patterns instead — same
+approach as every existing theme.
+
+Two new `CardThemeSurface.js` pattern kinds: `'grain'` (Undertow — a diagonal
+gradient with a fixed speckle of low-opacity dots approximating film grain,
+since SVG can't do real photographic noise) and `'starfield'` (Stargazer — a
+denser star scatter + a glow rising from the bottom edge; a deliberate
+sibling to `'nebula'`, not a shared/parameterized kind, so tuning one can't
+regress the other). Where a reference's brightest gradient stop would fight a
+single flat text color across the whole card (Eclipse's orange, Peacock's
+gold), the stop was muted rather than reproduced exactly — same restraint
+`lava`/`marble` already use elsewhere in this catalogue.
+
+**Text color fix, same day**: all 6 new themes plus **Nebula** and
+**Daybreak** (`20-milestone-spin-wheel.md` Phase 2's first-week themes)
+originally used a color-tinted near-white `textColor` (e.g. Borealis'
+`#EAFBFF`, Nebula's `#e8ddff`) — reads as low-opacity/washed out on the
+amount/income/expense text per direct feedback. Changed all 7 to flat
+`#FFFFFF`, matching how most of the pre-existing catalogue already does it
+(Dusk, Ocean Deep, Ember, Titanium, Aurora, etc.) — `mutedColor` (the
+currency symbol/subtext) is derived automatically from `textColor` via
+`withOpacity`, so it updated for free with no separate change needed.
+
+**Deliberately undecided, per direct instruction**: whether these stay
+regular coin-purchasable Shop themes, or some/all of them get reclassified as
+milestone/chest/trophy-exclusive rewards instead (`21`'s trophy-reward system
+is the most likely fit for at least one, if that's the direction). Shipped
+into the Shop now so they're usable/visible while that's decided.
+
+### Second batch: 3 more Rare themes, from photos shared directly in chat
+
+**Orchid Dusk** (950), **Crimson Shore** (900), **Dawnfall** (1000) — same
+day, same reasoning (gradients/patterns, not the actual photos), added to the
+same Rare tier. Text flat `#FFFFFF` from the start — no separate fix needed,
+unlike the first batch.
+
+Iterated twice, same session, per direct feedback — final state only
+(the intermediate builds aren't worth re-deriving from history):
+
+- **Started as horizontal-band gradients** (Orchid Dusk linear + a star
+  scatter; Crimson Shore/Dawnfall reusing `'grain'`/a new star+gradient
+  hybrid). **Changed**: "instead of horizontal layering, a radial mixed blur
+  at random places" — Crimson Shore and Dawnfall now both use the existing
+  **`'blotch'`** kind (the same multi-radial-blob mixing Aurora/Marble
+  already use), just with their own palettes. **Then**: "I don't think the
+  star patterns are required for both" — the star scatter was dropped
+  entirely from both. Net result: **Orchid Dusk is a plain `type: 'linear'`
+  gradient** (no pattern kind needed at all without stars); **Crimson
+  Shore** and **Dawnfall** are both plain `'blotch'`. The intermediate
+  `'starlit'`/`'starblotch'` pattern kinds this went through were removed
+  from `CardThemeSurface.js` once nothing referenced them anymore — no
+  orphaned dead code left behind.
+- **Supernova/Eclipse re-tuned**: Supernova's stops darkened/desaturated
+  (same hue progression, less neon-bright) per "colors look too bright and
+  contrasting." Eclipse's indigo→magenta→orange stops softened and moved
+  closer together per "gradient should be smoother, clashing colors look a
+  little harsh" — same restraint as this file's own Lava/Marble precedent,
+  applied more aggressively here.
+
+**Shop UI**: `app/shop.js`'s preview card + tabs are now pinned above the
+theme grid instead of scrolling with it — same pinned-top/scroll-middle
+shape `MenuSheet.js` already uses — per direct feedback that picking a theme
+shouldn't require re-scrolling back up each time.
+
+### Third round: 4 themes removed, Daybreak/Borealis re-tuned, day-1/10/200 gaps
+
+**Removed entirely, per direct instruction** — **Stargazer** and **Nebula**
+(too similar to each other), **Onyx** and **Jupiter**. Their now-unused
+`CardThemeSurface.js` pattern kinds (`'nebula'`, `'starfield'`) were deleted
+too, not left as dead code — same discipline as the `'starlit'`/`'starblotch'`
+cleanup earlier this session.
+
+**Consequence, flagged rather than silently patched**: three milestones lost
+their theme grant and are genuinely open until new inspiration arrives:
+- **Day 1** (was Nebula) → filled with the existing purchasable **Ocean
+  Deep** (`SPIN_WHEELS[1].theme` in `lib/rewards.js`) rather than left empty —
+  it stays buyable in the Shop too; owning it both ways is harmless.
+- **Day 10** (was Jupiter) → `SPIN_WHEELS[10]` now has no `theme` key at all;
+  the day still pays its full coin/freeze bonus, just no theme, until a
+  replacement is chosen.
+- **Day 200** (was Onyx) → removed from `MILESTONE_THEME_GRANTS`; same "still
+  pays coins/freezes, no theme yet" state.
+
+**Daybreak** re-tuned twice: first pass smoothed the transition by darkening
+every stop, which lost the bright sunrise payoff entirely ("lost its bright
+color... looks a bit dark now"). Fixed by keeping the dark-night top and
+bright-amber bottom close to their ORIGINAL brightness and adding two
+bridging mid-stops instead (5 stops total) — smooths the jump without
+dimming the card.
+
+**Borealis** replaced with a real aurora-photo reference (navy sky → rich
+blue → a pale haze → magenta-purple aurora → dark treeline silhouette),
+iterated four times, same session:
+1. Vertical angle (180°) to match the photo's bands — read worse in-app than
+   the diagonal, reverted to 45°.
+2. Violet bridge stop, still `linear` — not smooth enough per feedback
+   ("even more smoother like Crimson Shore").
+3. Switched to **`'blotch'`** (the same radial-blob technique Crimson
+   Shore/Dawnfall/Aurora use) — genuinely smoother by construction, and the
+   violet bridge became an indigo-leaning purple blob (`#4a2a9e`) per
+   "change the violet to purple close to indigo."
+4. **Reverted to `linear`** per direct instruction ("it should be linear
+   only, but this level smooth") — 6 close-spaced stops tuned to approximate
+   the same smoothness, turquoise given real presence as its own visible
+   band (`#1ab0c9`) rather than a fleeting transition color, per "the
+   turquoise should be a little more." **The `'blotch'` version from step 3
+   is kept as a commented-out fallback directly in the theme entry** — the
+   user may revert to it if the linear version doesn't read as smooth
+   enough on-device.
+5. **"Equal color distribution"** — blue/turquoise/purple each held a
+   genuine flat 3-stop plateau at equal 1/3 spacing, computed via real linear
+   RGB interpolation (a small node script, not eyeballed hex), 13 stops
+   total. Still flagged as structurally softer-but-not-blotch-soft (a
+   `linearGradient` transition is a straight-line ramp; `'blotch'`'s radial
+   blobs use a 3-point EASED falloff instead) — no amount of further linear
+   tuning was going to close that gap.
+6. **Switched to `'blotch'`**, per direct instruction ("switch back to
+   blotch") — same accent/accent2 as the earlier blotch attempt (deep blue +
+   indigo-purple), `accent3` upgraded to the more vivid turquoise (`#1ab0c9`)
+   from the linear round.
+7. **Re-checked the reference a second time** — "not necessary to have
+   equal distribution" released the equal-thirds constraint; re-examined the
+   actual photo and found the purple aurora glow is clearly the DOMINANT
+   color (most of the lower two-thirds, not an equal third), the pale
+   transitional haze is genuinely brief (not a bold teal band), and
+   corrected `accent2` (was too dark/muted) and `accent3` (was too
+   saturated) to match: `accent: '#1450a8'`, `accent2: '#7a3fc0'`,
+   `accent3: '#6fb8c9'`.
+8. **Back to `linear` again**, per direct instruction, specifically to match
+   **Eclipse's** own look/angle (165° — Eclipse's actual value, not a literal
+   45°, flagged in case that was meant literally). First pass gave purple a
+   flat 3-stop plateau (repeated identical color) to convey dominance — "not
+   as smooth as Eclipse" turned out to be about that flat, non-evolving
+   stretch specifically, since Eclipse's own gradient never repeats a stop
+   and evolves continuously. Fixed to 6 distinct, non-repeating stops with
+   purple's dominance carried by color choice (a purple-leaning bridge stop)
+   instead of repetition — still came back "not good."
+9. **Settled on `'blotch'`, FINAL**, per direct instruction ("switch back to
+   blotch") — using step 7's corrected colors. Not revisiting `linear` again
+   for this theme: 'blotch's radial blobs use a 3-point EASED opacity
+   falloff, structurally softer than any `linearGradient` stop-to-stop ramp
+   can be, and multiple rounds of stop-tuning already established that
+   ceiling isn't enough for what this theme needs.
+
+**Net catalogue count: 33 themes** (was 37, minus the 4 removed). **Borealis
+is `'blotch'`** (`accent: '#1450a8'`, `accent2: '#7a3fc0'`,
+`accent3: '#6fb8c9'`), final.
+
+### Fourth batch: 2 more Rare themes, blue-sky photos shared directly in chat
+
+**Dusk Bloom** (950) and **Cumulus** (900) — same day, same reasoning.
+Dusk Bloom is a smooth vertical `linear` (vivid blue → blue-lavender → soft
+pink bloom), matching its reference's own soft top-to-bottom transition.
+Cumulus is `'blotch'` over a flatter, more uniform cerulean base — its
+reference photo is a fairly solid blue sky with scattered pink/lavender/white
+cloud puffs, and 'blotch's soft blobs approximate the color mood; this
+renderer has no pattern kind that draws actual cloud shapes, flagged rather
+than pretended otherwise. Both biased darker/more saturated than their
+photos (which run genuinely pale in places) so flat white text stays
+legible everywhere — same restraint as Lava/Marble/Peacock.
+
+**Net catalogue count: 35 themes.**
+
+### Fifth: Ember Night (1000), one more sky photo shared directly in chat
+
+A deep starry night sky, crescent moon, and a glowing fiery-orange cloud low
+in the frame. Neither existing radial kind fit: `'glow'` and `'blotch'` both
+anchor their glow to a corner, and this composition's bright element sits
+low-and-centered instead. New **`'lowglow'`** pattern kind in
+`CardThemeSurface.js` — a radial glow centered at `(50%, 78%)` (not a
+corner), with an optional multi-hue `colors` sweep (same sweep mechanism
+`'glow'` already has) for a hot-core-to-cooling-edge ember gradient, plus a
+small star scatter in the upper portion. Unlike Dawnfall/Orchid Dusk (where
+stars were dropped as unnecessary clutter), this reference's night sky +
+stars is a real part of its identity, kept deliberately. No moon shape — this
+renderer draws gradients/dots, not custom paths; flagged rather than faked.
+
+**Removed the same day** — "doesn't look good," per direct feedback. The
+theme entry and its `'lowglow'` pattern kind were both deleted outright
+(nothing else used `'lowglow'`), not left as dead code.
+
+### Sixth: Neon Horizon (950), a city-sunset photo, colors only
+
+Per direct instruction ("colors only") — a smooth vertical `linear` sweep
+tracing the sky's own color band (deep blue-violet → violet-purple → vivid
+magenta-pink → pink-red → warm orange horizon glow → a dark base), with
+**no attempt at the photo's city-skyline silhouette** — this renderer draws
+gradients/dots, not custom shapes, so the color story carries the mood on
+its own rather than a half-built skyline.
+
+**Net catalogue count: 36 themes** (35, minus Ember Night, plus Neon
+Horizon).
+
+**Same day, smoothed further** — asked whether Dusk Bloom's smoothness
+technique could carry over. It's not one "technique," just small RGB steps
+between neighboring stops (Dusk Bloom never needed a fix because its
+original palette already had that property). Measured the actual distance
+between every Neon Horizon stop and found the real problem: every step sat
+around 57-83 except the last (orange straight to near-black) at 221.9 —
+nearly 3x any other jump. Added one bridge splitting the purple→magenta gap
+and two bridging the orange→dark cliff, all computed via real RGB
+interpolation (a small node script). Every step is now 42-83, consistent
+with the rest of the gradient.
+
+**Same day, colors hand-tweaked directly in-editor** — darkened the top
+stop, brightened several others, and **dropped the forced near-black ending
+entirely**, closing on a muted dark red-wine instead. This fixed the worst
+outlier outright (there's no black stop left to jump to). Re-measured:
+confirmed the user's own insight — "the smooth gradient was never about
+property, it's about finding the right colors" — every remaining step
+landed 31-71 except the darkened top stop, now the one outlier at 96.2.
+Split with one more RGB-interpolated bridge into two ~48s. Final 9-stop
+palette, every transition 31-71, no outliers.
+
+### Seventh: Firelight (950), a fiery orange sunset with a moon-gap, colors only
+
+Vivid orange-red clouds top and bottom, dipping through a cool muted
+purple-lavender gap in the middle (where the reference's crescent moon
+shows through a break in the clouds), back through pink into the most
+saturated orange near the bottom. Colors only — no moon/cloud shapes, no
+power-line silhouette, same standing instruction as Neon Horizon. Built the
+RGB-distance discipline in from the start this time (measure and bridge
+before committing, not after) — every stop-to-stop transition lands 27-74,
+no outlier, matching the range Neon Horizon converged to.
+
+**Same day**: the moon-gap stop was originally a cool muted purple-lavender
+(`#a888b8`, matching the reference photo's own moon-gap color) — per direct
+feedback ("drop the random blue"), replaced with a warm dusty-rose
+(`#b8707a`) instead, since this theme is meant to stay purely warm/orange,
+not trace the photo's cool interruption literally. Re-measured after the
+swap: 13.4-55.7, even tighter than before, and the whole palette now sits in
+one warm red-orange-pink family start to finish, no blue cast anywhere.
+
+**Rebuilt again, same day** — "the colors don't sit, there are gray
+shades... reduce colors and make it proper." The real bug: RGB-distance
+bridging (the discipline that fixed Neon Horizon) only guarantees smooth
+STEP SIZE, not smooth-looking color — interpolating in raw RGB between two
+different hues routinely produces a desaturated, muddy midpoint, which is
+exactly what every "dip" stop in this theme had been doing regardless of
+which colors filled it. Dropped the dip concept entirely rather than
+patching it again: rebuilt as 5 stops, this time checked in **HSL**, not
+just RGB distance — saturation 76-91% and rising throughout, hue sweeping
+smoothly red (5°) to orange (31°). No grey anywhere.
+`["#e0301f", "#e8503f", "#e8622f", "#f07a2f", "#f5952f"]`.
+
+**Net catalogue count: 37 themes.**
+
+### Eighth: Wanderer (950), an illustrated desert-dune piece
+
+Deep purple-black night sky, vivid red-coral clouds, and a dominant
+golden-yellow dune ground, from a stylized illustration (not a photo).
+Requested specifically as a `'blotch'` theme — maps naturally onto its
+three-blob structure: purple-black as the top-left blob, the dominant
+golden dune as the larger bottom-right blob, red-coral as the subtler
+third. Base is a muted warm gold-tan (not the coolest/darkest color in the
+piece) so any gap between blobs still reads as part of the same warm
+palette rather than an unrelated patch. No cloud linework or the
+illustration's tiny walking figure — colors only. Every blob color checked
+in HSL before committing (38-79% saturation), same discipline Firelight's
+rebuild established.
+
+**Net catalogue count: 38 themes.**
+
+### Ninth: Van Gogh (1000), a Starry-Night-style illustration
+
+A vivid golden swirl (top-left blob, matching the painting's own sun/moon
+position) against a deep-to-medium blue field — another natural `'blotch'`
+fit. Base is the rich medium blue dominating most of the canvas; the larger,
+dominant blob is a near-black navy from the painting's darkest passage; a
+pale sky-blue highlight fills the subtler third accent. No brushstroke
+texture, no silhouette/sunflower — colors only. Checked in HSL before
+committing (66-85% saturation). Built while the user was live-editing
+Wanderer's `accent` value in the same file — several edit attempts hit
+"file modified since read" as a result; resolved by anchoring the insertion
+on a stable comment elsewhere in the file rather than content actively
+being changed.
+
+**Same day, rebalanced** — "the yellow is too much... more blues and off-
+white, add yellow as a slight touch." Gold had been `accent` (blotch's
+top-left blob, FULL opacity), making it co-dominant with the navy. Moved
+gold to `accent3` instead — blotch's own reduced-opacity third slot
+(~0.45-0.5 by construction), which is exactly the "slight touch" mechanism
+already built in, not a custom value. Blue now fills both full-opacity
+blobs (medium blue + near-black navy), and `base` became a genuine
+off-white (92% lightness, a hint of blue) instead of the medium blue it
+used to be.
+
+**Same day, second pass** — "too much white. blue needs to be more." The
+off-white `base` from the previous pass was still showing through wherever
+the blotch blobs fall off, reading as visible white patches rather than a
+subtle hint. Replaced `base` (`#e4eaf0` → `#7ba8d4`) with a genuine
+light-medium blue instead of just lowering the same off-white's lightness —
+the card now reads as three distinct blue tones (light base, medium
+`accent`, near-black navy `accent2`) with zero white anywhere. Gold stays
+demoted to `accent3` as the one "slight touch." Verified in HSL (base
+H210°/S51%/L66%, no muddy dips) before committing.
+
+**Net catalogue count: 39 themes.**
+
+### Tenth: Prometheus (1000), a sun/solar-flare illustration — last of this batch
+
+Explicitly asked to experiment with a technique other than `'blotch'` this
+time. The reference is a white-hot core radiating through yellow/orange/red
+into a near-black starfield — mapped onto the existing `'grain'` kind
+(previously only used for Undertow) instead, with grain's own built-in
+speckle dots doubling as the reference image's starfield for free — no new
+pattern code needed.
+
+**Same day, fixed** — "fix the colors and angle to make the left section
+readable" (the account name/balance/stat text all lives in a left-aligned
+column, per `AccountHeroCarousel.js`). The original build (`angle: 50`,
+bright corner at bottom-left, 7 stops bright→dark) put the palest colors
+exactly where the white text sits. Rebuilt the 10 stops dark-to-bright
+instead (`#040201 → #150504 → #2c0a07 → #4a100c → #6f1710 → #9c2214 →
+#c9341a → #e8621f → #ffb347 → #fff2c9`), which alone puts the dark end at
+the bottom-left/top-left where the text lives and pushes the white-hot
+"sun" out toward the top-right/bottom-right corners instead — no angle
+change needed in the end, `angle` stayed `50`. HSL-verified: hue stays a
+tight 20°→46° warm-red/orange band, saturation 60-100% throughout, no grey
+dip.
+
+**Same day, final tweak** — a slight warm tint on `textColor` (`#FFFFFF` →
+`#fff8e2`), a deliberate deviation from this batch's flat-white default to
+tie the text into the fiery palette. Checked: `#fff8e2`'s luminance is
+~97% of pure white's, so it costs essentially nothing in contrast.
+Sampled actual text-anchor points (account name, balance, income/expense
+stats) against the live gradient — contrast ranges 5.9:1 to 19.4:1
+everywhere text sits, comfortably clear of the 4.5:1 AA threshold.
+
+**Net catalogue count: 40 themes.**

@@ -16,7 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import Button from '../components/Button';
 import ArrowMark from '../components/ArrowMark';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { resolveColors, DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { useAuth } from '../lib/AuthContext';
 import { getDraft } from '../lib/onboardingDraft';
 
@@ -27,7 +27,17 @@ import { getDraft } from '../lib/onboardingDraft';
 // opens straight into sign-up, framed as "save your progress" rather than
 // re-asking "create account" cold.
 export default function SignIn() {
-  const { colors } = useTheme();
+  // Pinned to the fixed default brand palette, NOT the active theme
+  // (useTheme). This is a pre-auth screen: the moment sign-in succeeds,
+  // ThemeProfileSync applies the account's own accent/mode to the active
+  // ThemeContext — and because this screen is still the visible one for a
+  // beat before navigation to Home completes, reading the active theme here
+  // made the whole sign-in screen visibly repaint into the account's colors
+  // before Home ever appeared (the reported "the login screen theme changes"
+  // flash). A fixed palette means sign-in never re-themes; the account's
+  // theme lands on Home, where it belongs. (The shared <Button> still uses
+  // the active accent for its fill — a single element, brief, acceptable.)
+  const colors = useMemo(() => resolveColors(DEFAULT_ACCENT_ID, DEFAULT_MODE_ID), []);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { signIn, signUp } = useAuth();
   const params = useLocalSearchParams();
@@ -189,11 +199,21 @@ export default function SignIn() {
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <View style={{ height: isSignUp ? 24 : 28 }} />
+          {/* Force the button fill to this screen's FIXED default brand
+              (colors.brand here is the default-palette lime, since `colors`
+              is resolveColors(DEFAULT_ACCENT_ID, …) above) — the shared Button
+              otherwise reads the ACTIVE theme's accent, which after a logout is
+              still the last account's color (we intentionally don't reset the
+              theme on logout, to avoid the outgoing-screen flash). Overriding
+              it here keeps the whole auth screen on the default brand
+              regardless of who was last signed in. `style` is applied last in
+              Button, so it wins over the variant's own backgroundColor. */}
           <Button
             title={isSignUp ? 'Create Account' : 'Sign In'}
             onPress={handleSubmit}
             loading={loading}
             disabled={!canSubmit}
+            style={{ backgroundColor: colors.brand }}
           />
 
           <View style={styles.dividerRow}>

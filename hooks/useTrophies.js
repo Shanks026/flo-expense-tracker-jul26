@@ -6,6 +6,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
 import useStreak from './useStreak';
 import { evaluateTrophies, hasPerfectMonth, isCategorizerStreak } from '../lib/trophies';
+import { TROPHY_REWARDS } from '../lib/rewards';
 
 // How far back the perfect-month/categorizer window queries reach. 400 days
 // (~13 months) covers "any completed calendar month" with margin, without
@@ -22,6 +23,9 @@ const EMPTY_STATS = {
   completedPlans: 0,
   keptBudgetPeriods: null, // not computable yet — see lib/trophies.js
   noSpendDays: 0,
+  // 21-achievement-rewards-and-milestone-road.md Phase 2 — which trophy tile
+  // ids already have a claimed reward_events row (source: 'trophy').
+  claimedTrophyRefs: new Set(),
 };
 
 // Global (user-scoped), like useStreak — a trophy is lifetime recognition,
@@ -33,7 +37,7 @@ async function fetchStats(userId, streak) {
 
   const since = format(subDays(new Date(), HISTORY_WINDOW_DAYS), 'yyyy-MM-dd');
 
-  const [txnCountRes, historyRes, plansRes, noSpendCountRes] = await Promise.all([
+  const [txnCountRes, historyRes, plansRes, noSpendCountRes, claimedTrophyRes] = await Promise.all([
     // Exact-type filter (income/expense only) — same discipline as the
     // streak and every other aggregation in this app: transfers are
     // bookkeeping between a user's own accounts, not "logging".
@@ -49,6 +53,10 @@ async function fetchStats(userId, streak) {
     // total, not bounded by HISTORY_WINDOW_DAYS (18-gamification-ritual-and-
     // ledger.md Phase 3).
     supabase.from('reward_events').select('id', { count: 'exact', head: true }).eq('source', 'no_spend'),
+    // Which trophy claims already have a ledger row (21-achievement-rewards-
+    // and-milestone-road.md Phase 2) — `ref` is the trophy tile's own id
+    // (`${groupId}:${tier}`), matching lib/trophies.js's makeEntry() exactly.
+    supabase.from('reward_events').select('ref').eq('source', 'trophy'),
   ]);
 
   const rows = historyRes.data ?? [];
@@ -62,6 +70,7 @@ async function fetchStats(userId, streak) {
     completedPlans: plansRes.data?.length ?? 0,
     keptBudgetPeriods: null,
     noSpendDays: noSpendCountRes.count ?? 0,
+    claimedTrophyRefs: new Set((claimedTrophyRes.data ?? []).map((r) => r.ref)),
   };
 }
 
@@ -99,7 +108,22 @@ export default function useTrophies() {
       .catch(() => {});
   }, [userId]);
 
-  const trophies = useMemo(() => evaluateTrophies(stats), [stats]);
+  // 21-achievement-rewards-and-milestone-road.md Phase 2 — annotates each
+  // tile with its reward + claimed state, WITHOUT touching lib/trophies.js
+  // (which stays purely behavioral, per its own cardinal rule: "every trophy
+  // rewards BEHAVIOR, never an amount"). A tile with no TROPHY_REWARDS entry
+  // (Streak Keeper, Budget Keeper, or any tier this map doesn't cover) is
+  // returned unchanged — that absence IS the "not claimable here" signal the
+  // UI reads.
+  const trophies = useMemo(
+    () =>
+      evaluateTrophies(stats).map((t) => {
+        const reward = TROPHY_REWARDS[t.id];
+        if (!reward) return t;
+        return { ...t, reward, claimed: stats.claimedTrophyRefs.has(t.id) };
+      }),
+    [stats]
+  );
   const earnedCount = useMemo(() => trophies.filter((t) => t.earned).length, [trophies]);
   const unseenCount = useMemo(
     () => trophies.filter((t) => t.earned && !seen.has(t.id)).length,

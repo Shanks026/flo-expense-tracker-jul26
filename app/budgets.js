@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Wallet } from 'lucide-react-native';
@@ -14,6 +14,7 @@ import FadeIn from '../components/FadeIn';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useBudgets, { budgetStatus } from '../hooks/useBudgets';
+import usePullToRefresh from '../hooks/usePullToRefresh';
 import { formatPeriodLabel, isBudgetEnded } from '../lib/budgets';
 import { useAddBudgetSheet } from '../components/AddBudgetSheet';
 import { supabase } from '../lib/supabase';
@@ -26,6 +27,7 @@ import useCurrency from '../hooks/useCurrency';
 export default function Budgets() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { refreshing, onRefresh } = usePullToRefresh();
   // Healthy uses the active theme's accent (not the income green) — same
   // pattern Plans' active-plan card already uses (tone="brand"), so a
   // healthy budget's icon/bg/remaining-amount and its progress bar (which
@@ -69,7 +71,12 @@ export default function Budgets() {
         <Text style={styles.title}>Budgets</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
+      >
         {loading ? (
           <>
             {[0, 1].map((i) => (

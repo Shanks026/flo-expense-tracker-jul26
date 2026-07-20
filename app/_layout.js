@@ -208,11 +208,13 @@ function OnboardingGate() {
 // device see whoever most recently used it. AccountContext already solves
 // this (resets activeAccountId to null the instant `userId` changes, then
 // re-resolves against the newly-signed-in user's own accounts) — this does
-// the equivalent for theme: the instant the signed-in user changes (sign
-// out, sign in, or switching accounts on the same device), reset to the
-// default accent/mode immediately, rather than let account A's cached
-// choice flash on screen while account B's profile is still loading. The
+// the equivalent for theme: on a LOGIN or account-switch (a new non-null
+// user), reset to the default accent/mode immediately so account A's cached
+// choice can't flash while account B's profile is still loading; the
 // reconciliation effect above then takes over once B's own profile arrives.
+// The reset is intentionally SKIPPED on logout (see the effect's own comment)
+// so it doesn't repaint the outgoing authenticated screen a beat before the
+// redirect to sign-in.
 // Sibling of <Stack>, same placement/reason as ThemeProfileSync (needs
 // useProfile(), which needs useDataRefresh(), which RootNavigator defines
 // but doesn't consume) — and the same real gap that push-token registration
@@ -258,8 +260,19 @@ function ThemeProfileSync() {
   useEffect(() => {
     if (prevUserIdRef.current !== userId) {
       prevUserIdRef.current = userId;
-      setAccent(DEFAULT_ACCENT_ID);
-      setMode(DEFAULT_MODE_ID);
+      // Reset to default ONLY on a login / account-switch (new userId is
+      // non-null) — giving the incoming account a clean default base before
+      // its own profile theme loads. Deliberately NOT on logout (userId →
+      // null): resetting there repaints the still-mounted authenticated
+      // screen (e.g. Settings) to default lime for a beat before the redirect
+      // to /sign-in lands — that was the reported logout flash. Pre-auth
+      // screens are now pinned to the default palette themselves
+      // (app/sign-in.js), so leaving the active theme on the outgoing
+      // account's colors until that screen unmounts is invisible.
+      if (userId) {
+        setAccent(DEFAULT_ACCENT_ID);
+        setMode(DEFAULT_MODE_ID);
+      }
     }
   }, [userId, setAccent, setMode]);
 

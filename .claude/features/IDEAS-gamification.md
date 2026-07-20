@@ -5,7 +5,9 @@ feature doc when picked up.
 
 **Recorded**: 17 July 2026, from a brainstorm that started with "leaderboards,
 mascot skins, gacha?" and ended somewhere more honest. Updated same day with
-the follow-up rounds: purchasable coins (rejected again, mechanism recorded),
+the follow-up rounds: purchasable coins (rejected here, later **REVERSED
+2026-07-20** — see `22-coin-store-and-reward-tiering.md` and the struck-through
+note below),
 dual-track cosmetics, seasonal themes, where skins actually display, and the
 promo-card/ads decision. The rejected ideas are recorded *with their
 reasoning* so they aren't re-litigated.
@@ -411,6 +413,16 @@ Never (same register as "never gate the ledger"):
   finance-discipline app selling impulse-priced currency undercuts its own
   premise, and FLO's revenue engine is Pro, not micro-spend. Coins stay
   earned-only, forever.
+  > **⚠️ REVERSED 2026-07-20 — see `22-coin-store-and-reward-tiering.md`.** The
+  > author opted into selling coins, on ROI grounds, with the transitive-freeze
+  > objection (point 3) resolved specifically: the freeze **cap** (5, can't be
+  > stockpiled) plus a freeze **price** raised 500 → 3,000 coins — set *above*
+  > the affordable coin packs — means no cheap pack buys streak protection, so
+  > "engagement is the cheapest path to a freeze" still holds. Money flows to
+  > cosmetics (themes/skins), not pay-to-win. Points 1–2 are accepted as the
+  > cost of the decision. Coins are now **spending-currency you can top up**;
+  > earning stays generous. (Store shipped UI-first, payments stubbed like Pro;
+  > real crediting rides the payments-go-live effort.)
 - **Selling streak freezes/repairs for cash.** Charging users to protect the
   habit you built for them is the predatory dark pattern this app's whole
   voice argues against.

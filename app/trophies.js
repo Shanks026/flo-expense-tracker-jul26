@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,9 +17,15 @@ import {
 } from 'lucide-react-native';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
+import CardThemeSurface from '../components/CardThemeSurface';
 import useTrophies from '../hooks/useTrophies';
 import useRewards from '../hooks/useRewards';
+import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useRewardBurst } from '../components/RewardBurst';
+import { useToast } from '../components/Toast';
+import { claimTrophy } from '../lib/rewardsMutations';
 import { TROPHY_GROUPS, TROPHY_GROUP_ORDER } from '../lib/trophies';
+import { getTheme } from '../lib/cardThemes';
 import { RANKS, rankFromXp } from '../lib/rewards';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -28,6 +34,15 @@ import { useTheme } from '../theme/ThemeContext';
 // rather than CategoryIcon.js, which is specifically the category icon
 // registry, not a general-purpose one.
 const ICONS = { Flame, NotebookPen, CalendarCheck2, Target, Leaf, Compass, Tags, RotateCcw, Sparkles };
+
+// The Claim button's headline amount — coins first (the thing most users
+// value most), then freezes (Comeback's reward is freeze-only, coins:0), XP
+// last (every reward has XP, so it's the only guaranteed non-zero fallback).
+function claimAmountLabel(reward) {
+  if (reward.coins > 0) return `+${reward.coins}`;
+  if (reward.freezes > 0) return `+${reward.freezes} freeze${reward.freezes === 1 ? '' : 's'}`;
+  return `+${reward.xp} XP`;
+}
 
 // The Trophy Room — 18-gamification-ritual-and-ledger.md Phase 1. Every tile
 // here is derived live from existing streak/transaction/plan data (via
@@ -40,6 +55,37 @@ export default function TrophiesScreen() {
   const { trophies, earnedCount, totalCount, markAllSeen, loading } = useTrophies();
   const { xp } = useRewards();
   const { current: currentRank } = rankFromXp(xp);
+  const { notifyChanged } = useDataRefresh();
+  const { showRewardBurst } = useRewardBurst();
+  const { showToast } = useToast();
+  // 21-achievement-rewards-and-milestone-road.md Phase 2 — tracks which
+  // single tile is mid-claim so only that row's button shows a spinner,
+  // rather than disabling the whole screen for one network round trip.
+  const [claimingId, setClaimingId] = useState(null);
+
+  const handleClaim = useCallback(
+    async (t) => {
+      setClaimingId(t.id);
+      const { error, isNewClaim, coins, xp: earnedXp, freezes, themeId } = await claimTrophy(t.id);
+      setClaimingId(null);
+      if (error || !isNewClaim) return;
+      // notifyChanged() bumps useDataRefresh's version, which useTrophies
+      // already subscribes to for its own refetch (including the
+      // claimedTrophyRefs query) — no separate refetch() call needed, same
+      // as every other claim site in this app (claimMilestone/claimSpin's
+      // callers only ever call notifyChanged()).
+      notifyChanged();
+      showRewardBurst({ coins, xp: earnedXp, freezes });
+      // Theme grants can't ride the RewardBurst (coins/XP/freezes only), so the
+      // cosmetic prize gets its own confirmation toast — the swatch in the tile
+      // already showed WHAT it is; this confirms it's now unlocked in the Shop.
+      // (22-coin-store-and-reward-tiering.md Phase 1.)
+      if (themeId) {
+        showToast({ message: `${getTheme(themeId).name} card unlocked`, variant: 'success' });
+      }
+    },
+    [notifyChanged, showRewardBurst, showToast]
+  );
 
   // Clears the unseen dot the moment the room is actually viewed, not on
   // first data arrival — matches the Menu sheet's own "seen" semantics.
@@ -173,8 +219,38 @@ export default function TrophiesScreen() {
                       <Text style={styles.rowSub} numberOfLines={2}>
                         {t.locked ? 'Coming soon' : t.hint}
                       </Text>
+                      {/* A themed trophy shows its card prize as a mini swatch
+                          (22-coin-store-and-reward-tiering.md Phase 1) — the
+                          same CardThemeSurface the Shop tiles use, so the
+                          cosmetic reward is visible before AND after claiming
+                          (it stays as "what you earned"). */}
+                      {t.reward?.themeId && (
+                        <View style={styles.themeReward}>
+                          <CardThemeSurface theme={getTheme(t.reward.themeId)} style={styles.themeRewardSwatch} />
+                          <Text style={styles.themeRewardText}>{getTheme(t.reward.themeId).name} card</Text>
+                        </View>
+                      )}
                     </View>
-                    {t.earned ? (
+                    {/* 21-achievement-rewards-and-milestone-road.md Phase 2 —
+                        a third state between "not earned" and "Earned": a
+                        Claim button, shown only when this tile has a defined
+                        reward (t.reward — absent for Streak Keeper/Budget
+                        Keeper, which stays exactly as before) and hasn't been
+                        claimed yet. Once claimed, falls through to the same
+                        "Earned" text every other earned tile already shows. */}
+                    {t.earned && t.reward && !t.claimed ? (
+                      <Pressable
+                        style={[styles.claimButton, claimingId === t.id && styles.claimButtonDisabled]}
+                        onPress={() => handleClaim(t)}
+                        disabled={claimingId === t.id}
+                      >
+                        {claimingId === t.id ? (
+                          <ActivityIndicator size="small" color={colors.ink} />
+                        ) : (
+                          <Text style={styles.claimButtonText}>Claim {claimAmountLabel(t.reward)}</Text>
+                        )}
+                      </Pressable>
+                    ) : t.earned ? (
                       <Text style={[styles.rowEarned, { color: toneColor[group.tone] }]}>Earned</Text>
                     ) : (
                       !t.locked && (
@@ -333,6 +409,23 @@ function makeStyles(colors) {
       color: colors.mutedMid,
       marginTop: 1,
     },
+    // Themed-trophy card prize (22-coin-store-and-reward-tiering.md Phase 1) —
+    // a small swatch + label under the hint, mirroring the Shop's tile swatch.
+    themeReward: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 5,
+    },
+    themeRewardSwatch: {
+      width: 30,
+      height: 19,
+    },
+    themeRewardText: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      color: colors.mutedDarker,
+    },
     rowProgress: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.sm,
@@ -343,6 +436,27 @@ function makeStyles(colors) {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.sm,
       letterSpacing: -0.1,
+    },
+    // Claim button (21-achievement-rewards-and-milestone-road.md Phase 2) —
+    // a compact pill matching this app's small-action-button grammar (Shop's
+    // tile actions, e.g.), sized to sit as a row's trailing element rather
+    // than a full-width button.
+    claimButton: {
+      minWidth: 72,
+      height: 32,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.pill,
+      backgroundColor: colors.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    claimButtonDisabled: {
+      opacity: 0.6,
+    },
+    claimButtonText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.xs,
+      color: colors.ink,
     },
     footnote: {
       fontFamily: fontFamily.medium,

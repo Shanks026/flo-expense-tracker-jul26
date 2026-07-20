@@ -22,11 +22,22 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
   // accent. `danger`/`dangerBorder` are semantic-locked already (identical
   // across every theme by construction), so reading them from the active
   // theme here is safe.
+  //
+  // `ghost` — added for the full-screen celebration Modals (StreakCelebration,
+  // MilestoneSpinWheel), which always paint a permanently-dark `colors.ink`
+  // background regardless of the app's active theme (same reasoning as
+  // `dark`'s own pinned static values, not `useTheme()`'s colors). A
+  // low-contrast, translucent-white pill for a simple ACKNOWLEDGE/dismiss
+  // action ("Nice") sitting alongside a real decision button ("Spin") that
+  // should stay the loud primary brand color — the two need visually
+  // distinct weights, per direct feedback that a lone bright button for
+  // every action in these modals "looks odd."
   const VARIANTS = {
     primary: { bg: colors.brand, text: staticColors.ink },
     dark: { bg: staticColors.ink, text: staticColors.surface },
     outline: { bg: colors.surface, text: colors.ink, border: colors.border },
     danger: { bg: colors.surface, text: colors.danger, border: colors.dangerBorder },
+    ghost: { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.78)', border: 'rgba(255,255,255,0.16)' },
   };
   const v = VARIANTS[variant] ?? VARIANTS.primary;
 
@@ -57,7 +68,11 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
 const styles = StyleSheet.create({
   base: {
     height: 56,
-    borderRadius: radii.button,
+    // Pill, not radii.button (16) — per direct feedback, every variant
+    // (primary/dark/outline/danger/ghost) shares this one base style, so
+    // rounding it here makes ALL of them pill-shaped everywhere this
+    // component is used, not just one call site.
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },

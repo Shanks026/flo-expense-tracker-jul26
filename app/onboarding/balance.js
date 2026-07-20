@@ -9,9 +9,12 @@ import { colors, spacing, fontFamily, fontSize } from '../../theme/tokens';
 import { currencySymbol, sanitizeAmountInput } from '../../lib/currency';
 import { supabase } from '../../lib/supabase';
 import { useAccount } from '../../lib/AccountContext';
+import { useAuth } from '../../lib/AuthContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 import useCurrency from '../../hooks/useCurrency';
+import { claimDailyLog } from '../../lib/rewardsMutations';
+import { setPendingLoginReward } from '../../lib/pendingLoginReward';
 
 // Sits between account.js and expense.js on purpose: without this, the demo
 // expense the very next screen invites is the account's first-ever row, so
@@ -25,6 +28,7 @@ const CURRENCY_SLOT = 26;
 export default function OnboardingBalance() {
   const router = useRouter();
   const { activeAccountId } = useAccount();
+  const { session } = useAuth();
   const { incomeCategories } = useCategories();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
@@ -55,6 +59,26 @@ export default function OnboardingBalance() {
       showToast({ message: error.message, variant: 'error' });
       return;
     }
+
+    // Gamification — this is a real logged transaction (same row shape as
+    // AddTransactionSheet's own), so it earns the same daily coin/XP claim.
+    // Found missing entirely (a brand-new account's first-ever transaction
+    // is almost always logged HERE, not through AddTransactionSheet, so the
+    // day-login reward was silently never claimed) — see
+    // 20-milestone-spin-wheel.md's Phase 2 post-build notes. Unlike
+    // AddTransactionSheet, this doesn't burst the reward immediately: per
+    // direct feedback, stacking a RewardBurst into the onboarding stepper
+    // (on top of the streak celebration + spin wheel, which already fire
+    // here independently via useStreak reading the transactions table
+    // directly) is too much at once. Persisted instead; Home shows it once,
+    // the first time it mounts after onboarding.
+    const { error: rewardError, isNewClaim, coins: earnedCoins, xp: earnedXp } = await claimDailyLog(
+      format(new Date(), 'yyyy-MM-dd')
+    );
+    if (!rewardError && isNewClaim) {
+      await setPendingLoginReward(session?.user?.id, { coins: earnedCoins, xp: earnedXp });
+    }
+
     notifyChanged();
     router.replace(next);
   }

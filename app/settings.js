@@ -7,17 +7,19 @@ import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMediu
 import { format } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
+import Skeleton from '../components/Skeleton';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { useAccount } from '../lib/AccountContext';
+import { useDataRefresh } from '../lib/DataRefreshContext';
 import useProfile from '../hooks/useProfile';
+import useCurrency from '../hooks/useCurrency';
 import useEntitlement from '../hooks/useEntitlement';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
-import { DEFAULT_CURRENCY } from '../lib/currency';
 import ProBadge from '../components/ProBadge';
-import ColorPicker from '../components/ColorPicker';
-import AppearanceToggle from '../components/AppearanceToggle';
 import { useTheme } from '../theme/ThemeContext';
 import {
   getNotificationSettings,
@@ -90,9 +92,12 @@ function timeOnTodayFromString(timeStr, fallbackHour, fallbackMinute) {
 export default function Settings() {
   const router = useRouter();
   const { session, deleteAccount } = useAuth();
-  const { profile, avatarUrl, updateProfile } = useProfile();
+  const { profile, avatarUrl, updateProfile, loading: profileLoading } = useProfile();
+  const { activeAccountId } = useAccount();
+  const { notifyChanged } = useDataRefresh();
+  const currency = useCurrency();
   const { openEditProfile } = useEditProfileSheet();
-  const { accentId, modeId, setAccent, setMode, colors } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPro } = useEntitlement();
   const { showToast } = useToast();
@@ -346,41 +351,29 @@ export default function Settings() {
     await setBillReminderSettings(next);
   }
 
-  // Only the default for NEW accounts — existing accounts keep their own
-  // currency (immutable once they have transactions; see AddAccountSheet).
+  // App-wide display currency. Writes BOTH the ACTIVE account's currency —
+  // which is what every screen actually displays via useCurrency() →
+  // activeAccount.currency — AND profiles.currency (the default seeded into
+  // future new accounts), so the two agree. Mirrors onboarding/currency.js's
+  // own dual write exactly. Previously this wrote ONLY profiles.currency,
+  // which nothing on screen reads, so the change never appeared anywhere —
+  // the reported bug. Currency here is purely a display symbol (no FX
+  // conversion), so re-labeling an existing account's amounts is intended.
   async function handleCurrencyChange(code) {
-    const { error } = await updateProfile({ currency: code });
+    if (!activeAccountId) return;
+    const [{ error: accountError }, { error: profileError }] = await Promise.all([
+      supabase.from('accounts').update({ currency: code }).eq('id', activeAccountId),
+      updateProfile({ currency: code }, { silent: true }),
+    ]);
+    const error = accountError ?? profileError;
     if (error) {
       showToast({ message: error.message, variant: 'error' });
       return;
     }
-    showToast({ message: 'Default currency updated', variant: 'success' });
-  }
-
-  // Same dual-write shape onboarding/currency.js uses: instant local
-  // application via setAccent()/setMode() (AsyncStorage-backed, no network
-  // round trip needed to see the change) plus the durable profile write so
-  // it follows the user across devices/reinstalls. Two independent fields
-  // (profiles.theme_accent/theme_mode) now, not one — see 16-app-themes.md's
-  // 2026-07-18 restructuring.
-  async function handleAccentChange(id) {
-    setAccent(id);
-    const { error } = await updateProfile({ theme_accent: id }, { silent: true });
-    if (error) {
-      showToast({ message: error.message, variant: 'error' });
-      return;
-    }
-    showToast({ message: 'Color updated', variant: 'success' });
-  }
-
-  async function handleModeChange(id) {
-    setMode(id);
-    const { error } = await updateProfile({ theme_mode: id }, { silent: true });
-    if (error) {
-      showToast({ message: error.message, variant: 'error' });
-      return;
-    }
-    showToast({ message: 'Appearance updated', variant: 'success' });
+    // Refetch accounts (AccountProvider subscribes to version) so useCurrency
+    // picks up the new active-account currency app-wide.
+    notifyChanged();
+    showToast({ message: 'Currency updated', variant: 'success' });
   }
 
   async function handleDelete() {
@@ -430,8 +423,11 @@ export default function Settings() {
         </Pressable>
 
         <Card style={styles.rowsCard}>
+          {/* value is the EFFECTIVE display currency (useCurrency →
+              activeAccount.currency), matching what the app actually shows,
+              not profiles.currency (which only seeds new accounts). */}
           <CurrencyPicker
-            value={profile?.currency ?? DEFAULT_CURRENCY}
+            value={currency}
             onChange={handleCurrencyChange}
             variant="dialog"
             renderTrigger={(selected, toggle) => (
@@ -441,11 +437,15 @@ export default function Settings() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>Currency</Text>
-                  <Text style={styles.rowHint}>Default for new accounts</Text>
+                  <Text style={styles.rowHint}>Shown across the app</Text>
                 </View>
-                <Text style={styles.rowValue}>
-                  {selected.symbol} {selected.code}
-                </Text>
+                {profileLoading ? (
+                  <Skeleton width={54} height={16} radius={6} />
+                ) : (
+                  <Text style={styles.rowValue}>
+                    {selected.symbol} {selected.code}
+                  </Text>
+                )}
               </Pressable>
             )}
           />
@@ -458,27 +458,18 @@ export default function Settings() {
             <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
           </Pressable>
 
-          <ColorPicker
-            value={accentId}
-            onChange={handleAccentChange}
-            renderTrigger={(selected, toggle) => (
-              <Pressable style={[styles.row, styles.rowBorder]} onPress={toggle}>
-                <View style={styles.rowIcon}>
-                  <Palette size={20} color={colors.ink} strokeWidth={2} />
-                </View>
-                <Text style={styles.rowTitle}>Primary Color</Text>
-                <Text style={styles.rowValue}>{selected.name}</Text>
-              </Pressable>
-            )}
-          />
-
-          <View style={styles.row}>
+          {/* Primary Color + Appearance collapsed into one row
+              (23-personalize-hub.md) — both, plus the card design (Shop-only
+              before), now live together in the Personalize hub with a single
+              preview and an explicit Equip step, instead of two rows that
+              each applied instantly. */}
+          <Pressable style={styles.row} onPress={() => router.push('/personalize')}>
             <View style={styles.rowIcon}>
-              <SunMedium size={20} color={colors.ink} strokeWidth={2} />
+              <Palette size={20} color={colors.ink} strokeWidth={2} />
             </View>
-            <Text style={styles.rowTitle}>Appearance</Text>
-            <AppearanceToggle value={modeId} onChange={handleModeChange} />
-          </View>
+            <Text style={styles.rowTitle}>Personalize</Text>
+            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+          </Pressable>
         </Card>
 
         <Text style={styles.sectionLabel}>Notifications</Text>

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Trophy, Unlink } from 'lucide-react-native';
+import { ChevronLeft, Trophy, Unlink, Flame } from 'lucide-react-native';
 import { Pressable } from 'react-native';
 import {
   parseISO,
@@ -22,11 +22,27 @@ import StreakFlameIcon from '../components/StreakFlameIcon';
 import { StreakFlame } from '../components/StreakDays';
 import useStreak from '../hooks/useStreak';
 import { streakHeadline } from '../lib/koban';
+import { milestoneRoad } from '../lib/rewards';
+import { getTheme } from '../lib/cardThemes';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
 const BADGE_SIZE = 92;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+// 21-achievement-rewards-and-milestone-road.md Phase 1 — composes one road
+// row's reward text from whatever milestoneRoad() reports for that day
+// (coins/freezes lump, a theme grant, a bonus spin) into a single short
+// subtitle line, matching this screen's existing one-line-per-row grammar.
+function roadRewardText(entry) {
+  const parts = [];
+  if (entry.coins > 0) parts.push(`${entry.coins.toLocaleString('en-IN')} coins`);
+  if (entry.freezes > 0) parts.push(`${entry.freezes} freeze${entry.freezes === 1 ? '' : 's'}`);
+  let text = parts.join(' · ') || 'Bonus reward';
+  if (entry.themeId) text += ` · + ${getTheme(entry.themeId).name}`;
+  if (entry.hasWheel) text += ' · + bonus spin';
+  return text;
+}
 
 // The streak's own screen — the destination behind Home's header flame.
 //
@@ -51,6 +67,7 @@ export default function StreakScreen() {
   }
 
   const lit = current > 0;
+  const road = milestoneRoad(current);
 
   // history is a flat list of { date: 'yyyy-MM-dd', logged, covered, type }
   // for the last 42 days (18-gamification-ritual-and-ledger.md Phase 3 added
@@ -117,6 +134,42 @@ export default function StreakScreen() {
               <Text style={styles.statValue}>{breaks}</Text>
               <Text style={styles.statLabel}>Breaks</Text>
             </View>
+          </Card>
+        </View>
+
+        {/* 21-achievement-rewards-and-milestone-road.md Phase 1 — a plain row
+            list, deliberately: the pure milestoneRoad() data is what needs to
+            be solid this phase, not a path/line graphic (deferred). Mirrors
+            app/trophies.js's Rank ladder row grammar (icon left, title+sub
+            stacked, trailing state) so the three states (earned/current/
+            locked) read the same way that screen's own three-state rows do. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Milestone Road</Text>
+          <Card style={styles.listCard}>
+            {road.map((entry, idx) => (
+              <View key={entry.day} style={[styles.row, idx < road.length - 1 && styles.rowBorder]}>
+                <IconTile tone={entry.state === 'locked' ? 'neutral' : 'streak'} size={44} radius={radii.iconTile}>
+                  <Flame
+                    size={20}
+                    color={entry.state === 'locked' ? colors.mutedLight : colors.streakDeep}
+                    strokeWidth={2}
+                  />
+                </IconTile>
+                <View style={styles.rowMid}>
+                  <Text style={[styles.rowTitle, entry.state === 'locked' && styles.rowTitleLocked]}>
+                    Day {entry.day}
+                  </Text>
+                  <Text style={styles.rowSub} numberOfLines={2}>
+                    {roadRewardText(entry)}
+                  </Text>
+                </View>
+                {entry.state === 'earned' ? (
+                  <Text style={[styles.rowEarned, { color: colors.streakDeep }]}>Earned</Text>
+                ) : entry.state === 'current' ? (
+                  <Text style={[styles.rowEarned, { color: colors.streak }]}>{entry.day - current} to go</Text>
+                ) : null}
+              </View>
+            ))}
           </Card>
         </View>
 
@@ -263,6 +316,54 @@ function makeStyles(colors) {
     fontSize: fontSize.sm,
     color: colors.mutedMid,
     marginTop: 2,
+  },
+  // Milestone Road (21-achievement-rewards-and-milestone-road.md Phase 1) —
+  // same row grammar as app/trophies.js's trophy/rank rows (icon left,
+  // title+subtitle stacked, trailing state right), reused verbatim here.
+  section: {
+    marginBottom: spacing.lg,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    color: colors.ink,
+    marginBottom: spacing.sm,
+  },
+  listCard: {
+    padding: 0,
+    paddingHorizontal: spacing.lg,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 13,
+  },
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  rowMid: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.lg,
+    color: colors.ink,
+  },
+  rowTitleLocked: {
+    color: colors.mutedMid,
+  },
+  rowSub: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+    marginTop: 1,
+  },
+  rowEarned: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.sm,
+    letterSpacing: -0.1,
   },
   calendarCard: {
     paddingVertical: spacing.lg,

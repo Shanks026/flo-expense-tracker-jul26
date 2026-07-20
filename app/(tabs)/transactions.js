@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react-native';
 import { addMonths, subMonths, format, isToday, isYesterday } from 'date-fns';
 import Screen from '../../components/Screen';
@@ -13,6 +13,7 @@ import FadeIn from '../../components/FadeIn';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import useTransactions from '../../hooks/useTransactions';
+import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
@@ -58,6 +59,7 @@ function formatAmount(n, currency) {
 export default function Transactions() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { refreshing, onRefresh } = usePullToRefresh();
   const [month, setMonth] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState('all');
   const { transactions, loading } = useTransactions({ month, type: typeFilter });
@@ -126,7 +128,12 @@ export default function Transactions() {
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
+      >
         {loading ? (
           <Card style={styles.dayCard}>
             {[0, 1, 2].map((i) => (

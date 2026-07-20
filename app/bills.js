@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Plus, Receipt } from 'lucide-react-native';
@@ -13,6 +13,7 @@ import FadeIn from '../components/FadeIn';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useBills, { billStatus } from '../hooks/useBills';
+import usePullToRefresh from '../hooks/usePullToRefresh';
 import { useAddBillSheet } from '../components/AddBillSheet';
 import { usePayBillSheet } from '../components/PayBillSheet';
 import { formatMoney } from '../lib/currency';
@@ -22,6 +23,7 @@ const CADENCE_LABELS = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' 
 export default function Bills() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { refreshing, onRefresh } = usePullToRefresh();
   const STATUS_STYLES = {
     overdue: { iconTone: 'danger', amountColor: colors.danger, pill: { label: 'Overdue', tone: 'danger' } },
     due_soon: { iconTone: 'warn', amountColor: colors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
@@ -52,7 +54,12 @@ export default function Bills() {
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
+      >
         {loading ? (
           <>
             {[0, 1, 2].map((i) => (

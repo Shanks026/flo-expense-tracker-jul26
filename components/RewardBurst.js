@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, AccessibilityInfo } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
-import { CircleDollarSign, Star } from 'lucide-react-native';
+import { CircleDollarSign, Star, Snowflake } from 'lucide-react-native';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -17,11 +17,15 @@ export function RewardBurstProvider({ children }) {
   const [burst, setBurst] = useState(null);
 
   // Silently does nothing for a zero-value burst (e.g. a repeat/no-op claim
-  // upstream already guards this, but a stray call with {coins:0, xp:0}
-  // showing an empty popup would be a bug, not a celebration).
-  const showRewardBurst = useCallback(({ coins = 0, xp = 0 } = {}) => {
-    if (!coins && !xp) return;
-    setBurst({ id: Date.now(), coins, xp });
+  // upstream already guards this, but a stray call with {coins:0, xp:0,
+  // freezes:0} showing an empty popup would be a bug, not a celebration).
+  // `freezes` added 21-achievement-rewards-and-milestone-road.md Phase 2 (some
+  // trophy claims grant a freeze) — optional, defaults to 0, so every
+  // existing caller (AddTransactionSheet, TodayCard) that never passes it
+  // renders identically to before.
+  const showRewardBurst = useCallback(({ coins = 0, xp = 0, freezes = 0 } = {}) => {
+    if (!coins && !xp && !freezes) return;
+    setBurst({ id: Date.now(), coins, xp, freezes });
   }, []);
 
   return (
@@ -34,7 +38,15 @@ export function RewardBurstProvider({ children }) {
     // only clears via onDone at the very end.
     <RewardBurstContext.Provider value={{ showRewardBurst, isBursting: burst !== null }}>
       {children}
-      {burst && <RewardBurstOverlay key={burst.id} coins={burst.coins} xp={burst.xp} onDone={() => setBurst(null)} />}
+      {burst && (
+        <RewardBurstOverlay
+          key={burst.id}
+          coins={burst.coins}
+          xp={burst.xp}
+          freezes={burst.freezes}
+          onDone={() => setBurst(null)}
+        />
+      )}
     </RewardBurstContext.Provider>
   );
 }
@@ -48,7 +60,7 @@ export function useRewardBurst() {
 const VISIBLE_MS = 1200;
 const FADE_OUT_MS = 220;
 
-function RewardBurstOverlay({ coins, xp, onDone }) {
+function RewardBurstOverlay({ coins, xp, freezes = 0, onDone }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const progress = useSharedValue(0);
@@ -110,6 +122,14 @@ function RewardBurstOverlay({ coins, xp, onDone }) {
           <View style={styles.entry}>
             <Star size={20} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
             <Text style={styles.text}>+{xp} XP</Text>
+          </View>
+        )}
+        {freezes > 0 && (
+          <View style={styles.entry}>
+            <Snowflake size={20} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={1.5} />
+            <Text style={styles.text}>
+              +{freezes} freeze{freezes === 1 ? '' : 's'}
+            </Text>
           </View>
         )}
       </View>
