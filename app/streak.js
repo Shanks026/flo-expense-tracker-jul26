@@ -37,6 +37,10 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 function roadRewardText(entry) {
   const parts = [];
   if (entry.coins > 0) parts.push(`${entry.coins.toLocaleString('en-IN')} coins`);
+  // XP added 27-rank-ladder-rework.md Phase 1 — milestones now grant it, and
+  // it's what actually moves your rank, so a road listing only coins/freezes
+  // would under-report the reward it exists to advertise.
+  if (entry.xp > 0) parts.push(`${entry.xp.toLocaleString('en-IN')} XP`);
   if (entry.freezes > 0) parts.push(`${entry.freezes} freeze${entry.freezes === 1 ? '' : 's'}`);
   let text = parts.join(' · ') || 'Bonus reward';
   if (entry.themeId) text += ` · + ${getTheme(entry.themeId).name}`;

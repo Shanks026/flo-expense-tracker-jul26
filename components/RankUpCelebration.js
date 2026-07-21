@@ -4,10 +4,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
 import Button from './Button';
 import Confetti from './Confetti';
+import CardThemeSurface from './CardThemeSurface';
 import useRewards from '../hooks/useRewards';
 import useProfile from '../hooks/useProfile';
 import { useAuth } from '../lib/AuthContext';
+import { useDataRefresh } from '../lib/DataRefreshContext';
 import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
+import { claimRank } from '../lib/rewardsMutations';
+import { getTheme } from '../lib/cardThemes';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 
 // A root-mounted celebration for crossing a Rank threshold
@@ -35,6 +39,7 @@ export default function RankUpCelebration() {
   const { session } = useAuth();
   const { xp, loading } = useRewards();
   const { profile, loading: profileLoading, updateProfile } = useProfile();
+  const { notifyChanged } = useDataRefresh();
   const [visible, setVisible] = useState(false);
   const contentRef = useRef(null);
   // Tracks which rank.id this component has already resolved a check for, so
@@ -75,7 +80,17 @@ export default function RankUpCelebration() {
       // component fully controls.
       if (newIndex <= lastIndex) return;
 
-      contentRef.current = rank;
+      // Rank theme grant (27-rank-ladder-rework.md Phase 2). Runs BEFORE the
+      // dialog shows so the reveal can't display a theme the grant then failed
+      // to write. claimRank is idempotent on (user_id,'rank',rankId) and a
+      // no-op for the six ranks with no theme, so calling it unconditionally
+      // here is safe. notifyChanged() only on a genuine first grant — that's
+      // what makes useCardThemes pick the new theme up without a refetch of
+      // the whole app on every re-render of this component.
+      const { themeId } = await claimRank(rank.id);
+      if (themeId) notifyChanged();
+
+      contentRef.current = { ...rank, themeId: themeId ?? null };
       setVisible(true);
     })();
     // updateProfile is a fresh function reference every render (useProfile
@@ -119,6 +134,25 @@ export default function RankUpCelebration() {
           <Animated.Text entering={FadeInDown.delay(400).duration(400)} style={styles.body}>
             {RANK_FLAVOR[shownRank.id]}
           </Animated.Text>
+          {/* Rank card-theme reveal (27-rank-ladder-rework.md Phase 2) — only
+              three of the nine ranks carry one, so this block is absent
+              entirely for the other six and the screen is exactly as it was.
+              Enters last (delay 600, after the flavor line) so the beat order
+              reads announcement → badge → title → why it matters → and here's
+              what you got. Mirrors app/shop.js's own bought-dialog preview
+              (CardThemeSurface + a "Flo" label in the theme's own textColor)
+              rather than inventing a second way to show a card. */}
+          {shownRank.themeId && (
+            <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.themeWrap}>
+              <Text style={styles.themeLabel}>Card unlocked</Text>
+              <CardThemeSurface theme={getTheme(shownRank.themeId)} style={styles.themePreview}>
+                <View style={styles.themePreviewContent}>
+                  <Text style={[styles.themePreviewName, { color: getTheme(shownRank.themeId).textColor }]}>Flo</Text>
+                </View>
+              </CardThemeSurface>
+              <Text style={styles.themeName}>{getTheme(shownRank.themeId).name}</Text>
+            </Animated.View>
+          )}
         </View>
         <Animated.View entering={FadeInDown.delay(500).duration(400)} style={[styles.buttonWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
           {/* Ghost, not primary — same reasoning as StreakCelebration's own
@@ -189,6 +223,42 @@ function makeStyles() {
     },
     buttonWrap: {
       width: '100%',
+    },
+    // Rank theme reveal (27-rank-ladder-rework.md Phase 2). Sized well under
+    // the Shop dialog's 110px preview — this sits below an already-tall stack
+    // (eyebrow, badge art, title, flavor) on the shortest supported screen,
+    // where a full-size card would push the flavor line into the button.
+    themeWrap: {
+      width: '100%',
+      alignItems: 'center',
+    },
+    themeLabel: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      color: colors.mutedDarker,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      marginBottom: spacing.sm,
+    },
+    themePreview: {
+      width: '78%',
+      height: 84,
+    },
+    themePreviewContent: {
+      flex: 1,
+      padding: spacing.md,
+    },
+    themePreviewName: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.md,
+    },
+    themeName: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.sm,
+      // colors.surface, not a literal white — this screen is pinned dark, and
+      // `title` above already uses surface as its on-ink foreground.
+      color: colors.surface,
+      marginTop: spacing.sm,
     },
   });
 }

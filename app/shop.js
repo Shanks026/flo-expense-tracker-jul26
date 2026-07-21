@@ -14,7 +14,7 @@ import { formatMoney } from '../lib/currency';
 import useCardThemes from '../hooks/useCardThemes';
 import useRewards from '../hooks/useRewards';
 import { CARD_THEMES, TIERS, LOCKED_TIERS, TIER_LABELS, getTheme } from '../lib/cardThemes';
-import { FREEZE_COST, FREEZE_CAP } from '../lib/rewards';
+import { FREEZE_COST, freezeCapForRank, rankFromXp } from '../lib/rewards';
 import { COIN_PACKS } from '../lib/coins';
 import { buyTheme, equipTheme } from '../lib/cardThemeMutations';
 import { buyFreeze } from '../lib/rewardsMutations';
@@ -48,6 +48,10 @@ function unlockCaption(theme) {
   // achievement-tier theme earned by claiming a specific trophy; `label` is a
   // human name for it (e.g. "Perfect Month"), set on the theme's `unlock`.
   if (theme.unlock.type === 'trophy') return `Earn: ${theme.unlock.label}`;
+  // 'rank' unlock (27-rank-ladder-rework.md Phase 2) — `label` is the rank's
+  // display TITLE, not its id (those deliberately differ; see THE ID RULE in
+  // lib/rewards.js), so this caption stays readable if a title is ever retuned.
+  if (theme.unlock.type === 'rank') return `Reach: ${theme.unlock.label}`;
   return null;
 }
 
@@ -64,7 +68,12 @@ export default function Shop() {
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { coins, ownedIds, equippedId, loading, refetch } = useCardThemes();
-  const { freezes, refetch: refetchRewards } = useRewards();
+  const { freezes, xp, refetch: refetchRewards } = useRewards();
+  // The cap is rank-derived as of 27-rank-ladder-rework.md Phase 2. This screen
+  // must compute it the same way buyFreeze does, or it would advertise "hold up
+  // to 5" while the mutation happily allows 7 — and the Buy button would look
+  // blocked at a cap the user has already outgrown.
+  const freezeCap = freezeCapForRank(rankFromXp(xp).current);
   const [tab, setTab] = useState(initialTab === 'general' ? 'general' : 'cards');
   const [selectedId, setSelectedId] = useState(null);
   const [working, setWorking] = useState(false);
@@ -78,7 +87,7 @@ export default function Shop() {
   const selectedOwned = ownedIds.has(selected.id);
   const selectedEquipped = equippedId === selected.id;
   const canAfford = coins >= selected.cost;
-  const freezeAtCap = freezes >= FREEZE_CAP;
+  const freezeAtCap = freezes >= freezeCap;
   const freezeCantAfford = coins < FREEZE_COST;
   // Same derivation as AccountHeroCarousel — both trend icons share one
   // lightened tint from the theme's own accent (chipColor); darkening
@@ -270,7 +279,7 @@ export default function Shop() {
             <View style={styles.freezeTextWrap}>
               <Text style={styles.freezeTitle}>Streak Freeze</Text>
               <Text style={styles.freezeSubtitle}>
-                {freezeAtCap ? `You're holding the max (${FREEZE_CAP})` : `${FREEZE_COST} coins · hold up to ${FREEZE_CAP}`}
+                {freezeAtCap ? `You're holding the max (${freezeCap})` : `${FREEZE_COST} coins · hold up to ${freezeCap}`}
               </Text>
               <Text style={styles.freezeCount}>You have {freezes}</Text>
             </View>

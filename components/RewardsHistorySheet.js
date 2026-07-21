@@ -11,7 +11,17 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useRewards from '../hooks/useRewards';
 import ProgressBar from './ProgressBar';
 import { buyFreeze } from '../lib/rewardsMutations';
-import { FREEZE_COST, FREEZE_CAP, RANKS, RANK_BADGE_ART, RANK_BADGE_ART_LOCKED, rankFromXp, levelFromXp } from '../lib/rewards';
+import {
+  FREEZE_COST,
+  RANKS,
+  RANK_BADGE_ART,
+  RANK_BADGE_ART_LOCKED,
+  RANK_THEME_GRANTS,
+  rankFromXp,
+  levelFromXp,
+  freezeCapForRank,
+} from '../lib/rewards';
+import { getTheme } from '../lib/cardThemes';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 
 // Every source this ledger will ever record, across every phase of
@@ -78,7 +88,24 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
   // stored anywhere. This is the direct answer to "how do level and rank
   // relate": they don't share a curve, so a rank's start level has to be
   // derived from levelFromXp(rank.minXp) every time, not assumed.
-  const rankLadder = useMemo(() => RANKS.map((r) => ({ ...r, atLevel: levelFromXp(r.minXp).level })), []);
+  // `rewardText` (27-rank-ladder-rework.md Phase 2) joins whatever this rank
+  // grants: its card theme, and/or the freeze-cap step it introduces. The cap
+  // line is shown only on the rank where the cap actually CHANGES (compared
+  // against the previous rank), not on every rank that happens to sit in the
+  // same band — repeating "7 freeze slots" down three consecutive rows reads
+  // as three separate rewards.
+  const rankLadder = useMemo(
+    () =>
+      RANKS.map((r, i) => {
+        const parts = [];
+        const themeId = RANK_THEME_GRANTS[r.id];
+        if (themeId) parts.push(`${getTheme(themeId).name} card`);
+        const cap = freezeCapForRank(r);
+        if (i > 0 && cap > freezeCapForRank(RANKS[i - 1])) parts.push(`${cap} freeze slots`);
+        return { ...r, atLevel: levelFromXp(r.minXp).level, rewardText: parts.join(' · ') };
+      }),
+    []
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,7 +125,10 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
     },
   }));
 
-  const atCap = freezes >= FREEZE_CAP;
+  // Rank-derived cap (27-rank-ladder-rework.md Phase 2) — must match
+  // buyFreeze's own check, or this sheet blocks a buy the mutation allows.
+  const freezeCap = freezeCapForRank(rank);
+  const atCap = freezes >= freezeCap;
   const cantAfford = coins < FREEZE_COST;
 
   function handleBuyPress() {
@@ -164,7 +194,7 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
           <View style={styles.shopTextWrap}>
             <Text style={styles.shopTitle}>{freezes} held</Text>
             <Text style={styles.shopSubtitle}>
-              {atCap ? `You're holding the max (${FREEZE_CAP})` : `${FREEZE_COST} coins · hold up to ${FREEZE_CAP}`}
+              {atCap ? `You're holding the max (${freezeCap})` : `${FREEZE_COST} coins · hold up to ${freezeCap}`}
             </Text>
           </View>
           <Pressable
@@ -221,9 +251,22 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
                   style={styles.ladderBadge}
                   resizeMode="contain"
                 />
-                <Text style={[styles.ladderTitle, !reached && styles.ladderTitleLocked]} numberOfLines={1}>
-                  {r.title}
-                </Text>
+                <View style={styles.ladderMid}>
+                  <Text style={[styles.ladderTitle, !reached && styles.ladderTitleLocked]} numberOfLines={1}>
+                    {r.title}
+                  </Text>
+                  {/* What this rank actually GIVES (27-rank-ladder-rework.md
+                      Phase 2). Without it the ladder shows a road with no
+                      signposts — the same invisible-progression problem
+                      21-achievement-rewards-and-milestone-road.md fixed for
+                      streak milestones. Absent entirely for a rank carrying
+                      neither reward, rather than printing an empty line. */}
+                  {r.rewardText ? (
+                    <Text style={styles.ladderReward} numberOfLines={1}>
+                      {r.rewardText}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text style={styles.ladderLevel}>Level {r.atLevel}</Text>
               </View>
             );
@@ -510,11 +553,22 @@ function makeStyles(colors) {
       width: 32,
       height: 32,
     },
-    ladderTitle: {
+    // Wraps title + rewardText so the row stays a 3-column layout
+    // (badge | text stack | level) — `flex: 1` moved here from ladderTitle,
+    // which now sizes to its own text inside this column.
+    ladderMid: {
       flex: 1,
+    },
+    ladderTitle: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.sm,
       color: staticColors.surface,
+    },
+    ladderReward: {
+      fontFamily: fontFamily.medium,
+      fontSize: fontSize.xs,
+      color: staticColors.mutedMid,
+      marginTop: 2,
     },
     ladderTitleLocked: {
       color: staticColors.mutedMid,

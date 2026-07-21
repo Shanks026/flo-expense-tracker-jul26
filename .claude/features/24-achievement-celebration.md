@@ -1,8 +1,12 @@
 # Feature: Achievement Celebration Dialog
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/24-achievement-celebration.md`
-**Status**: Planned
-**Last Updated**: 2026-07-21
+**Status**: 📋 Planned, not built. **Re-baselined 2026-07-22** against the
+badge-art pass that landed in the meantime (commit `9d01dbb "badges and
+stuff"`) — no part of Phase 1 was ever implemented, but the screen it builds
+on changed underneath it. See §Re-baseline below for what moved; the phase
+spec has been corrected in place.
+**Last Updated**: 2026-07-22
 
 ---
 
@@ -30,6 +34,57 @@ flourish for trophy claims — a flat coins/XP/freeze grant + RewardBurst is
 enough") — that was the right call for a plain list row; it isn't for the new
 badge-grid Trophy Room this session already built, where trophies now look
 and feel like real collectibles.
+
+---
+
+## Re-baseline (2026-07-22)
+
+This doc was written 2026-07-21 and never implemented. The session moved on to
+**illustrated badge art** instead — which this doc had twice listed as Out of
+Scope ("same placeholder `IconTile`+`Icon` the grid already uses; swappable
+later the same way `RANK_BADGE_ART` was"). That "later" happened first. The
+current code is being **kept as-is**; this doc is corrected to match it rather
+than the other way round.
+
+**Verified still true** (the "before" state this feature was written against
+is intact — nothing here was half-built):
+
+- `components/AchievementCelebration.js` does not exist. Only
+  `RankUpCelebration.js` / `StreakCelebration.js`.
+- No `flo.trophies.announced.${userId}` key anywhere. The only trophy
+  AsyncStorage key is still `useTrophies.js`'s `flo.trophies.seen.${userId}`
+  (the Menu unseen-dot) — which 1.2 correctly says not to reuse.
+- `app/trophies.js` still claims inline: `handleClaim` → `claimTrophy` →
+  `showRewardBurst` + theme-unlock toast, with per-tile `claimingId` spinner
+  state. Nothing was rerouted.
+- Budget Keeper is still not computable (`keptBudgetPeriods = null`,
+  `budget_keeper` hint still returns "Coming soon") — 1.6's exclusion stands.
+
+**What changed underneath it** (commit `9d01dbb`, 289 lines of
+`app/trophies.js` + 99 of `lib/trophies.js`):
+
+- **Illustrated badge art now exists for 7 of the 9 trophy groups**, with
+  earned *and* locked variants, keyed exactly the way this doc predicted:
+  `STREAK_`/`LOGGER_`/`PLANNER_`/`BUDGET_BADGE_ART` are tier-keyed ladders
+  (`ART[t.tier]`); `PERFECT_MONTH_`/`CATEGORIZER_`/`COMEBACK_BADGE_ART` are
+  single binary images. All in `lib/trophies.js`, mirroring `RANK_BADGE_ART`.
+- **`frugal` and `fresh_start` have no art yet** — `trophyBadgeArt()` returns
+  `null` for them and the grid falls back to the `IconTile`+`Icon`
+  placeholder. So the placeholder path is *not* dead; it's the fallback, and
+  any new surface showing a badge must handle both. Briefs are open at
+  `assets/FRUGAL_BADGES_BRIEF.md` / `assets/TROPHY_BADGES_BRIEF.md`, pending
+  user art.
+- `app/trophies.js` gained `trophyBadgeArt(groupId, t)` (~line 58) — the
+  single resolver for "which image for this tile, earned or locked". Any
+  badge rendered outside the grid should call it, not re-derive the mapping.
+- `RankUpCelebration.js` was itself rewritten in the same commit (142 lines)
+  — re-read it before copying its visual language (1.3), don't work from this
+  doc's 2026-07-21 description of it.
+
+**Consequence for building Phase 1**: the dialog's badge is no longer a
+placeholder tile — it's real art with a locked/unlocked pair, which this doc
+never anticipated and which opens a reveal treatment (locked → unlocked) that
+didn't exist when it was written. 1.3 and 1.6 are corrected accordingly.
 
 ---
 
@@ -79,7 +134,9 @@ earned-but-unclaimed: visiting the Trophy Room still shows its Claim button
   correctness guard against a double-pay; already exists, unchanged here.
 - `components/RankUpCelebration.js` — the closest existing precedent: root-
   mounted, `Modal` + `Confetti` + `Animated.View` staggered entrance
-  (`ZoomIn`/`FadeInDown`), `Button` component for the CTA. Copy this visual
+  (`ZoomIn`/`FadeInDown`), `Button` component for the CTA. **Rewritten
+  2026-07-22 (commit `9d01dbb`, 142 lines) — read the current file, not this
+  description**, which predates that pass. Copy this visual
   language, not `StreakCelebration`'s pinned-dark full-screen treatment
   (trophies are frequent enough — up to 24 — that a full-screen takeover
   every time would be fatiguing; a centered card dialog matches Shop's own
@@ -171,9 +228,17 @@ state that isn't itself a correctness guarantee.
     manual open does NOT check/touch the `announced` set (that set only
     gates the *automatic* popup; manual access from the Trophy Room must
     always work regardless of whether this trophy was ever auto-announced).
-  - **Dialog content, stage `'unlocked'`**: badge (same `IconTile`
-    size≈88/`Icon` placeholder the Trophy Room grid already uses — tone-
-    colored, since this only ever shows for an earned trophy), an eyebrow
+  - **Dialog content, stage `'unlocked'`**: the trophy's badge — **real
+    illustrated art via `trophyBadgeArt(groupId, t)`** (the resolver added to
+    `app/trophies.js` ~line 58; lift it to `lib/trophies.js` if the dialog
+    needs it too rather than importing across screens), falling back to the
+    tone-colored `IconTile`+`Icon` placeholder for `frugal`/`fresh_start`,
+    which have no art yet. Note the resolver takes `t.earned` into account
+    and returns the **locked** variant when false — the dialog only ever
+    shows for an earned trophy, so it gets the unlocked image by default;
+    an optional flourish (open at locked, cross-fade to unlocked on Claim
+    Now) is available now that both variants exist, but is **not** required
+    by this phase. Alongside the badge: an eyebrow
     pill reading "ACHIEVEMENT UNLOCKED" (mirrors `RankUpCelebration`'s
     "RANK UP" eyebrow), the trophy's `label` as the title, and a primary
     **Claim Now** button. No reward shown yet, nothing granted yet.
@@ -237,8 +302,11 @@ state that isn't itself a correctness guarantee.
 - **No changes to Rank's celebration** (`RankUpCelebration` stays exactly
   as-is — ranks are a different mechanic, already has its own working
   celebration).
-- **No illustrated trophy badge art** — same placeholder `IconTile`+`Icon`
-  the grid already uses; swappable later the same way `RANK_BADGE_ART` was.
+- **No new trophy badge art.** ~~Same placeholder `IconTile`+`Icon` the grid
+  already uses~~ — **superseded 2026-07-22**: art now exists for 7 of 9
+  groups and the dialog consumes it (1.3). This phase adds **no** art; it
+  reuses what's there and keeps the placeholder fallback for the two groups
+  (`frugal`, `fresh_start`) still awaiting it.
 
 ### 1.7 Phase 1 Checklist — Before Marking Complete
 
@@ -290,9 +358,12 @@ grants) continues through the existing `reward_events` table.
 
 ## Out of Scope (All Phases)
 
-- **Illustrated trophy badge art** — same placeholder icon tiles the grid
-  uses today; a future pass once art exists (`assets/rank/BADGES.md`'s
-  pattern extended to trophies).
+- **Trophy badge art** — ~~a future pass once art exists~~ **done
+  2026-07-22, outside this doc** (commit `9d01dbb`): `assets/rank/BADGES.md`'s
+  pattern was extended to trophies for 7 of 9 groups. Still out of scope
+  *here*: art for `frugal` and `fresh_start` (briefs open at
+  `assets/FRUGAL_BADGES_BRIEF.md` / `assets/TROPHY_BADGES_BRIEF.md`, pending
+  user art).
 - **Budget Keeper / Streak Keeper celebrations** — neither has a claimable
   reward defined; out of scope until `18`'s Budget Keeper computability gap
   is resolved.

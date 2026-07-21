@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
-import { Flame, CircleDollarSign, Snowflake } from 'lucide-react-native';
+import { Flame, CircleDollarSign, Snowflake, Star } from 'lucide-react-native';
 import Button from './Button';
 import Confetti from './Confetti';
 import StreakDays from './StreakDays';
@@ -234,6 +234,17 @@ export default function StreakCelebration() {
                 <CircleDollarSign size={18} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
                 <Text style={styles.rewardAmount}>+{contentRef.current.reward.coins} coins</Text>
               </View>
+              {/* XP added 27-rank-ladder-rework.md Phase 1 — milestones now
+                  grant it, and it's the largest single component at most
+                  tiers. Star/brand/filled and the coins→XP→freezes order both
+                  match RewardBurst's existing treatment, so the same reward
+                  reads identically wherever it surfaces. */}
+              {contentRef.current.reward.xp > 0 && (
+                <View style={styles.rewardEntry}>
+                  <Star size={18} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
+                  <Text style={styles.rewardAmount}>+{contentRef.current.reward.xp} XP</Text>
+                </View>
+              )}
               {contentRef.current.reward.freezes > 0 && (
                 <View style={styles.rewardEntry}>
                   <Snowflake size={18} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.2} />
