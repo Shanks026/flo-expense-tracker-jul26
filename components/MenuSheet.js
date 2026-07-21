@@ -3,17 +3,12 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight, Trophy, Award, ShoppingBag } from 'lucide-react-native';
+import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight, ShoppingBag } from 'lucide-react-native';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
-import useTrophies from '../hooks/useTrophies';
-import useRewards from '../hooks/useRewards';
-import { useRewardsHistorySheet } from './RewardsHistorySheet';
-import ProgressBar from './ProgressBar';
-import { rankFromXp } from '../lib/rewards';
 
 const MenuSheetContext = createContext(null);
 
@@ -49,12 +44,10 @@ const ITEMS = [
   { key: 'budgets', label: 'Budgets', route: '/budgets', icon: Wallet },
   { key: 'reports', label: 'Reports', route: '/report', icon: FileText },
   { key: 'bills', label: 'Bills', route: '/bills', icon: Receipt },
-  // Added 18-gamification-ritual-and-ledger.md Phase 1 — the Trophy Room,
-  // a new global destination that isn't tab-worthy, so it lands here per the
-  // standing convention rather than a 6th tab.
-  { key: 'trophies', label: 'Trophies', route: '/trophies', icon: Trophy },
-  // Added 19-card-themes.md Phase 1 — same standing convention as Trophies
-  // above (a new global destination that isn't tab-worthy).
+  // Trophies moved OUT of this sheet (2026-07-21) — it's now a dedicated
+  // header button on Home, beside the bell. Kept the Shop row here.
+  // Added 19-card-themes.md Phase 1 — a new global destination that isn't
+  // tab-worthy, so it lands here per the standing convention.
   { key: 'shop', label: 'Shop', route: '/shop', icon: ShoppingBag },
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
@@ -68,14 +61,6 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   const router = useRouter();
   const { signOut } = useAuth();
   const { isPro } = useEntitlement();
-  const { unseenCount } = useTrophies();
-  const { xp, level, nextLevelAt, progress: levelProgress } = useRewards();
-  const { openRewardsHistory } = useRewardsHistorySheet();
-  // Rank (18-gamification-ritual-and-ledger.md Phase 5) — a named band over
-  // the same lifetime XP Level already tracks, arriving with a badge. Badge
-  // is a placeholder Award icon recoloured per rank (lib/rewards.js's own
-  // `badgeColor`) until real illustrated badges exist.
-  const { current: rank } = rankFromXp(xp);
 
   useImperativeHandle(ref, () => ({
     open() {
@@ -96,11 +81,6 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   function handleLogout() {
     modalRef.current?.dismiss();
     signOut();
-  }
-
-  function handleOpenRewards() {
-    modalRef.current?.dismiss();
-    openRewardsHistory();
   }
 
   return (
@@ -155,40 +135,6 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
           </Pressable>
         </View>
 
-        {/* Money Level + Rank (18-gamification-ritual-and-ledger.md Phases 2
-            + 5) — moved here from Home's scroll body per user feedback:
-            Home's header carries only a compact Level number now (folded
-            into the item-stats chip, not its own pill — see that file's own
-            comment on why), and this fuller card (rank, level, absolute XP
-            progress) lives at the top of Menu instead — the highest-
-            frequency destination after Home itself, and already home to the
-            Trophies row (same "progress" domain). `{xp}/{nextLevelAt}`, not
-            xpIntoLevel/xpForNext — a level-relative delta that resets toward
-            0 on every level-up reads as XP "shrinking" next to a Rank badge
-            that's supposed to represent the same ever-growing number
-            (caught on-device; see lib/rewards.js's own comment on
-            `nextLevelAt`). The Award icon's colour is the rank's own
-            `badgeColor` (Saver → Money Master) — a placeholder for real
-            illustrated badge art, upgradeable in lib/rewards.js alone once
-            that exists. Uses ProgressBar's `dark` prop since this sheet is
-            pinned-ink chrome, not a light Card. */}
-        <Pressable style={styles.levelCard} onPress={handleOpenRewards}>
-          <View style={[styles.levelIconTile, { backgroundColor: `${rank.badgeColor}29` }]}>
-            <Award size={19} color={rank.badgeColor} strokeWidth={2} />
-          </View>
-          <View style={styles.levelContent}>
-            <View style={styles.levelTopRow}>
-              <Text style={styles.levelLabel}>
-                {rank.title} · Level {level}
-              </Text>
-              <Text style={styles.levelXp}>
-                {xp.toLocaleString('en-IN')}/{nextLevelAt.toLocaleString('en-IN')} XP
-              </Text>
-            </View>
-            <ProgressBar progress={levelProgress} status="healthy" dark height={6} />
-          </View>
-        </Pressable>
-
         {!isPro && (
           <Pressable style={styles.upgradeCard} onPress={() => handlePress('/pro')}>
             <View style={styles.upgradeIconTile}>
@@ -206,12 +152,10 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
         {ITEMS.map((item) => {
           const Icon = item.icon;
-          const showDot = item.key === 'trophies' && unseenCount > 0;
           return (
             <Pressable key={item.key} style={styles.row} onPress={() => handlePress(item.route)}>
               <View style={styles.rowIcon}>
                 <Icon size={19} color={staticColors.surface} strokeWidth={2} />
-                {showDot && <View style={styles.rowDot} />}
               </View>
               <Text style={styles.rowLabel}>{item.label}</Text>
             </Pressable>
@@ -298,44 +242,6 @@ function makeStyles(colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  levelCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: staticColors.inkCard,
-    borderRadius: radii.card,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  levelIconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.iconTile,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelContent: {
-    flex: 1,
-    gap: 6,
-  },
-  levelTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  levelLabel: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.sm,
-    color: staticColors.surface,
-  },
-  levelXp: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: staticColors.mutedMid,
-    fontVariant: ['tabular-nums'],
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -350,19 +256,6 @@ function makeStyles(colors) {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  // Mirrors Home's bellDot exactly (white ring so it reads on the dark
-  // rowIcon tile instead of merging into it) — unseen-trophy indicator.
-  rowDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 11,
-    height: 11,
-    borderRadius: radii.pill,
-    backgroundColor: staticColors.rose,
-    borderWidth: 2,
-    borderColor: staticColors.ink,
   },
   upgradeCard: {
     flexDirection: 'row',

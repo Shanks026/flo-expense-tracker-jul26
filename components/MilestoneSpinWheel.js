@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Modal, AccessibilityInfo } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, ZoomIn, FadeInDown } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { Gift, CircleDollarSign, Snowflake } from 'lucide-react-native';
@@ -59,6 +60,7 @@ function findSegmentIndex(segments, coins, freezes) {
 }
 
 export default function MilestoneSpinWheel({ day, segments, visible, onDone }) {
+  const insets = useSafeAreaInsets();
   const { notifyChanged } = useDataRefresh();
   const rotation = useSharedValue(0);
   // 'idle' (waiting for the Spin tap) | 'spinning' | 'done' — per direct
@@ -122,6 +124,10 @@ export default function MilestoneSpinWheel({ day, segments, visible, onDone }) {
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={() => {}}>
       <View style={styles.screen}>
+        {/* Content centers in the space ABOVE the button (per direct
+            feedback, "place the button at the bottom of the screen") — same
+            split as StreakCelebration/RankUpCelebration. */}
+        <View style={styles.content}>
         <Animated.View entering={ZoomIn.duration(400)} style={styles.iconTile}>
           <Gift size={38} color={colors.coinGold} strokeWidth={2} />
         </Animated.View>
@@ -214,6 +220,7 @@ export default function MilestoneSpinWheel({ day, segments, visible, onDone }) {
             </Text>
           </Animated.View>
         )}
+        </View>
 
         {/* Spin is the real decision here — a deliberate tap, matching the
             wheel's own "earned only" rule (see the file's own top comment) —
@@ -221,13 +228,13 @@ export default function MilestoneSpinWheel({ day, segments, visible, onDone }) {
             acknowledge/dismiss, ghost per direct feedback. Nothing renders
             mid-spin; the wheel itself is the only thing to watch. */}
         {phase === 'idle' && (
-          <Animated.View entering={FadeInDown.duration(300)} style={styles.buttonWrap}>
+          <Animated.View entering={FadeInDown.duration(300)} style={[styles.buttonWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
             <Button variant="primary" title="Spin" onPress={spin} />
           </Animated.View>
         )}
 
         {phase === 'done' && (
-          <Animated.View entering={FadeInDown.duration(300)} style={styles.buttonWrap}>
+          <Animated.View entering={FadeInDown.duration(300)} style={[styles.buttonWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
             <Button variant="ghost" title="Nice" onPress={handleDone} />
           </Animated.View>
         )}
@@ -240,9 +247,14 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.ink,
+    paddingHorizontal: spacing.xl,
+  },
+  // Takes all the space ABOVE the pinned button, centering its own content
+  // within that remaining area — see the button's own comment in the JSX.
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
   },
   iconTile: {
     width: 80,

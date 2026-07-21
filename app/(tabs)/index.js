@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Star } from 'lucide-react-native';
+import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Trophy } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -36,6 +36,8 @@ import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
 import { getGreeting } from '../../lib/greetings';
 import useRewards from '../../hooks/useRewards';
+import useTrophies from '../../hooks/useTrophies';
+import { rankFromXp, RANK_BADGE_ART } from '../../lib/rewards';
 import { useRewardsHistorySheet } from '../../components/RewardsHistorySheet';
 import useCardThemes from '../../hooks/useCardThemes';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
@@ -68,7 +70,9 @@ export default function Home() {
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
   const currency = useCurrency();
-  const { coins, freezes, level, loading: rewardsLoading } = useRewards();
+  const { coins, freezes, level, xp, loading: rewardsLoading } = useRewards();
+  const { current: rank } = rankFromXp(xp);
+  const { unseenCount: unseenTrophies } = useTrophies();
   const { openRewardsHistory } = useRewardsHistorySheet();
   const { equippedTheme } = useCardThemes();
   const { showRewardBurst } = useRewardBurst();
@@ -158,8 +162,15 @@ export default function Home() {
                 streak, whose icon already carries the meaning), and adding a
                 "LVL" label to disambiguate needed more room than fit as a
                 third entry in this chip. */}
+            {/* One chip, three counters — coins, freeze, and level (folded in
+                per direct feedback, no longer its own pill). Level shows the
+                user's current rank badge (the same RANK_BADGE_ART the Trophy
+                Room / Menu use) + a bare level number — the badge carries the
+                "this is your rank/level" meaning, so no text label is needed.
+                Whole chip opens Rewards history; the fuller Rank/Level/XP card
+                stays one tap away via the Menu (avatar). */}
             {chipsLoading ? (
-              <Skeleton width={98} height={44} radius={14} />
+              <Skeleton width={150} height={44} radius={14} />
             ) : (
               <FadeIn>
                 <Pressable style={styles.itemStats} onPress={openRewardsHistory}>
@@ -177,22 +188,11 @@ export default function Home() {
                     <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
                     <Text style={styles.itemStatText}>{freezes}</Text>
                   </View>
-                </Pressable>
-              </FadeIn>
-            )}
-            {/* Level — its own chip, "LVL" label + number. Opens Menu, where
-                the fuller Rank/Level/XP card lives — same "compact here,
-                full detail one tap away" pattern as the streak chip → /streak. */}
-            {chipsLoading ? (
-              <Skeleton width={66} height={44} radius={14} />
-            ) : (
-              <FadeIn>
-                <Pressable style={styles.levelChip} onPress={openMenu}>
-                  <Star size={16} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
-                  <Text style={styles.itemStatText}>
-                    <Text style={styles.levelChipLabel}>LVL </Text>
-                    {level}
-                  </Text>
+                  <View style={styles.itemStatDivider} />
+                  <View style={styles.itemStatEntry}>
+                    <Image source={RANK_BADGE_ART[rank.id]} style={styles.levelRankBadge} resizeMode="contain" />
+                    <Text style={styles.itemStatText}>{level}</Text>
+                  </View>
                 </Pressable>
               </FadeIn>
             )}
@@ -228,7 +228,14 @@ export default function Home() {
                 </Pressable>
               </FadeIn>
             )}
-            <Pressable style={styles.bellButton} onPress={openAlerts}>
+            {/* Trophy Room — moved out of the Menu sheet into the header (per
+                direct feedback), beside the bell, carrying its own unseen-dot
+                the same way the bell does its alert dot. */}
+            <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/trophies')}>
+              <Trophy size={20} color={colors.ink} strokeWidth={2} />
+              {unseenTrophies > 0 && <View style={styles.bellDot} />}
+            </Pressable>
+            <Pressable style={styles.headerIconButton} hitSlop={10} onPress={openAlerts}>
               <Bell size={20} color={colors.ink} strokeWidth={2} />
               {alertCount > 0 && <View style={styles.bellDot} />}
             </Pressable>
@@ -412,18 +419,17 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: spacing.sm,
   },
-  // One container for "your stuff" — coins + freeze count. Same
-  // streakChip/bellButton grammar (44-tall, bordered surface) so it reads as
-  // part of the same header counter language.
+  // "Your stuff" — coins + freeze + level. Chip background/border removed
+  // (per direct feedback, "might look more natural and have a bit more
+  // space") — the dividers below are what still reads this as one grouped
+  // cluster rather than three floating numbers, not a bordered surface.
   itemStats: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 44,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    // Reverted to 10 (per direct feedback) — the lg(16) bump read as too
+    // loose for this cluster specifically, even though headerRight's own
+    // gap stayed widened. Left as it was pre-chip-removal.
     gap: 10,
   },
   itemStatEntry: {
@@ -442,27 +448,13 @@ function makeStyles(colors) {
     letterSpacing: -0.2,
     color: colors.ink,
   },
-  // Level's own chip (18-gamification-ritual-and-ledger.md Phase 5) — same
-  // grammar as itemStats, separate pill: a bare number folded into
-  // itemStats read as unclear (unlike coins/freeze, whose icon alone already
-  // says what the number is), and the "LVL" label needed to disambiguate it
-  // didn't fit as a third itemStats entry without cramping the row.
-  levelChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    height: 44,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  levelChipLabel: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    letterSpacing: 0.2,
-    color: colors.mutedMid,
+  // The current rank badge shown in place of the old Star, inside the shared
+  // item-stats chip's level entry (per direct feedback). A touch larger than
+  // the 16px sibling icons since illustrated art reads smaller than a flat
+  // glyph at the same box.
+  levelRankBadge: {
+    width: 20,
+    height: 20,
   },
   avatarWrap: {
     position: 'relative',
@@ -516,18 +508,17 @@ function makeStyles(colors) {
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    // sm(8)→lg(16)→xl(20) (per direct feedback, in two passes) — this
+    // cluster reads better looser than itemStats does.
+    gap: spacing.xl,
   },
+  // Chip background/border removed (per direct feedback) — same bare
+  // treatment as itemStats now.
   streakChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     height: 44,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   streakCount: {
     fontFamily: fontFamily.extrabold,
@@ -538,28 +529,38 @@ function makeStyles(colors) {
   streakCountEmpty: {
     color: colors.mutedLight,
   },
-  bellButton: {
-    width: 44,
+  // Shared by the trophy + bell header buttons. Bare, content-sized (no
+  // fixed width/background/border, per direct feedback) — same shape
+  // discipline as streakChip now, so headerRight's own `gap` is the ONLY
+  // thing determining spacing between streak/trophy/bell. The old fixed
+  // 44-wide centered box added invisible padding around the 20px icon that
+  // streakChip's intrinsic sizing didn't have, which is what made the
+  // streak↔trophy gap look different from the trophy↔bell gap. `hitSlop`
+  // on the Pressables (not this box) is what keeps the tap target
+  // comfortable now that the visual box shrank to the icon's own size.
+  headerIconButton: {
     height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
     justifyContent: 'center',
   },
   bellDot: {
     position: 'absolute',
     top: 9,
-    right: 9,
+    // Retuned for headerIconButton's new content-sized (~20px) width — the
+    // old right:9 assumed a 44-wide centered box; same "sits at the icon's
+    // top-right corner" relationship, just recomputed for the narrower box.
+    right: -2,
     width: 11,
     height: 11,
     borderRadius: radii.pill,
     backgroundColor: colors.rose,
-    // The white ring is what keeps it legible against the bell's strokes at this
-    // size — without it the dot merges into the icon rather than sitting on it.
+    // The ring's color needs to MATCH WHATEVER IS BEHIND IT — it used to be
+    // colors.surface because both header buttons sat on a colors.surface
+    // chip; now that those chips are gone (bare icons, per direct feedback),
+    // the real backdrop is the screen itself, so this is colors.bg, not
+    // colors.surface (they differ — #F6F7F3 vs #FFFFFF in Brand light).
+    // Getting this wrong shows a faint mismatched-color halo around the dot.
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: colors.bg,
   },
   chartCard: {
     marginTop: spacing.lg,

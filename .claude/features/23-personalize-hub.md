@@ -2,7 +2,7 @@
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/23-personalize-hub.md`
 **Status**: Planned
-**Last Updated**: July 2026
+**Last Updated**: 2026-07-21
 
 ---
 
@@ -292,6 +292,39 @@ The hub only changes *when* they're written (on Equip, not on tap).
   (Palette icon, chevron, pushes `/personalize`) — verified `SunMedium` stays
   imported (still used by the unrelated Daily Reminders row).
 - **Verified**: all four touched/new files Babel-compile clean.
+
+### Known Drift (2026-07-21) — Not Fixed Here
+
+A same-day, unrelated Home-screen pass ("tweak", `af2dd80`) restyled the
+**real** hero card in `components/AccountHeroCarousel.js` without touching
+`components/PersonalizePreview.js`. Since the preview's whole premise is
+hand-cloning that card at real token values, it now renders a stale version
+of it:
+
+- `heroLabel` ("In Hand") and `heroStatLabel` ("Income"/"Expenses") moved
+  from `fontFamily.semibold` / `fontSize.base`|`fontSize.sm` (no tracking) to
+  `fontFamily.bold` / `fontSize.xs` + `letterSpacing: 0.3` — a smaller,
+  micro-kicker treatment. `PersonalizePreview.js` still uses the old sizes/
+  weights (`personalize.js` styles `heroLabel`/`heroStatLabel`, unchanged).
+- The muted label color went from the per-card-theme `theme.mutedColor` to a
+  flat `rgba(255,255,255,0.55)` (`MUTED_LABEL_COLOR`) — the real card no
+  longer derives that color from the theme at all; the preview still passes
+  `cardTheme.mutedColor`.
+- `heroTopRow`'s bottom margin grew `spacing.md` → `spacing.lg`; the real
+  `heroBalance` gained `letterSpacing: -1` (was the shared `AmountText`
+  default). Preview has neither.
+- Real `AccountHeroCarousel`/Home also grew a loading-skeleton state
+  (`accountsLoading` prop, chip `Skeleton`s on Home). **Not applicable** to
+  the preview by design — it's always-static/never-loading, so there's
+  nothing to mirror here; noted so this isn't mistaken for a missed spot.
+- `components/AmountText.js` gained `fontVariant: ['tabular-nums']`. No
+  action needed — the preview reuses the real `AmountText` component (not a
+  hand-rolled clone) for the hero balance, so this applied automatically.
+
+**Reconciliation is still owed**: re-sync `PersonalizePreview.js`'s
+`heroLabel`/`heroStatLabel`/`heroTopRow`/`heroBalance` styles and the muted-
+label color source to match the real card. Left undone in this pass — this
+section only records the drift.
 
 **→ Stop here. Show the result and wait for approval.**
 

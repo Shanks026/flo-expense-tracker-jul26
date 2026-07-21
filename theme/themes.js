@@ -115,10 +115,16 @@ export const ACCENTS = {
   ocean: {
     id: 'ocean',
     name: 'Ocean',
-    // Brightened from #4A90D9 — same hue (~211°), lightness bumped ~57%→64%
-    // and saturation nudged up to compensate, so it doesn't just look
-    // washed-out lighter, it reads as a livelier blue.
-    brand: '#65A3E2',
+    // Darkened again (2026-07-21, per direct feedback — "the text are hard
+    // to read") — the #65A3E2 brightening pass above went too far the other
+    // way for a color also used as TEXT/icon fill on light surfaces, not
+    // just as a card accent. Same hue (~210°), lightness pulled back down
+    // 64%→53% and saturation nudged up (68%→72%) so it darkens without
+    // reading muddy/desaturated. Contrast vs a white/cream screen bg goes
+    // from ~2.5:1 to ~3.5:1 — a real, measured improvement, though still
+    // short of WCAG AA's 4.5:1 for small body text; revisit further if it's
+    // still not enough on-device.
+    brand: '#2e81d4',
     brandBg: '#E2EDF9',
     brandBgDark: '#162636',
   },

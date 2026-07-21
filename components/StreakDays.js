@@ -1,6 +1,11 @@
 import { View, StyleSheet } from 'react-native';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import { Flame, Snowflake } from 'lucide-react-native';
 import { colors, radii } from '../theme/tokens';
+
+// Per-cell stagger step for the `animated` variant below — small enough that
+// 7 cells finish well within half a second, not a slow reveal.
+const STAGGER_MS = 60;
 
 // A single day of a streak — four states, since
 // 18-gamification-ritual-and-ledger.md Phase 3/4:
@@ -81,14 +86,28 @@ export const STREAK_WINDOW_DAYS = 7;
 // progress read as an afterthought tacked onto a mostly-empty week. Newest
 // (today) first puts the thing worth celebrating up front, with the rest of
 // the row reading as "what's ahead," not "what's missing."
-export default function StreakDays({ history, size = 34, dark = false }) {
+// `animated` (opt-in, off by default) staggers each cell in one-by-one —
+// used by StreakCelebration's 7-day row, NOT the /streak screen's month
+// grid (42 cells animating in one-by-one on every visit would be noise, not
+// a celebration). Same shared StreakFlame primitive either way, so the two
+// screens can never drift into different visual languages for the same
+// day-state — only the entrance differs. `baseDelay` lets the caller slot
+// this into its own staggered sequence (e.g. after a title/body have
+// already animated in) instead of always starting at 0.
+export default function StreakDays({ history, size = 34, dark = false, animated = false, baseDelay = 0 }) {
   const days = history.slice(-STREAK_WINDOW_DAYS).reverse();
 
   return (
     <View style={styles.row}>
-      {days.map((day) => (
-        <StreakFlame key={day.date} type={day.type} size={size} dark={dark} />
-      ))}
+      {days.map((day, index) =>
+        animated ? (
+          <Animated.View key={day.date} entering={ZoomIn.delay(baseDelay + index * STAGGER_MS).duration(300)}>
+            <StreakFlame type={day.type} size={size} dark={dark} />
+          </Animated.View>
+        ) : (
+          <StreakFlame key={day.date} type={day.type} size={size} dark={dark} />
+        )
+      )}
     </View>
   );
 }

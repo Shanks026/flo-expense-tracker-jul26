@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, CircleDollarSign, Check, Snowflake, Lock, TrendingUp, TrendingDown } from 'lucide-react-native';
 import CardThemeSurface from '../components/CardThemeSurface';
@@ -53,6 +53,10 @@ function unlockCaption(theme) {
 
 export default function Shop() {
   const router = useRouter();
+  // Optional deep link into the General tab (RewardsHistorySheet's coin Buy
+  // button, 25-rewards-hub-sheet.md) — every other entry point into Shop
+  // omits this param and gets the unchanged default (Cards).
+  const { tab: initialTab } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -61,7 +65,7 @@ export default function Shop() {
   const { showToast } = useToast();
   const { coins, ownedIds, equippedId, loading, refetch } = useCardThemes();
   const { freezes, refetch: refetchRewards } = useRewards();
-  const [tab, setTab] = useState('cards');
+  const [tab, setTab] = useState(initialTab === 'general' ? 'general' : 'cards');
   const [selectedId, setSelectedId] = useState(null);
   const [working, setWorking] = useState(false);
   const [buyingFreeze, setBuyingFreeze] = useState(false);

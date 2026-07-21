@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -13,20 +13,35 @@ import {
   Tags,
   RotateCcw,
   Sparkles,
-  Award,
 } from 'lucide-react-native';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
-import CardThemeSurface from '../components/CardThemeSurface';
 import useTrophies from '../hooks/useTrophies';
 import useRewards from '../hooks/useRewards';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useRewardBurst } from '../components/RewardBurst';
 import { useToast } from '../components/Toast';
 import { claimTrophy } from '../lib/rewardsMutations';
-import { TROPHY_GROUPS, TROPHY_GROUP_ORDER } from '../lib/trophies';
+import {
+  TROPHY_GROUPS,
+  TROPHY_GROUP_ORDER,
+  STREAK_BADGE_ART,
+  STREAK_BADGE_ART_LOCKED,
+  LOGGER_BADGE_ART,
+  LOGGER_BADGE_ART_LOCKED,
+  PERFECT_MONTH_BADGE_ART,
+  PERFECT_MONTH_BADGE_ART_LOCKED,
+  CATEGORIZER_BADGE_ART,
+  CATEGORIZER_BADGE_ART_LOCKED,
+  COMEBACK_BADGE_ART,
+  COMEBACK_BADGE_ART_LOCKED,
+  PLANNER_BADGE_ART,
+  PLANNER_BADGE_ART_LOCKED,
+  BUDGET_BADGE_ART,
+  BUDGET_BADGE_ART_LOCKED,
+} from '../lib/trophies';
 import { getTheme } from '../lib/cardThemes';
-import { RANKS, rankFromXp } from '../lib/rewards';
+import { RANKS, RANK_BADGE_ART, RANK_BADGE_ART_LOCKED } from '../lib/rewards';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -34,6 +49,32 @@ import { useTheme } from '../theme/ThemeContext';
 // rather than CategoryIcon.js, which is specifically the category icon
 // registry, not a general-purpose one.
 const ICONS = { Flame, NotebookPen, CalendarCheck2, Target, Leaf, Compass, Tags, RotateCcw, Sparkles };
+
+// Illustrated badge art per group, where it exists — Streak/Logger are
+// tier-keyed ladders (STREAK_BADGE_ART[t.tier]), Perfect Month/Categorizer
+// are single binary trophies (one image, no tier key). Any group not listed
+// here (or a ladder tier missing its art, e.g. Streak's day 50 for a while)
+// falls back to the icon-tile placeholder — see the render below.
+function trophyBadgeArt(groupId, t) {
+  switch (groupId) {
+    case 'streak':
+      return t.earned ? STREAK_BADGE_ART[t.tier] : STREAK_BADGE_ART_LOCKED[t.tier];
+    case 'logger':
+      return t.earned ? LOGGER_BADGE_ART[t.tier] : LOGGER_BADGE_ART_LOCKED[t.tier];
+    case 'perfect_month':
+      return t.earned ? PERFECT_MONTH_BADGE_ART : PERFECT_MONTH_BADGE_ART_LOCKED;
+    case 'categorizer':
+      return t.earned ? CATEGORIZER_BADGE_ART : CATEGORIZER_BADGE_ART_LOCKED;
+    case 'comeback':
+      return t.earned ? COMEBACK_BADGE_ART : COMEBACK_BADGE_ART_LOCKED;
+    case 'planner':
+      return t.earned ? PLANNER_BADGE_ART[t.tier] : PLANNER_BADGE_ART_LOCKED[t.tier];
+    case 'budget_keeper':
+      return t.earned ? BUDGET_BADGE_ART[t.tier] : BUDGET_BADGE_ART_LOCKED[t.tier];
+    default:
+      return null;
+  }
+}
 
 // The Claim button's headline amount — coins first (the thing most users
 // value most), then freezes (Comeback's reward is freeze-only, coins:0), XP
@@ -54,7 +95,6 @@ export default function TrophiesScreen() {
   const router = useRouter();
   const { trophies, earnedCount, totalCount, markAllSeen, loading } = useTrophies();
   const { xp } = useRewards();
-  const { current: currentRank } = rankFromXp(xp);
   const { notifyChanged } = useDataRefresh();
   const { showRewardBurst } = useRewardBurst();
   const { showToast } = useToast();
@@ -154,48 +194,48 @@ export default function TrophiesScreen() {
         </Card>
 
         {/* Rank ladder (18-gamification-ritual-and-ledger.md Phase 5) —
-            reuses the exact trophy-row grammar (icon left, title+subtitle
-            stacked, trailing state) rather than a bespoke layout, per the
-            doc's own "reuse the trophy-room tile grammar; no new infra".
-            Every rank you've already passed shows "Earned"; the one you're
-            actually AT shows "Current"; anything ahead shows XP progress —
-            same three-state shape the trophy rows already use, just applied
-            to a fixed, ordered ladder instead of independent achievements. */}
+            a game-style trophy-case grid (3 per row) rather than the list-row
+            grammar every other section here uses, per direct feedback. Earned
+            is conveyed by color alone — a reached rank shows its real
+            illustrated badge, an unreached one shows the pre-baked grayscale
+            variant (RANK_BADGE_ART_LOCKED) — no separate "Earned"/"Current"
+            label needed on top of that. No reward info surfaces here (ranks
+            don't carry one, unlike the trophy tiles below). */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Rank</Text>
-          <Card style={styles.listCard}>
-            {RANKS.map((rank, idx) => {
+          <View style={styles.badgeGrid}>
+            {RANKS.map((rank) => {
               const reached = xp >= rank.minXp;
-              const isCurrent = rank.id === currentRank.id;
               return (
-                <View key={rank.id} style={[styles.row, idx < RANKS.length - 1 && styles.rowBorder]}>
-                  <View
-                    style={[
-                      styles.rankIconTile,
-                      { backgroundColor: reached ? `${rank.badgeColor}29` : colors.iconTileBg },
-                    ]}
-                  >
-                    <Award size={20} color={reached ? rank.badgeColor : colors.mutedLight} strokeWidth={2} />
-                  </View>
-                  <View style={styles.rowMid}>
-                    <Text style={[styles.rowTitle, !reached && styles.rowTitleLocked]}>{rank.title}</Text>
-                    <Text style={styles.rowSub}>{rank.minXp.toLocaleString('en-IN')} XP</Text>
-                  </View>
-                  {isCurrent ? (
-                    <Text style={[styles.rowEarned, { color: rank.badgeColor }]}>Current</Text>
-                  ) : reached ? (
-                    <Text style={[styles.rowEarned, { color: colors.mutedLight }]}>Earned</Text>
-                  ) : (
-                    <Text style={styles.rowProgress}>
-                      {Math.min(xp, rank.minXp).toLocaleString('en-IN')}/{rank.minXp.toLocaleString('en-IN')}
-                    </Text>
-                  )}
+                <View key={rank.id} style={styles.badgeGridItem}>
+                  <Image
+                    source={reached ? RANK_BADGE_ART[rank.id] : RANK_BADGE_ART_LOCKED[rank.id]}
+                    style={styles.badgeGridImage}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.badgeGridTitle} numberOfLines={1}>
+                    {rank.title}
+                  </Text>
+                  <Text style={styles.badgeGridSub}>
+                    {Math.min(xp, rank.minXp).toLocaleString('en-IN')}/{rank.minXp.toLocaleString('en-IN')} XP
+                  </Text>
                 </View>
               );
             })}
-          </Card>
+          </View>
         </View>
 
+        {/* Trophy groups — same grid grammar as Rank above (per direct
+            feedback: "same layout for all sections"). No illustrated art yet
+            per group (assets/rank/BADGES.md's pattern is coming for these
+            too) — a circular IconTile stands in as the placeholder badge,
+            same earned/locked tone-color logic the old row layout used.
+            Dropped for grid consistency: the hint description line and the
+            reward theme-swatch preview (both were list-row-shaped, not
+            grid-tile-shaped). KEPT: the Claim button — it's the actual
+            mechanism for collecting a trophy's coin/freeze/theme reward, not
+            cosmetic, so removing it would silently break claiming rather
+            than just simplifying the look. */}
         {TROPHY_GROUP_ORDER.map((groupId) => {
           const group = TROPHY_GROUPS[groupId];
           const Icon = ICONS[group.icon];
@@ -204,43 +244,24 @@ export default function TrophiesScreen() {
           return (
             <View key={groupId} style={styles.section}>
               <Text style={styles.sectionTitle}>{group.name}</Text>
-              <Card style={styles.listCard}>
-                {tiles.map((t, idx) => (
-                  <View key={t.id} style={[styles.row, idx < tiles.length - 1 && styles.rowBorder]}>
-                    <IconTile tone={t.earned ? group.tone : 'neutral'} size={44} radius={radii.iconTile}>
-                      <Icon
-                        size={20}
-                        color={t.earned ? toneColor[group.tone] : colors.mutedLight}
-                        strokeWidth={2}
-                      />
-                    </IconTile>
-                    <View style={styles.rowMid}>
-                      <Text style={[styles.rowTitle, !t.earned && styles.rowTitleLocked]}>{t.label}</Text>
-                      <Text style={styles.rowSub} numberOfLines={2}>
-                        {t.locked ? 'Coming soon' : t.hint}
-                      </Text>
-                      {/* A themed trophy shows its card prize as a mini swatch
-                          (22-coin-store-and-reward-tiering.md Phase 1) — the
-                          same CardThemeSurface the Shop tiles use, so the
-                          cosmetic reward is visible before AND after claiming
-                          (it stays as "what you earned"). */}
-                      {t.reward?.themeId && (
-                        <View style={styles.themeReward}>
-                          <CardThemeSurface theme={getTheme(t.reward.themeId)} style={styles.themeRewardSwatch} />
-                          <Text style={styles.themeRewardText}>{getTheme(t.reward.themeId).name} card</Text>
-                        </View>
-                      )}
-                    </View>
-                    {/* 21-achievement-rewards-and-milestone-road.md Phase 2 —
-                        a third state between "not earned" and "Earned": a
-                        Claim button, shown only when this tile has a defined
-                        reward (t.reward — absent for Streak Keeper/Budget
-                        Keeper, which stays exactly as before) and hasn't been
-                        claimed yet. Once claimed, falls through to the same
-                        "Earned" text every other earned tile already shows. */}
+              <View style={styles.badgeGrid}>
+                {tiles.map((t) => {
+                  const art = trophyBadgeArt(groupId, t);
+                  return (
+                  <View key={t.id} style={styles.badgeGridItem}>
+                    {art ? (
+                      <Image source={art} style={styles.badgeGridImage} resizeMode="contain" />
+                    ) : (
+                      <IconTile tone={t.earned ? group.tone : 'neutral'} size={64} radius={32}>
+                        <Icon size={28} color={t.earned ? toneColor[group.tone] : colors.mutedLight} strokeWidth={2} />
+                      </IconTile>
+                    )}
+                    <Text style={styles.badgeGridTitle} numberOfLines={2}>
+                      {t.label}
+                    </Text>
                     {t.earned && t.reward && !t.claimed ? (
                       <Pressable
-                        style={[styles.claimButton, claimingId === t.id && styles.claimButtonDisabled]}
+                        style={[styles.claimButton, styles.badgeGridClaim, claimingId === t.id && styles.claimButtonDisabled]}
                         onPress={() => handleClaim(t)}
                         disabled={claimingId === t.id}
                       >
@@ -250,18 +271,17 @@ export default function TrophiesScreen() {
                           <Text style={styles.claimButtonText}>Claim {claimAmountLabel(t.reward)}</Text>
                         )}
                       </Pressable>
-                    ) : t.earned ? (
-                      <Text style={[styles.rowEarned, { color: toneColor[group.tone] }]}>Earned</Text>
+                    ) : t.locked ? (
+                      <Text style={styles.badgeGridSub}>Coming soon</Text>
                     ) : (
-                      !t.locked && (
-                        <Text style={styles.rowProgress}>
-                          {t.current}/{t.threshold}
-                        </Text>
-                      )
+                      <Text style={styles.badgeGridSub}>
+                        {Math.min(t.current, t.threshold).toLocaleString('en-IN')}/{t.threshold.toLocaleString('en-IN')}
+                      </Text>
                     )}
                   </View>
-                ))}
-              </Card>
+                  );
+                })}
+              </View>
             </View>
           );
         })}
@@ -365,82 +385,56 @@ function makeStyles(colors) {
       color: colors.ink,
       marginBottom: spacing.sm,
     },
-    // Same grammar as Home's Recent Transactions / Upcoming Bills lists —
-    // icon left, title+subtitle stacked right, optional trailing value.
-    listCard: {
-      padding: 0,
-      paddingHorizontal: spacing.lg,
-    },
-    // Hand-rolled, not IconTile — a rank badge needs a per-rank colour
-    // (lib/rewards.js's `badgeColor`), and IconTile's background is fixed by
-    // its `tone` lookup with no override escape hatch. Same 44/iconTile
-    // dimensions as every IconTile on this screen, for visual consistency.
-    rankIconTile: {
-      width: 44,
-      height: 44,
-      borderRadius: radii.iconTile,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    row: {
+    // Trophy-case grid (3 per row) — every section on this screen (Rank AND
+    // every trophy group) shares this one grid grammar now, no Card wrapper,
+    // per direct feedback ("make it look like an actual game" / "same
+    // layout for all sections"). Column count divides evenly for Rank (9)
+    // and most groups; a partial last row (e.g. Frugal's 3 tiles fills
+    // exactly, Streak's 6 fills exactly, but a group with e.g. 4 tiles
+    // leaves one slot short) just left-aligns rather than stretching —
+    // acceptable, matches how any real trophy-case grid handles a partial
+    // row.
+    badgeGrid: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    badgeGridItem: {
+      width: '33.333%',
       alignItems: 'center',
-      gap: spacing.md,
-      paddingVertical: 13,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xs,
     },
-    rowBorder: {
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderSoft,
+    // Earned/locked is conveyed entirely by which art (color vs pre-baked
+    // grayscale) is passed in as the source — no tint/opacity override here.
+    badgeGridImage: {
+      width: 80,
+      height: 80,
     },
-    rowMid: {
-      flex: 1,
-    },
-    rowTitle: {
+    badgeGridTitle: {
       fontFamily: fontFamily.bold,
-      fontSize: fontSize.lg,
+      fontSize: fontSize.sm,
       color: colors.ink,
+      marginTop: spacing.xs,
+      textAlign: 'center',
     },
-    rowTitleLocked: {
-      color: colors.mutedMid,
-    },
-    rowSub: {
+    badgeGridSub: {
       fontFamily: fontFamily.semibold,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginTop: 1,
-    },
-    // Themed-trophy card prize (22-coin-store-and-reward-tiering.md Phase 1) —
-    // a small swatch + label under the hint, mirroring the Shop's tile swatch.
-    themeReward: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: 5,
-    },
-    themeRewardSwatch: {
-      width: 30,
-      height: 19,
-    },
-    themeRewardText: {
-      fontFamily: fontFamily.bold,
       fontSize: fontSize.xs,
-      color: colors.mutedDarker,
-    },
-    rowProgress: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.sm,
       color: colors.mutedLight,
-      fontVariant: ['tabular-nums'],
+      marginTop: 2,
+      textAlign: 'center',
     },
-    rowEarned: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.sm,
-      letterSpacing: -0.1,
-    },
+    // Trophy groups don't have illustrated art yet (assets/rank/BADGES.md's
+    // pattern, upcoming) — a circular IconTile-based placeholder stands in,
+    // same earned/locked color logic the old row layout used (tone color vs
+    // colors.mutedLight), just resized into the grid's badge slot. Swap for
+    // real per-trophy art the same way RANK_BADGE_ART was wired once it
+    // exists — no other layout change needed.
     // Claim button (21-achievement-rewards-and-milestone-road.md Phase 2) —
     // a compact pill matching this app's small-action-button grammar (Shop's
-    // tile actions, e.g.), sized to sit as a row's trailing element rather
-    // than a full-width button.
+    // tile actions, e.g.). badgeGridClaim adds the top spacing it needs
+    // sitting under a grid tile's title instead of as a row's trailing
+    // element.
     claimButton: {
       minWidth: 72,
       height: 32,
@@ -449,6 +443,9 @@ function makeStyles(colors) {
       backgroundColor: colors.brand,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    badgeGridClaim: {
+      marginTop: 2,
     },
     claimButtonDisabled: {
       opacity: 0.6,

@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Modal } from 'react-native';
+import { View, Text, StyleSheet, Modal, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
-import { Award } from 'lucide-react-native';
 import Button from './Button';
 import Confetti from './Confetti';
 import useRewards from '../hooks/useRewards';
 import useProfile from '../hooks/useProfile';
 import { useAuth } from '../lib/AuthContext';
-import { useTheme } from '../theme/ThemeContext';
-import { RANKS, rankFromXp } from '../lib/rewards';
-import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
+import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 
-// A small, root-mounted celebration for crossing a Rank threshold
-// (18-gamification-ritual-and-ledger.md Phase 5) — same light-card-on-dark-
-// overlay family as FreezePrompt/DueBillsModal (theme-adaptive), not
-// StreakCelebration's pinned-dark full-screen treatment: rank-ups are rare
-// (the first threshold is 1500 XP, ~15 logged days minimum) and don't need
-// the same full-screen production every time XP quietly ticks up within the
-// same rank.
+// A root-mounted celebration for crossing a Rank threshold
+// (18-gamification-ritual-and-ledger.md Phase 5). Full-screen, pinned-dark
+// takeover (per direct feedback, "like Duolingo") — switched from a centered
+// dialog to the same full-screen shape StreakCelebration already uses
+// (pinned to the STATIC theme/tokens colors, not useTheme(), so it doesn't
+// adapt to the user's active theme — same "always this look" precedent).
+// Confetti kept from the dialog version; StreakCelebration doesn't use it
+// (its own celebration leans on the streak-day calendar reveal instead), but
+// nothing here says every full-screen celebration must look identical.
 //
 // "Highest rank seen" lives in profiles.highest_rank_seen (DB), not
 // AsyncStorage — it used to be device-local, which had two real problems: a
@@ -29,8 +30,8 @@ import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 // durable — the same fix already applied to theme_accent/theme_mode
 // (app/_layout.js's ThemeProfileSync) for the identical class of bug.
 export default function RankUpCelebration() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => makeStyles(), []);
+  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { xp, loading } = useRewards();
   const { profile, loading: profileLoading, updateProfile } = useProfile();
@@ -90,86 +91,101 @@ export default function RankUpCelebration() {
   const shownRank = contentRef.current;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
-      <Confetti />
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Animated.View
-            entering={ZoomIn.duration(400)}
-            style={[styles.iconTile, { backgroundColor: `${shownRank.badgeColor}29` }]}
-          >
-            <Award size={40} color={shownRank.badgeColor} strokeWidth={2} />
+    <Modal visible={visible} animationType="fade" onRequestClose={() => setVisible(false)}>
+      <View style={styles.screen}>
+        <Confetti />
+        {/* Content centers in the space ABOVE the button (per direct
+            feedback, "place the button at the bottom of the screen") — the
+            button itself lives in its own non-flex footer below, so it pins
+            to the bottom edge instead of flowing right after the body text. */}
+        <View style={styles.content}>
+          {/* Leads the screen now (per direct feedback — "it feels random,
+              add context") — states plainly what just happened BEFORE the
+              badge reveal, instead of a bare badge/confetti popping up with
+              no announcement first. Plain large text now, not a pill/chip
+              (per direct feedback, "apple-esque") — source string is
+              lowercase, textTransform:'capitalize' title-cases each word
+              rather than a literal ALL-CAPS string or an uppercase
+              transform. */}
+          <Animated.Text entering={FadeInDown.duration(300)} style={styles.eyebrowText}>
+            new rank unlocked!
+          </Animated.Text>
+          <Animated.View entering={ZoomIn.delay(150).duration(400)} style={styles.badgeWrap}>
+            <Image source={RANK_BADGE_ART[shownRank.id]} style={styles.badgeArt} resizeMode="contain" />
           </Animated.View>
-          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.eyebrow}>
-            <Text style={styles.eyebrowText}>RANK UP</Text>
-          </Animated.View>
-          <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={styles.title}>
+          <Animated.Text entering={FadeInDown.delay(300).duration(400)} style={styles.title}>
             {shownRank.title}
           </Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(250).duration(400)} style={styles.body}>
-            Your lifetime XP just crossed into a new rank.
+          <Animated.Text entering={FadeInDown.delay(400).duration(400)} style={styles.body}>
+            {RANK_FLAVOR[shownRank.id]}
           </Animated.Text>
-          <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.buttonWrap}>
-            <Button variant="primary" title="Nice" onPress={() => setVisible(false)} />
-          </Animated.View>
         </View>
+        <Animated.View entering={FadeInDown.delay(500).duration(400)} style={[styles.buttonWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
+          {/* Ghost, not primary — same reasoning as StreakCelebration's own
+              dismiss button: a plain acknowledge, not a decision. */}
+          <Button variant="ghost" title="Nice" onPress={() => setVisible(false)} />
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles() {
   return StyleSheet.create({
-    overlay: {
+    screen: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.55)',
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: colors.ink,
       paddingHorizontal: spacing.xl,
     },
-    card: {
-      width: '100%',
-      backgroundColor: colors.surface,
-      borderRadius: radii.cardLg,
-      padding: spacing.xl,
-      alignItems: 'center',
-    },
-    iconTile: {
-      width: 88,
-      height: 88,
-      borderRadius: radii.pill,
+    // Takes all the space ABOVE the pinned button, centering its own content
+    // within that remaining area — the button (styles.buttonWrap, a sibling
+    // below this, not inside it) then sits at the screen's true bottom edge
+    // instead of flowing right after the body text.
+    content: {
+      flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: spacing.lg,
     },
-    eyebrow: {
-      backgroundColor: colors.chipBg,
-      borderRadius: radii.pill,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 6,
-      marginBottom: spacing.md,
+    badgeWrap: {
+      width: 140,
+      height: 140,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.xl,
     },
+    badgeArt: {
+      width: 140,
+      height: 140,
+    },
+    // No pill/chip anymore (per direct feedback, "apple-esque") — large
+    // plain white text instead of a small kicker on a tinted background.
+    // textTransform:'capitalize' (not a literal ALL-CAPS string, and not
+    // 'uppercase') title-cases the lowercase source string word-by-word.
     eyebrowText: {
       fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xs,
-      letterSpacing: 1.2,
-      color: colors.mutedDarker,
+      fontSize: fontSize.title,
+      letterSpacing: -0.3,
+      textTransform: 'capitalize',
+      color: colors.surface,
+      textAlign: 'center',
+      marginBottom: spacing.md,
     },
     title: {
       fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.display,
-      letterSpacing: -0.3,
-      color: colors.ink,
+      fontSize: fontSize.hero,
+      lineHeight: 36,
+      letterSpacing: -0.5,
+      color: colors.surface,
       textAlign: 'center',
       marginBottom: spacing.sm,
     },
     body: {
       fontFamily: fontFamily.medium,
-      fontSize: fontSize.base,
-      color: colors.muted,
+      fontSize: fontSize.md,
+      color: colors.mutedMid,
       textAlign: 'center',
-      lineHeight: 20,
-      marginBottom: spacing.xl,
+      lineHeight: 22,
+      marginBottom: spacing.xxl,
     },
     buttonWrap: {
       width: '100%',
