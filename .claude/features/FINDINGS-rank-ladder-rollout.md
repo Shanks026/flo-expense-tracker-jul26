@@ -3,7 +3,8 @@
 **File**: `.claude/features/FINDINGS-rank-ladder-rollout.md`
 **Covers**: `27-rank-ladder-rework.md` (both phases, built 2026-07-22)
 **Status**: Test plan partially executed — 3 cases confirmed on live data, the
-rest pending. 3 open findings raised by the user, none yet fixed.
+rest pending. **All 3 findings fixed 2026-07-22** — on-device confirmation
+still pending (no device in this environment).
 **Last Updated**: 2026-07-22
 
 ---
@@ -155,9 +156,9 @@ clean `npx expo export` (8.28 MB Android bundle, zero resolution errors).
 
 ---
 
-## Part 4 — Open Findings (raised 2026-07-22, none fixed)
+## Part 4 — Findings (raised 2026-07-22, all fixed 2026-07-22)
 
-### Finding 1 — Drop the day-1 spin wheel
+### Finding 1 — Drop the day-1 spin wheel ✅ Fixed
 
 > *"drop the spin in day 1 — too much for new users"*
 
@@ -183,7 +184,16 @@ whether day 1 keeps a small flat reward instead of a wheel.
 "front-loaded first week." This partially reverses that decision for day 1 only
 — record it there when actioned.
 
-### Finding 2 — Saver is never celebrated, and its coins/XP float free
+**Fix applied**: the `1:` entry deleted from `SPIN_WHEELS` (`lib/rewards.js`).
+`spinWheelFor(1)` now returns `undefined`; day 1 is a plain streak celebration,
+same as any other non-milestone day. No replacement flat reward was added —
+"drop the spin" was taken literally, matching the direct feedback quoted
+above. `ocean-deep` stays in the catalogue as a plain purchasable Common theme
+(its own comment in `lib/cardThemes.js` updated to match). If day 1 giving
+nothing at all reads as swinging too far the other way once seen on-device,
+that's a follow-up, not something guessed at here.
+
+### Finding 2 — Saver is never celebrated, and its coins/XP float free ✅ Fixed
 
 > *"the first rank title saver badge is never displayed as a celebration screen
 > and the coins granted and xp are just floating. merge this to display the
@@ -223,12 +233,42 @@ wheel's segments pay 25–150 coins or 1 freeze. So Findings 1 and 2 are
 entangled: **dropping the day-1 spin (Finding 1) removes the coin source that
 Finding 2 wants merged into the Saver celebration.** Decide Finding 1 first.
 
-### Finding 3 — Show the reward text in the subtitle beside the actual reward
+**Fix applied** (`components/RankUpCelebration.js`): Finding 1 landing first
+resolved the entanglement — there's no longer a day-1 coin source to merge
+into anything, so no separate design decision was needed on that front. Two
+changes:
+
+1. **The silent "first-ever check" branch is gone.** `lastSeenId` being null
+   is now treated as index `-1` — "below every rank" — instead of a special
+   "welcome, record and return" case. Whatever rank the user is actually at
+   gets celebrated exactly once, Saver included. This also fixes a second real
+   bug the silent branch caused: **live data (queried via Supabase MCP while
+   fixing this) showed two existing accounts already sitting at
+   `highest_rank_seen = null`** despite being weeks old — under the old code
+   they would never see a celebration for any rank, ever, not just Saver. Now
+   they get the one celebration for whichever rank they've actually earned.
+2. **`RankUpCelebration` now defers to `RewardBurst`** (`isBursting`), the
+   same ordering guard `StreakCelebration` already had and this component was
+   missing — a full-screen rank-up Modal can no longer render on top of, and
+   hide, a coins/XP burst animating from the same action. This is the concrete
+   fix for "the coins granted and xp are just floating": the burst now always
+   finishes animating in full before any rank celebration takes over.
+
+**Deliberately not done**: Saver's celebration screen does not display a
+coins/XP figure of its own. Ranks paying currency was rejected outright in
+`27-rank-ladder-rework.md`'s Context ("Ranks will not pay coins," a double-pay
++ currency-scarcity violation) and that invariant wasn't reopened here — the
+"floating" complaint is resolved by ordering (fix 2), not by attaching a
+payout to the rank event itself. If a literal coins/XP line inside the Saver
+dialog is still wanted after seeing this on-device, that's a scope decision to
+raise separately.
+
+### Finding 3 — Show the reward text in the subtitle beside the actual reward ✅ Fixed
 
 > *"display the text reward in the subtitle beside the actual reward"*
 
-**Needs clarification before it can be actioned** — it is not yet clear which
-surface this refers to. Candidates:
+**Needed clarification before it could be actioned** — it wasn't yet clear
+which surface this refers to. Candidates considered:
 
 - **The Rewards hub ledger** (`RewardsHistorySheet`) — rows currently show a
   `SOURCE_LABELS` label plus signed coin/XP amounts, but a `theme_grant` row
@@ -239,9 +279,29 @@ surface this refers to. Candidates:
 - **The rank ladder** (`RewardsHistorySheet`) — gained `rewardText` in `27`
   Phase 2.
 
-The ledger is the most likely fit, since it is the one surface that shows a
-reward *event* without naming what was actually received. Confirm before
-building.
+The ledger was confirmed as the right fit once the actual code was read while
+fixing this: `SOURCE_LABELS` had **no entry at all** for `theme_grant`, `rank`,
+`trophy`, or `spin` — every row of those four types was rendering the raw
+source string (literally `"theme_grant"`, `"rank"`, etc.) with no reward
+detail, not just a missing theme name. This is the ledger's own gap the doc
+predicted, confirmed rather than assumed.
+
+**Fix applied** (`components/RewardsHistorySheet.js`):
+
+1. `SOURCE_LABELS` gained entries for all four: `theme_grant` → "Card
+   unlocked", `rank` → "Rank reached", `trophy` → "Achievement claimed", `spin`
+   → "Bonus spin".
+2. New `rewardDetailFor(item)` resolves what was actually granted: a
+   `theme_grant` row's `ref` (the theme id) → `getTheme(ref).name`; a `rank`
+   row's `ref` (the rank id) → the matching `RANKS[].title`. Every other
+   source returns `null` — their existing label + coin/XP amount already say
+   what happened.
+3. The ledger query now selects `ref` (it didn't before — the column existed
+   in the table but was never read here).
+4. Each row's subtitle shows the resolved detail beside the date (e.g.
+   "Meridian · 22 Jul, 8:03 PM"), instead of the date alone. `theme_grant` and
+   `rank` rows always carry `coins: 0` by design, so before this fix those rows
+   showed literally nothing but a raw source string and a timestamp.
 
 ---
 
@@ -262,3 +322,82 @@ building.
   `equipped_card_theme`. The index's feature table is also **missing features
   13–21** entirely, and its Shared Infrastructure Notes stop at 2026-07-19 —
   nothing about the reward ledger, card themes, or badge art is recorded there.
+
+---
+
+## Part 6 — Round 2: real on-device findings (2026-07-22)
+
+Three more bugs, found on-device after Round 1's fixes shipped, plus one
+product decision.
+
+### Bug A — Rank ladder shows two "Level 1"s ✅ Fixed
+
+Reported: `chrisaustin2001` (level 4, rank Steward) saw the `RewardsHistorySheet`
+ladder read **Saver → Level 1, Keeper → Level 1, Steward → Level 4**. Verified
+by computing `levelFromXp` against every rank's live `minXp`: Level and Rank
+are genuinely independent curves (by design — see `levelFromXp`'s own comment
+in `lib/rewards.js`), and the Phase 1 retune put Keeper's XP threshold (400)
+under Level 2's requirement (455) — the ONLY collision on the ladder (checked
+all nine ranks; every other rank's level is strictly increasing).
+
+Two ways to fix it existed and both were rejected: raising Keeper's threshold
+above 455 would **violate the no-demotion invariant** for any live user
+already sitting at 400–454 XP; retuning the Level curve's constants would
+change every user's displayed level app-wide, a change `27`'s own doc
+explicitly put out of scope. Instead, fixed at the display layer
+(`RewardsHistorySheet.js`'s `rankLadder`): a rank's "Level N" text now only
+renders when it's strictly greater than the previous rank's — the same
+de-dup rule already used one line above it for the freeze-cap reward text.
+Keeper's row now shows no level line at all (nothing new to report — it's
+still within the Level 1 band Saver already introduced); Steward still jumps
+straight to "Level 4", correctly.
+
+### Bug B — Rank celebration replays on every APK reinstall ✅ Fixed
+
+Reported: "I'm seeing the new rank celebration screen multiple times, as I
+uninstall the apk, update it with new one. I think it's because of the async
+storage." **It isn't** — `RankUpCelebration` was already DB-backed
+(`profiles.highest_rank_seen`), not AsyncStorage, and querying the live table
+mid-investigation showed `chrisaustin2001`'s `highest_rank_seen` correctly at
+`'steward'`, matching their actual rank. So the persisted VALUE was correct;
+the bug was that the persist path had no way to detect a **silent failure**.
+
+Root cause: `useProfile.js`'s `updateProfile()` did
+`.update(fields).eq('id', userId)` with no `.select()`. Postgrest returns
+`error: null` for an UPDATE whose WHERE clause matches zero rows (an RLS
+mismatch, a stale/racing session right after a fresh sign-in after
+reinstall, etc.) — there is no way to tell "succeeded" from "silently matched
+nothing" without asking for the row back. Every caller that treats a clean
+return as proof the write landed (`RankUpCelebration`'s
+`highest_rank_seen` persist is the concrete one) had no way to notice a
+no-op, so the stale DB value could survive a reinstall and replay the
+celebration on the next launch.
+
+**Fix applied**:
+1. `useProfile.js`'s `updateProfile()` now chains `.select().maybeSingle()`
+   and treats a null result (with no `error`) as a real error
+   (`profile_update_no_match`) — a write that matched nothing is no longer
+   reported as success. All existing callers only ever checked `{ error }`,
+   so this is a strictly additive guarantee, not a breaking change.
+2. `RankUpCelebration.js` now reads that error: if the `highest_rank_seen`
+   persist fails, it does **not** proceed to `claimRank`/show the dialog, and
+   resets `checkedRankRef` so a later XP tick or remount retries the write
+   instead of getting stuck having "seen" a rank it never durably recorded.
+
+### Decision — Ocean Deep moved from the day-1 spin to Saver's rank reward ✅ Done
+
+Direct instruction: *"since we dropped the spin, we can move the ocean-deep
+theme to saver as reward."* `RANK_THEME_GRANTS` gained `saver: 'ocean-deep'`
+(`lib/rewards.js`); Ocean Deep itself moved in `lib/cardThemes.js` from
+`tier: "common", cost: 400` (plain purchasable) to `tier: "rank", cost: 0`
+with `unlock: { type: "rank", rankId: "saver", label: "Saver" }` — following
+the same "never purchasable at any price" rule the other three rank themes
+already have, rather than being the one exception. Functionally this is the
+same guaranteed day-one grant Ocean Deep always gave (previously via the
+now-removed spin wheel), just moved onto `claimRank`. It also means Saver's
+celebration (Round 1, Finding 2) now has a real reward to reveal — the
+`themeWrap` block in `RankUpCelebration.js` needed no code change, since it
+already renders whenever `claimRank` returns a `themeId`.
+
+**Still pending**: all of Round 2 is code-verified only (Babel-parses clean,
+traced against live DB state); on-device confirmation needs a new build.

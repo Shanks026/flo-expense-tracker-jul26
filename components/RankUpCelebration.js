@@ -7,6 +7,7 @@ import Confetti from './Confetti';
 import CardThemeSurface from './CardThemeSurface';
 import useRewards from '../hooks/useRewards';
 import useProfile from '../hooks/useProfile';
+import { useRewardBurst } from './RewardBurst';
 import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
@@ -39,6 +40,7 @@ export default function RankUpCelebration() {
   const { session } = useAuth();
   const { xp, loading } = useRewards();
   const { profile, loading: profileLoading, updateProfile } = useProfile();
+  const { isBursting } = useRewardBurst();
   const { notifyChanged } = useDataRefresh();
   const [visible, setVisible] = useState(false);
   const contentRef = useRef(null);
@@ -52,28 +54,67 @@ export default function RankUpCelebration() {
 
   useEffect(() => {
     if (!session || !userId || loading || profileLoading || !profile) return;
+    // Don't check/celebrate before onboarding finishes (`profiles.onboarded_at`
+    // is null until Act 3's done.js). This component is mounted globally (a
+    // root Stack sibling, not scoped to any route), and onboarding's own
+    // expense.js step inserts a REAL transaction + calls claimDailyLog — so a
+    // brand-new signup's XP/profile resolve mid-onboarding, and Finding 2's
+    // fix (celebrating a genuine first-ever Saver instead of recording it
+    // silently) made that fire as a full-screen "new rank unlocked!" takeover
+    // in the middle of the onboarding narrative, before Home ever appeared.
+    // Found live. Not marking checkedRankRef here means this simply
+    // re-evaluates once onboarding finishes and profile.onboarded_at is set,
+    // celebrating whatever rank was actually reached by then — one dialog,
+    // same as any other multi-rank jump. This is where the Saver celebration
+    // lands for a brand-new user: on Home, after onboarding's done screen
+    // (28-onboarding-welcome-bundle.md — the welcome bundle is a separate
+    // reveal on the done screen, so the two don't stack).
+    if (!profile.onboarded_at) return;
     if (checkedRankRef.current === rank.id) return;
+    // Defer while a RewardBurst overlay is animating (e.g. the daily-log coin
+    // pop from the very action that raised this rank) — same ordering fix
+    // StreakCelebration already applies for the identical collision: this is
+    // a full-screen Modal that would otherwise render on top of, and hide,
+    // the burst (FINDINGS-rank-ladder-rollout.md Finding 2). checkedRankRef
+    // is deliberately NOT set yet — leaving it unset means this effect just
+    // re-evaluates once isBursting flips false, instead of the two racing.
+    if (isBursting) return;
     checkedRankRef.current = rank.id;
 
     const lastSeenId = profile.highest_rank_seen;
 
     (async () => {
-      // First-ever check for this user (no stored rank at all) — everyone
-      // starts at Saver by construction (minXp: 0), so this is "welcome",
-      // not a rank-UP. Record it silently and move on; nothing to celebrate.
-      if (!lastSeenId) {
-        await updateProfile({ highest_rank_seen: rank.id }, { silent: true });
-        return;
-      }
       if (lastSeenId === rank.id) return;
 
-      const lastIndex = RANKS.findIndex((r) => r.id === lastSeenId);
+      // No stored rank yet (either a genuinely brand-new user, always exactly
+      // at Saver on their first check, or an existing user whose
+      // highest_rank_seen was simply never backfilled — confirmed live: two
+      // real accounts sit at null despite being weeks old) is treated as
+      // "one below the lowest rank" (index -1), NOT as a silent first-time
+      // record. That means whatever rank.id resolves to right now is always
+      // a genuine crossing and gets celebrated exactly once — Saver included.
+      // This is the fix for Finding 2 (FINDINGS-rank-ladder-rollout.md): Saver
+      // used to be recorded with no dialog at all, and an untracked existing
+      // user got permanent silence instead of the one celebration they'd
+      // actually earned.
+      const lastIndex = lastSeenId ? RANKS.findIndex((r) => r.id === lastSeenId) : -1;
       const newIndex = RANKS.findIndex((r) => r.id === rank.id);
       // Awaited, and written BEFORE the dialog shows — the write this
       // replaces raced showing the dialog against persisting "seen", which
       // is exactly how a rank-up could replay. Confirming the record landed
       // first closes that gap.
-      await updateProfile({ highest_rank_seen: rank.id }, { silent: true });
+      const { error: persistError } = await updateProfile({ highest_rank_seen: rank.id }, { silent: true });
+      if (persistError) {
+        // The write didn't durably land (useProfile's updateProfile now
+        // surfaces a zero-row match as an error instead of silent success —
+        // see its own comment) — do NOT proceed as if "seen" was recorded.
+        // Reported live: this exact gap replayed the celebration on every
+        // APK reinstall, since the stale DB value never actually changed
+        // (FINDINGS-rank-ladder-rollout.md). Clear checkedRankRef so a later
+        // XP tick or remount retries the write instead of getting stuck.
+        checkedRankRef.current = null;
+        return;
+      }
       // XP only ever rises (it's never spent — lib/rewards.js), so a rank
       // moving backward shouldn't be reachable in practice; guarded anyway
       // rather than trusted, since this reads from the DB, not a value this
@@ -83,10 +124,10 @@ export default function RankUpCelebration() {
       // Rank theme grant (27-rank-ladder-rework.md Phase 2). Runs BEFORE the
       // dialog shows so the reveal can't display a theme the grant then failed
       // to write. claimRank is idempotent on (user_id,'rank',rankId) and a
-      // no-op for the six ranks with no theme, so calling it unconditionally
-      // here is safe. notifyChanged() only on a genuine first grant — that's
-      // what makes useCardThemes pick the new theme up without a refetch of
-      // the whole app on every re-render of this component.
+      // no-op for the six ranks with no theme (Saver included), so calling it
+      // unconditionally here is safe. notifyChanged() only on a genuine first
+      // grant — that's what makes useCardThemes pick the new theme up without
+      // a refetch of the whole app on every re-render of this component.
       const { themeId } = await claimRank(rank.id);
       if (themeId) notifyChanged();
 
@@ -99,7 +140,7 @@ export default function RankUpCelebration() {
     // checkedRankRef guard above is what actually controls re-entry, not
     // this dependency list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, userId, loading, profileLoading, profile, rank.id]);
+  }, [session, userId, loading, profileLoading, profile, rank.id, isBursting]);
 
   if (!visible || !contentRef.current) return null;
 

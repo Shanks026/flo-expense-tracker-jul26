@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../components/OnboardingScreen';
 import ChoiceList from '../../components/OnboardingChoice';
 import useProfile from '../../hooks/useProfile';
-import { getNextRoute, getStepPosition } from '../../lib/onboarding';
+import { getStepPosition, TOUR_START_ROUTE } from '../../lib/onboarding';
 
 // 12-personal-onboarding.md Phase 3, screen 22 — MCQ cards WITH emojis, light
 // bg, matching the other question screens exactly (goal/leak/habit) — not the
@@ -28,7 +28,11 @@ export default function OnboardingCommitment() {
   const router = useRouter();
   const { profile, updateProfile } = useProfile();
   const pos = getStepPosition('commitment');
-  const next = getNextRoute('commitment');
+  // The last setup question hands off to the "Know your space" tour
+  // (28-onboarding-welcome-bundle.md), which ends on the done screen — rather
+  // than straight to done. commitment is the last STEP, so getNextRoute would
+  // have returned DONE_ROUTE; the tour slots in between.
+  const next = TOUR_START_ROUTE;
 
   const [value, setValue] = useState(null);
   const [saving, setSaving] = useState(false);

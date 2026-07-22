@@ -37,10 +37,32 @@ const SOURCE_LABELS = {
   freeze_used: 'Freeze used',
   freeze_comeback: 'Welcome back',
   chest: 'Milestone chest',
+  // Added (FINDINGS-rank-ladder-rollout.md Finding 3) — these four sources
+  // already existed in reward_events (theme grants from milestones/spins/
+  // trophies/ranks, achievement trophies, the milestone spin wheel) but had no
+  // entry here, so every one fell through to the raw source string with no
+  // indication of what was actually granted.
+  theme_grant: 'Card unlocked',
+  rank: 'Rank reached',
+  trophy: 'Achievement claimed',
+  spin: 'Bonus spin',
 };
 
 function labelFor(source) {
   return SOURCE_LABELS[source] ?? source;
+}
+
+// What was actually granted, in words — the gap Finding 3 named: a
+// theme_grant/rank row's `ref` IS the reward (a theme id or a rank id), but
+// the ledger only ever showed a coin amount beside a generic label, so a
+// granted card or a reached rank read as a bare, unexplained line (and
+// theme_grant/rank rows always carry coins: 0, so previously nothing but the
+// date showed at all). Null for every other source, whose SOURCE_LABELS text
+// plus its coin/xp amount already says what happened.
+function rewardDetailFor(item) {
+  if (item.source === 'theme_grant') return getTheme(item.ref)?.name ?? null;
+  if (item.source === 'rank') return RANKS.find((r) => r.id === item.ref)?.title ?? null;
+  return null;
 }
 
 const RewardsHistorySheetContext = createContext(null);
@@ -94,24 +116,36 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
   // against the previous rank), not on every rank that happens to sit in the
   // same band — repeating "7 freeze slots" down three consecutive rows reads
   // as three separate rewards.
-  const rankLadder = useMemo(
-    () =>
-      RANKS.map((r, i) => {
-        const parts = [];
-        const themeId = RANK_THEME_GRANTS[r.id];
-        if (themeId) parts.push(`${getTheme(themeId).name} card`);
-        const cap = freezeCapForRank(r);
-        if (i > 0 && cap > freezeCapForRank(RANKS[i - 1])) parts.push(`${cap} freeze slots`);
-        return { ...r, atLevel: levelFromXp(r.minXp).level, rewardText: parts.join(' · ') };
-      }),
-    []
-  );
+  const rankLadder = useMemo(() => {
+    let lastAtLevel = 0;
+    return RANKS.map((r, i) => {
+      const parts = [];
+      const themeId = RANK_THEME_GRANTS[r.id];
+      if (themeId) parts.push(`${getTheme(themeId).name} card`);
+      const cap = freezeCapForRank(r);
+      if (i > 0 && cap > freezeCapForRank(RANKS[i - 1])) parts.push(`${cap} freeze slots`);
+      const atLevel = levelFromXp(r.minXp).level;
+      // Level and Rank are independent curves (Level's own comment in
+      // lib/rewards.js) — the retuned early rank thresholds
+      // (27-rank-ladder-rework.md Phase 1) put Keeper's 400 XP under Level
+      // 2's 455 XP requirement, so Saver AND Keeper both compute to "Level 1".
+      // Showing that number twice in a column that exists to signal
+      // progression reads as a bug (found live, FINDINGS-rank-ladder-rollout.md)
+      // even though it's mathematically consistent with both curves. Same
+      // de-dup rule the freeze-cap reward line above already uses for the
+      // identical class of problem: only show the number where it actually
+      // changes vs. the previous rank.
+      const showLevel = atLevel > lastAtLevel;
+      lastAtLevel = atLevel;
+      return { ...r, atLevel, levelText: showLevel ? `Level ${atLevel}` : null, rewardText: parts.join(' · ') };
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('reward_events')
-      .select('id, source, coins, xp, created_at')
+      .select('id, source, ref, coins, xp, created_at')
       .order('created_at', { ascending: false })
       .limit(30);
     setEvents(error ? [] : (data ?? []));
@@ -267,7 +301,7 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
                     </Text>
                   ) : null}
                 </View>
-                <Text style={styles.ladderLevel}>Level {r.atLevel}</Text>
+                <Text style={styles.ladderLevel}>{r.levelText}</Text>
               </View>
             );
           })}
@@ -314,20 +348,26 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
             </View>
           )
         }
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={styles.rowMid}>
-              <Text style={styles.rowTitle}>{labelFor(item.source)}</Text>
-              <Text style={styles.rowSub}>{format(new Date(item.created_at), 'd MMM, h:mm a')}</Text>
+        renderItem={({ item }) => {
+          const detail = rewardDetailFor(item);
+          return (
+            <View style={styles.row}>
+              <View style={styles.rowMid}>
+                <Text style={styles.rowTitle}>{labelFor(item.source)}</Text>
+                <Text style={styles.rowSub}>
+                  {detail ? `${detail} · ` : ''}
+                  {format(new Date(item.created_at), 'd MMM, h:mm a')}
+                </Text>
+              </View>
+              {item.coins !== 0 && (
+                <Text style={[styles.rowAmount, item.coins < 0 && styles.rowAmountNegative]}>
+                  {item.coins > 0 ? '+' : ''}
+                  {item.coins}
+                </Text>
+              )}
             </View>
-            {item.coins !== 0 && (
-              <Text style={[styles.rowAmount, item.coins < 0 && styles.rowAmountNegative]}>
-                {item.coins > 0 ? '+' : ''}
-                {item.coins}
-              </Text>
-            )}
-          </View>
-        )}
+          );
+        }}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     </BottomSheetModal>

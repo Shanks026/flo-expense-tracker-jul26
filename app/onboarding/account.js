@@ -20,7 +20,13 @@ export default function OnboardingAccount() {
   const { showToast } = useToast();
   const { profile, updateProfile } = useProfile();
 
-  const [name, setName] = useState('');
+  // Defaults to 'Personal' (what handle_new_user names the auto-created
+  // account) rather than '' — so the field is never blank in the gap before
+  // `activeAccount` resolves (it lands a beat after mount, and is reset to null
+  // on a user switch). The effect below still overwrites with the real account
+  // name once it resolves, if the user hasn't typed. Fixes the reported
+  // "Name your account — Personal doesn't get prefilled sometimes".
+  const [name, setName] = useState('Personal');
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -31,7 +37,7 @@ export default function OnboardingAccount() {
   // user has already typed if it resolves late.
   useEffect(() => {
     if (!activeAccount || touched) return;
-    setName(activeAccount.name ?? '');
+    setName(activeAccount.name || 'Personal');
     setColor(activeAccount.color ?? CATEGORY_COLORS[0]);
   }, [activeAccount, touched]);
 

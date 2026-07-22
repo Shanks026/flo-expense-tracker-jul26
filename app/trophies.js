@@ -39,6 +39,10 @@ import {
   PLANNER_BADGE_ART_LOCKED,
   BUDGET_BADGE_ART,
   BUDGET_BADGE_ART_LOCKED,
+  FRESH_START_BADGE_ART,
+  FRESH_START_BADGE_ART_LOCKED,
+  FRUGAL_BADGE_ART,
+  FRUGAL_BADGE_ART_LOCKED,
 } from '../lib/trophies';
 import { getTheme } from '../lib/cardThemes';
 import { RANKS, RANK_BADGE_ART, RANK_BADGE_ART_LOCKED } from '../lib/rewards';
@@ -71,6 +75,10 @@ function trophyBadgeArt(groupId, t) {
       return t.earned ? PLANNER_BADGE_ART[t.tier] : PLANNER_BADGE_ART_LOCKED[t.tier];
     case 'budget_keeper':
       return t.earned ? BUDGET_BADGE_ART[t.tier] : BUDGET_BADGE_ART_LOCKED[t.tier];
+    case 'fresh_start':
+      return t.earned ? FRESH_START_BADGE_ART : FRESH_START_BADGE_ART_LOCKED;
+    case 'frugal':
+      return t.earned ? FRUGAL_BADGE_ART[t.tier] : FRUGAL_BADGE_ART_LOCKED[t.tier];
     default:
       return null;
   }

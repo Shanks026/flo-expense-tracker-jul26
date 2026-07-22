@@ -123,6 +123,25 @@ SECURITY DEFINER, fixed by `fix_views_security_invoker`). Run the security
 advisor immediately after any view-recreating migration and treat any new
 `security_definer_view` ERROR as a stop-everything blocker.
 
+**Standing rule — `user_id` FKs to `auth.users` must be `ON DELETE CASCADE`**
+(caught again 2026-07-22 — this is the SAME class of gap `cascade_delete_user_data`
+fixed once already for `accounts`, just re-caught two tables later): every
+table's `user_id` FK must cascade, or `delete_current_user()` (and the
+in-app "Delete Everything" flow that calls it) fails with a real foreign-key
+violation for any account holding a row in the un-cascaded table — a `NO
+ACTION`/`RESTRICT` FK is Postgres's own default when a `CREATE TABLE`'s FK
+clause omits `ON DELETE`, so this silently regresses every time a **new**
+table is added without copying the pattern, not just once. Found live: real
+accounts (`themusicaldude90@gmail.com`, `test@gmail.com`) with rows in
+`push_tokens` (`17-server-push-notifications.md`) and `reminder_sends`
+(`05-koban-engagement.md`) — both added well after `cascade_delete_user_data`
+ran, both created with the Postgres default, neither ever re-checked. Fixed
+by `fix_missing_cascade_deletes` (below). When adding any new table with a
+`user_id` FK, verify its `confdeltype` is `c` (cascade) via `pg_constraint`
+before considering the feature done — `information_schema.columns` (the
+check the `user_id DEFAULT` rule above already recommends) doesn't surface
+this; you need `pg_constraint.confdeltype` specifically.
+
 ---
 
 ## Foundation
@@ -162,6 +181,8 @@ data model.
 | 23 | `23-personalize-hub.md` | One "Personalize" screen (draft accent + appearance + card theme, previewed live against a miniature Home clone) replacing Settings' separate Primary Color/Appearance rows; a single Equip commits all three at once. | ✅ **Phase 1 built**, on-device pending. No DB changes — reads/writes existing `profiles.theme_accent`/`theme_mode`/`equipped_card_theme` fields, just moved from immediate-apply to draft-then-Equip. New `app/personalize.js` + `components/PersonalizePreview.js` (a scaled-down real clone of Home, not a redesigned mini layout). `components/Button.js`'s base `borderRadius` changed app-wide (16→pill) as a side effect of this pass. |
 | 24 | `24-achievement-celebration.md` | An auto-triggered, two-stage "New Achievement Unlocked!" → tap Claim Now → reward-reveal-with-confetti dialog for trophies, reusing Shop's own bought-dialog layout for themed rewards; manual Claim stays as the catch-up path for a missed celebration. | 📋 **Planned, not yet built** — session moved on to other trophy/rank work before implementation started. |
 | 25 | `25-rewards-hub-sheet.md` | Expanded `RewardsHistorySheet` (opened from Home's header coins/freeze/level chip) into a full Rewards hub: Coins (+ what they buy + a Buy button deep-linking to Shop's General tab), Freeze (existing buy flow + explainer), and a new XP/Level/Rank section with a computed rank ladder showing which level each rank starts at. Menu sheet's old level card removed (moved here). | ✅ **Phase 1 built** (2026-07-21), Babel-verified; on-device pending. No DB changes. `app/shop.js` gained an optional `?tab=general` route param (default Cards unchanged for every other entry point). Sheet's `BottomSheetFlatList` restructured to use `ListHeaderComponent`/`ListEmptyComponent` (was fixed-content-above-a-conditionally-rendered-list) so the new sections always show regardless of ledger length, and `snapPoints` bumped 70%→92% for the extra content. |
+| 27 | `27-rank-ladder-rework.md` (+ `FINDINGS-rank-ladder-rollout.md`) | Rank ladder rework: retuned the 9-rank XP curve to be reachable in ~3 yrs (was ~7), milestones now grant XP (the burst source rank was missing), renamed 6 ranks around mastery not wealth, and gave ranks a reward — a card theme at 3 ranks + a freeze cap that scales 5→7. **No DB changes.** | ✅ **Both phases built** (2026-07-22), assertion-verified; on-device pending. **Findings fixed 2026-07-22** (`FINDINGS-rank-ladder-rollout.md`): dropped the day-1 spin wheel; Saver now celebrates (the silent first-ever branch removed) and `RankUpCelebration` defers to `RewardBurst`; ledger (`RewardsHistorySheet`) shows theme/rank/trophy/spin labels + reward detail; fixed the duplicate "Level 1" ladder rows; hardened `updateProfile` to detect zero-row writes (was replaying the celebration after reinstall). Ocean Deep moved from the removed day-1 spin to Saver's rank reward. Rank badge art reworked (animal-form medals) then reverted to the originals per the user; Frugal + Fresh Start trophy badge art wired. |
+| 28 | `28-onboarding-welcome-bundle.md` | New-user **welcome bundle** (3,000 coins + 2 freezes + the Glitch card, one-time at onboarding completion) + a post-onboarding **"Know your space" tour** (10 image-cards: Home/Transactions/Add/Analytics/Menu/Budgets/Plans/Bills/Coins-Freezes-XP/Make-it-yours) ending on a dedicated welcome-bundle reveal, then the "You're set" done screen. Softens the stingy first-session economy (churn risk) and teaches navigation. | 🚧 **Both phases built** (2026-07-22), Babel-verified; **on-device pending, tour images are placeholders**. One migration (`add_profiles_tour_seen_at`) — but that column ended up **unused** (the tour moved into onboarding, gated by `onboarded_at`; the flag was for an abandoned overlay approach). `claimWelcomeBundle()` in `lib/rewardsMutations.js`; `WELCOME_BUNDLE` in `lib/rewards.js`; new `components/TourScreen.js`, `app/onboarding/tour/[step].js`, `app/onboarding/welcome-bundle.js`; `done.js` reworked (white bg). Celebration sequencing settled: day-1 streak fires immediately, Saver rank on Home, bundle on its own screen — never stacked. **Needs `npx expo start -c`** (new route dir). A DELIBERATE, bounded exception to "ranks never pay" / "coins stay scarce" — see `WELCOME_BUNDLE`'s comment. |
 
 ---
 
@@ -174,7 +195,7 @@ migration files exist). Keep this in sync as feature files land.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at`, `onboarded_at`, `onboarding_answers` | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. **`onboarding_answers`** (jsonb, nullable, added 2026-07-14, `12-personal-onboarding.md`): `{ age_range, goal, leak_category, tracking_habit, commitment }` — a bag for personalisation + future callbacks, not filtered on in SQL. **Income is deliberately never stored anywhere** — it lives only in the pre-auth AsyncStorage draft and sizes the first budget before being cleared. |
+| `profiles` | `id` (=`auth.users.id`), `full_name`, `currency` (default `'INR'`), `avatar_url`, `created_at`, `onboarded_at`, `onboarding_answers`, `tour_seen_at` (+ theme/reminder/report columns not all listed here) | `avatar_url` + the `avatars` storage bucket exist in code (`EditProfileSheet.js`) but aren't in `FEATURE_PLAN.md`'s original data model — added ad hoc during Phase 5, undocumented until now. **`avatar_url` stores the storage object *path* (`{user_id}/avatar.jpg`), not a URL** (since the bucket went private, 2026-07-11) — read it through a signed URL, don't render it directly. **`onboarding_answers`** (jsonb, nullable, added 2026-07-14, `12-personal-onboarding.md`): `{ age_range, goal, leak_category, tracking_habit, commitment }` — a bag for personalisation + future callbacks, not filtered on in SQL. **Income is deliberately never stored anywhere** — it lives only in the pre-auth AsyncStorage draft and sizes the first budget before being cleared. **`tour_seen_at`** (timestamptz, nullable, added 2026-07-22, `28-onboarding-welcome-bundle.md`, migration `add_profiles_tour_seen_at`, existing rows backfilled to `now()`) — **currently UNUSED**: added for an abandoned root-overlay tour; the tour ultimately became the final onboarding steps, gated by `onboarded_at`. Left in place (harmless); safe to drop or repurpose. |
 | `categories` | `id`, `user_id`, `name`, `icon`, `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `type` (`'income'`\|`'expense'`), `is_default` | Seeded on signup: Food, Travel, Shopping, Bills, Coffee, Groceries, Other (expense); Salary, Freelance, Other (income) — 10 rows, each with a curated `color` (see `add_category_colors` migration below). `color` added 2026-07-11; picked via a curated swatch grid in `AddCategorySheet.js`, currently consumed only by Analytics (not tinted elsewhere in the app). **Global — not scoped by account, shared across all of a user's accounts.** |
 | `accounts` | `id`, `user_id`, `name`, `description` (nullable), `color` (text, hex, `NOT NULL DEFAULT '#BBDC12'`), `created_at` | Added 2026-07-11 (`add_accounts` migration, `02-accounts.md` Phase 1). Every user always has ≥1 account; `handle_new_user` auto-creates a "Personal" account on signup. Active account is client-side state (`lib/AccountContext.js`), persisted to AsyncStorage — not itself a DB concept. |
 | `transactions` | `id`, `user_id`, `account_id` (NOT NULL, added 2026-07-11), `type` (`'income'`\|`'expense'`\|`'transfer_in'`\|`'transfer_out'`), `amount` (always positive), `category_id`, `plan_id`, `note`, `occurred_at` (date), `created_at`, `transfer_id` (uuid, nullable), `transfer_account_id` (uuid, nullable, FK → `accounts` ON DELETE SET NULL) | The single source of truth — every summary is computed from this table. **`transfer_in`/`transfer_out` added 2026-07-14** (`10-account-self-transfer.md`): a self-transfer is two rows sharing a `transfer_id`, each carrying the counterpart account in `transfer_account_id`. They move per-account balance (`v_global_summary`) but are excluded from every spent/earned total, budget, plan, analytics fn, and the streak — **because those all filter on the exact type string `'income'`/`'expense'`**. Any NEW aggregation must keep that exact-type discipline, or it will accidentally count transfers. |
@@ -224,6 +245,8 @@ Supabase performance advisor flags.
 | 2026-07-13 | `add_profiles_onboarded_at` | Added `profiles.onboarded_at` (nullable timestamptz, no default) — the first-run onboarding flag (`07-onboarding.md` Phase 1). NULL = hasn't finished onboarding; `OnboardingGate` in `app/_layout.js` reads it. **Backfilled every existing row to `now()`** so no existing user is dragged through the flow — the flag only fires for signups created after this migration. `handle_new_user` deliberately **not** changed: it inserts only `(id, full_name)`, so new profiles get NULL and onboard for free. |
 | 2026-07-14 | `add_profiles_onboarding_answers` | `12-personal-onboarding.md` Phase 1. Added `profiles.onboarding_answers` (nullable jsonb, no default). NULL until a user finishes the v2 pre-auth intro; both existing profiles confirmed NULL and already onboarded, so neither is dragged into the flow. No view recreated → no `security_invoker` step. Advisor clean (only the 2 pre-existing WARNs) both immediately after and after Phases 2–3. |
 | 2026-07-11 | `fix_user_delete_trigger_storage_guard` | Critical follow-up: `storage.objects` has a `protect_objects_delete` BEFORE-DELETE trigger that rejects any direct delete unless the session GUC `storage.allow_delete_query = 'true'`. `handle_user_delete()` was doing a direct delete, so it would have raised `42501` and **blocked** every auth-user deletion. Fixed by `perform set_config('storage.allow_delete_query','true',true)` before the delete. **Standing rule**: any DB code that deletes from `storage.objects` directly must set this GUC transaction-locally first, or use the Storage API instead. |
+| 2026-07-22 | `fix_missing_cascade_deletes` | Found live: "Delete Everything" (`delete_current_user()`) failed with a foreign-key violation for `themusicaldude90@gmail.com` and `test@gmail.com` specifically. Root cause: `push_tokens.user_id` and `reminder_sends.user_id` both had `ON DELETE NO ACTION` (Postgres's default when a `CREATE TABLE`'s FK omits `ON DELETE` — neither table's original migration set it), unlike every other `user_id` FK in the schema. Both accounts had rows in one or both tables (push tokens registered, reminder sends logged), so deleting `auth.users` for them hit the constraint. Fixed by dropping and re-adding both FKs with `ON DELETE CASCADE`. Verified live via `pg_constraint.confdeltype` (`'c'` for both, confirmed after) and a clean security advisor run (only the 4 pre-existing WARNs — `pg_net` in public, the two intentional `SECURITY DEFINER` RPCs, leaked-password-protection). See the new standing rule above. |
+| 2026-07-22 | `add_profiles_tour_seen_at` | `28-onboarding-welcome-bundle.md`. Added `profiles.tour_seen_at` (nullable timestamptz, no default) + backfilled every existing row to `now()`. `handle_new_user` NOT changed (new signups get NULL). Was intended to gate an abandoned root-overlay tour; the tour became the final onboarding steps instead (gated by `onboarded_at`), so **this column is currently unused** — left in place, harmless, safe to drop later. No view recreated → no `security_invoker` step. |
 
 **Still open, not fixed**: Security advisor flags leaked-password-protection
 as disabled (Auth setting, not schema — toggle in Supabase dashboard under
@@ -249,6 +272,23 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   so white is convention not requirement) was verified via `npx expo prebuild
   --platform android --clean`, confirming Expo generated all five density
   variants (`mdpi`–`xxxhdpi`) under `android/app/src/main/res/drawable-*/`.
+  **That verification only checked that the files existed, not that the
+  glyph matched** — found live 2026-07-22: the notification icon was a
+  visibly different vector (a plain 2-point checkmark/"V") from the real
+  3-point zigzag in `icon.png`/`adaptive-icon.png`, confirmed by compositing
+  the transparent PNG onto a solid background to actually see the white
+  glyph (invisible against a white canvas otherwise). Root cause unclear
+  (likely regenerated from a stale/wrong reference at some point after the
+  revamp — its content hash did change again in `6678db0`, 2026-07-20, the
+  same commit that touched `icon.png`, but apparently from a different
+  source). **Fixed**: regenerated `assets/notification-icon.png` directly
+  from `adaptive-icon.png`'s own alpha-masked glyph (already a clean white-
+  on-transparent-equivalent source — same shape, just black — so no manual
+  redraw), area-averaged down to 96×96 for clean anti-aliasing. Since this
+  only changes the checked-in source asset, **a fresh `npx expo prebuild`
+  is still required** before a rebuilt install shows the correct icon (see
+  the separate stale-`android/`-project note below/this same investigation)
+  — don't assume editing the source alone is sufficient to see it on-device.
   One real near-miss caught in this pass: the app icon file was briefly
   renamed `Icon.png` (capital I) — harmless on Windows' case-insensitive
   filesystem, but would have broken silently on EAS Build's case-sensitive
@@ -541,16 +581,67 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   Cancel, with inline loading + error). **Log Out** moved out of Settings to
   the `MenuSheet` (Home header menu); Settings' destructive action is now
   Delete Account only.
+- **Auto-logout on a server-side-deleted account** (`AuthContext.verifyUser`,
+  added 2026-07-22) — if an account's `auth.users` row is deleted straight
+  from the DB (or another device) while this device holds a live session, the
+  locally-stored JWT keeps working until it expires (~1h): RLS-filtered reads
+  just return empty (the user's rows cascade-deleted), so nothing errors on its
+  own and the app sits in a broken empty state. `verifyUser()` calls
+  `supabase.auth.getUser()` (validates the token against the auth server, which
+  returns 401/403 `user_not_found` the moment the user is gone — unlike
+  `getSession()`, which only reads local storage) and, on a **definitive 401/403
+  only** (never a network/5xx error — that would sign people out on a flaky
+  connection), does `signOut({ scope: 'local' })`. Triggered from three places:
+  cold start (a restored session may belong to an account deleted while the app
+  was closed), app foreground (`AppState` → `active`, catches deletion while
+  backgrounded), and `useProfile.refetch` when a live session's profile comes
+  back **null** (the profiles row cascade-deletes with `auth.users`, so a null
+  profile for a signed-in user is the in-session signal — `verifyUser` tells the
+  deletion case apart from the brief post-signup `handle_new_user` race, since
+  `getUser` succeeds for a user that merely hasn't had its profile row inserted
+  yet). Exposed on the auth context so any future data path that sees the same
+  signal can call it. Logout then flows exactly like a normal one — null session
+  → `RootNavigator` → sign-in, and every user-scoped cache resets on the
+  `userId` change.
 - **Signed avatar URLs** — the `avatars` bucket is private, so avatars are
   never rendered from a stored URL. `useProfile` returns `avatarUrl` (a 24h
   signed URL freshly generated from `profiles.avatar_url`'s path on every
   refetch) alongside `profile`. Any screen showing an avatar consumes
   `avatarUrl`, not `profile.avatar_url`. `EditProfileSheet` uploads to the
   fixed path and saves that path (not a URL) to `profiles.avatar_url`.
-- **Google Sign-In** — `AuthContext.signInWithGoogle` is fully implemented
-  (`expo-auth-session`/`expo-web-browser`/`expo-linking`) but the UI button
-  in `sign-in.js` is currently disabled/unreachable, per `FEATURE_PLAN.md`'s
-  v1 default of email/password only.
+- **Google Sign-In** — the note that used to live here ("button disabled/
+  unreachable") was stale: `sign-in.js`'s Google button is live and wired to
+  `AuthContext.signInWithGoogle`. **It was silently broken until fixed
+  2026-07-22** — found live: "opens a browser, asks to choose account, upon
+  confirm, comes back to the app but stuck in login screen, no message."
+  Root cause: `lib/supabase.js`'s `createClient` never set `flowType`, so
+  `@supabase/auth-js` (v2.110.2) ran Google OAuth under its actual default,
+  `'implicit'` — the redirect carries `access_token`/`refresh_token` in the
+  URL's **hash fragment**, not a `code` query param, while
+  `signInWithGoogle` only ever checked `Linking.parse(result.url).queryParams
+  ?.code` (`expo-linking`'s parser doesn't read the fragment at all). The
+  browser closed, the deep link fired, there was nothing there to act on —
+  no exception, so no error surfaced either. **Fixed** in
+  `AuthContext.signInWithGoogle`: it now parses the callback with
+  `expo-auth-session/build/QueryParams`'s `getQueryParams` (merges query +
+  hash fragment) and handles either shape (`access_token`+`refresh_token` via
+  `setSession`, or `code` via `exchangeCodeForSession`) rather than assuming
+  one, and throws a real error if a "success" browser result carries neither —
+  so a genuine failure is no longer silent. Any future OAuth provider added
+  the same way should route through this same parsing, not re-add a
+  `Linking.parse` call. **PKCE was briefly tried and reverted** (same day):
+  `flowType: 'pkce'` derives its code challenge with SHA-256, which needs the
+  WebCrypto API (`crypto.subtle`) — **React Native doesn't have it** (the
+  `react-native-get-random-values` polyfill provides only
+  `crypto.getRandomValues`), so `@supabase/auth-js` fell back to the `plain`
+  challenge method and logged *"WebCrypto API is not supported. Code challenge
+  method will default to use plain instead of sha256"* on every launch.
+  `plain` gives up most of PKCE's benefit, so PKCE bought nothing here — the
+  client stays on the default **implicit** flow, and the `getQueryParams`
+  parsing above (which reads the hash-fragment tokens implicit returns) is
+  what actually makes Google sign-in work. **Don't re-enable PKCE** unless a
+  real WebCrypto/SHA-256 polyfill is added first, or it just re-introduces the
+  warning with no gain.
 - **Known gap**: Settings → Currency row is static text ("₹ INR"), not
   wired to `profiles.currency` despite the column existing. Not yet
   scheduled as a feature file.

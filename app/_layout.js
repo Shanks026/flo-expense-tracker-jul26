@@ -157,6 +157,14 @@ function OnboardingGate() {
 
     const inOnboarding = segments[0] === 'onboarding';
     const onSignIn = segments[0] === 'sign-in';
+    // The tour's "Make it yours" card (28-onboarding-welcome-bundle.md Phase 2)
+    // deep-links to the REAL Personalize / Manage-Categories screens, which
+    // live OUTSIDE /onboarding. Without allowing them, this gate would see a
+    // not-yet-onboarded user on a non-onboarding route and yank them back to
+    // /onboarding/account, breaking the detour (and losing tour progress).
+    // Backing out of either returns to the tour card (an /onboarding route),
+    // where the normal rule resumes.
+    const onTourDetour = segments[0] === 'personalize' || segments[0] === 'manage-categories';
 
     // This gate — not RootNavigator — owns where an authenticated user lands.
     // RootNavigator only knows about `session`, so if it sent signed-in users
@@ -166,8 +174,9 @@ function OnboardingGate() {
     // loaded, is the only way to avoid that flash.
     if (!onboardedAt) {
       // Post-auth resume point is Act 2's first step — a signed-in user is
-      // already past the pre-auth intro (12-personal-onboarding.md).
-      if (!inOnboarding) router.replace('/onboarding/account');
+      // already past the pre-auth intro (12-personal-onboarding.md). The tour
+      // detour routes (Personalize / Manage-Categories) are allowed through.
+      if (!inOnboarding && !onTourDetour) router.replace('/onboarding/account');
     } else if (inOnboarding || onSignIn) {
       router.replace('/');
     }

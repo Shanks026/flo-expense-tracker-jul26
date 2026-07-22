@@ -91,6 +91,16 @@ export default function StreakCelebration() {
       return;
     }
     if (!session || !userId || loading || !loggedToday) return;
+    // The day-1 streak celebration is DELIBERATELY allowed to fire during
+    // onboarding (28-onboarding-welcome-bundle.md, direct decision): onboarding's
+    // balance.js/expense.js insert a real transaction, and the user wants the
+    // streak moment to land right after that action — so this is NOT gated on
+    // onboarded_at. It fires once, at whichever point the first transaction
+    // happens: during onboarding if they log there, or later on Home (via the
+    // Add sheet) if they skipped those steps. The AsyncStorage "already
+    // celebrated today" key below is what stops it re-showing. (The RANK
+    // celebration is the opposite — it DOES wait for onboarded_at, so the
+    // Saver reward lands on Home, not mid-onboarding.)
     if (!worthCelebrating) return;
     // Ordering fix (18-gamification-ritual-and-ledger.md Phase 3, found on-
     // device): this is a full-screen Modal, which renders in its own native
