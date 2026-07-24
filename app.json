@@ -62,8 +62,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow FLO to access your photos to attach a receipt.",
-          "cameraPermission": "Allow FLO to use your camera to scan a receipt.",
+          "photosPermission": "Allow FLO to access your photos to set a profile picture.",
           "microphonePermission": false
         }
       ]

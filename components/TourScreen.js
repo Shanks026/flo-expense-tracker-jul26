@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from './Button';
 import OnboardingReveal from './OnboardingReveal';
@@ -17,7 +17,12 @@ import { colors, spacing, radii, fontFamily, fontSize } from '../theme/tokens';
 // `image` is optional and null for now — real screenshots get dropped in
 // later (like the badge art). Until then the placeholder box shows the
 // section's icon so it reads as intentional, not broken. When images arrive,
-// pass a require()'d source and it renders in place of the placeholder.
+// pass a require()'d source and it renders in place of the placeholder
+// (resizeMode="cover", so it crops-to-fill rather than needing an exact
+// pixel match — the box's real height is FLEX-DETERMINED, not fixed, since
+// it fills whatever space is left after the text/CTA below it, which varies
+// per card (the currency and hub cards have more content underneath) and per
+// device height. See the export-size guidance in the image asset brief.
 export default function TourScreen({
   progress, // 0..1
   stepLabel, // e.g. "3 of 6"
@@ -43,11 +48,17 @@ export default function TourScreen({
         {stepLabel ? <Text style={styles.stepLabel}>{stepLabel}</Text> : null}
       </View>
 
-      {/* Top ~2/3: the screen preview (placeholder for now). */}
+      {/* Top ~2/3: the screen preview (placeholder until real images land). */}
       <View style={styles.imageWrap}>
         <View style={styles.placeholder}>
-          {Icon ? <Icon size={64} color={colors.income} strokeWidth={1.8} /> : null}
-          <Text style={styles.placeholderHint}>Preview</Text>
+          {image ? (
+            <Image source={image} style={styles.previewImage} resizeMode="cover" />
+          ) : (
+            <>
+              {Icon ? <Icon size={64} color={colors.income} strokeWidth={1.8} /> : null}
+              <Text style={styles.placeholderHint}>Preview</Text>
+            </>
+          )}
         </View>
       </View>
 
@@ -120,6 +131,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
+    // Needed for the real <Image> below — without it, a cover-resized image
+    // would paint square corners over this box's own rounded ones.
+    overflow: 'hidden',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
   },
   placeholderHint: {
     fontFamily: fontFamily.bold,

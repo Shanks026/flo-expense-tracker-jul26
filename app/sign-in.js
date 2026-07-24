@@ -19,7 +19,7 @@ import ArrowMark from '../components/ArrowMark';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { resolveColors, DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { useAuth } from '../lib/AuthContext';
-import { getDraft } from '../lib/onboardingDraft';
+import { getDraft, clearDraft } from '../lib/onboardingDraft';
 
 // The hinge (12-personal-onboarding.md screen 13): the pre-auth intro already
 // asked for a name (screen 4), so a user arriving here with a drafted name
@@ -75,6 +75,7 @@ export default function SignIn() {
       if (isSignUp) {
         const fullName = draftName || `${firstName.trim()} ${lastName.trim()}`.trim();
         await signUp(email.trim(), password, fullName);
+        await discardStaleDraftIfBypassed();
       } else {
         await signIn(email.trim(), password);
       }
@@ -82,6 +83,27 @@ export default function SignIn() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // The pre-auth draft (lib/onboardingDraft.js) is device-scoped, not
+  // user-scoped, and only ever cleared by finish() — so it happily survives an
+  // ABANDONED signup (account deleted, or the app just closed mid-intro).
+  // `?mode=signup` is passed to THIS screen only by reflection.js's legitimate
+  // intro→signup handoff (grep-verified: no other caller sets it) — every
+  // other arrival at sign-up here (RootNavigator's plain `/sign-in` redirect,
+  // once `introSeen` is already true, with its own "Sign Up" toggle) bypassed
+  // the intro entirely. For that bypass case, whatever's in the draft belongs
+  // to a DIFFERENT, unrelated attempt — left uncleared, it silently leaks into
+  // this new account: `budget.js` (Act 2) would create a budget from a leak
+  // category this user never actually chose. Clearing here, right after a
+  // successful signup, closes that gap without touching the legitimate path
+  // (mode === 'signup'), which still needs the draft intact for account.js's
+  // durable-answer flush. Found live — reported as "the created-budget screen
+  // shows even though a budget wasn't created".
+  async function discardStaleDraftIfBypassed() {
+    if (params.mode !== 'signup') {
+      await clearDraft();
     }
   }
 
@@ -94,6 +116,10 @@ export default function SignIn() {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
+      // Same bypass gap as email signup above — a NEW Google account also
+      // never passes through the intro's leak.js, so a stale draft from an
+      // unrelated attempt must not leak into it either.
+      await discardStaleDraftIfBypassed();
     } catch (err) {
       setError(err.message);
     } finally {

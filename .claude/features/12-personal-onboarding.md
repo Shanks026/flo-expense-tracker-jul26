@@ -85,7 +85,7 @@ sign-up. So the gate inverts to three states:
 |---|---|---|
 | Name — "what should we call you?" | Passed as `user_metadata.full_name` at sign-up → `handle_new_user` writes it to `profiles.full_name`. Greets by name throughout. | `profiles.full_name` (existing) |
 | Age range | Selects which aha-stat variant shows (screen 7); stored for later callbacks | `profiles.onboarding_answers.age_range` |
-| Income band | **Sizes the real budget** built in Act 2 (screen 17). Used in-session only. | **No — never stored** (user's explicit call: "should not store the revenue data") |
+| Income band | **Sizes the real budget** built in Act 2 (screen 17). | ⚠️ **Reversed 2026-07-22** — was "never stored" (user's original call), now **persisted** to `onboarding_answers.income_band` as a coarse band for personalisation/analytics; the income screen's "we never store this" badge was reworded to match. See `28-onboarding-welcome-bundle.md`. |
 | Goal — "what do you want from this?" | Frames the streak explainer + the journey screen (20) + future callbacks | `onboarding_answers.goal` |
 | Leak — "where does it quietly leak?" | **Pre-creates a real budget** in that category (screen 17) | `onboarding_answers.leak_category` |
 | Tracking habit — "how often do you check today?" | Sets the nightly-reminder default + framing on the reminders step (19) | `onboarding_answers.tracking_habit` |

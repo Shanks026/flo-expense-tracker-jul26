@@ -8,9 +8,13 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../../../theme/tok
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
 
-// Screen 6 — income band. Used ONLY in-session to size the first budget (Act 2).
-// Never stored (the "we never store this" badge is literally true — the Phase 2
-// flush whitelists the durable keys and omits income_band).
+// Screen 6 — income band. Sizes the first budget (Act 2) AND is now persisted
+// to profiles.onboarding_answers for later personalisation/analytics (decision
+// 2026-07-22, reversing the earlier "never stored" call). It's a coarse BAND,
+// not an exact figure, in the user's own RLS-protected row — low sensitivity,
+// far less than the transaction ledger already stored. The badge copy below no
+// longer claims "we never store this" (it would be a lie now); it reassures
+// without over-claiming. `income_band` is in DURABLE_KEYS (lib/onboardingDraft.js).
 const OPTIONS = [
   { key: 'lt_30k', label: 'Under ₹30k' },
   { key: '30_75k', label: '₹30k – 75k' },
@@ -43,7 +47,7 @@ export default function Income() {
     >
       <View style={styles.badge}>
         <Lock size={14} color={colors.income} strokeWidth={2.5} />
-        <Text style={styles.badgeText}>We never store this. It just helps us size your first budget.</Text>
+        <Text style={styles.badgeText}>Private to you. Helps size your first budget and tailor your experience.</Text>
       </View>
       <ChoiceList options={OPTIONS} value={value} onChange={setValue} />
     </OnboardingScreen>

@@ -177,7 +177,13 @@ export default function StreakCelebration() {
   return (
     <>
     {visible && contentRef.current && (
-    <Modal visible={visible} animationType="fade" onRequestClose={handleCelebrationDismiss}>
+    /* statusBarTranslucent — without it, Android doesn't draw this Modal's
+       window edge-to-edge: it leaves a gap at the very top (and bottom)
+       where the screen BEHIND shows through — here, specifically, the
+       onboarding screen underneath (its own progress bar at top, its
+       "I'll do this later" link at the bottom), since day-1's streak
+       celebration fires mid-onboarding by design. Found live. */
+    <Modal visible={visible} statusBarTranslucent animationType="fade" onRequestClose={handleCelebrationDismiss}>
       <View style={styles.screen}>
         <Confetti />
         {/* Content centers in the space ABOVE the button (per direct

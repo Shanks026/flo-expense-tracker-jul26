@@ -113,6 +113,12 @@ export default function OnboardingBalance() {
               identical spacer — keeps the digits centred under the label. */}
           <View style={styles.currencySlot} />
         </View>
+        {/* Clarifies the WHY behind this screen's own mechanics — the row
+            inserted on save (see handleSave) is a real `type: 'income'`
+            transaction, same as any other income entry, not a separate
+            "starting balance" concept. Per direct feedback: the user should
+            know that going in, not discover it later on Transactions. */}
+        <Text style={styles.recordedAs}>This will be recorded as income.</Text>
         <Text style={styles.hint}>This becomes your starting point - we'll track everything from here.</Text>
       </View>
     </OnboardingScreen>
@@ -168,12 +174,19 @@ const styles = StyleSheet.create({
     color: colors.ink,
     padding: 0,
   },
+  recordedAs: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.income,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
   hint: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
     color: colors.mutedLight,
     textAlign: 'center',
-    marginTop: spacing.xl,
+    marginTop: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
 });

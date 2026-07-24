@@ -147,7 +147,10 @@ export default function RankUpCelebration() {
   const shownRank = contentRef.current;
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={() => setVisible(false)}>
+    /* statusBarTranslucent — same fix as StreakCelebration's identical Modal
+       pattern: without it, Android leaves the screen behind visible through
+       a gap at the top/bottom edges instead of this covering edge-to-edge. */
+    <Modal visible={visible} statusBarTranslucent animationType="fade" onRequestClose={() => setVisible(false)}>
       <View style={styles.screen}>
         <Confetti />
         {/* Content centers in the space ABOVE the button (per direct

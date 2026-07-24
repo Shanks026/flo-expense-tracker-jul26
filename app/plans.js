@@ -134,8 +134,8 @@ export default function Plans() {
                   <Card style={styles.planCard}>
                     <View style={styles.rowBetween}>
                       <View style={styles.rowLeft}>
-                        <IconTile tone="neutral" size={44} radius={13}>
-                          <Flag size={21} color={colors.ink} strokeWidth={2} />
+                        <IconTile tone="brandSolid" size={44} radius={13}>
+                          <Flag size={21} color={colors.ink} fill={colors.ink} strokeWidth={2} />
                         </IconTile>
                         <View>
                           <Text style={styles.planName}>{plan.name}</Text>
@@ -158,8 +158,8 @@ export default function Plans() {
                 <Card dark style={styles.planCard}>
                   <View style={styles.rowBetween}>
                     <View style={styles.rowLeft}>
-                      <IconTile tone="brand" onDark size={44} radius={13}>
-                        <Flag size={21} color={colors.brand} strokeWidth={2} />
+                      <IconTile tone="brandSolid" size={44} radius={13}>
+                        <Flag size={21} color={colors.ink} fill={colors.ink} strokeWidth={2} />
                       </IconTile>
                       <View>
                         <Text style={styles.planNameDark}>{plan.name}</Text>

@@ -161,9 +161,10 @@ see Data Model. Not dropped; harmless.)
 
 ### Goal
 
-Insert a short guided tour as the final onboarding steps (after `commitment`,
-before `done`), so a new user learns where things are *before* the done-screen
-reward. No overlay, no new flag — its own sub-flow like `INTRO_STEPS`.
+Insert a short guided tour as the final onboarding steps (after the last setup
+step — now `journey`, since `commitment` was trimmed; see the Onboarding trim
+note below — before `done`), so a new user learns where things are *before* the
+done-screen reward. No overlay, no new flag — its own sub-flow like `INTRO_STEPS`.
 
 ### As built (expanded 2026-07-22 per follow-up feedback)
 
@@ -172,9 +173,9 @@ reward. No overlay, no new flag — its own sub-flow like `INTRO_STEPS`.
   10-step bar) plus `TOUR_START_ROUTE`, `BUNDLE_ROUTE`, `getTourStep`,
   `getTourPosition`, `getTourNext`. **Ten cards**: Home, Transactions, Add,
   Analytics, Menu, **Budgets, Plans, Bills** (each its own card, per feedback),
-  **Coins/freezes/XP** (one segmented card), Make-it-yours. `commitment.js`
-  routes to `TOUR_START_ROUTE`; the last card + any "Skip tour" route to
-  `BUNDLE_ROUTE`.
+  **Coins/freezes/XP** (one segmented card), Make-it-yours. The last setup step
+  (`journey`) routes into the tour via `getNextRoute`; the last tour card + any
+  "Skip tour" route to `BUNDLE_ROUTE`.
 - **`components/TourScreen.js`** — card layout: image placeholder in the top
   ~2/3 (`chipBg` box, section icon + "Preview" until real screenshots drop in —
   pass a `require()`'d `image` later), then a **"Quick Tour" eyebrow** + title +
@@ -195,7 +196,7 @@ reward. No overlay, no new flag — its own sub-flow like `INTRO_STEPS`.
 - **`app/_layout.js` `OnboardingGate`** — allowlisted `personalize` /
   `manage-categories` as tour "detour" routes.
 
-**Full new-user flow now:** `…commitment → tour (Home · Transactions · Add ·
+**Full new-user flow now:** `…journey → tour (Home · Transactions · Add ·
 Analytics · Menu · Budgets · Plans · Bills · Coins/Freezes/XP · Make-it-yours)
 → welcome-bundle reveal → done → Home (Saver celebration)`. Skipping the tour
 jumps to the welcome-bundle reveal (never skips the reward), then done.
@@ -204,6 +205,31 @@ jumps to the welcome-bundle reveal (never skips the reward), then done.
 are ONE segmented card (three rows), not three screens — chosen to keep an
 already-longer tour from ballooning. Budgets/Plans/Bills ARE separate cards
 (explicit feedback).
+
+**Onboarding trim (2026-07-22, same revamp).** To offset the tour lengthening
+the flow, three existing screens were removed (user's call):
+- **`intro/gender`** + **`intro/stat`** — gender only fed stat's tailored line;
+  stat was the "aha" reveal. Both deleted; `age`/`income` kept.
+
+**Income now stored (2026-07-22, follow-up decision).** Reversing the earlier
+"income is deliberately never stored" invariant: `income_band` was added to
+`DURABLE_KEYS` (`lib/onboardingDraft.js`), so it flushes to
+`profiles.onboarding_answers` alongside the other durable answers. It's a
+coarse BAND (4 buckets), not an exact figure, in the user's own RLS-protected
+row — low sensitivity, less than the transaction ledger already stored. The
+income screen's lock badge, which read *"We never store this,"* was reworded to
+*"Private to you. Helps size your first budget and tailor your experience."* —
+storing it while keeping the old copy would have made the app lie on a privacy
+screen (that trust cost, not the band's sensitivity, was the real issue). `name`
+remains the only never-persisted intro answer (rides in via signup metadata).
+- **`commitment`** — the "you're about to…" `journey` screen reads as the end,
+  so a question after it was cut. `commitment` had no reader anyway (its
+  Koban-tone consumer was removed 2026-07-19). `journey` is now the last STEP;
+  `getNextRoute`'s fallback now returns `TOUR_START_ROUTE` (was `DONE_ROUTE`,
+  with `commitment` hardcoding the tour) so the last step routes into the tour
+  centrally. `commitment` dropped from `DURABLE_KEYS`. Files deleted:
+  `app/onboarding/intro/gender.js`, `intro/stat.js`, `commitment.js`. Verified
+  no dangling refs (grep). `CountUp` (was stat's) still used elsewhere — kept.
 
 **⚠️ Needs `npx expo start -c`** — new `app/onboarding/tour/` route directory;
 Expo Router won't see it on a dev server started before the dir existed
@@ -215,6 +241,12 @@ Expo Router won't see it on a dev server started before the dir existed
   occupying the top ~2/3**, then title + subtitle + CTA below (the layout the
   user described). Images are **placeholders** to be supplied later (like the
   badge art); they'll need re-capturing when a screen's UI changes (accepted).
+> **⚠️ The 6-card table below is the ORIGINAL Phase-2 plan.** It was superseded
+> by the "As built (expanded)" section above — the shipped tour is **10 cards**
+> (Budgets/Plans/Bills split out, Coins/Freezes/XP added) as its own
+> `TOUR_STEPS` list (NOT appended to `STEPS`), and the last setup step is now
+> `journey` (not `commitment`, which was trimmed). Kept for history.
+
 - One card per area, matching the real tab bar
   (`[Home] [Transactions] [⊕ Add] [Analytics] [Menu]`) plus a closing
   "make it yours" card:
@@ -228,11 +260,8 @@ Expo Router won't see it on a dev server started before the dir existed
   | Menu | Everything else | Budgets, Bills, Plans, Reports, Shop, Settings live in the Menu. |
   | Make it yours | Make it yours | Optional: Personalize + set up categories (deep-link to the real screens), or skip. |
 
-- Added to `lib/onboarding.js`'s `STEPS` (after `commitment`), so the progress
-  bar + routing renumber automatically. Each card is a route under
-  `app/onboarding/` using `OnboardingScreen`.
-- Skippable; skipping still completes onboarding (→ `done` → bundle), so a
-  skipping user still gets the bundle.
+- Skippable; skipping still completes onboarding (→ welcome-bundle → `done` →
+  bundle granted), so a skipping user still gets the bundle.
 - `onboarded_at` (set at `done`) is the only gate — no `tour_seen_at`.
 
 ### Open before building

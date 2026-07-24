@@ -42,16 +42,24 @@ function formatDateLabel(date) {
   return format(date, 'd MMM yyyy');
 }
 
+// Always an expense — removed the Expense/Income toggle (2026-07-22, user's
+// call: "it's clearly a transaction, no need of income selection"). Income has
+// its own dedicated screen (balance.js, "Let's fill your wallet"); this
+// screen's whole framing ("remember your most recent transaction?") is really
+// asking for the everyday case, an expense, so the toggle was redundant
+// complexity for a demo step. `type` kept as a named constant (not re-derived
+// inline) so the single `type: TYPE` use at the insert site stays obvious.
+const TYPE = 'expense';
+
 export default function OnboardingExpense() {
   const router = useRouter();
   const { activeAccount, activeAccountId } = useAccount();
   const { session } = useAuth();
-  const { expenseCategories, incomeCategories } = useCategories();
+  const { expenseCategories } = useCategories();
   const { activePlans } = usePlans();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
 
-  const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(null);
   const [planId, setPlanId] = useState(null);
@@ -61,11 +69,10 @@ export default function OnboardingExpense() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const categories = type === 'expense' ? expenseCategories : incomeCategories;
+  const categories = expenseCategories;
   const selectedPlan = activePlans.find((p) => p.id === planId);
 
-  // Categories load a beat after mount; select the first as soon as they
-  // arrive, and again when the type flips (the two lists are disjoint).
+  // Categories load a beat after mount; select the first as soon as they arrive.
   useEffect(() => {
     if (!categories.some((c) => c.id === categoryId)) {
       setCategoryId(categories[0]?.id ?? null);
@@ -83,7 +90,7 @@ export default function OnboardingExpense() {
     // Identical row shape to an AddTransactionSheet-created transaction —
     // that's the contract, since every other screen reads these rows.
     const { error } = await supabase.from('transactions').insert({
-      type,
+      type: TYPE,
       amount: numericAmount,
       category_id: categoryId,
       plan_id: planId,
@@ -142,21 +149,6 @@ export default function OnboardingExpense() {
         </View>
       )}
 
-      <View style={styles.segmentWrap}>
-        <Pressable
-          style={[styles.segment, type === 'expense' && styles.segmentActive]}
-          onPress={() => setType('expense')}
-        >
-          <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.segment, type === 'income' && styles.segmentActive]}
-          onPress={() => setType('income')}
-        >
-          <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
-        </Pressable>
-      </View>
-
       <View style={styles.amountWrap}>
         <Text style={styles.amountLabel}>Amount</Text>
         <View style={styles.amountRow}>
@@ -179,7 +171,6 @@ export default function OnboardingExpense() {
 
       <Text style={styles.sectionLabel}>CATEGORY</Text>
       <ScrollView
-        key={type}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -296,30 +287,6 @@ const styles = StyleSheet.create({
   accountName: {
     fontFamily: fontFamily.extrabold,
     color: colors.ink,
-  },
-  segmentWrap: {
-    flexDirection: 'row',
-    backgroundColor: colors.chipBg,
-    borderRadius: radii.buttonSm,
-    padding: 4,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 11,
-    borderRadius: radii.buttonSm - 3,
-  },
-  segmentActive: {
-    backgroundColor: colors.ink,
-  },
-  segmentText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
-  segmentTextActive: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.surface,
   },
   amountWrap: {
     alignItems: 'center',

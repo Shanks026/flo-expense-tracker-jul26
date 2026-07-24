@@ -21,9 +21,8 @@
 //                            for continued debugging.
 //
 // Uses the service-role key (auto-injected as SUPABASE_SERVICE_ROLE_KEY by
-// the Edge Functions runtime — never set this as a secret manually, same
-// note as ai-interpret's lib/entitlements.ts) so it can read across every
-// user, not just one.
+// the Edge Functions runtime — never set this as a secret manually) so it
+// can read across every user, not just one.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getReminderCopy } from './reminderCopy.ts';
 

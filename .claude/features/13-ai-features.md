@@ -1,12 +1,57 @@
 # Feature: AI Features (Edge Function proxy → categorisation → receipt scan)
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/13-ai-features.md`
-**Status**: Planned
-**Last Updated**: July 2026
+**Status**: 🗑️ **REVERTED 2026-07-22** — see note below. Rest of this doc is historical record.
+**Last Updated**: 2026-07-22
 
 ---
 
-## Context
+## ⚠️ Reverted 2026-07-22 — direct instruction
+
+> *"remove the ai based receipt scanning entirely. we can rebuild it better
+> once we actually have revenue and anthropic key"*
+
+Receipt scanning (Phase 3) had shipped and was live in `AddTransactionSheet`.
+Categorisation (Phase 1's other mode) was **never actually wired to any
+client UI** — confirmed via grep before removing anything; the one
+`ai_usage` row for it was a manual/dev test, not real usage. Since the whole
+point of the provider seam was "swap Gemini for Anthropic later, server-side
+only, client never changes" (see Context below), and that swap is exactly
+what's being deferred to a later, better-funded rebuild, **everything** was
+removed rather than leaving half of it as unused scaffolding:
+
+- **Client**: `AddTransactionSheet`'s scan button/flow, `lib/ai.js`,
+  `lib/receipts.js` — all deleted.
+- **Database**: `transactions.receipt_path`/`receipt_data` columns dropped
+  (both were all-NULL, zero data loss, confirmed before dropping);
+  `ai_usage` table dropped (1 row total, confirmed as the dev-test
+  `categorise` row, not `receipt`).
+- **Storage**: the `receipts` bucket deleted (confirmed empty, 0 objects,
+  before deleting).
+- **Edge Function**: `supabase/functions/ai-interpret/` source deleted from
+  the repo. **The deployed function itself is still ACTIVE on Supabase** —
+  no MCP tool exists to delete a live Edge Function, so removing it fully
+  needs the Dashboard (Edge Functions → `ai-interpret` → Delete) or
+  `supabase functions delete ai-interpret` via the CLI. It's inert in the
+  meantime (nothing calls it; it still enforces its own entitlement/JWT
+  checks either way).
+- **`app.json`**: `cameraPermission` removed from the `expo-image-picker`
+  plugin config (its only consumer was receipt scanning — avatar upload,
+  the remaining `expo-image-picker` use, is gallery-only); `photosPermission`
+  copy reworded from "...to attach a receipt" to "...to set a profile
+  picture".
+- **`14-subscription-pro.md`**: its "AI receipt scan" Pro-gate references are
+  now stale (feature doesn't exist) — flagged there, not rewritten.
+
+**Rebuilding later**: the architectural insight below (one Edge Function, a
+provider-agnostic seam, category-constrained output, server-side metering)
+is still the right shape — just build it fresh against Anthropic once
+there's revenue to justify the per-call cost, rather than resurrecting this
+Gemini-keyed version.
+
+---
+
+## Context (historical — describes the REMOVED feature)
 
 This graduates `IDEAS-ai-features.md` into a build. AI is FLO's cross-platform,
 gate-able Pro backbone (auto-detect can't ship to a store — `00-index.md`

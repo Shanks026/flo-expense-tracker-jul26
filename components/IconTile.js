@@ -28,6 +28,11 @@ export default function IconTile({ children, tone = 'neutral', size = 42, radius
   const TONES = {
     neutral: colors.iconTileBg,
     brand: onDark ? colors.brandBgDark : colors.brandBg,
+    // Solid brand fill (not a tint) — for icons drawn filled rather than
+    // outlined, same pairing as ProBadge's crown badge (colors.brand tile +
+    // colors.ink filled glyph). Unlike `brand`, doesn't vary with `onDark`:
+    // a solid tile reads the same regardless of what card it sits on.
+    brandSolid: colors.brand,
     streak: colors.streakBg,
     income: colors.incomeBg,
     danger: colors.dangerBg,

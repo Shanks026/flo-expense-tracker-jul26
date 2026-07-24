@@ -75,16 +75,18 @@ thin re-export).
 (`FREE_LIMITS`, `PRO_PRICING`). `useEntitlement()` → `entitlements` table
 (`is_pro`; missing row = Free, intentionally). **Client checks are create-time
 gates only** (block the 2nd account / 3rd budget, etc.) — never access-time,
-never data-model changes. Real money enforcement (AI) is **server-side** in the
-Edge Function. See `.claude/features/14-subscription-pro.md`.
+never data-model changes. See `.claude/features/14-subscription-pro.md`.
 
-## AI & Edge Functions (`supabase/functions/`)
+## Edge Functions (`supabase/functions/`)
 
-- `ai-interpret` — the AI proxy. The AI key **never** ships in the client
-  (`EXPO_PUBLIC_*` is plaintext in the APK). All AI routes through here, which
-  also holds entitlement checks + metering.
 - `send-push` — server push, driven by a cron reading `profiles.timezone` for
   local-time scheduling. `TimezoneSync` writes the device's real IANA zone.
+- `ai-interpret` (AI proxy: categorisation + receipt scanning) was **removed
+  entirely 2026-07-22** — see `.claude/features/13-ai-features.md`. Rebuild
+  later against an Anthropic key once there's revenue; don't resurrect the
+  Gemini-keyed version. The pattern it used (key never in the client, one
+  proxy Edge Function, entitlement + metering checks server-side) is still
+  the right shape for whatever AI feature comes next.
 
 ## Supabase / schema truth
 

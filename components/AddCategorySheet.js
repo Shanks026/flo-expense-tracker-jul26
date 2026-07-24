@@ -75,7 +75,16 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
 
     setSaving(false);
     if (saveError) {
-      showToast({ message: saveError.message, variant: 'error' });
+      // 23505 = unique_violation — categories_user_id_name_type_key
+      // (categories_unique_and_stop_auto_seed migration, 00-index.md). A
+      // friendly message here instead of the raw Postgres text, which reads
+      // as a bug ("duplicate key value violates constraint...") rather than
+      // the simple "you already have this" it actually is.
+      const message =
+        saveError.code === '23505'
+          ? `You already have a ${type} category named "${name.trim()}"`
+          : saveError.message;
+      showToast({ message, variant: 'error' });
       return;
     }
     notifyChanged();

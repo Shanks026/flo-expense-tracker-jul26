@@ -122,7 +122,11 @@ export default function MilestoneSpinWheel({ day, segments, visible, onDone }) {
   }));
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={() => {}}>
+    /* statusBarTranslucent — same fix as StreakCelebration's identical Modal
+       pattern: without it, Android leaves the screen behind visible through
+       a gap at the top/bottom edges instead of this covering edge-to-edge.
+       Chains right after StreakCelebration on wheel days, same exposure. */
+    <Modal visible={visible} statusBarTranslucent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.screen}>
         {/* Content centers in the space ABOVE the button (per direct
             feedback, "place the button at the bottom of the screen") — same

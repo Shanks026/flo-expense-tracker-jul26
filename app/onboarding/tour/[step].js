@@ -18,6 +18,25 @@ const ICONS = {
   Home, List, Plus, ChartColumn, Menu: MenuIcon, Wallet, Flag, Receipt, Sparkles, Palette,
 };
 
+// Real screen previews, one per card — see assets/tour/BRIEF.md for the exact
+// export spec. Metro requires static string-literal require() calls (same
+// constraint as STREAK_BADGE_ART/RANK_BADGE_ART), so a key can't be added
+// until its file actually exists on disk — uncomment each line as its image
+// lands. Absent keys fall back to TourScreen's icon+"Preview" placeholder,
+// so dropping images in one at a time is always safe.
+const TOUR_IMAGES = {
+  // home: require('../../../assets/tour/home.png'),
+  // transactions: require('../../../assets/tour/transactions.png'),
+  // add: require('../../../assets/tour/add.png'),
+  // analytics: require('../../../assets/tour/analytics.png'),
+  // menu: require('../../../assets/tour/menu.png'),
+  // budgets: require('../../../assets/tour/budgets.png'),
+  // plans: require('../../../assets/tour/plans.png'),
+  // bills: require('../../../assets/tour/bills.png'),
+  // currency: require('../../../assets/tour/currency.png'),
+  // personalize: require('../../../assets/tour/personalize.png'),
+};
+
 // The three things logging earns you — the `currency` card's segmented body.
 const CURRENCY_ROWS = [
   { key: 'coins', Icon: CircleDollarSign, color: colors.coinGold, label: 'Coins', body: 'Earned by logging — spend them on card designs in the Shop.' },
@@ -52,6 +71,7 @@ export default function TourStep() {
       stepLabel={`${pos.index} of ${pos.total}`}
       eyebrow="Quick Tour"
       Icon={Icon}
+      image={TOUR_IMAGES[step.key]}
       title={step.title}
       subtitle={step.body}
       primaryLabel={isLast ? 'Continue' : 'Next'}

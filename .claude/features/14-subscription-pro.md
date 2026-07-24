@@ -3,7 +3,11 @@
 **File**: `.claude/features/14-subscription-pro.md`
 **Status**: Complete (Phase 1 + Phase 2, both confirmed on-device). Payment
 (RevenueCat / Play Billing) is a separate, later master-sequence step — see
-Out of Scope.
+Out of Scope. **Note (2026-07-22)**: every "AI receipt scan" Pro-gate
+reference below is now stale — receipt scanning was removed entirely
+(`13-ai-features.md`, reverted 2026-07-22). Left as historical record, not
+rewritten; the gating *pattern* they show (`isPro` check → `openProUpsell`
+if free) is still the one every other Pro gate in this doc follows.
 **Last Updated**: July 2026
 
 ---
