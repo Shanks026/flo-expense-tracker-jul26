@@ -62,6 +62,12 @@ export default function TodayCard() {
 
   if (streakLoading || stateLoading || profileLoading) return null;
   if (!isPastLocalTime(profile?.evening_reminder_time ?? '21:00:00')) return null;
+  // The "day closed" receipt is only meaningful for an acknowledged no-spend
+  // day. On a normal logged day it's a redundant "you logged, nice" (per user
+  // feedback), so suppress it entirely. The remaining states that render are
+  // 'open' (the no-spend declaration prompt — the only entry point to reach
+  // 'nospend') and 'nospend' (the acknowledged receipt).
+  if (state === 'logged') return null;
 
   const copy = todayCardCopy({ state, todayTotals });
   const closed = state !== 'open';

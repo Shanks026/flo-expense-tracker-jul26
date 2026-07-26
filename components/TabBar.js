@@ -58,7 +58,14 @@ export default function TabBar({ state, navigation }) {
   const secondHalf = state.routes.slice(2);
 
   return (
-    <View style={[styles.bar, { height: 96 + insets.bottom, paddingBottom: insets.bottom }]}>
+    /* Base height 72 (was 96) + the device's real bottom safe-area inset. The
+       base is the bar's own content height; items are top-aligned under
+       paddingTop:14, so base − (icon+label ≈ 56) is the gap BELOW the labels,
+       and 96 left ~40px of dead space there. 72 lands that gap at ~14px — a
+       comfortable breathing room, not a chasm — while paddingBottom:insets.bottom
+       still carries the safe area on top of it, so gesture-nav and 3-button-nav
+       devices (and zero-inset screens) each keep the correct clearance. */
+    <View style={[styles.bar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
       {firstHalf.map((route, i) => renderItem(route, i))}
       <Pressable style={styles.addButton} onPress={() => openAdd()}>
         {/* Pinned: the button itself stays the theme's accent color

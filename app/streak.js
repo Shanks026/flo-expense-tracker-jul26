@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useMemo, useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Trophy, Unlink, Flame } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, Trophy, Unlink, Flame, CircleDollarSign, Star, Snowflake, Gift } from 'lucide-react-native';
 import { Pressable } from 'react-native';
+import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import CardThemeSurface from '../components/CardThemeSurface';
 import {
   parseISO,
   format,
@@ -23,30 +25,13 @@ import { StreakFlame } from '../components/StreakDays';
 import useStreak from '../hooks/useStreak';
 import { streakHeadline } from '../lib/koban';
 import { milestoneRoad } from '../lib/rewards';
+import { STREAK_BADGE_ART, STREAK_BADGE_ART_LOCKED } from '../lib/trophies';
 import { getTheme } from '../lib/cardThemes';
-import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
 const BADGE_SIZE = 92;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-// 21-achievement-rewards-and-milestone-road.md Phase 1 — composes one road
-// row's reward text from whatever milestoneRoad() reports for that day
-// (coins/freezes lump, a theme grant, a bonus spin) into a single short
-// subtitle line, matching this screen's existing one-line-per-row grammar.
-function roadRewardText(entry) {
-  const parts = [];
-  if (entry.coins > 0) parts.push(`${entry.coins.toLocaleString('en-IN')} coins`);
-  // XP added 27-rank-ladder-rework.md Phase 1 — milestones now grant it, and
-  // it's what actually moves your rank, so a road listing only coins/freezes
-  // would under-report the reward it exists to advertise.
-  if (entry.xp > 0) parts.push(`${entry.xp.toLocaleString('en-IN')} XP`);
-  if (entry.freezes > 0) parts.push(`${entry.freezes} freeze${entry.freezes === 1 ? '' : 's'}`);
-  let text = parts.join(' · ') || 'Bonus reward';
-  if (entry.themeId) text += ` · + ${getTheme(entry.themeId).name}`;
-  if (entry.hasWheel) text += ' · + bonus spin';
-  return text;
-}
 
 // The streak's own screen — the destination behind Home's header flame.
 //
@@ -64,6 +49,23 @@ export default function StreakScreen() {
   // to live (they'd have nowhere to go crammed below the milestone road), and
   // "what's next" (the road) reads as its own distinct view.
   const [tab, setTab] = useState('streak');
+  // Reward detail sheet — tapping any milestone badge opens it with that day's
+  // coins/XP/freezes shown as icons (the celebration screen's own reward
+  // grammar) plus a real CardThemeSurface preview when the day grants a theme,
+  // instead of the cramped text line the grid used to carry under each badge.
+  const insets = useSafeAreaInsets();
+  const rewardSheetRef = useRef(null);
+  const [rewardEntry, setRewardEntry] = useState(null);
+
+  const openReward = useCallback((entry) => {
+    setRewardEntry(entry);
+    rewardSheetRef.current?.present();
+  }, []);
+
+  const renderSheetBackdrop = useCallback(
+    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
+    []
+  );
 
   if (loading) {
     return (
@@ -210,40 +212,132 @@ export default function StreakScreen() {
             </Text>
           </>
         ) : (
-          /* 21-achievement-rewards-and-milestone-road.md Phase 1 — a plain row
-             list, deliberately: the pure milestoneRoad() data is what needs to
-             be solid this phase, not a path/line graphic (deferred). Mirrors
-             app/trophies.js's Rank ladder row grammar (icon left, title+sub
-             stacked, trailing state) so the three states (earned/current/
-             locked) read the same way that screen's own three-state rows do. */
-          <Card style={styles.listCard}>
-            {road.map((entry, idx) => (
-              <View key={entry.day} style={[styles.row, idx < road.length - 1 && styles.rowBorder]}>
-                <IconTile tone={entry.state === 'locked' ? 'neutral' : 'streak'} size={44} radius={radii.iconTile}>
-                  <Flame
-                    size={20}
-                    color={entry.state === 'locked' ? colors.mutedLight : colors.streakDeep}
-                    strokeWidth={2}
-                  />
-                </IconTile>
-                <View style={styles.rowMid}>
-                  <Text style={[styles.rowTitle, entry.state === 'locked' && styles.rowTitleLocked]}>
-                    Day {entry.day}
-                  </Text>
-                  <Text style={styles.rowSub} numberOfLines={2}>
-                    {roadRewardText(entry)}
-                  </Text>
-                </View>
-                {entry.state === 'earned' ? (
-                  <Text style={[styles.rowEarned, { color: colors.streakDeep }]}>Earned</Text>
-                ) : entry.state === 'current' ? (
-                  <Text style={[styles.rowEarned, { color: colors.streak }]}>{entry.day - current} to go</Text>
-                ) : null}
-              </View>
-            ))}
-          </Card>
+          /* Milestone badge wall — mirrors app/trophies.js's trophy-case grid
+             (3 per row, illustrated badge as the main visual, color art when
+             reached / pre-baked grayscale when not) rather than the old
+             flame-icon row list. These are the SAME STREAK_BADGE_ART PNGs the
+             Trophy Room's Streak Keeper group renders, so the two surfaces
+             agree. Unlike a trophy tile (which carries a Claim button), a
+             milestone road is purely informational, so each badge keeps its
+             day + reward as sub-lines. STREAK_BADGE_ART covers every MILESTONES
+             day; the IconTile/Flame fallback only fires if a future day lacks
+             art (same graceful-degrade pattern trophies uses). */
+          <>
+            <Text style={styles.milestoneHint}>Tap a badge to see its reward</Text>
+            <View style={styles.badgeGrid}>
+              {road.map((entry) => {
+                const reached = entry.state === 'earned';
+                const art = reached ? STREAK_BADGE_ART[entry.day] : STREAK_BADGE_ART_LOCKED[entry.day];
+                return (
+                  <Pressable
+                    key={entry.day}
+                    style={({ pressed }) => [styles.badgeGridItem, pressed && styles.badgeGridItemPressed]}
+                    onPress={() => openReward(entry)}
+                  >
+                    {art ? (
+                      <Image source={art} style={styles.badgeGridImage} resizeMode="contain" />
+                    ) : (
+                      <IconTile tone={reached ? 'streak' : 'neutral'} size={64} radius={32}>
+                        <Flame size={28} color={reached ? colors.streakDeep : colors.mutedLight} strokeWidth={2} />
+                      </IconTile>
+                    )}
+                    <Text style={styles.badgeGridTitle} numberOfLines={1}>
+                      Day {entry.day}
+                    </Text>
+                    {/* Completed milestones keep the "Earned" label; the rest
+                        show neutral current/target progress, same grammar as the
+                        Trophy Room's tiles. */}
+                    {entry.state === 'earned' ? (
+                      <Text style={[styles.badgeGridSub, { color: colors.streakDeep }]}>Earned</Text>
+                    ) : (
+                      <Text style={styles.badgeGridSub}>
+                        {Math.min(current, entry.day).toLocaleString('en-IN')}/{entry.day.toLocaleString('en-IN')}
+                      </Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
         )}
       </ScrollView>
+
+      {/* Reward detail sheet — dark like the celebration screen, reusing its
+          coin/XP/freeze icon grammar plus a real CardThemeSurface card preview
+          (the same one the Shop and spin-wheel reveal use) when the milestone
+          grants a theme. Dynamic-sized: content is short and has no
+          pinned/scroll conflict, so it sizes to its own height cleanly. */}
+      <BottomSheetModal
+        ref={rewardSheetRef}
+        enableDynamicSizing
+        backdropComponent={renderSheetBackdrop}
+        backgroundStyle={styles.sheetBg}
+        handleIndicatorStyle={styles.sheetHandle}
+      >
+        <BottomSheetView style={[styles.sheetContent, { paddingBottom: insets.bottom + spacing.xl }]}>
+          {rewardEntry && (
+            <>
+              <Image
+                source={
+                  rewardEntry.state === 'earned'
+                    ? STREAK_BADGE_ART[rewardEntry.day]
+                    : STREAK_BADGE_ART_LOCKED[rewardEntry.day]
+                }
+                style={styles.sheetBadge}
+                resizeMode="contain"
+              />
+              <Text style={styles.sheetTitle}>Day {rewardEntry.day}</Text>
+              <Text style={styles.sheetSub}>
+                {rewardEntry.state === 'earned' ? 'You earned' : 'Reach this streak to earn'}
+              </Text>
+
+              <View style={styles.sheetRewardRow}>
+                {rewardEntry.coins > 0 && (
+                  <View style={styles.sheetRewardEntry}>
+                    <CircleDollarSign size={22} color={staticColors.coinGold} fill={staticColors.coinGold} strokeWidth={1.5} />
+                    <Text style={styles.sheetRewardAmount}>+{rewardEntry.coins.toLocaleString('en-IN')}</Text>
+                    <Text style={styles.sheetRewardUnit}>coins</Text>
+                  </View>
+                )}
+                {rewardEntry.xp > 0 && (
+                  <View style={styles.sheetRewardEntry}>
+                    <Star size={22} color={staticColors.brand} fill={staticColors.brand} strokeWidth={1.5} />
+                    <Text style={styles.sheetRewardAmount}>+{rewardEntry.xp.toLocaleString('en-IN')}</Text>
+                    <Text style={styles.sheetRewardUnit}>XP</Text>
+                  </View>
+                )}
+                {rewardEntry.freezes > 0 && (
+                  <View style={styles.sheetRewardEntry}>
+                    <Snowflake size={22} color={staticColors.iceBlue} fill={staticColors.iceBlue} strokeWidth={2.2} />
+                    <Text style={styles.sheetRewardAmount}>+{rewardEntry.freezes}</Text>
+                    <Text style={styles.sheetRewardUnit}>freeze{rewardEntry.freezes === 1 ? '' : 's'}</Text>
+                  </View>
+                )}
+              </View>
+
+              {rewardEntry.themeId && (
+                <View style={styles.sheetThemeWrap}>
+                  <Text style={styles.sheetThemeLabel}>Card theme</Text>
+                  <CardThemeSurface theme={getTheme(rewardEntry.themeId)} style={styles.sheetThemeCard}>
+                    <View style={styles.sheetThemeContent}>
+                      <Text style={[styles.sheetThemeName, { color: getTheme(rewardEntry.themeId).textColor }]}>
+                        {getTheme(rewardEntry.themeId).name}
+                      </Text>
+                    </View>
+                  </CardThemeSurface>
+                </View>
+              )}
+
+              {rewardEntry.hasWheel && (
+                <View style={styles.sheetSpinRow}>
+                  <Gift size={16} color={staticColors.brand} strokeWidth={2.2} />
+                  <Text style={styles.sheetSpinText}>Includes a bonus spin</Text>
+                </View>
+              )}
+            </>
+          )}
+        </BottomSheetView>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -378,47 +472,141 @@ function makeStyles(colors) {
     color: colors.mutedMid,
     marginTop: 2,
   },
-  // Milestone Road (21-achievement-rewards-and-milestone-road.md Phase 1) —
-  // same row grammar as app/trophies.js's trophy/rank rows (icon left,
-  // title+subtitle stacked, trailing state right), reused verbatim here. Its
-  // own section title/wrapper was dropped when it moved into the Milestones
-  // tab — the tab label already names it, so a "Milestone Road" heading right
-  // under it was redundant.
-  listCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-  },
-  row: {
+  // Milestone badge grid — the same trophy-case grid grammar as
+  // app/trophies.js (3 per row, illustrated badge as the main visual, no Card
+  // wrapper), so the Milestones tab and the Trophy Room's Streak Keeper group
+  // read as one system. 12 milestones fill exactly four rows of three.
+  // Earned/locked is conveyed by which art (color vs pre-baked grayscale) is
+  // passed in — no tint/opacity override here, same as trophies.
+  badgeGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  badgeGridItem: {
+    width: '33.333%',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 13,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
   },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
+  badgeGridImage: {
+    width: 80,
+    height: 80,
   },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitle: {
+  badgeGridTitle: {
     fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.sm,
     color: colors.ink,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
-  rowTitleLocked: {
-    color: colors.mutedMid,
+  // Neutral progress line, same as the Trophy Room's badgeGridSub — no colored
+  // state, just current/target in muted grey.
+  badgeGridSub: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    color: colors.mutedLight,
+    marginTop: 2,
+    textAlign: 'center',
   },
-  rowSub: {
+  badgeGridItemPressed: {
+    opacity: 0.6,
+  },
+  milestoneHint: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
     color: colors.mutedMid,
-    marginTop: 1,
+    textAlign: 'center',
+    marginBottom: spacing.md,
   },
-  rowEarned: {
+  // Reward detail sheet — dark (staticColors.ink) so the coin/XP/freeze icons
+  // and the card preview read the same way they do on the celebration screen.
+  sheetBg: {
+    backgroundColor: staticColors.ink,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
+  },
+  sheetHandle: {
+    backgroundColor: '#3a3a3a',
+    width: 44,
+  },
+  sheetContent: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+  },
+  sheetBadge: {
+    width: 96,
+    height: 96,
+    marginBottom: spacing.md,
+  },
+  sheetTitle: {
     fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.display,
+    color: staticColors.surface,
+  },
+  sheetSub: {
+    fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    letterSpacing: -0.1,
+    color: staticColors.mutedMid,
+    marginTop: 2,
+    marginBottom: spacing.xl,
+  },
+  sheetRewardRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.lg,
+  },
+  sheetRewardEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sheetRewardAmount: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.lg,
+    color: staticColors.surface,
+  },
+  sheetRewardUnit: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: staticColors.mutedMid,
+  },
+  sheetThemeWrap: {
+    width: '100%',
+    marginTop: spacing.xl,
+  },
+  sheetThemeLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: staticColors.mutedMid,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  sheetThemeCard: {
+    width: '100%',
+    height: 140,
+    borderRadius: radii.card,
+  },
+  sheetThemeContent: {
+    flex: 1,
+    padding: spacing.lg,
+    justifyContent: 'flex-end',
+  },
+  sheetThemeName: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.xl,
+  },
+  sheetSpinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.lg,
+  },
+  sheetSpinText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: staticColors.surface,
   },
   calendarCard: {
     paddingVertical: spacing.lg,

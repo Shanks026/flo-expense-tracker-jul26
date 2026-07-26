@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Trophy } from 'lucide-react-native';
+import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Trophy, ShoppingBag } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -178,7 +178,6 @@ export default function Home() {
                     <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
                     <Text style={styles.itemStatText}>{coins.toLocaleString('en-IN')}</Text>
                   </View>
-                  <View style={styles.itemStatDivider} />
                   <View style={styles.itemStatEntry}>
                     {/* Snowflake has no closed/fillable region (just radiating
                         strokes) — `fill` is a harmless no-op here; a bolder
@@ -188,7 +187,6 @@ export default function Home() {
                     <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
                     <Text style={styles.itemStatText}>{freezes}</Text>
                   </View>
-                  <View style={styles.itemStatDivider} />
                   <View style={styles.itemStatEntry}>
                     <Image source={RANK_BADGE_ART[rank.id]} style={styles.levelRankBadge} resizeMode="contain" />
                     <Text style={styles.itemStatText}>{level}</Text>
@@ -235,6 +233,12 @@ export default function Home() {
               <Trophy size={20} color={colors.ink} strokeWidth={2} />
               {unseenTrophies > 0 && <View style={styles.bellDot} />}
             </Pressable>
+            {/* Shop — moved out of the Menu sheet into the header (2026-07-26),
+                grouped with the Trophy button since both are gamification
+                destinations. */}
+            <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/shop')}>
+              <ShoppingBag size={20} color={colors.ink} strokeWidth={2} />
+            </Pressable>
             <Pressable style={styles.headerIconButton} hitSlop={10} onPress={openAlerts}>
               <Bell size={20} color={colors.ink} strokeWidth={2} />
               {alertCount > 0 && <View style={styles.bellDot} />}
@@ -270,6 +274,8 @@ export default function Home() {
           accountsLoading={heroLoading}
         />
 
+        <ReportReadyCard />
+
         {/* Close-the-day ritual (18-gamification-ritual-and-ledger.md Phase 3) */}
         <TodayCard />
 
@@ -288,8 +294,6 @@ export default function Home() {
             </FadeIn>
           )}
         </Card>
-
-        <ReportReadyCard />
 
         {!billsLoading && upcomingBills.length > 0 && (
           <FadeIn>
@@ -419,28 +423,21 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: spacing.sm,
   },
-  // "Your stuff" — coins + freeze + level. Chip background/border removed
-  // (per direct feedback, "might look more natural and have a bit more
-  // space") — the dividers below are what still reads this as one grouped
-  // cluster rather than three floating numbers, not a bordered surface.
+  // "Your stuff" — coins + freeze + level. No chip background/border and no
+  // dividers anymore (both removed per direct feedback); spacing alone groups
+  // the three counters. spacing.lg — the dividers-gone gap:10 read as crowded,
+  // but headerRight's spacing.xl was too loose for this tighter cluster, so it
+  // sits one step under it (per direct feedback).
   itemStats: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 44,
-    // Reverted to 10 (per direct feedback) — the lg(16) bump read as too
-    // loose for this cluster specifically, even though headerRight's own
-    // gap stayed widened. Left as it was pre-chip-removal.
-    gap: 10,
+    gap: spacing.lg,
   },
   itemStatEntry: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-  },
-  itemStatDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: colors.border,
   },
   itemStatText: {
     fontFamily: fontFamily.extrabold,

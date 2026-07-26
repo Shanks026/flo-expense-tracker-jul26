@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight, ShoppingBag } from 'lucide-react-native';
+import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight } from 'lucide-react-native';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
@@ -44,11 +44,10 @@ const ITEMS = [
   { key: 'budgets', label: 'Budgets', route: '/budgets', icon: Wallet },
   { key: 'reports', label: 'Reports', route: '/report', icon: FileText },
   { key: 'bills', label: 'Bills', route: '/bills', icon: Receipt },
-  // Trophies moved OUT of this sheet (2026-07-21) — it's now a dedicated
-  // header button on Home, beside the bell. Kept the Shop row here.
-  // Added 19-card-themes.md Phase 1 — a new global destination that isn't
-  // tab-worthy, so it lands here per the standing convention.
-  { key: 'shop', label: 'Shop', route: '/shop', icon: ShoppingBag },
+  // Both Trophies (2026-07-21) and Shop (2026-07-26) moved OUT of this sheet
+  // into dedicated Home header buttons (beside the bell). The menu is now
+  // just navigation rows + the optional Upgrade card, so it also got shorter
+  // — see the isPro-conditional snapPoints below.
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
 
@@ -100,11 +99,16 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
       // configuration already confirmed correct on-device (full content,
       // all rows visible): a plain fixed snapPoint.
       //
-      // ▼▼▼ TO CHANGE THE SHEET'S HEIGHT, EDIT THIS ONE VALUE ▼▼▼
-      snapPoints={useMemo(() => ['85%'], [])}
-      // ▲▲▲ e.g. '85%' for shorter, '96%' for taller — same '%' string
-      // snapPoints every other sheet in this app uses (AddTransactionSheet,
-      // AddBudgetSheet, etc.) — no other line needs to change alongside it.
+      // ▼▼▼ TO CHANGE THE SHEET'S HEIGHT, EDIT THESE TWO VALUES ▼▼▼
+      // Two heights now, keyed on Pro. Non-Pro is taller to make room for the
+      // Upgrade card pinned in the top section; Pro (no Upgrade card, and with
+      // Trophies + Shop now in the Home header) is shorter so it doesn't sit
+      // half-empty. Same '%' snapPoint string every other sheet in this app
+      // uses (AddTransactionSheet, AddBudgetSheet, etc.). Tune either value
+      // freely — no other line needs to change alongside it. (Picked without
+      // an on-device measure here; adjust if either sits too tall/short.)
+      snapPoints={useMemo(() => (isPro ? ['66%'] : ['78%']), [isPro])}
+      // ▲▲▲ first = Pro (shorter), second = non-Pro (taller, fits Upgrade card)
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
@@ -121,12 +125,12 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
              absorbs that growth without the sheet's own height ever needing
              to change.
           3. Footer (pinned) — divider + Log Out, always reachable.
-          The sheet's total height is the fixed snapPoints value above (see
-          its own comment) — NOT content-driven. A Pro account (no Upgrade
-          card) will show a bit more empty space in region 2 rather than a
-          shorter sheet; that's an accepted tradeoff for reliability after
-          dynamic sizing proved to conflict with this pinned/scroll/pinned
-          structure (see the snapPoints comment for what broke). */}
+          The sheet's total height is the snapPoints value above (see its own
+          comment) — NOT content-driven (dynamic sizing proved to conflict with
+          this pinned/scroll/pinned structure; see the snapPoints comment for
+          what broke). There are now two fixed heights keyed on Pro: a Pro
+          account gets a genuinely shorter sheet (no Upgrade card to make room
+          for), rather than the same height with empty space. */}
       <View style={styles.topSection}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Menu</Text>

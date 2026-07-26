@@ -281,6 +281,11 @@ export default function TrophiesScreen() {
                       </Pressable>
                     ) : t.locked ? (
                       <Text style={styles.badgeGridSub}>Coming soon</Text>
+                    ) : t.earned ? (
+                      /* Completed (already-claimed, or no-reward) trophies show
+                         "Earned" in the selected primary/accent color, matching
+                         the streak Milestones grid — not a "7/7" progress line. */
+                      <Text style={[styles.badgeGridSub, { color: colors.brand }]}>Earned</Text>
                     ) : (
                       <Text style={styles.badgeGridSub}>
                         {Math.min(t.current, t.threshold).toLocaleString('en-IN')}/{t.threshold.toLocaleString('en-IN')}

@@ -248,6 +248,9 @@ export default function AccountHeroCarousel({
                           currency={currency}
                           currencyColor={MUTED_LABEL_COLOR}
                           size={fontSize.amountLg}
+                          adjustsFontSizeToFit
+                          numberOfLines={1}
+                          minimumFontScale={0.35}
                           style={[styles.heroBalance, { color: theme.textColor }]}
                         />
                       )}
@@ -261,14 +264,14 @@ export default function AccountHeroCarousel({
                           <View style={styles.heroStat}>
                             <TrendingUp size={11} color={incomeIconColor} strokeWidth={2.8} />
                             <View style={styles.heroStatTextGroup}>
-                              <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_income, currency)}</Text>
+                              <Text style={[styles.heroStatValue, { color: theme.textColor }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>{formatAmount(summary.month_income, currency)}</Text>
                               <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Income</Text>
                             </View>
                           </View>
                           <View style={styles.heroStat}>
                             <TrendingDown size={11} color={expenseIconColor} strokeWidth={2.8} />
                             <View style={styles.heroStatTextGroup}>
-                              <Text style={[styles.heroStatValue, { color: theme.textColor }]}>{formatAmount(summary.month_expense, currency)}</Text>
+                              <Text style={[styles.heroStatValue, { color: theme.textColor }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>{formatAmount(summary.month_expense, currency)}</Text>
                               <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Expenses</Text>
                             </View>
                           </View>

@@ -233,9 +233,10 @@ async function sendNudges(supabase: ReturnType<typeof createClient>) {
       // reminderCopy.ts's own comment on why this replaced day-of-week
       // keying. Evening already implies "not logged today" by construction
       // (the skip above); this is specifically about YESTERDAY, i.e.
-      // whether today's gap is breaking real momentum or not.
+      // whether today's gap is breaking real momentum or not. The specific
+      // variant within that state is picked at random inside getReminderCopy.
       const loggedYesterday = await hasLoggedOnRelativeDay(supabase, profile.id, timezone, 1);
-      const copy = getReminderCopy(trigger, loggedYesterday, localNow.dayOfWeek, firstName);
+      const copy = getReminderCopy(trigger, loggedYesterday, firstName);
       // `trigger` added 18-gamification-ritual-and-ledger.md Phase 3 — lets
       // the client (lib/notifications.js's useNotificationSync) route the
       // evening nudge to Home (where TodayCard, the close-the-day ritual,
