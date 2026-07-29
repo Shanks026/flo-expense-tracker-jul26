@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import ChoiceList from '../../../components/OnboardingChoice';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
+
+const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
 
 // Screen 10 — the leak. Pre-creates a real budget in this category (Act 2). The
 // most consequential question in the intro, so it should feel like one.
@@ -32,7 +35,10 @@ export default function Leak() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
       title="Where do you think your money quietly leaks?"
+      titleSize={22}
       primaryLabel="Continue"
       primaryDisabled={!value}
       onPrimary={handleNext}

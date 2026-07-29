@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../../theme/tokens';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
+
+const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
 
 // Screen 4 — name. Feeds signup metadata (Phase 2) → profiles.full_name.
 export default function Name() {
@@ -25,6 +28,9 @@ export default function Name() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
+      scrollable
+      bias="up"
+      hero={<OnboardingMascot image={KOBAN_WAVE} size={190} />}
       title="First, what should we call you?"
       subtitle="No pressure. You can change it later."
       primaryLabel="Continue"

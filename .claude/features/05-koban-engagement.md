@@ -1116,11 +1116,39 @@ reasonable v2, not required now).
 
 ## Phase 5 — Mascot (illustrated icon) — LAST, deprioritized
 
+> **✅ UNBLOCKED, AND EFFECTIVELY ALREADY BUILT (2026-07-29).** The art landed:
+> `assets/mascot/hey_screen.png` (waving/beckoning) and
+> `assets/mascot/waht_would_screen.png` (clipboard — note the misspelled
+> filename, left as-is). **This phase's actual deliverables already exist**:
+> `assets/icon.png` is Koban, and `assets/notification-icon.png` is a verified
+> correct 96×96 all-white silhouette (47.2% opaque coverage, **zero** non-white
+> opaque pixels, ears + eye cutouts intact — checked by decoding the alpha
+> channel, not by eyeballing it), already wired into `app.json`'s
+> `expo-notifications` plugin with `color: "#BBDC12"`. The checklist below is
+> simply unticked; only the **on-device** status-bar confirmation remains.
+>
+> **Where the mascot goes from here is scoped in
+> `IDEAS-koban-mascot-placement.md`** — read it before placing art anywhere. Its
+> two headline findings:
+> 1. **`lib/koban.js`'s stripped personification is now unblocked.** This doc's
+>    own Phase 3 copy table (*"Koban's paw goes up"*, *"the lucky cat is not
+>    feeling lucky"*, *"Koban is impressed"*) was written and then deliberately
+>    removed at build time for want of art. Restoring it needs **no art** and is
+>    the highest character payoff available. ⚠️ The nudge/recap copy has since
+>    moved to `lib/reminderCopy.js` + its hand-mirrored Deno twin
+>    `supabase/functions/send-push/reminderCopy.ts` — **edit both**.
+> 2. **Koban is a black cat; this feature's own celebration screens are pinned
+>    `colors.ink` (#101010).** Phase 4's *"swapping [the Flame] for a
+>    Koban-branded icon is a one-line change"* note still holds — but it needs a
+>    **rim-lit/light-outline variant** first, and the swap applies to **day 1
+>    only** (`isNewStreak`), never to milestone days, whose earned
+>    `STREAK_BADGE_ART` must not be displaced.
+
 ### Goal
 The status bar wears Koban's actual face instead of a monochrome placeholder or
-the default app icon. **Not scheduled** — the user is producing the illustration
-work separately (*"i will come up with illustrations"*), and this phase doesn't
-start until that art exists.
+the default app icon. ~~**Not scheduled**~~ — was blocked on the user producing
+the illustration work separately (*"i will come up with illustrations"*); **that
+art now exists** (see the note above).
 
 ### What's needed, whenever art arrives
 - `assets/notification-icon.png` — **96×96, all-white PNG with transparency**

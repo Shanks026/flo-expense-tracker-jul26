@@ -46,6 +46,12 @@ export default function OnboardingScreen({
   // Decorative brand-arrow watermark, for the "text + subtitle only" hero
   // screens only (problem/solution/ready/journey) — 'top' | 'bottom' | omit.
   arrowMotif,
+  // Nudges the centred content group up/down within the space above the
+  // footer, independent of arrowMotif (which also renders the decorative
+  // vector) — for screens that want the asymmetric placement without the
+  // arrow, e.g. name.js pulling the mascot+input up off dead-centre.
+  // 'up' | 'down' | omit (exactly centred).
+  bias,
   eyebrow,
   hero,
   title,
@@ -80,7 +86,11 @@ export default function OnboardingScreen({
   // breathing room on both sides. Equal ratios (no motif) is exactly centred,
   // same as before.
   const [spacerBefore, spacerAfter] =
-    arrowMotif === 'top' ? [8, 1] : arrowMotif === 'bottom' ? [2, 8] : [1, 1];
+    arrowMotif === 'top' ? [8, 1]
+    : arrowMotif === 'bottom' ? [2, 8]
+    : bias === 'up' ? [2, 8]
+    : bias === 'down' ? [8, 1]
+    : [1, 1];
 
   const group = (
     <OnboardingReveal>

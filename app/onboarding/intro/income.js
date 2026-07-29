@@ -3,10 +3,13 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Lock } from 'lucide-react-native';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import ChoiceList from '../../../components/OnboardingChoice';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../../theme/tokens';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
+
+const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
 
 // Screen 6 — income band. Sizes the first budget (Act 2) AND is now persisted
 // to profiles.onboarding_answers for later personalisation/analytics (decision
@@ -40,7 +43,10 @@ export default function Income() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
       title="Roughly how much comes in each month?"
+      titleSize={24}
       primaryLabel="Continue"
       primaryDisabled={!value}
       onPrimary={handleNext}

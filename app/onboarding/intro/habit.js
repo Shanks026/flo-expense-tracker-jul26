@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import ChoiceList from '../../../components/OnboardingChoice';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
+
+const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
 
 // Screen 11 — current habit. Sets the nightly-reminder default + framing on the
 // reminders step (Act 2). Stored durably.
@@ -32,7 +35,10 @@ export default function Habit() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
       title="How often do you check your spending today?"
+      titleSize={22}
       primaryLabel="Continue"
       primaryDisabled={!value}
       onPrimary={handleNext}

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import ChoiceList from '../../../components/OnboardingChoice';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
+
+const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
 
 // Screen 9 — the goal. Frames the streak explainer, the journey screen (Act 3),
 // and later callbacks. Stored durably.
@@ -32,7 +35,10 @@ export default function Goal() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
       title="What would feel like a win for you?"
+      titleSize={24}
       primaryLabel="Continue"
       primaryDisabled={!value}
       onPrimary={handleNext}

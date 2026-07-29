@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import ChoiceList from '../../../components/OnboardingChoice';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
+
+const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
 
 // Screen 5 — age. Redesigned as engaging full-width stacked cards (the plain
 // 2x2 grid was rejected). Drives which aha-stat variant shows next; stored for
@@ -33,7 +36,10 @@ export default function Age() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
       title="Which of these is you?"
+      titleSize={24}
       primaryLabel="Continue"
       primaryDisabled={!value}
       onPrimary={handleNext}

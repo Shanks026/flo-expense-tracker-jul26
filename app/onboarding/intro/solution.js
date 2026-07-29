@@ -1,14 +1,15 @@
 import { Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import { colors, fontFamily } from '../../../theme/tokens';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 
-// Screen 3 — the promise. "2 minutes a day" gets a marker-style highlight
-// (pale-lime background behind deep-lime extrabold text) — decoration, not an
-// underline: it must never read as a tappable link. Rendered via `title` (not
-// a bespoke headline) so it shares the same titleSize as every other
-// "text + subtitle only" hero screen in the intro.
+const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
+
+// Screen 3 — the promise. The payoff clause is a plain colour change now (no
+// marker-style background pill) — same mascot size/placement as opener and
+// problem so all three "hero, no body content" intro screens read as one beat.
 export default function Solution() {
   const router = useRouter();
   const pos = getIntroPosition('solution');
@@ -17,14 +18,14 @@ export default function Solution() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
-      arrowMotif="bottom"
+      hero={<OnboardingMascot image={KOBAN_WAVE} size={200} />}
       title={
-        <>
-          All it takes is <Text style={styles.mark}> 2 minutes a day </Text> to know where your money
-          goes.
-        </>
+        <Text style={styles.titleCenter}>
+          Let's find out together.{'\n'}All it takes is just 2 minutes a day to{' '}
+          <Text style={styles.mark}>know where your money goes</Text>.
+        </Text>
       }
-      titleSize={28}
+      titleSize={22}
       primaryLabel="Show me"
       onPrimary={() => router.replace(getIntroNext('solution'))}
     />
@@ -32,9 +33,11 @@ export default function Solution() {
 }
 
 const styles = StyleSheet.create({
+  titleCenter: {
+    textAlign: 'center',
+  },
   mark: {
     fontFamily: fontFamily.extrabold,
     color: colors.income,
-    backgroundColor: colors.incomeBg,
   },
 });

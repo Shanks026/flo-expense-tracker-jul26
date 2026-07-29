@@ -30,6 +30,7 @@ import DueBillsModal from '../components/DueBillsModal';
 import StreakCelebration from '../components/StreakCelebration';
 import FreezePrompt from '../components/FreezePrompt';
 import RankUpCelebration from '../components/RankUpCelebration';
+import OnboardingDevBack from '../components/OnboardingDevBack';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
 import { AddCategorySheetProvider } from '../components/AddCategorySheet';
 import { RewardsHistorySheetProvider } from '../components/RewardsHistorySheet';
@@ -414,6 +415,11 @@ function RootNavigator() {
                                         background takes over. Invisible on Brand (already
                                         near-white) but a visible white flash on Dark. */}
                                     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                                    {/* MUST render after <Stack>, not before — React Native
+                                        paints later siblings on top, and Stack's own screen
+                                        content is an opaque full-bleed view that would
+                                        otherwise cover this absolutely-positioned button. */}
+                                    <OnboardingDevBack />
                                   </AlertsSheetProvider>
                                 </MenuSheetProvider>
                                 </RewardsHistorySheetProvider>

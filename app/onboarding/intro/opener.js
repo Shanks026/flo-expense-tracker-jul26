@@ -1,12 +1,15 @@
-import { Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
+import OnboardingMascot from '../../../components/OnboardingMascot';
 import { colors, fontFamily, fontSize, spacing } from '../../../theme/tokens';
 import { getIntroNext } from '../../../lib/onboarding';
 import { setIntroSeen } from '../../../lib/onboardingDraft';
 
-// Screen 1 — the warm opener. Full lime, one huge word, and the "Sign in"
-// escape hatch that keeps a returning user from ever seeing a question.
+const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
+
+// Screen 1 — the warm opener. Koban (the app's mascot) waves hello; the "Sign
+// in" escape hatch keeps a returning user from ever seeing a question.
 export default function Opener() {
   const router = useRouter();
 
@@ -17,10 +20,14 @@ export default function Opener() {
 
   return (
     <OnboardingScreen
-      bg="brand"
-      hero={<Text style={styles.hey}>Hey.</Text>}
-      subtitle="Let's figure out where your money actually goes. Together, in just a couple of minutes."
-      primaryLabel="Start"
+      bg="light"
+      hero={
+        <View style={styles.heroWrap}>
+          <OnboardingMascot image={KOBAN_WAVE} size={200} style={styles.mascotSpacing} />
+          <Text style={styles.hey}>Hi there, I'm Koban!</Text>
+        </View>
+      }
+      primaryLabel="Dive In"
       onPrimary={() => router.replace(getIntroNext('opener'))}
       footerNote={
         <Pressable style={styles.link} onPress={handleSignIn}>
@@ -34,19 +41,23 @@ export default function Opener() {
 }
 
 const styles = StyleSheet.create({
+  // `alignSelf: 'stretch'` overrides OnboardingScreen's hero box (which
+  // shrink-wraps to content via `alignItems: 'flex-start'`) so this group
+  // centres against the FULL screen width, not just against its own children.
+  heroWrap: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  mascotSpacing: {
+    marginBottom: spacing.lg,
+  },
   hey: {
     fontFamily: fontFamily.extrabold,
-    // Deliberately larger than theme/tokens.js's fontSize scale tops out
-    // (amountXl = 56) — this is the flow's single loudest word, matching the
-    // design mock's actual value (104px) for this screen almost exactly.
-    fontSize: 100,
-    // MUST exceed fontSize, not sit below it — a lineHeight smaller than the
-    // font size clips the glyph box itself (the descender on "y" was getting
-    // cut off at 96). RN needs headroom above the em-square for a font this
-    // large, not just leading between lines.
-    lineHeight: 124,
-    letterSpacing: -2,
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.5,
     color: colors.ink,
+    textAlign: 'center',
   },
   link: {
     alignItems: 'center',
