@@ -140,7 +140,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
             const selected = key === icon;
             return (
               <Pressable key={key} style={[styles.iconOption, selected && styles.iconOptionSelected]} onPress={() => setIcon(key)}>
-                <CategoryIcon icon={key} size={20} color={selected ? staticColors.ink : staticColors.surface} strokeWidth={2} />
+                <CategoryIcon icon={key} size={20} color={selected ? colors.brandText : staticColors.surface} strokeWidth={2} />
               </Pressable>
             );
           })}
@@ -231,7 +231,7 @@ function makeStyles(colors) {
   },
   segmentTextActive: {
     fontFamily: fontFamily.extrabold,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   iconGrid: {
     flexDirection: 'row',

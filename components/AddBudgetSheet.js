@@ -290,7 +290,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
               }}
             >
               <View style={[styles.chipIcon, categoryId === null && styles.chipIconSelected]}>
-                <Text style={styles.chipOverallText}>All</Text>
+                <Text style={[styles.chipOverallText, categoryId === null && styles.chipOverallTextSelected]}>All</Text>
               </View>
               <Text style={styles.chipLabel} numberOfLines={1}>
                 Overall
@@ -306,7 +306,12 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
                 }}
               >
                 <View style={[styles.chipIcon, cat.id === categoryId && styles.chipIconSelected]}>
-                  <CategoryIcon icon={cat.icon} size={20} color={staticColors.surface} strokeWidth={2} />
+                  <CategoryIcon
+                    icon={cat.icon}
+                    size={20}
+                    color={cat.id === categoryId ? colors.brandText : staticColors.surface}
+                    strokeWidth={2}
+                  />
                 </View>
                 <Text style={styles.chipLabel} numberOfLines={1}>
                   {cat.name}
@@ -443,7 +448,7 @@ function makeStyles(colors) {
   },
   segmentTextActive: {
     fontFamily: fontFamily.extrabold,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   categoryRow: {
     backgroundColor: staticColors.inkCard,
@@ -491,6 +496,9 @@ function makeStyles(colors) {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
     color: staticColors.surface,
+  },
+  chipOverallTextSelected: {
+    color: colors.brandText,
   },
   chipLabel: {
     fontFamily: fontFamily.semibold,

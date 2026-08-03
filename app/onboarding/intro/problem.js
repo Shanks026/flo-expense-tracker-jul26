@@ -5,11 +5,7 @@ import OnboardingMascot from '../../../components/OnboardingMascot';
 import { colors, fontFamily } from '../../../theme/tokens';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 
-// The waving hey_screen art (not the clipboard) — the clipboard mascot is
-// reserved for the actual multiple-choice question screens (age/income/goal/
-// leak/habit); this is a rhetorical hook, not a question with answers, so it
-// uses the same placeholder art as opener/solution/name for now.
-const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
+const KOBAN_EVER_REACH = require('../../../assets/mascot/ever-reach.png');
 
 // Screen 2 — the hook. A rhetorical question, no subtitle — the mascot +
 // question stand alone, matching the same size/placement as the opener
@@ -23,7 +19,7 @@ export default function Problem() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
-      hero={<OnboardingMascot image={KOBAN_WAVE} size={200} />}
+      hero={<OnboardingMascot image={KOBAN_EVER_REACH} size={210} />}
       title={
         <Text style={styles.titleCenter}>
           Ever reach month-end and wonder… <Text style={styles.emphasis}>where did it all go?</Text>

@@ -191,10 +191,9 @@ export default function RankUpCelebration() {
               <Text style={styles.themeLabel}>Card unlocked</Text>
               <CardThemeSurface theme={getTheme(shownRank.themeId)} style={styles.themePreview}>
                 <View style={styles.themePreviewContent}>
-                  <Text style={[styles.themePreviewName, { color: getTheme(shownRank.themeId).textColor }]}>Flo</Text>
+                  <Text style={[styles.themePreviewName, { color: getTheme(shownRank.themeId).textColor }]}>{getTheme(shownRank.themeId).name}</Text>
                 </View>
               </CardThemeSurface>
-              <Text style={styles.themeName}>{getTheme(shownRank.themeId).name}</Text>
             </Animated.View>
           )}
         </View>
@@ -295,14 +294,6 @@ function makeStyles() {
     themePreviewName: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.md,
-    },
-    themeName: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.sm,
-      // colors.surface, not a literal white — this screen is pinned dark, and
-      // `title` above already uses surface as its on-ink foreground.
-      color: colors.surface,
-      marginTop: spacing.sm,
     },
   });
 }

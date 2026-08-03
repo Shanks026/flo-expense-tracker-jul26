@@ -5,7 +5,7 @@ import OnboardingMascot from '../../../components/OnboardingMascot';
 import { colors, fontFamily } from '../../../theme/tokens';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 
-const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
+const KOBAN_2MINS = require('../../../assets/mascot/2mins.png');
 
 // Screen 3 — the promise. The payoff clause is a plain colour change now (no
 // marker-style background pill) — same mascot size/placement as opener and
@@ -18,7 +18,7 @@ export default function Solution() {
     <OnboardingScreen
       bg="light"
       progress={pos.index / pos.total}
-      hero={<OnboardingMascot image={KOBAN_WAVE} size={200} />}
+      hero={<OnboardingMascot image={KOBAN_2MINS} size={215} />}
       title={
         <Text style={styles.titleCenter}>
           Let's find out together.{'\n'}All it takes is just 2 minutes a day to{' '}

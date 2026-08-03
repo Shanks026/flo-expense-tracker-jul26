@@ -13,7 +13,6 @@ import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
-import { useAccountSwitcherSheet } from './AccountSwitcherSheet';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
@@ -97,7 +96,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId, activeAccount, accounts } = useAccount();
-  const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { showToast } = useToast();
   const { showRewardBurst } = useRewardBurst();
   const { expenseCategories, incomeCategories } = useCategories();
@@ -114,6 +112,19 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const [categoryId, setCategoryId] = useState(null);
   const [planId, setPlanId] = useState(null);
   const [planPickerOpen, setPlanPickerOpen] = useState(false);
+  // Which account a non-transfer entry saves into — was hardcoded to
+  // activeAccountId at save time with no way to change it for THIS entry
+  // (the old "Adding to X" row dismissed the whole sheet to open the real
+  // account switcher, which changes the GLOBAL active account and never
+  // reopens this sheet — losing whatever was already filled in, worst of all
+  // for an auto-detected prefill). Now a per-transaction choice, local to
+  // this sheet, same inline-dropdown shape AccountField already uses for
+  // Transfer's From/To. Editing an existing transaction still never changes
+  // its account (handleSave's update() below doesn't touch account_id) — this
+  // just displays the transaction's REAL account correctly instead of
+  // whatever happens to be globally active right now.
+  const [accountId, setAccountId] = useState(null);
+  const [accountPickerOpen, setAccountPickerOpen] = useState(false);
   const [fromAccountId, setFromAccountId] = useState(null);
   const [toAccountId, setToAccountId] = useState(null);
   const [fromPickerOpen, setFromPickerOpen] = useState(false);
@@ -126,6 +137,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   const selectedPlan = activePlans.find((p) => p.id === planId);
+  // Falls back to activeAccount only for the brief window before `open()`'s
+  // setAccountId has run (or if accounts hasn't loaded yet) — once open,
+  // accountId is always set explicitly by open() above.
+  const selectedAccount = accounts.find((a) => a.id === accountId) ?? activeAccount;
   // The Transfer tab itself is ALWAYS shown now (previously hidden entirely
   // below 2 accounts) — this just controls which UI renders INSIDE it: the
   // real From/To form, or a prompt to add a second account. FREE_LIMITS.accounts
@@ -140,6 +155,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       setPlanPickerOpen(false);
       setFromPickerOpen(false);
       setToPickerOpen(false);
+      setAccountPickerOpen(false);
       // Autofocus the amount field ONLY for a genuinely blank entry (the ⊕
       // tab, no payload at all) — that's the one case where typing the amount
       // is obviously the user's next move. Every other path already has an
@@ -166,6 +182,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           setFromAccountId(tx.transfer_account_id);
           setToAccountId(tx.account_id);
         }
+        // Harmless fallback — the transfer branch doesn't render the
+        // accountId row, but keeps it defined in case type is switched
+        // away from 'transfer' while this sheet is open.
+        setAccountId(tx.account_id);
         setDate(new Date(tx.occurred_at));
         setNote(tx.note ?? '');
       } else if (payload?.id) {
@@ -176,6 +196,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setAmount(String(tx.amount));
         setCategoryId(tx.category_id);
         setPlanId(tx.plan_id);
+        // The transaction's REAL account — editing never changes it (see
+        // handleSave), this is display-only, but must reflect the actual
+        // row, not whatever's currently globally active.
+        setAccountId(tx.account_id);
         setDate(new Date(tx.occurred_at));
         setNote(tx.note ?? '');
       } else {
@@ -186,6 +210,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setAmount(payload?.amount ? String(Math.round(payload.amount)) : '');
         const prefillList = prefillType === 'expense' ? expenseCategories : incomeCategories;
         setCategoryId(prefillList[0]?.id ?? null);
+        // Defaults to the active account, same as before — now changeable
+        // via the inline dropdown before saving, instead of fixed.
+        setAccountId(activeAccountId);
         // Transfer From/To seed: From = the account you're in, To = unset.
         setFromAccountId(activeAccountId);
         setToAccountId(null);
@@ -309,7 +336,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     if (editingId) {
       ({ error: saveError } = await supabase.from('transactions').update(payload).eq('id', editingId));
     } else {
-      ({ error: saveError } = await supabase.from('transactions').insert({ ...payload, account_id: activeAccountId }));
+      ({ error: saveError } = await supabase.from('transactions').insert({ ...payload, account_id: accountId }));
       isNewEntry = !saveError;
     }
 
@@ -347,7 +374,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
 
     if (!editingId && type === 'expense') {
-      const budgetMsg = await budgetToastForSave({ categoryId, accountId: activeAccountId });
+      const budgetMsg = await budgetToastForSave({ categoryId, accountId });
       const planMsg = planId ? await planToastForSave({ planId }) : null;
       if (budgetMsg) showToast({ message: budgetMsg, variant: 'warn' });
       if (planMsg) showToast({ message: planMsg, variant: 'warn' });
@@ -409,19 +436,47 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           </View>
         </View>
 
-        {activeAccount && type !== 'transfer' && (
-          <Pressable
-            style={styles.accountRow}
-            onPress={() => {
-              modalRef.current?.dismiss();
-              openAccountSwitcher();
-            }}
-          >
-            <View style={[styles.accountDot, { backgroundColor: activeAccount.color }]} />
-            <Text style={styles.accountText}>
-              Adding to <Text style={styles.accountName}>{activeAccount.name}</Text>
-            </Text>
-          </Pressable>
+        {selectedAccount && type !== 'transfer' && (
+          <>
+            <Pressable
+              style={styles.accountRow}
+              disabled={!!editingId || accounts.length < 2}
+              onPress={() => setAccountPickerOpen((v) => !v)}
+            >
+              <View style={[styles.accountDot, { backgroundColor: selectedAccount.color }]} />
+              <Text style={styles.accountText}>
+                Adding to <Text style={styles.accountName}>{selectedAccount.name}</Text>
+              </Text>
+              {/* Editing never changes an entry's account (see handleSave),
+                  and there's nothing to pick among with only one account —
+                  the chevron only appears when this row is actually
+                  interactive. */}
+              {!editingId && accounts.length >= 2 && (
+                <ChevronDown size={14} color={staticColors.mutedDarker} strokeWidth={2.4} />
+              )}
+            </Pressable>
+            {accountPickerOpen && (
+              <View style={styles.planPicker}>
+                {accounts.map((a) => (
+                  <Pressable
+                    key={a.id}
+                    style={[styles.planOption, accountId === a.id && styles.planOptionSelected]}
+                    onPress={() => {
+                      setAccountId(a.id);
+                      setAccountPickerOpen(false);
+                    }}
+                  >
+                    <Text
+                      style={[styles.planOptionText, accountId === a.id && styles.planOptionTextSelected]}
+                      numberOfLines={1}
+                    >
+                      {a.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         <View style={styles.segmentWrap}>
@@ -448,7 +503,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         <View style={styles.amountWrap}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
-            <Text style={styles.amountCurrency}>{currencySymbol(activeAccount?.currency)}</Text>
+            <Text style={styles.amountCurrency}>{currencySymbol(selectedAccount?.currency)}</Text>
             <TextInput
               ref={amountInputRef}
               value={amount}
@@ -536,7 +591,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                 return (
                   <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
                     <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
-                      <CategoryIcon icon={cat.icon} size={22} color={selected ? staticColors.ink : staticColors.ink} strokeWidth={2} />
+                      <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : staticColors.ink} strokeWidth={2} />
                     </View>
                     <Text style={[styles.chipLabel, !selected && styles.chipLabelInactive]} numberOfLines={1}>
                       {cat.name}

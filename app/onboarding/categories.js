@@ -27,6 +27,10 @@ import { CATEGORY_BANK } from '../../lib/categoryBank';
 // plain insert — idempotent if this screen is ever visited twice (e.g. a
 // cold restart mid-onboarding resumes at account.js, walking back through
 // this screen), without needing a live check to prevent double-inserting.
+// No mascot on this screen (UX call, not an oversight): two full chip grids
+// (expense + income) already fill it, and even a small placeholder pushed the
+// INCOME grid partly off the first screen. The list needs the space more than
+// the mascot does here.
 function preselectedSet(items) {
   return new Set(items.filter((i) => i.preselected).map((i) => i.name));
 }

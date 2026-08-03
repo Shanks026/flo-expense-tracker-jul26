@@ -67,6 +67,12 @@ export default function OnboardingScreen({
   // print underneath it. Bigger, bolder, and ink rather than muted.
   subtitleEmphasis = false,
   scrollable = false,
+  // Like `scrollable`, but ONLY `children` scrolls — hero/title/subtitle stay
+  // fixed at the top instead of scrolling (and re-centering) along with a long
+  // list below them. For screens whose body is a real list (e.g. currency's
+  // ChoiceList) where the question should stay put and only the options move.
+  // Takes priority over `scrollable` if both are passed.
+  scrollableBody = false,
   primaryLabel,
   onPrimary,
   primaryDisabled,
@@ -92,8 +98,11 @@ export default function OnboardingScreen({
     : bias === 'down' ? [8, 1]
     : [1, 1];
 
-  const group = (
-    <OnboardingReveal>
+  // Split from `children` so scrollableBody mode can pin this part and let
+  // only the body scroll — the other two modes just recombine it with
+  // children below, unchanged from before the split.
+  const head = (
+    <>
       {eyebrow ? <Text style={[styles.eyebrow, { color: p.eyebrow }]}>{eyebrow}</Text> : null}
       {hero ? <View style={styles.hero}>{hero}</View> : null}
       {title ? (
@@ -120,6 +129,12 @@ export default function OnboardingScreen({
           {subtitle}
         </Text>
       ) : null}
+    </>
+  );
+
+  const group = (
+    <OnboardingReveal>
+      {head}
       {children ? <View style={styles.body}>{children}</View> : null}
     </OnboardingReveal>
   );
@@ -138,7 +153,21 @@ export default function OnboardingScreen({
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.content}>
-          {scrollable ? (
+          {scrollableBody ? (
+            <View style={styles.flex}>
+              <OnboardingReveal style={styles.scrollBodyHead}>{head}</OnboardingReveal>
+              {children ? (
+                <ScrollView
+                  style={styles.flex}
+                  contentContainerStyle={styles.scrollBodyContent}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {children}
+                </ScrollView>
+              ) : null}
+            </View>
+          ) : scrollable ? (
             <ScrollView
               style={styles.flex}
               contentContainerStyle={styles.scrollGroup}
@@ -220,6 +249,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingVertical: spacing.xxl,
+  },
+  // scrollableBody mode — the head sits fixed under the progress bar; only
+  // the ScrollView below it (the real body content) scrolls.
+  scrollBodyHead: {
+    paddingTop: spacing.lg,
+  },
+  scrollBodyContent: {
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
   },
   eyebrow: {
     fontFamily: fontFamily.extrabold,

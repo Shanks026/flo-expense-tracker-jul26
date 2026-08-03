@@ -45,7 +45,7 @@ function formatBalance(value, currency) {
   return { sign: value < 0 ? '−' : '', number: formatAmountNumber(value, currency) };
 }
 
-function AccountCard({ account, summary, active, onSelect, onEdit, styles }) {
+function AccountCard({ account, summary, active, activeIconColor, onSelect, onEdit, styles }) {
   const currency = account.currency ?? 'INR';
   const balance = formatBalance(summary?.in_hand_balance ?? 0, currency);
 
@@ -59,7 +59,7 @@ function AccountCard({ account, summary, active, onSelect, onEdit, styles }) {
           </Text>
           {active && (
             <View style={styles.activePill}>
-              <Check size={10} color={staticColors.ink} strokeWidth={3} />
+              <Check size={10} color={activeIconColor} strokeWidth={3} />
             </View>
           )}
         </View>
@@ -78,12 +78,12 @@ function AccountCard({ account, summary, active, onSelect, onEdit, styles }) {
       <View style={styles.cardStatsRow}>
         <View style={styles.statLine}>
           <TrendingUp size={12} color={staticColors.mutedMid} strokeWidth={2.6} />
-          <Text style={styles.statValue}>{formatAmount(summary?.month_income ?? 0, currency)}</Text>
+          <Text style={styles.statValue}>{formatAmount(summary?.period_income ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Income</Text>
         </View>
         <View style={styles.statLine}>
           <TrendingDown size={12} color={staticColors.mutedMid} strokeWidth={2.6} />
-          <Text style={styles.statValue}>{formatAmount(summary?.month_expense ?? 0, currency)}</Text>
+          <Text style={styles.statValue}>{formatAmount(summary?.period_expense ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Expenses</Text>
         </View>
       </View>
@@ -171,6 +171,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
             account={account}
             summary={summaries[account.id]}
             active={account.id === activeAccountId}
+            activeIconColor={colors.brandText}
             onSelect={() => handleSelect(account)}
             onEdit={() => handleEdit(account)}
           />

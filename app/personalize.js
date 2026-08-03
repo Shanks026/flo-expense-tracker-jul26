@@ -8,7 +8,7 @@ import CardThemeSurface from '../components/CardThemeSurface';
 import PersonalizePreview from '../components/PersonalizePreview';
 import AppearanceToggle from '../components/AppearanceToggle';
 import { ColorSwatch } from '../components/ColorPicker';
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
@@ -173,7 +173,7 @@ export default function Personalize() {
                 <CardThemeSurface theme={t} style={[styles.cardSwatchShape, isSelected && styles.cardSwatchSelected]}>
                   {isSelected && (
                     <View style={styles.cardBadge}>
-                      <Check size={11} color={staticColors.ink} strokeWidth={3} />
+                      <Check size={11} color={colors.brandText} strokeWidth={3} />
                     </View>
                   )}
                 </CardThemeSurface>

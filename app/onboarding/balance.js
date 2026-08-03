@@ -87,6 +87,7 @@ export default function OnboardingBalance() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
+      scrollable
       title="Let's fill your wallet"
       subtitle="Optional. Add what's yours. Let's not start from zero."
       primaryLabel="Add & Continue"

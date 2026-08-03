@@ -1,12 +1,14 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams, Redirect } from 'expo-router';
 import {
   Home, List, Plus, ChartColumn, Menu as MenuIcon, Wallet, Flag, Receipt,
-  Sparkles, Palette, Tags, ChevronRight, CircleDollarSign, Snowflake, Star,
+  Sparkles, Palette, Tags, ChevronRight, Snowflake, Star,
 } from 'lucide-react-native';
 import TourScreen from '../../../components/TourScreen';
 import { colors, spacing, radii, fontFamily, fontSize } from '../../../theme/tokens';
 import { getTourStep, getTourPosition, getTourNext, BUNDLE_ROUTE } from '../../../lib/onboarding';
+
+const KOBAN_COIN = require('../../../assets/general/coin.png');
 
 // "Know your space" tour cards (28-onboarding-welcome-bundle.md Phase 2). One
 // dynamic route for all the informational cards — content from TOUR_STEPS
@@ -39,7 +41,7 @@ const TOUR_IMAGES = {
 
 // The three things logging earns you — the `currency` card's segmented body.
 const CURRENCY_ROWS = [
-  { key: 'coins', Icon: CircleDollarSign, color: colors.coinGold, label: 'Coins', body: 'Earned by logging — spend them on card designs in the Shop.' },
+  { key: 'coins', image: KOBAN_COIN, label: 'Coins', body: 'Earned by logging — spend them on card designs in the Shop.' },
   { key: 'freeze', Icon: Snowflake, color: colors.iceBlue, label: 'Streak freezes', body: 'Protect your streak on a day you miss.' },
   { key: 'xp', Icon: Star, color: colors.brand, label: 'XP', body: 'Builds your Level and Rank as you keep going.' },
 ];
@@ -86,7 +88,11 @@ export default function TourStep() {
           {CURRENCY_ROWS.map((r) => (
             <View key={r.key} style={styles.currencyRow}>
               <View style={styles.currencyIcon}>
-                <r.Icon size={20} color={r.color} fill={r.color} strokeWidth={1.6} />
+                {r.image ? (
+                  <Image source={r.image} style={styles.currencyImage} resizeMode="contain" />
+                ) : (
+                  <r.Icon size={20} color={r.color} fill={r.color} strokeWidth={1.6} />
+                )}
               </View>
               <View style={styles.currencyText}>
                 <Text style={styles.currencyLabel}>{r.label}</Text>
@@ -138,13 +144,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // 20 / 0.693 (the illustrated coin's measured ~69.3% canvas fill) — matches
+  // the 20px Snowflake/Star icons beside it in the other two currency rows.
+  currencyImage: {
+    width: 29,
+    height: 29,
+  },
   currencyText: {
     flex: 1,
   },
+  // includeFontPadding/textAlignVertical — Android's default extra font
+  // padding otherwise makes this sit low against the row's icon/coin image
+  // despite `alignItems: 'center'` on currencyRow.
   currencyLabel: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
     color: colors.ink,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   currencyBody: {
     fontFamily: fontFamily.medium,

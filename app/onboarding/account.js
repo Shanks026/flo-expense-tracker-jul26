@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
+import OnboardingMascot from '../../components/OnboardingMascot';
 import { CATEGORY_COLORS } from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
 import { colors, radii, spacing, fontFamily, fontSize } from '../../theme/tokens';
@@ -12,6 +13,8 @@ import { useDataRefresh } from '../../lib/DataRefreshContext';
 import useProfile from '../../hooks/useProfile';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 import { getDraft, pickDurableAnswers } from '../../lib/onboardingDraft';
+
+const KOBAN_ACCOUNT_NAME = require('../../assets/mascot/account-name.png');
 
 export default function OnboardingAccount() {
   const router = useRouter();
@@ -89,6 +92,8 @@ export default function OnboardingAccount() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_ACCOUNT_NAME} size={190} />}
       title="Name your account"
       subtitle="Track separate spaces later, like Personal or Business. Start with one."
       primaryLabel="Continue"

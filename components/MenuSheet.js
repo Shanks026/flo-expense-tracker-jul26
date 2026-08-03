@@ -142,13 +142,13 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
         {!isPro && (
           <Pressable style={styles.upgradeCard} onPress={() => handlePress('/pro')}>
             <View style={styles.upgradeIconTile}>
-              <Crown size={20} color={staticColors.ink} strokeWidth={2.2} fill={staticColors.ink} />
+              <Crown size={20} color={colors.brandText} strokeWidth={2.2} fill={colors.brandText} />
             </View>
             <View style={styles.upgradeTextWrap}>
               <Text style={styles.upgradeTitle}>Upgrade to Pro</Text>
               <Text style={styles.upgradeSubtitle}>Unlimited accounts, budgets & more</Text>
             </View>
-            <ChevronRight size={18} color={staticColors.ink} strokeWidth={2.4} />
+            <ChevronRight size={18} color={colors.brandText} strokeWidth={2.4} />
           </Pressable>
         )}
       </View>
@@ -275,7 +275,7 @@ function makeStyles(colors) {
     width: 44,
     height: 44,
     borderRadius: radii.iconTileLg,
-    backgroundColor: 'rgba(16, 16, 16, 0.12)',
+    backgroundColor: colors.brandOverlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -285,12 +285,12 @@ function makeStyles(colors) {
   upgradeTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   upgradeSubtitle: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: 'rgba(16, 16, 16, 0.65)',
+    color: colors.brandTextMuted,
     marginTop: 1,
   },
   rowLabel: {

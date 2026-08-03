@@ -38,7 +38,13 @@ export const colors = {
   // stays the money colour and the app's identity; orange means "you showed up".
   streak: '#FF6B2C',
   streakDeep: '#D9480F', // text + the flame's core; readable on white
-  streakBg: '#FFE8DC', // pale wash, for tiles behind the flame
+  streakBg: '#ffe5dc', // pale wash, for tiles behind the flame
+  // A purer, less red-leaning orange than `streak` itself (hue ~18°, reads as
+  // "rich red/orange") — specifically for the streak calendar's filled/logged
+  // day cells, per direct feedback that they should read as orange, not red.
+  // Deepened once already (from #FF9500) per direct feedback for more
+  // contrast/pop against the screen.
+  streakFill: '#FF8A00',
 
   // Unread-alert dot on the bell. Rose rather than the full `danger` red: this
   // is "there is something to read", not "you are in trouble" — the alerts

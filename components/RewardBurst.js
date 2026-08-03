@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, AccessibilityInfo } from 'react-native';
+import { View, Text, Image, StyleSheet, AccessibilityInfo } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
-import { CircleDollarSign, Star, Snowflake } from 'lucide-react-native';
+import { Star, Snowflake } from 'lucide-react-native';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
+
+const KOBAN_COIN = require('../assets/general/coin.png');
 
 // A brief "you earned this" celebration — 18-gamification-ritual-and-ledger.md
 // Phase 3. Triggered from two places (AddTransactionSheet's first log of the
@@ -114,7 +116,7 @@ function RewardBurstOverlay({ coins, xp, freezes = 0, onDone }) {
       <View style={styles.card}>
         {coins > 0 && (
           <View style={styles.entry}>
-            <CircleDollarSign size={20} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+            <Image source={KOBAN_COIN} style={styles.coinIcon} resizeMode="contain" />
             <Text style={styles.text}>+{coins}</Text>
           </View>
         )}
@@ -169,11 +171,21 @@ function makeStyles(colors) {
       alignItems: 'center',
       gap: 6,
     },
+    // 20 / 0.693 (the illustrated coin's measured ~69.3% canvas fill).
+    coinIcon: {
+      width: 29,
+      height: 29,
+    },
+    // includeFontPadding/textAlignVertical — Android's default extra font
+    // padding otherwise makes this sit low against the coin/Star/Snowflake
+    // icon beside it despite `alignItems: 'center'` on `entry`.
     text: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.xl,
       letterSpacing: -0.2,
       color: staticColors.surface,
+      textAlignVertical: 'center',
+      includeFontPadding: false,
     },
   });
 }

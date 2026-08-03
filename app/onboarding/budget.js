@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../components/OnboardingScreen';
+import OnboardingMascot from '../../components/OnboardingMascot';
 import CategoryIcon from '../../components/CategoryIcon';
 import ProgressBar from '../../components/ProgressBar';
 import { useToast } from '../../components/Toast';
@@ -38,6 +39,11 @@ const BAND_TO_BUDGET = {
   gt_150k: 15000,
 };
 const DEFAULT_BUDGET_AMOUNT = 5000;
+
+// Only the 'created' branch below (the common, positive-confirmation path)
+// uses this — a thumbs-up doesn't fit the 'error'/'unknown' branches' tone,
+// and there's no dedicated art for those yet, so they keep the gray placeholder.
+const KOBAN_BUDGET = require('../../assets/mascot/budget.png');
 
 export default function OnboardingBudget() {
   const router = useRouter();
@@ -133,11 +139,14 @@ export default function OnboardingBudget() {
       <OnboardingScreen
         bg="light"
         progress={pos ? pos.index / pos.total : undefined}
+        scrollable
+        hero={<OnboardingMascot image={KOBAN_BUDGET} size={205} />}
         title={
           <>
             You said <Text style={styles.emphasis}>{leakLabel}</Text> was the leak.
           </>
         }
+        titleSize={24}
         subtitle="So we've set up a budget. It's already on your Budgets tab."
         primaryLabel="Nice"
         onPrimary={() => router.replace(next)}
@@ -165,6 +174,7 @@ export default function OnboardingBudget() {
       <OnboardingScreen
         bg="light"
         progress={pos ? pos.index / pos.total : undefined}
+        hero={<OnboardingMascot size={200} />}
         title="We couldn't set this up just now"
         subtitle="No worries. You can add a budget any time from the Budgets tab."
         primaryLabel="Continue"
@@ -178,6 +188,7 @@ export default function OnboardingBudget() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
+      hero={<OnboardingMascot size={200} />}
       title="We'll help you find it."
       subtitle="No budget to show yet, but once you start logging, we'll point out exactly where it's going."
       primaryLabel="Sounds good"

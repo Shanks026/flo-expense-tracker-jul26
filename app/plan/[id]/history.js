@@ -220,7 +220,7 @@ export default function PlanHistory() {
               </View>
               <AmountText value={item.amount} type="neutral" currency={currency} />
               <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                {isSelected && <Check size={15} color={staticColors.ink} strokeWidth={3} />}
+                {isSelected && <Check size={15} color={colors.brandText} strokeWidth={3} />}
               </View>
             </Pressable>
           );
@@ -249,7 +249,7 @@ function CategoryChip({ label, icon, active, onPress }) {
   return (
     <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
       {icon && (
-        <CategoryIcon icon={icon} size={15} color={active ? staticColors.ink : colors.mutedDarker} strokeWidth={2} />
+        <CategoryIcon icon={icon} size={15} color={active ? colors.brandText : colors.mutedDarker} strokeWidth={2} />
       )}
       <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
     </Pressable>
@@ -343,9 +343,9 @@ function makeStyles(colors) {
     color: colors.mutedDarker,
   },
   chipLabelActive: {
-    // Sits on the theme-accent chip bg — pinned dark, same assumption as
-    // Button's primary-text pin.
-    color: staticColors.ink,
+    // Sits on the theme-accent chip bg — colors.brandText picks legible
+    // dark/light text per-accent (theme/themes.js).
+    color: colors.brandText,
   },
   listContent: {
     paddingHorizontal: spacing.xl,

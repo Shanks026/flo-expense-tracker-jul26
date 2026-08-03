@@ -1,23 +1,29 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { CircleDollarSign, Snowflake } from 'lucide-react-native';
-import Confetti from '../../components/Confetti';
+import { Snowflake } from 'lucide-react-native';
 import Button from '../../components/Button';
 import CardThemeSurface from '../../components/CardThemeSurface';
 import OnboardingReveal from '../../components/OnboardingReveal';
+import OnboardingMascot from '../../components/OnboardingMascot';
 import { DONE_ROUTE } from '../../lib/onboarding';
 import { WELCOME_BUNDLE } from '../../lib/rewards';
 import { getTheme } from '../../lib/cardThemes';
-import { colors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { colors, fontFamily, fontSize, spacing } from '../../theme/tokens';
+
+const KOBAN_WELCOME_BUNDLE = require('../../assets/mascot/welcome-bundle.png');
+const KOBAN_COIN = require('../../assets/general/coin.png');
 
 // The welcome-bundle reveal (28-onboarding-welcome-bundle.md Phase 2) — its own
 // dedicated screen after the tour, reached from the last tour card AND from
-// "Skip tour" (so a skipping user still sees their reward). Confetti + the
-// three rewards, then Continue → the done screen (which owns finish(): the
-// grant + onboarded_at write). The amounts here come from the WELCOME_BUNDLE
-// constant, not a live read — the actual grant happens at finish(), so this
-// screen only needs to SHOW what's coming.
+// "Skip tour" (so a skipping user still sees their reward). Koban + the three
+// rewards, then Continue → the done screen (which owns finish(): the grant +
+// onboarded_at write). The amounts here come from the WELCOME_BUNDLE constant,
+// not a live read — the actual grant happens at finish(), so this screen only
+// needs to SHOW what's coming.
+//
+// Confetti removed (2026-07-29, user's call) — the mascot now carries the
+// celebratory beat instead of a particle effect.
 //
 // Pinned to the static default palette (white bg, ink text), like the rest of
 // onboarding and sign-in.
@@ -30,31 +36,38 @@ export default function OnboardingWelcomeBundle() {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.hero}>
           <OnboardingReveal>
+            <OnboardingMascot image={KOBAN_WELCOME_BUNDLE} size={210} style={styles.mascotSpacing} />
             <Text style={styles.eyebrow}>A gift to start</Text>
-            <Text style={styles.title}>Here's your{'\n'}welcome bundle</Text>
+            <Text style={styles.title}>Here's your welcome bundle</Text>
 
             <View style={styles.rewards}>
-              <View style={styles.rewardRow}>
-                <View style={styles.rewardIcon}>
-                  <CircleDollarSign size={22} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+              <View style={styles.rewardCols}>
+                <View style={styles.rewardCol}>
+                  <Image source={KOBAN_COIN} style={styles.coinIcon} resizeMode="contain" />
+                  <Text style={styles.rewardColText}>
+                    <Text style={styles.rewardColAmount}>{WELCOME_BUNDLE.coins.toLocaleString('en-IN')}</Text> coins
+                  </Text>
                 </View>
-                <Text style={styles.rewardAmount}>+{WELCOME_BUNDLE.coins.toLocaleString('en-IN')}</Text>
-                <Text style={styles.rewardName}>coins</Text>
+                <View style={styles.rewardCol}>
+                  <Snowflake size={36} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.2} />
+                  <Text style={styles.rewardColText}>
+                    <Text style={styles.rewardColAmount}>{WELCOME_BUNDLE.freezes}</Text> freeze
+                    {WELCOME_BUNDLE.freezes === 1 ? '' : 's'}
+                  </Text>
+                </View>
               </View>
 
-              <View style={styles.rewardRow}>
-                <View style={styles.rewardIcon}>
-                  <Snowflake size={22} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.2} />
-                </View>
-                <Text style={styles.rewardAmount}>+{WELCOME_BUNDLE.freezes}</Text>
-                <Text style={styles.rewardName}>streak freeze{WELCOME_BUNDLE.freezes === 1 ? '' : 's'}</Text>
-              </View>
-
-              <View style={styles.rewardRow}>
-                <CardThemeSurface theme={glitch} style={styles.themeSwatch}>
-                  <View />
+              {/* Same rectangle-preview shape RankUpCelebration's own card
+                  reveal uses (label above, full-width preview, name below) —
+                  CardThemeSurface applies its own border radius internally,
+                  so `themePreview` only needs to set the box's dimensions. */}
+              <View style={styles.themeWrap}>
+                <Text style={styles.themeLabel}>Card unlocked</Text>
+                <CardThemeSurface theme={glitch} style={styles.themePreview}>
+                  <View style={styles.themePreviewContent}>
+                    <Text style={[styles.themePreviewName, { color: glitch.textColor }]}>{glitch.name}</Text>
+                  </View>
                 </CardThemeSurface>
-                <Text style={styles.rewardName}>the {glitch.name} card</Text>
               </View>
             </View>
           </OnboardingReveal>
@@ -69,10 +82,6 @@ export default function OnboardingWelcomeBundle() {
           />
         </View>
       </SafeAreaView>
-
-      {/* After the SafeAreaView so it paints on top (its bg is opaque);
-          pointerEvents="none". */}
-      <Confetti />
     </View>
   );
 }
@@ -90,6 +99,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  mascotSpacing: {
+    marginBottom: spacing.xl,
+  },
   eyebrow: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
@@ -97,47 +109,79 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.income,
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
+  // Matches app/onboarding/done.js's title exactly ("You're all set" screen)
+  // — same 26px/1.2 line-height/-0.3 letter-spacing, per direct request to
+  // keep the two closing screens' headings visually consistent.
   title: {
     fontFamily: fontFamily.extrabold,
-    fontSize: 40,
-    lineHeight: 40 * 1.15,
-    letterSpacing: -0.5,
+    fontSize: 26,
+    lineHeight: 26 * 1.2,
+    letterSpacing: -0.3,
     color: colors.ink,
     marginBottom: spacing.xxl,
+    textAlign: 'center',
   },
   rewards: {
+    gap: spacing.xxl,
+  },
+  rewardCols: {
+    flexDirection: 'row',
     gap: spacing.lg,
   },
-  rewardRow: {
-    flexDirection: 'row',
+  // No icon tile/background — bare glyphs, per direct feedback. Each column
+  // centers its icon over one combined line of text (amount + label) below
+  // it, rather than the old icon-left/amount-right single-row shape.
+  rewardCol: {
+    flex: 1,
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  rewardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.iconTileLg,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
+  // 36 / 0.693 (the illustrated coin's measured ~69.3% canvas fill) — matches
+  // the 36px Snowflake icon in the freeze column beside it.
+  coinIcon: {
+    width: 52,
+    height: 52,
   },
-  rewardAmount: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-    fontVariant: ['tabular-nums'],
-  },
-  rewardName: {
+  // includeFontPadding/textAlignVertical — Android's default extra font
+  // padding otherwise makes this sit low against the icon above it.
+  rewardColText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.lg,
     color: colors.muted,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
-  themeSwatch: {
-    width: 44,
-    height: 30,
-    borderRadius: 8,
-    overflow: 'hidden',
+  rewardColAmount: {
+    fontFamily: fontFamily.extrabold,
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  themeWrap: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  themeLabel: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.xs,
+    color: colors.mutedDarker,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
+  themePreview: {
+    width: '78%',
+    height: 84,
+  },
+  themePreviewContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  themePreviewName: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
   },
   footer: {
     paddingBottom: spacing.sm,

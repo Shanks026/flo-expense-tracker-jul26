@@ -3,6 +3,7 @@ import { differenceInCalendarDays, startOfDay } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
+import useLoadedFor from './useLoadedFor';
 
 const DUE_SOON_DAYS = 3;
 
@@ -22,15 +23,16 @@ export function billStatus(nextDueDate) {
 // 00-index.md for the categories-not-loading bug.
 export default function useBills() {
   const { version } = useDataRefresh();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
   const [bills, setBills] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // See hooks/useLoadedFor.js.
+  const [loading, markLoaded] = useLoadedFor(userId, authLoading);
 
   const refetch = useCallback(async () => {
     if (!userId) {
       setBills([]);
-      setLoading(false);
+      markLoaded(null);
       return;
     }
 
@@ -39,7 +41,7 @@ export default function useBills() {
       .select('*, category:categories(name, icon, color)')
       .order('next_due_date', { ascending: true });
     if (!error) setBills(data ?? []);
-    setLoading(false);
+    markLoaded(userId);
   }, [userId]);
 
   useEffect(() => {

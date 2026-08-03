@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
 import { levelFromXp } from '../lib/rewards';
+import useLoadedFor from './useLoadedFor';
 
 const EMPTY_BALANCE = { coins: 0, xp: 0, freezes: 0 };
 
@@ -13,20 +14,22 @@ const EMPTY_BALANCE = { coins: 0, xp: 0, freezes: 0 };
 // as v_global_summary's own no-transactions-yet case.
 export default function useRewards() {
   const { version } = useDataRefresh();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
   const [balance, setBalance] = useState(EMPTY_BALANCE);
-  const [loading, setLoading] = useState(true);
+  // See hooks/useLoadedFor.js — otherwise Home's coin/freeze/level chips
+  // reported "loaded" and painted zeros while the real fetch was in flight.
+  const [loading, markLoaded] = useLoadedFor(userId, authLoading);
 
   const refetch = useCallback(async () => {
     if (!userId) {
       setBalance(EMPTY_BALANCE);
-      setLoading(false);
+      markLoaded(null);
       return;
     }
     const { data, error } = await supabase.from('v_reward_balances').select('*').maybeSingle();
     setBalance(error || !data ? EMPTY_BALANCE : { coins: data.coins, xp: data.xp, freezes: data.freezes });
-    setLoading(false);
+    markLoaded(userId);
   }, [userId]);
 
   useEffect(() => {

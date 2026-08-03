@@ -240,6 +240,36 @@ export function accentModeLabel(accent) {
   return modes[0] === 'dark' ? 'Dark mode only' : 'Light mode only';
 }
 
+// WCAG relative luminance (sRGB) — used only to pick a legible text color for
+// content sitting directly on a solid `brand` fill, below.
+function relativeLuminance(hex) {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lin = c.map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+}
+
+function contrastRatio(l1, l2) {
+  const [a, b] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (a + 0.05) / (b + 0.05);
+}
+
+// Every accent's `brand` hex sits somewhere between lime (very light) and
+// merlot/cobalt (quite dark) — a single hardcoded text color (every button
+// pinning `staticColors.ink` or `staticColors.surface` before this existed)
+// is wrong for roughly half the palette. This picks whichever of the app's
+// two fixed text colors (dark ink / light surface) contrasts better against
+// the ACTIVE accent's actual brand color, so any button/pill/chip painting
+// text or an icon directly onto `colors.brand` reads correctly no matter
+// which of the 20+ accents is selected — including ones added later.
+const INK = '#101010'; // staticColors.ink
+const SURFACE = '#F6F7F3'; // staticColors.bg — the light mode "near-white" text tone
+function pickBrandTextColor(brandHex) {
+  const l = relativeLuminance(brandHex);
+  const vsInk = contrastRatio(l, relativeLuminance(INK));
+  const vsSurface = contrastRatio(l, relativeLuminance(SURFACE));
+  return vsInk >= vsSurface ? INK : SURFACE;
+}
+
 // The actual resolved color set a screen reads via useTheme().colors — the
 // mode supplies everything, the accent overrides just the three brand keys
 // on top of it, and SEMANTIC is spread last so it can never be shadowed.
@@ -253,6 +283,11 @@ export function accentModeLabel(accent) {
 // UNCONDITIONALLY — it's for a tile on a surface that's dark regardless of
 // mode (IconTile's `onDark` prop, e.g. Plans' `Card dark` block, which is
 // dark under light mode too).
+//
+// `brandText` — see pickBrandTextColor above. Use this (not a hardcoded
+// ink/surface/white) for ANY text or icon painted directly onto a solid
+// `colors.brand` fill. `brandTextMuted` is the same color at 65% alpha, for a
+// de-emphasized second line on the same fill (e.g. a subtitle under a title).
 export function resolveColors(accentId, modeId) {
   let accent = accentMeta(accentId);
   const mode = modeMeta(modeId);
@@ -265,11 +300,19 @@ export function resolveColors(accentId, modeId) {
   // itself is never mutated). The picker also locks such accents in the wrong
   // mode, so this only fires for the toggle-after-picking path.
   if (!accentSupportsMode(accent, mode.id)) accent = accentMeta(DEFAULT_ACCENT_ID);
+  const brandText = pickBrandTextColor(accent.brand);
   return {
     ...mode.colors,
     ...SEMANTIC,
     brand: accent.brand,
     brandBg: modeId === 'dark' ? accent.brandBgDark : accent.brandBg,
     brandBgDark: accent.brandBgDark,
+    brandText,
+    brandTextMuted: brandText === INK ? 'rgba(16,16,16,0.65)' : 'rgba(246,247,243,0.65)',
+    // A subtle icon-tile scrim sitting ON TOP of a solid `brand` fill (e.g. a
+    // translucent chip behind an icon on the MenuSheet upgrade card) — same
+    // color family as `brandText` so the scrim and the icon/text drawn over
+    // it always invert together.
+    brandOverlay: brandText === INK ? 'rgba(16,16,16,0.12)' : 'rgba(246,247,243,0.12)',
   };
 }

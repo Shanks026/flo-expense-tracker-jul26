@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../components/OnboardingScreen';
+import OnboardingMascot from '../../components/OnboardingMascot';
 import ChoiceList from '../../components/OnboardingChoice';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 import { setReportSettings } from '../../lib/reports';
+
+const KOBAN_REPORTS = require('../../assets/mascot/reports.png');
 
 // 12-personal-onboarding.md Phase 2, screen 18 — cadence only. Deliberately no
 // preview graph card here (revision note removed the design's black card with
@@ -36,7 +39,10 @@ export default function OnboardingReports() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
+      scrollable
+      hero={<OnboardingMascot image={KOBAN_REPORTS} size={190} />}
       title="How often do you want a report on where it went?"
+      titleSize={24}
       primaryLabel="Continue"
       onPrimary={handleNext}
     >

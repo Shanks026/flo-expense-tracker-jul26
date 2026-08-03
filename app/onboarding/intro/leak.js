@@ -6,7 +6,7 @@ import ChoiceList from '../../../components/OnboardingChoice';
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
 
-const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
+const KOBAN_MONEY_LEAK = require('../../../assets/mascot/money-leak.png');
 
 // Screen 10 — the leak. Pre-creates a real budget in this category (Act 2). The
 // most consequential question in the intro, so it should feel like one.
@@ -36,7 +36,7 @@ export default function Leak() {
       bg="light"
       progress={pos.index / pos.total}
       scrollable
-      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
+      hero={<OnboardingMascot image={KOBAN_MONEY_LEAK} size={205} />}
       title="Where do you think your money quietly leaks?"
       titleSize={22}
       primaryLabel="Continue"

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, List, ChartColumn, Menu as MenuIcon, Plus } from 'lucide-react-native';
-import { colors as staticColors, radii, fontFamily } from '../theme/tokens';
+import { radii, fontFamily } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAddTransactionSheet } from './AddTransactionSheet';
 import { useMenuSheet } from './MenuSheet';
@@ -68,10 +68,11 @@ export default function TabBar({ state, navigation }) {
     <View style={[styles.bar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
       {firstHalf.map((route, i) => renderItem(route, i))}
       <Pressable style={styles.addButton} onPress={() => openAdd()}>
-        {/* Pinned: the button itself stays the theme's accent color
-            (colors.brand) regardless of theme, so the icon on top needs a
-            fixed color too, not one that inverts with the active theme. */}
-        <Plus size={28} color={staticColors.ink} strokeWidth={2.6} />
+        {/* The button itself stays the theme's accent color (colors.brand)
+            regardless of theme; the icon uses colors.brandText (computed
+            per-accent via WCAG contrast) rather than a color that inverts
+            with the active theme's mode but not its accent. */}
+        <Plus size={28} color={colors.brandText} strokeWidth={2.6} />
       </Pressable>
       {secondHalf.map((route, i) => renderItem(route, i + 2))}
       <Pressable style={styles.item} onPress={openMenu}>

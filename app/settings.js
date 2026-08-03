@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert, Send } from 'lucide-react-native';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
 import Skeleton from '../components/Skeleton';
@@ -43,6 +43,7 @@ import {
 } from '../lib/detect';
 import { getReportSettings, setReportSettings, DEFAULT_REPORT_SETTINGS } from '../lib/reports';
 import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
+import { RESET_PERIOD_OPTIONS } from '../lib/periods';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 
@@ -118,6 +119,14 @@ export default function Settings() {
   const [reportSettings, setReportSettingsState] = useState(DEFAULT_REPORT_SETTINGS);
   const [showReportTimePicker, setShowReportTimePicker] = useState(false);
 
+  // 30-summary-reset-period.md — governs the period Home's hero card and the
+  // account switcher sum Income/Expenses over. Read straight off `profile`
+  // (no local state mirror needed, unlike reportSettings above — this has no
+  // AsyncStorage/server-cron side that needs a separate persisted copy).
+  const [showResetDatePicker, setShowResetDatePicker] = useState(false);
+  const resetPeriod = profile?.reset_period ?? 'monthly';
+  const resetCustomStart = profile?.reset_custom_start ?? null;
+
   // Transaction Detection (06-transaction-auto-detect.md). Notification
   // access is granted outside the app (system settings), with no callback —
   // same reason getPermissionStatus() exists for OS notifications below —
@@ -148,6 +157,28 @@ export default function Settings() {
     // No local reschedule needed — setReportSettings mirrors to `profiles`
     // itself (17-server-push-notifications.md Phase 3), and the server
     // reads that directly on its own cron tick.
+  }
+
+  // Switching INTO Custom for the first time (no anchor set yet) defaults the
+  // start date to today, not null — lands on a concrete, immediately-visible
+  // "fresh start" instead of an ambiguous empty state. Any other transition
+  // just writes the new period; useAllAccountSummaries picks it up on its
+  // next notifyChanged()-triggered refetch (updateProfile is non-silent here
+  // on purpose — Home/the account switcher should actually update).
+  async function handleResetPeriodChange(value) {
+    if (value === 'custom' && !resetCustomStart) {
+      await updateProfile({ reset_period: 'custom', reset_custom_start: format(new Date(), 'yyyy-MM-dd') });
+    } else {
+      await updateProfile({ reset_period: value });
+    }
+  }
+
+  function handleResetCustomStartChange(_event, selected) {
+    setShowResetDatePicker(false);
+    if (!selected) return;
+    // The date field IS the reset action for Custom mode — picking a new
+    // anchor is how the user "starts fresh" (there's no separate button).
+    updateProfile({ reset_custom_start: format(selected, 'yyyy-MM-dd') });
   }
 
   useEffect(() => {
@@ -674,6 +705,50 @@ export default function Settings() {
           />
         )}
 
+        <Text style={styles.sectionLabel}>Summary Period</Text>
+        <Card style={styles.rowsCard}>
+          <View style={[styles.reportCadenceBlock, resetPeriod === 'custom' && styles.rowBorder]}>
+            <View style={styles.reportCadenceTop}>
+              <View style={styles.rowIcon}>
+                <CircleDollarSign size={20} color={colors.ink} strokeWidth={2} />
+              </View>
+              <Text style={styles.rowTitle}>Income & Expenses reset</Text>
+            </View>
+            <View style={styles.reportSegmentWrap}>
+              {RESET_PERIOD_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  style={[styles.reportSegment, resetPeriod === opt.value && styles.reportSegmentActive]}
+                  onPress={() => handleResetPeriodChange(opt.value)}
+                >
+                  <Text style={[styles.reportSegmentText, resetPeriod === opt.value && styles.reportSegmentTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {resetPeriod === 'custom' && (
+            <Pressable style={styles.subRow} onPress={() => setShowResetDatePicker(true)}>
+              <Text style={styles.subRowLabel}>Starts from</Text>
+              <Text style={styles.subRowValue}>
+                {format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
+              </Text>
+            </Pressable>
+          )}
+        </Card>
+
+        {showResetDatePicker && (
+          <DateTimePicker
+            value={resetCustomStart ? parseISO(resetCustomStart) : new Date()}
+            mode="date"
+            display="default"
+            maximumDate={new Date()}
+            onChange={handleResetCustomStartChange}
+          />
+        )}
+
         {isAutoDetectVariant() && (
           <>
             <Text style={styles.sectionLabel}>Transaction Detection</Text>
@@ -836,9 +911,9 @@ function makeStyles(colors) {
   avatarInitial: {
     fontFamily: fontFamily.extrabold,
     fontSize: 24,
-    // Sits on the theme-accent avatar bg — pinned dark, same assumption as
-    // Button's primary-text pin (every accent is light enough for dark text).
-    color: staticColors.ink,
+    // Sits on the theme-accent avatar bg — colors.brandText picks legible
+    // dark/light text per-accent (theme/themes.js).
+    color: colors.brandText,
   },
   profileNameRow: {
     flexDirection: 'row',

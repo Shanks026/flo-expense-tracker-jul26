@@ -1,7 +1,23 @@
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
-import { Flame, Snowflake } from 'lucide-react-native';
+import { Flame, Check } from 'lucide-react-native';
 import { colors, radii } from '../theme/tokens';
+
+const KOBAN_STREAK_FLAME_LOCKED = require('../assets/general/streak-locked.png');
+const KOBAN_FREEZE = require('../assets/general/freeze.png');
+// Measured via the source art's alpha bounding box — it's a tall flame shape
+// that only fills ~82.5% of its own square canvas height. Corrected so the
+// VISIBLE flame matches the glyph size it's replacing, not the frame around it.
+const FLAME_FILL_RATIO = 0.825;
+// Freeze illustration is a circular ice medallion with a drip tail hanging
+// below it — the medallion's OWN diameter (not the full bbox, which includes
+// the drip) is ~77.4% of the canvas height, row-profile-measured by finding
+// where the circle's width suddenly narrows into the drip's neck. Sizing off
+// just the medallion means it exactly fills the cell; the drip (which the
+// medallion ratio doesn't account for) naturally hangs past the cell's
+// bottom edge instead of being squeezed to fit inside it — `cell` has no
+// `overflow: 'hidden'`, so nothing clips it.
+const FREEZE_FILL_RATIO = 0.774;
 
 // Per-cell stagger step for the `animated` variant below — small enough that
 // 7 cells finish well within half a second, not a slow reveal.
@@ -43,34 +59,38 @@ export function StreakFlame({ type, size = 34, dark = false, dimmed = false }) {
           ? styles.cellEmptyDark
           : styles.cellEmpty;
 
-  const iconColor = isLogged
-    ? colors.streakDeep
-    : isFrozen
-      ? colors.iceBlue
-      : isNospend
-        ? colors.income
-        : dark
-          ? colors.mutedDarker
-          : colors.mutedLight;
+  // Only the default/unused case still uses the illustrated flame — its
+  // fixed orange/yellow palette can't be retinted at runtime the way the
+  // lucide glyph could, so 'nospend' (which relies on a green tint to stay
+  // visually distinct from a real logged day) keeps the vector Flame.
+  const iconFrame = (size * 0.5) / FLAME_FILL_RATIO;
+  // The freeze medallion fills the ENTIRE cell (Duolingo's frozen-day
+  // treatment), not sit at half-size like the other glyphs — its own
+  // circular shape IS the cell's fill, not an icon floating inside a
+  // separately-coloured circle. The measured ratio alone still left a sliver
+  // of bg visible at the bottom edge (per direct feedback) — the extra 1.12x
+  // closes that gap; only the drip tail should bleed past the cell now.
+  const freezeFrame = (size * 1.05) / FREEZE_FILL_RATIO;
 
   return (
     <View style={[styles.cell, { width: size, height: size, borderRadius: radii.pill }, cellStyle, dimmed && styles.dimmed]}>
       {isFrozen ? (
-        // Snowflake has no closed/fillable region (just radiating strokes,
-        // same shape Home's freeze chip already renders) — no `fill` prop,
-        // a bolder strokeWidth is what reads as "solid" for a line-only glyph.
-        <Snowflake size={size * 0.5} color={iconColor} strokeWidth={2.8} />
-      ) : (
-        <Flame
-          size={size * 0.5}
-          // The deep orange on the orange fill — same hue, darker value, so the
-          // flame sits IN the circle rather than fighting it. A white or ink flame
-          // would read as a separate object stamped on top. Same reasoning for
-          // the nospend green.
-          color={iconColor}
-          fill={isLogged || isNospend ? iconColor : 'transparent'}
-          strokeWidth={2.4}
+        // Nudged down 4px per direct feedback — the medallion's own art reads
+        // slightly high otherwise (its glassy highlight sits near the top).
+        <Image
+          source={KOBAN_FREEZE}
+          style={{ width: freezeFrame, height: freezeFrame, marginTop: 3 }}
+          resizeMode="contain"
         />
+      ) : isLogged ? (
+        // A plain white checkmark on the rich streak-orange fill — Duolingo's
+        // own treatment for a completed day, and simpler/clearer at this
+        // small size than the illustrated flame was.
+        <Check size={size * 0.5} color="#FFFFFF" strokeWidth={3.4} />
+      ) : isNospend ? (
+        <Flame size={size * 0.5} color={colors.income} fill={colors.income} strokeWidth={2.4} />
+      ) : (
+        <Image source={KOBAN_STREAK_FLAME_LOCKED} style={{ width: iconFrame, height: iconFrame }} resizeMode="contain" />
       )}
     </View>
   );
@@ -121,8 +141,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // streakFill, not colors.streak — per direct feedback, the logged-day cell
+  // should read as orange, not the redder-leaning streak orange.
   cellLit: {
-    backgroundColor: colors.streak,
+    backgroundColor: colors.streakFill,
   },
   // No-spend day — a muted income-green wash, deliberately NOT the vivid
   // streak orange: covered ≠ logged, and the calendar must say so at a glance.

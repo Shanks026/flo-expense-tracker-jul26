@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
-import { Snowflake } from 'lucide-react-native';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
-import useRewards from '../hooks/useRewards';
-import useMissedDays from '../hooks/useMissedDays';
-import { useFreezeForDates } from '../lib/rewardsMutations';
-import { useDataRefresh } from '../lib/DataRefreshContext';
+import useFreezeRecovery from '../hooks/useFreezeRecovery';
+
+const KOBAN_FREEZE = require('../assets/general/freeze.png');
+// Freeze illustration fills ~87.6% of its own square canvas — corrected so
+// the visible shape matches the glyph size it's replacing.
+const FREEZE_FILL_RATIO = 0.876;
 
 // User-scoped, same standing rule as StreakCelebration's own
 // lastCelebrated key (00-index.md) — this device may have more than one
@@ -31,17 +32,13 @@ export default function FreezePrompt() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
-  const { freezes, loading: rewardsLoading } = useRewards();
-  const { missedDates, loading: missedLoading } = useMissedDays();
-  const { notifyChanged } = useDataRefresh();
+  const { missedDates, freezes, loading, coverCount, isPartial, using, useFreeze } = useFreezeRecovery();
 
   const [visible, setVisible] = useState(false);
-  const [using, setUsing] = useState(false);
   const checkedRef = useRef(false);
 
   const userId = session?.user?.id ?? null;
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const loading = rewardsLoading || missedLoading;
 
   useEffect(() => {
     if (!session || !userId || loading || checkedRef.current) return;
@@ -60,19 +57,9 @@ export default function FreezePrompt() {
 
   if (missedDates.length === 0 || freezes < 1) return null;
 
-  // Closest-to-today subset when only partially covering — see
-  // useMissedDays.js's own comment on why this ordering matters for
-  // computeStreak's `current` to actually benefit.
-  const coverCount = Math.min(freezes, missedDates.length);
-  const datesToUse = missedDates.slice(-coverCount);
-  const isPartial = coverCount < missedDates.length;
-
   async function handleUseFreeze() {
-    setUsing(true);
-    const { error } = await useFreezeForDates(datesToUse, todayStr);
-    setUsing(false);
+    await useFreeze();
     setVisible(false);
-    if (!error) notifyChanged();
   }
 
   function handleStartFresh() {
@@ -84,7 +71,11 @@ export default function FreezePrompt() {
       <View style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.icon}>
-            <Snowflake size={26} color={colors.iceBlue} strokeWidth={2.2} />
+            <Image
+              source={KOBAN_FREEZE}
+              style={{ width: 26 / FREEZE_FILL_RATIO, height: 26 / FREEZE_FILL_RATIO }}
+              resizeMode="contain"
+            />
           </View>
           <Text style={styles.title}>
             You missed {missedDates.length} day{missedDates.length === 1 ? '' : 's'}

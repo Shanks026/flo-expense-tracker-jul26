@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Image } from 'react-native';
 import { BottomSheetModal, BottomSheetFlatList, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
-import { X, CircleDollarSign, PiggyBank, Snowflake } from 'lucide-react-native';
+import { X, PiggyBank } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -29,6 +29,9 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 // A row with a source this sheet doesn't recognise (a future addition landing
 // before this map is updated) falls back to the raw string rather than
 // crashing or rendering blank.
+const KOBAN_COIN = require('../assets/general/coin.png');
+const KOBAN_FREEZE = require('../assets/general/freeze.png');
+
 const SOURCE_LABELS = {
   daily_log: 'Logged a transaction',
   no_spend: 'No-spend day',
@@ -206,7 +209,7 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
           <Text style={styles.sectionTitle}>Coins</Text>
         </View>
         <View style={styles.balanceRow}>
-          <CircleDollarSign size={22} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+          <Image source={KOBAN_COIN} style={styles.balanceCoinIcon} resizeMode="contain" />
           <Text style={styles.balanceText}>{coins.toLocaleString('en-IN')}</Text>
         </View>
         <Text style={styles.explainerText}>
@@ -222,9 +225,7 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
         </View>
         <Text style={styles.explainerText}>Protects your streak on a day you miss.</Text>
         <View style={styles.shopCard}>
-          <View style={styles.shopIcon}>
-            <Snowflake size={20} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
-          </View>
+          <Image source={KOBAN_FREEZE} style={styles.shopFreezeIcon} resizeMode="contain" />
           <View style={styles.shopTextWrap}>
             <Text style={styles.shopTitle}>{freezes} held</Text>
             <Text style={styles.shopSubtitle}>
@@ -424,11 +425,21 @@ function makeStyles(colors) {
       paddingHorizontal: spacing.xl,
       marginBottom: spacing.xs,
     },
+    // 22 / 0.693 (the illustrated coin's measured ~69.3% canvas fill).
+    balanceCoinIcon: {
+      width: 32,
+      height: 32,
+    },
+    // includeFontPadding/textAlignVertical — Android's default extra font
+    // padding otherwise makes this sit low against the coin image beside it
+    // despite `alignItems: 'center'` on balanceRow.
     balanceText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.display,
       color: staticColors.surface,
       fontVariant: ['tabular-nums'],
+      textAlignVertical: 'center',
+      includeFontPadding: false,
     },
     // Full-width brand pill — the coins Buy button is a bigger ask (leaves
     // the sheet entirely, into Shop) than the freeze card's own compact
@@ -445,7 +456,7 @@ function makeStyles(colors) {
     buyButtonText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.md,
-      color: colors.ink,
+      color: colors.brandText,
     },
     shopCard: {
       flexDirection: 'row',
@@ -458,13 +469,13 @@ function makeStyles(colors) {
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
     },
-    shopIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: radii.iconTile,
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-      alignItems: 'center',
-      justifyContent: 'center',
+    // Bare illustration, no wrapping tile/bg — the coin-balance icon (bareCoinIcon
+    // pattern) below uses the same "no bg" treatment. Sized so the visible
+    // freeze shape (which fills ~87.6% of its own square canvas) reads at
+    // roughly the same visual footprint the old 40px icon-in-tile occupied.
+    shopFreezeIcon: {
+      width: 40 / 0.876,
+      height: 40 / 0.876,
     },
     shopTextWrap: {
       flex: 1,

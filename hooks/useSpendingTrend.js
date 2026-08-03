@@ -3,6 +3,7 @@ import { format, subDays, addDays, eachWeekOfInterval, endOfWeek, isWithinInterv
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
+import useLoadedFor from './useLoadedFor';
 
 // Bucket granularity mirrors lib/analytics.js's computeTrend: daily bars stay
 // readable up to a few weeks, but 30-90 daily bars would be too thin/cramped
@@ -16,9 +17,11 @@ const RANGE_CONFIG = {
 
 export default function useSpendingTrend(range = '7d') {
   const { version } = useDataRefresh();
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, loading: accountLoading } = useAccount();
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // See hooks/useLoadedFor.js — otherwise the chart reported "loaded" while the
+  // real fetch was in flight, rendering a flat all-zero trend as the answer.
+  const [loading, markLoaded] = useLoadedFor(activeAccountId, accountLoading);
 
   const { days, granularity } = RANGE_CONFIG[range] ?? RANGE_CONFIG['7d'];
 
@@ -37,7 +40,7 @@ export default function useSpendingTrend(range = '7d') {
 
     if (!activeAccountId) {
       setData(buckets);
-      setLoading(false);
+      markLoaded(null);
       return;
     }
 
@@ -65,7 +68,7 @@ export default function useSpendingTrend(range = '7d') {
     }
 
     setData(buckets);
-    setLoading(false);
+    markLoaded(activeAccountId);
   }, [days, granularity, activeAccountId]);
 
   useEffect(() => {

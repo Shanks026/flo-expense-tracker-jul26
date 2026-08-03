@@ -16,7 +16,7 @@ import {
 import CardThemeSurface from './CardThemeSurface';
 import AmountText from './AmountText';
 import CategoryIcon from './CategoryIcon';
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { formatMoney } from '../lib/currency';
 import { lighten } from '../lib/color';
 
@@ -131,7 +131,7 @@ export default function PersonalizePreview({ colors, cardTheme, style }) {
 
           <View style={styles.welcomeRow}>
             <View style={[styles.avatar, { backgroundColor: colors.brand }]}>
-              <Text style={[styles.avatarText, { color: staticColors.ink }]}>F</Text>
+              <Text style={[styles.avatarText, { color: colors.brandText }]}>F</Text>
             </View>
             <View>
               <Text style={[styles.welcomeTitle, { color: colors.ink }]}>Good morning</Text>
@@ -242,7 +242,7 @@ export default function PersonalizePreview({ colors, cardTheme, style }) {
             <List size={20} color={colors.mutedLight} strokeWidth={2} />
           </View>
           <View style={[styles.navAddButton, { backgroundColor: colors.brand }]}>
-            <Plus size={22} color={staticColors.ink} strokeWidth={2.6} />
+            <Plus size={22} color={colors.brandText} strokeWidth={2.6} />
           </View>
           <View style={styles.navItem}>
             <ChartColumn size={20} color={colors.mutedLight} strokeWidth={2} />

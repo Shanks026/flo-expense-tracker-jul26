@@ -266,6 +266,26 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
 
 ## Shared Infrastructure Notes
 
+- **`AddTransactionSheet` gained a per-transaction account picker
+  (2026-07-29)** — the "Adding to X" row previously **dismissed the whole
+  sheet** to open the real `AccountSwitcherSheet` (which changes the GLOBAL
+  active account) and never reopened this one, silently losing whatever was
+  already filled in. Worst for auto-detect: `DetectedTransactionHandler`'s
+  `openAdd({ amount, type })` prefill was lost entirely if the user tried to
+  pick a different account, since detection always attributes a transaction
+  to whichever account happens to be globally active at that moment,
+  regardless of which bank/account the notification actually came from. Fixed
+  by adding a new local `accountId` state (defaults to `activeAccountId`,
+  same as before) and an inline dropdown reusing the exact shape Transfer's
+  own `AccountField` already established (`styles.planPicker`/`planOption` —
+  no new styles) — selecting a different account is now local to the
+  transaction being composed, doesn't touch the global active account, and
+  `handleSave`'s insert uses `accountId` instead of `activeAccountId`. The row
+  is read-only (no chevron, disabled) while editing an existing transaction
+  (its account is never changed by an edit — `update()` never touched
+  `account_id` and still doesn't) or when the user only has one account.
+  `useAccountSwitcherSheet` import removed from this file — no remaining
+  caller.
 - **Logo revamp to the arrow "flow" mark (2026-07-15)** — the user replaced
   the app's icon-level branding around the same two-arrow vector used for
   `OnboardingArrowMotif.js`. `assets/icon.png` (1024×1024, solid lime bg,

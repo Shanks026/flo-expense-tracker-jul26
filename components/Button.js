@@ -7,11 +7,9 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
 
   // `primary`'s bg is the one thing in this file that MUST track the active
   // theme — it's the app's actual accent color, the whole point of a theme.
-  // Its text stays pinned to the static dark ink, not the active theme's
-  // `colors.ink`: Dark theme inverts `ink` to a LIGHT color (for on-screen
-  // text), which would put near-white text on a bright accent background —
-  // broken contrast. The accent itself is light-ish across every planned
-  // theme, so a pinned dark label reliably reads on all of them.
+  // Its text uses `colors.brandText` (theme/themes.js), computed per-accent
+  // via WCAG contrast rather than pinned to one color — some accents (e.g.
+  // cobalt, merlot) are dark enough to need light text, not dark.
   //
   // `dark` is a deliberately dark button regardless of screen theme (same
   // "permanently dark emphasis" role as Card's `dark` prop) — pinned to
@@ -33,7 +31,7 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
   // distinct weights, per direct feedback that a lone bright button for
   // every action in these modals "looks odd."
   const VARIANTS = {
-    primary: { bg: colors.brand, text: staticColors.ink },
+    primary: { bg: colors.brand, text: colors.brandText },
     dark: { bg: staticColors.ink, text: staticColors.surface },
     outline: { bg: colors.surface, text: colors.ink, border: colors.border },
     danger: { bg: colors.surface, text: colors.danger, border: colors.dangerBorder },

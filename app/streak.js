@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Trophy, Unlink, Flame, CircleDollarSign, Star, Snowflake, Gift } from 'lucide-react-native';
+import { ChevronLeft, Trophy, Unlink, Star, Snowflake, Gift } from 'lucide-react-native';
 import { Pressable } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import CardThemeSurface from '../components/CardThemeSurface';
@@ -20,17 +20,43 @@ import {
 } from 'date-fns';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
-import StreakFlameIcon from '../components/StreakFlameIcon';
+import Button from '../components/Button';
 import { StreakFlame } from '../components/StreakDays';
 import useStreak from '../hooks/useStreak';
+import useFreezeRecovery from '../hooks/useFreezeRecovery';
 import { streakHeadline } from '../lib/koban';
 import { milestoneRoad } from '../lib/rewards';
 import { STREAK_BADGE_ART, STREAK_BADGE_ART_LOCKED } from '../lib/trophies';
 import { getTheme } from '../lib/cardThemes';
+
+const KOBAN_STREAK = require('../assets/mascot/streak.png');
+const KOBAN_STREAK_LOCKED = require('../assets/general/streak-locked.png');
+const KOBAN_COIN = require('../assets/general/coin.png');
+const KOBAN_STREAK_FLAME = require('../assets/general/streak.png');
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
-const BADGE_SIZE = 92;
+// Same fill-ratio correction as StreakDays.js/StreakFlameIcon.js for this
+// same flame asset.
+const HERO_FLAME_FILL_RATIO = 0.825;
+
+// Hero mascot geometry — the cat is a POSTER on the card's right edge: large,
+// anchored to the top, and deliberately CROPPED by the card's bottom edge
+// (`hero` sets `overflow: 'hidden'`) so only its top half shows, exactly like
+// a poster whose bottom runs off the frame. Everything below is derived from
+// KOBAN_STREAK's own alpha-bbox — measured, not eyeballed: within its square
+// canvas the art occupies 21.3%→84.7% vertically and 22.1%→78.5%
+// horizontally, so a frame offset has to account for that transparent margin
+// or the visible cat lands nowhere near where the numbers say.
+const HERO_CARD_MIN_HEIGHT = 132;
+const HERO_CAT_FRAME = 276;
+const HERO_CAT_CONTENT_TOP = 0.213;
+const HERO_CAT_CONTENT_RIGHT = 0.785;
+// Start the visible art ~6px below the card's top edge; whatever falls past
+// the card's bottom (the cat's legs + the lower flame) gets cropped away.
+const HERO_CAT_TOP = 6 - HERO_CAT_CONTENT_TOP * HERO_CAT_FRAME;
+// Land the flame's right tip ~14px inside the card's right edge.
+const HERO_CAT_RIGHT = 14 - (1 - HERO_CAT_CONTENT_RIGHT) * HERO_CAT_FRAME;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 // The streak's own screen — the destination behind Home's header flame.
@@ -44,6 +70,11 @@ export default function StreakScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { current, longest, breaks, loggedToday, isNewStreak, history, loading } = useStreak();
+  // Same mechanic FreezePrompt's once-a-day auto-popup uses, exposed here as
+  // a persistent action — a user who dismissed today's popup with "Start
+  // fresh" (which commits nothing; see that component) can still come back
+  // and use a freeze later, as long as the gap it would cover still exists.
+  const { missedDates, freezes, coverCount, isPartial, canUse: canUseFreeze, using: usingFreeze, useFreeze } = useFreezeRecovery();
   // Streak vs Milestones — two tabs, not one long scroll. The streak calendar
   // is getting its own dedicated space so the planned calendar skins have room
   // to live (they'd have nowhere to go crammed below the milestone road), and
@@ -127,22 +158,59 @@ export default function StreakScreen() {
 
         {tab === 'streak' ? (
           <>
-            {/* Number and label left, flame right — the reference's layout. The
-                count led with the flame before, which buried the one number the
-                screen exists to show. */}
+            {/* Number and label left (flame icon beside the count, not
+                leading it — burying the one number the screen exists to show
+                was the earlier mistake). The cat mascot on the right is now a
+                large top-anchored POSTER on the card's right edge, cropped by
+                the card's own bottom edge so only its top half shows — per
+                the reference screenshot. Not a small contained badge. */}
             <Card style={styles.hero}>
               <View style={styles.heroText}>
-                <Text style={[styles.count, !lit && styles.countEmpty]}>{current}</Text>
+                <View style={styles.heroCountRow}>
+                  <Image source={KOBAN_STREAK_FLAME} style={styles.heroFlameIcon} resizeMode="contain" />
+                  <Text style={[styles.count, !lit && styles.countEmpty]}>{current}</Text>
+                </View>
                 {/* "day streak" regardless of count, as in the reference — "days
                     streak" is not English, and "1 day streak" reads fine. */}
                 <Text style={[styles.caption, !lit && styles.captionEmpty]}>day streak!</Text>
               </View>
-              <StreakFlameIcon size={BADGE_SIZE} lit={lit} />
+              <Image source={KOBAN_STREAK} style={styles.heroCatPoster} resizeMode="contain" />
             </Card>
 
             <Text style={styles.headline}>
               {streakHeadline({ current, loggedToday, isNewStreak })}
             </Text>
+
+            {/* Persistent freeze-recovery action (only rendered when there's an
+                actual gap to cover AND at least one freeze to spend — same gate
+                FreezePrompt's own popup uses). This is the only OTHER place a
+                freeze can be spent; previously the once-a-day modal was the
+                sole entry point. */}
+            {canUseFreeze && (
+              <Card style={styles.freezeCard}>
+                <View style={styles.freezeRow}>
+                  <View style={styles.freezeIcon}>
+                    <Snowflake size={18} color={colors.iceBlue} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.freezeText}>
+                    <Text style={styles.freezeTitle}>
+                      You missed {missedDates.length} day{missedDates.length === 1 ? '' : 's'}
+                    </Text>
+                    <Text style={styles.freezeBody}>
+                      {isPartial
+                        ? `${freezes} freeze${freezes === 1 ? '' : 's'} covers ${coverCount} of ${missedDates.length}.`
+                        : `Use ${coverCount} freeze${coverCount === 1 ? '' : 's'} to keep it going.`}
+                    </Text>
+                  </View>
+                </View>
+                <Button
+                  title={`Use ${coverCount} freeze${coverCount === 1 ? '' : 's'}`}
+                  onPress={useFreeze}
+                  loading={usingFreeze}
+                  style={styles.freezeButton}
+                />
+              </Card>
+            )}
 
             {/* Longest and Breaks — NOT "Current", which is already the enormous
                 number at the top of this screen. Breaks is the gaps between streaks:
@@ -236,10 +304,21 @@ export default function StreakScreen() {
                   >
                     {art ? (
                       <Image source={art} style={styles.badgeGridImage} resizeMode="contain" />
+                    ) : reached ? (
+                      // A reached-but-no-specific-art tier (shouldn't normally
+                      // happen — STREAK_BADGE_ART covers every MILESTONES day —
+                      // but future-proofs a new milestone added without its
+                      // own badge yet) falls to the illustrated streak mascot
+                      // rather than a generic glyph, same "art if it exists"
+                      // rule as everywhere else this mascot fills a fallback.
+                      <Image source={KOBAN_STREAK} style={styles.badgeGridImage} resizeMode="contain" />
                     ) : (
-                      <IconTile tone={reached ? 'streak' : 'neutral'} size={64} radius={32}>
-                        <Flame size={28} color={reached ? colors.streakDeep : colors.mutedLight} strokeWidth={2} />
-                      </IconTile>
+                      // Not-yet-reached tier — the pre-baked grayscale twin of
+                      // the same illustrated flame, matching the "reached"
+                      // fallback right above it, and the same earned-color/
+                      // locked-grayscale convention STREAK_BADGE_ART/
+                      // STREAK_BADGE_ART_LOCKED already use.
+                      <Image source={KOBAN_STREAK_LOCKED} style={styles.badgeGridImage} resizeMode="contain" />
                     )}
                     <Text style={styles.badgeGridTitle} numberOfLines={1}>
                       Day {entry.day}
@@ -294,7 +373,7 @@ export default function StreakScreen() {
               <View style={styles.sheetRewardRow}>
                 {rewardEntry.coins > 0 && (
                   <View style={styles.sheetRewardEntry}>
-                    <CircleDollarSign size={22} color={staticColors.coinGold} fill={staticColors.coinGold} strokeWidth={1.5} />
+                    <Image source={KOBAN_COIN} style={styles.sheetCoinIcon} resizeMode="contain" />
                     <Text style={styles.sheetRewardAmount}>+{rewardEntry.coins.toLocaleString('en-IN')}</Text>
                     <Text style={styles.sheetRewardUnit}>coins</Text>
                   </View>
@@ -414,12 +493,37 @@ function makeStyles(colors) {
   hero: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: spacing.xl,
     marginBottom: spacing.lg,
+    minHeight: HERO_CARD_MIN_HEIGHT,
+    // The whole point of the poster treatment — crops the oversized mascot at
+    // the card's own rounded edges so only its top half shows.
+    overflow: 'hidden',
   },
   heroText: {
     flex: 1,
+    // The mascot is absolutely positioned (out of flow), so the text needs its
+    // own right inset or the count/caption would run underneath it.
+    paddingRight: HERO_CAT_FRAME * (HERO_CAT_CONTENT_RIGHT - 0.35),
+  },
+  heroCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  heroFlameIcon: {
+    width: 40 / HERO_FLAME_FILL_RATIO,
+    height: 40 / HERO_FLAME_FILL_RATIO,
+  },
+  // See the HERO_CAT_* geometry block at the top of this file — top-anchored
+  // and oversized on purpose so the card's bottom edge slices through the cat,
+  // leaving only its top half on the card like a cropped poster.
+  heroCatPoster: {
+    position: 'absolute',
+    top: HERO_CAT_TOP,
+    right: HERO_CAT_RIGHT,
+    width: HERO_CAT_FRAME,
+    height: HERO_CAT_FRAME,
   },
   count: {
     fontFamily: fontFamily.extrabold,
@@ -447,6 +551,41 @@ function makeStyles(colors) {
     letterSpacing: -0.3,
     color: colors.ink,
     marginBottom: spacing.lg,
+  },
+  freezeCard: {
+    marginBottom: spacing.lg,
+  },
+  freezeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  freezeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.iceBlueBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  freezeText: {
+    flex: 1,
+  },
+  freezeTitle: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.md,
+    color: colors.ink,
+  },
+  freezeBody: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+    marginTop: 1,
+  },
+  freezeButton: {
+    height: 48,
+    backgroundColor: colors.iceBlue,
   },
   statsRow: {
     flexDirection: 'row',
@@ -562,15 +701,28 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: 6,
   },
+  // 22 / 0.693 (the illustrated coin's measured ~69.3% canvas fill) — matches
+  // the 22px Star/Snowflake icons in the sibling reward entries beside it.
+  sheetCoinIcon: {
+    width: 32,
+    height: 32,
+  },
+  // includeFontPadding/textAlignVertical — Android's default extra font
+  // padding otherwise makes this sit low against the coin/Star/Snowflake
+  // icon beside it despite `alignItems: 'center'` on sheetRewardEntry.
   sheetRewardAmount: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
     color: staticColors.surface,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   sheetRewardUnit: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
     color: staticColors.mutedMid,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   sheetThemeWrap: {
     width: '100%',

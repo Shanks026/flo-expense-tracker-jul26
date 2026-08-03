@@ -3,17 +3,21 @@ import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
+import useLoadedFor from './useLoadedFor';
 
 export default function useTransactions({ month, type = 'all', categoryId = null, planId = null, limit } = {}) {
   const { version } = useDataRefresh();
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, loading: accountLoading } = useAccount();
   const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // See hooks/useLoadedFor.js — otherwise the list reported "loaded" while the
+  // real fetch was in flight, so screens rendered their "nothing here yet"
+  // empty state as though it were the answer, then popped to real rows.
+  const [loading, markLoaded] = useLoadedFor(activeAccountId, accountLoading);
 
   const refetch = useCallback(async () => {
     if (!activeAccountId) {
       setTransactions([]);
-      setLoading(false);
+      markLoaded(null);
       return;
     }
 
@@ -44,7 +48,7 @@ export default function useTransactions({ month, type = 'all', categoryId = null
 
     const { data, error } = await query;
     if (!error) setTransactions(data ?? []);
-    setLoading(false);
+    markLoaded(activeAccountId);
   }, [month?.getTime(), type, categoryId, planId, limit, activeAccountId]);
 
   useEffect(() => {

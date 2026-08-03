@@ -9,7 +9,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../../../theme/tok
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
 
-const KOBAN_CLIPBOARD = require('../../../assets/mascot/waht_would_screen.png');
+const KOBAN_HOW_MUCH = require('../../../assets/mascot/how-much-comes.png');
 
 // Screen 6 — income band. Sizes the first budget (Act 2) AND is now persisted
 // to profiles.onboarding_answers for later personalisation/analytics (decision
@@ -44,7 +44,7 @@ export default function Income() {
       bg="light"
       progress={pos.index / pos.total}
       scrollable
-      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
+      hero={<OnboardingMascot image={KOBAN_HOW_MUCH} size={200} />}
       title="Roughly how much comes in each month?"
       titleSize={24}
       primaryLabel="Continue"

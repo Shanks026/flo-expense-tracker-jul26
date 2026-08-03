@@ -37,7 +37,7 @@ export default function Age() {
       bg="light"
       progress={pos.index / pos.total}
       scrollable
-      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={200} />}
+      hero={<OnboardingMascot image={KOBAN_CLIPBOARD} size={210} />}
       title="Which of these is you?"
       titleSize={24}
       primaryLabel="Continue"

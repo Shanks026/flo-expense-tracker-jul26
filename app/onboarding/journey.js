@@ -1,9 +1,12 @@
 import { Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../components/OnboardingScreen';
+import OnboardingMascot from '../../components/OnboardingMascot';
 import { colors, fontFamily } from '../../theme/tokens';
 import { getNextRoute, getStepPosition } from '../../lib/onboarding';
 import useProfile from '../../hooks/useProfile';
+
+const KOBAN_YOU_ARE_ABOUT_TO = require('../../assets/mascot/you-are-about-to.png');
 
 // 12-personal-onboarding.md Phase 3, screen 20 — short and punchy, NOT a
 // timeline. The "where you are / where you're going / how FLO gets you there"
@@ -38,16 +41,16 @@ export default function OnboardingJourney() {
     <OnboardingScreen
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
-      arrowMotif="bottom"
+      hero={<OnboardingMascot image={KOBAN_YOU_ARE_ABOUT_TO} size={210} />}
       title={
-        <>
+        <Text style={styles.titleCenter}>
           You're about to <Text style={styles.emphasis}>{phrase}</Text>.{' '}
           <Text style={styles.emphasis}>For free</Text>
           {firstName ? `, ${firstName}` : ''}.
-        </>
+        </Text>
       }
-      titleSize={28}
-      subtitle="No card to start. No catch."
+      titleSize={24}
+      subtitle={<Text style={styles.titleCenter}>No card to start. No catch.</Text>}
       primaryLabel="Almost there"
       onPrimary={() => router.replace(next)}
     />
@@ -55,6 +58,9 @@ export default function OnboardingJourney() {
 }
 
 const styles = StyleSheet.create({
+  titleCenter: {
+    textAlign: 'center',
+  },
   emphasis: {
     fontFamily: fontFamily.extrabold,
     color: colors.income,

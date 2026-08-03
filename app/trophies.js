@@ -4,7 +4,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
-  Flame,
   NotebookPen,
   CalendarCheck2,
   Target,
@@ -45,6 +44,9 @@ import {
   FRUGAL_BADGE_ART_LOCKED,
 } from '../lib/trophies';
 import { getTheme } from '../lib/cardThemes';
+
+const KOBAN_STREAK = require('../assets/mascot/streak.png');
+const KOBAN_STREAK_LOCKED = require('../assets/general/streak-locked.png');
 import { RANKS, RANK_BADGE_ART, RANK_BADGE_ART_LOCKED } from '../lib/rewards';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -52,7 +54,7 @@ import { useTheme } from '../theme/ThemeContext';
 // String keys in lib/trophies.js map to these — kept local to this screen
 // rather than CategoryIcon.js, which is specifically the category icon
 // registry, not a general-purpose one.
-const ICONS = { Flame, NotebookPen, CalendarCheck2, Target, Leaf, Compass, Tags, RotateCcw, Sparkles };
+const ICONS = { NotebookPen, CalendarCheck2, Target, Leaf, Compass, Tags, RotateCcw, Sparkles };
 
 // Illustrated badge art per group, where it exists — Streak/Logger are
 // tier-keyed ladders (STREAK_BADGE_ART[t.tier]), Perfect Month/Categorizer
@@ -259,6 +261,18 @@ export default function TrophiesScreen() {
                   <View key={t.id} style={styles.badgeGridItem}>
                     {art ? (
                       <Image source={art} style={styles.badgeGridImage} resizeMode="contain" />
+                    ) : t.earned && groupId === 'streak' ? (
+                      // Streak Keeper tiles are always backed by STREAK_BADGE_ART
+                      // in practice — this only fires if a future milestone is
+                      // added without its own badge art yet. Falls to the
+                      // illustrated mascot rather than a generic Flame glyph,
+                      // same fallback used everywhere else this art fills a gap.
+                      <Image source={KOBAN_STREAK} style={styles.badgeGridImage} resizeMode="contain" />
+                    ) : !t.earned && groupId === 'streak' ? (
+                      // Not-yet-reached Streak Keeper tier — same grayscale
+                      // flame twin used for /streak's Milestones tab fallback,
+                      // instead of the generic muted Flame IconTile below.
+                      <Image source={KOBAN_STREAK_LOCKED} style={styles.badgeGridImage} resizeMode="contain" />
                     ) : (
                       <IconTile tone={t.earned ? group.tone : 'neutral'} size={64} radius={32}>
                         <Icon size={28} color={t.earned ? toneColor[group.tone] : colors.mutedLight} strokeWidth={2} />
@@ -274,7 +288,7 @@ export default function TrophiesScreen() {
                         disabled={claimingId === t.id}
                       >
                         {claimingId === t.id ? (
-                          <ActivityIndicator size="small" color={colors.ink} />
+                          <ActivityIndicator size="small" color={colors.brandText} />
                         ) : (
                           <Text style={styles.claimButtonText}>Claim {claimAmountLabel(t.reward)}</Text>
                         )}
@@ -466,7 +480,7 @@ function makeStyles(colors) {
     claimButtonText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.xs,
-      color: colors.ink,
+      color: colors.brandText,
     },
     footnote: {
       fontFamily: fontFamily.medium,

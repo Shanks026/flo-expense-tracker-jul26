@@ -7,7 +7,7 @@ import { colors, radii, spacing, fontFamily, fontSize } from '../../../theme/tok
 import { getIntroNext, getIntroPosition } from '../../../lib/onboarding';
 import { getDraft, setDraftAnswer } from '../../../lib/onboardingDraft';
 
-const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
+const KOBAN_WHAT_SHOULD_WE = require('../../../assets/mascot/what-should-we.png');
 
 // Screen 4 — name. Feeds signup metadata (Phase 2) → profiles.full_name.
 export default function Name() {
@@ -30,7 +30,7 @@ export default function Name() {
       progress={pos.index / pos.total}
       scrollable
       bias="up"
-      hero={<OnboardingMascot image={KOBAN_WAVE} size={190} />}
+      hero={<OnboardingMascot image={KOBAN_WHAT_SHOULD_WE} size={205} />}
       title="First, what should we call you?"
       subtitle="No pressure. You can change it later."
       primaryLabel="Continue"

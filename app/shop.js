@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, CircleDollarSign, Check, Snowflake, Lock, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { ChevronLeft, CircleDollarSign, Check, Lock, TrendingUp, TrendingDown } from 'lucide-react-native';
 import CardThemeSurface from '../components/CardThemeSurface';
 import AmountText from '../components/AmountText';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
@@ -23,6 +23,20 @@ import { lighten } from '../lib/color';
 // 'freeze' tab renamed to 'general' (22-coin-store-and-reward-tiering.md
 // Phase 3) — it now holds coin packs AND the streak freeze, not just the
 // freeze.
+const KOBAN_COIN = require('../assets/general/coin.png');
+const KOBAN_FREEZE = require('../assets/general/freeze.png');
+
+// Coin-pack illustrations, keyed by the pack's coin amount (lib/coins.js's
+// COIN_PACKS).
+const COIN_PACK_ART = {
+  500: require('../assets/general/coin-packs/500.png'),
+  1200: require('../assets/general/coin-packs/1200.png'),
+  2700: require('../assets/general/coin-packs/2700.png'),
+  6000: require('../assets/general/coin-packs/6000.png'),
+  13000: require('../assets/general/coin-packs/13000.png'),
+  20000: require('../assets/general/coin-packs/20000.png'),
+};
+
 const TABS = [
   { key: 'cards', label: 'Cards' },
   { key: 'general', label: 'General' },
@@ -202,7 +216,7 @@ export default function Shop() {
           )}
           {equipped && (
             <View style={styles.tileBadge}>
-              <Check size={11} color={staticColors.ink} strokeWidth={3} />
+              <Check size={11} color={colors.brandText} strokeWidth={3} />
             </View>
           )}
         </CardThemeSurface>
@@ -227,7 +241,7 @@ export default function Shop() {
         </Pressable>
         <Text style={styles.headerTitle}>Shop</Text>
         <View style={styles.coinPill}>
-          <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+          <Image source={KOBAN_COIN} style={styles.coinPillIcon} resizeMode="contain" />
           <Text style={styles.coinPillText}>{loading ? '···' : coins.toLocaleString('en-IN')}</Text>
         </View>
       </View>
@@ -249,8 +263,7 @@ export default function Shop() {
         // Coin-pack Buy is stubbed to a toast (no payments yet); the freeze is
         // a real coin spend and works normally.
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.generalScroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionLabel}>Coin Packs</Text>
-          <Text style={styles.generalHint}>Top up coins to unlock themes and more.</Text>
+          <Text style={styles.generalSectionTitle}>Coin Packs</Text>
           <View style={styles.packGrid}>
             {COIN_PACKS.map((pack) => (
               <Pressable key={pack.id} style={styles.packCard} onPress={() => handleBuyCoins(pack)}>
@@ -259,11 +272,8 @@ export default function Shop() {
                     <Text style={styles.packBadgeText}>Popular</Text>
                   </View>
                 )}
-                {/* Placeholder icon — swap for pack illustrations later (one
-                    line here). */}
-                <CircleDollarSign size={26} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
-                <Text style={styles.packCoins}>{pack.coins.toLocaleString('en-IN')}</Text>
-                <Text style={styles.packCoinsLabel}>coins</Text>
+                <Image source={COIN_PACK_ART[pack.coins]} style={styles.packImage} resizeMode="contain" />
+                <Text style={styles.packCoinsLine}>{pack.coins.toLocaleString('en-IN')} coins</Text>
                 <View style={styles.packBuyBtn}>
                   <Text style={styles.packBuyText}>{pack.price}</Text>
                 </View>
@@ -271,16 +281,11 @@ export default function Shop() {
             ))}
           </View>
 
-          <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>Streak Freeze</Text>
+          <Text style={[styles.generalSectionTitle, styles.generalSectionTitleSpaced]}>Streak Freeze</Text>
           <View style={styles.freezeCard}>
-            <View style={styles.freezeIconTile}>
-              <Snowflake size={22} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.2} />
-            </View>
+            <Image source={KOBAN_FREEZE} style={styles.freezeIcon} resizeMode="contain" />
             <View style={styles.freezeTextWrap}>
               <Text style={styles.freezeTitle}>Streak Freeze</Text>
-              <Text style={styles.freezeSubtitle}>
-                {freezeAtCap ? `You're holding the max (${freezeCap})` : `${FREEZE_COST} coins · hold up to ${freezeCap}`}
-              </Text>
               <Text style={styles.freezeCount}>You have {freezes}</Text>
             </View>
             <Pressable
@@ -289,9 +294,11 @@ export default function Shop() {
               disabled={buyingFreeze || freezeAtCap || freezeCantAfford}
             >
               {buyingFreeze ? (
-                <ActivityIndicator size="small" color={staticColors.ink} />
+                <ActivityIndicator size="small" color={colors.brandText} />
               ) : (
-                <Text style={styles.actionButtonText}>Buy for {FREEZE_COST}</Text>
+                <Text style={[styles.actionButtonText, (freezeAtCap || freezeCantAfford) && styles.actionButtonTextDisabled]}>
+                  Buy for {FREEZE_COST}
+                </Text>
               )}
             </Pressable>
           </View>
@@ -305,7 +312,7 @@ export default function Shop() {
           <View style={styles.pinnedPreview}>
             <CardThemeSurface theme={selected} style={styles.previewShape}>
               <View style={styles.previewContent}>
-                <Text style={[styles.previewName, { color: selected.textColor }]}>Flo</Text>
+                <Text style={[styles.previewName, { color: selected.textColor }]}>{selected.name}</Text>
                 <Text style={[styles.previewLabel, { color: selected.mutedColor }]}>In Hand</Text>
                 {/* AmountText + currencyColor, not a plain formatMoney string
                     — matches AccountHeroCarousel's own muted-₹ treatment
@@ -344,7 +351,6 @@ export default function Shop() {
             </CardThemeSurface>
 
             <View style={styles.previewNameRow}>
-              <Text style={styles.previewTitle}>{selected.name}</Text>
               {selectedEquipped && <Check size={16} color={colors.brand} strokeWidth={2.8} />}
             </View>
           </View>
@@ -391,24 +397,24 @@ export default function Shop() {
           </View>
           {selectedEquipped ? (
             <View style={[styles.actionButton, styles.actionButtonDisabled]}>
-              <Text style={styles.actionButtonText}>Equipped</Text>
+              <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>Equipped</Text>
             </View>
           ) : selectedOwned ? (
             <Pressable style={styles.actionButton} onPress={handleEquip} disabled={working}>
-              {working ? <ActivityIndicator size="small" color={staticColors.ink} /> : <Text style={styles.actionButtonText}>Equip</Text>}
+              {working ? <ActivityIndicator size="small" color={colors.brandText} /> : <Text style={styles.actionButtonText}>Equip</Text>}
             </Pressable>
           ) : selected.unlock ? (
             <View style={[styles.actionButton, styles.actionButtonDisabled]}>
-              <Text style={styles.actionButtonText}>{unlockCaption(selected)}</Text>
+              <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>{unlockCaption(selected)}</Text>
             </View>
           ) : canAfford ? (
             <Pressable style={styles.actionButton} onPress={handleBuyPress} disabled={working}>
               {working ? (
-                <ActivityIndicator size="small" color={staticColors.ink} />
+                <ActivityIndicator size="small" color={colors.brandText} />
               ) : (
                 <View style={styles.actionButtonRow}>
                   <Text style={styles.actionButtonText}>Buy for </Text>
-                  <CircleDollarSign size={13} color={colors.ink} fill={colors.ink} strokeWidth={1.5} />
+                  <CircleDollarSign size={13} color={colors.brandText} fill={colors.brandText} strokeWidth={1.5} />
                   <Text style={styles.actionButtonText}> {selected.cost.toLocaleString('en-IN')}</Text>
                 </View>
               )}
@@ -431,10 +437,10 @@ export default function Shop() {
           <View style={styles.dialogCard}>
             <CardThemeSurface theme={selected} style={styles.dialogPreviewShape}>
               <View style={styles.dialogPreviewContent}>
-                <Text style={[styles.previewName, { color: selected.textColor }]}>Flo</Text>
+                <Text style={[styles.previewName, { color: selected.textColor }]}>{selected.name}</Text>
                 {buyDialogStage === 'bought' && (
                   <View style={styles.dialogBoughtBadge}>
-                    <Check size={12} color={staticColors.ink} strokeWidth={3} />
+                    <Check size={12} color={colors.brandText} strokeWidth={3} />
                   </View>
                 )}
               </View>
@@ -442,17 +448,16 @@ export default function Shop() {
 
             {buyDialogStage === 'confirm' ? (
               <>
-                <Text style={styles.dialogTitle}>{selected.name}</Text>
                 <Text style={styles.dialogBody}>
                   Spend {selected.cost?.toLocaleString('en-IN')} coins to buy this theme?
                 </Text>
                 <Pressable style={styles.dialogPrimaryButton} onPress={confirmBuy} disabled={working}>
                   {working ? (
-                    <ActivityIndicator size="small" color={staticColors.ink} />
+                    <ActivityIndicator size="small" color={colors.brandText} />
                   ) : (
                     <View style={styles.actionButtonRow}>
                       <Text style={styles.dialogPrimaryButtonText}>Buy for </Text>
-                      <CircleDollarSign size={13} color={colors.ink} fill={colors.ink} strokeWidth={1.5} />
+                      <CircleDollarSign size={13} color={colors.brandText} fill={colors.brandText} strokeWidth={1.5} />
                       <Text style={styles.dialogPrimaryButtonText}> {selected.cost?.toLocaleString('en-IN')}</Text>
                     </View>
                   )}
@@ -522,11 +527,21 @@ function makeStyles(colors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
+    // 16 / 0.693 (the illustrated coin's measured ~69.3% canvas fill).
+    coinPillIcon: {
+      width: 23,
+      height: 23,
+    },
+    // includeFontPadding/textAlignVertical — Android's default extra font
+    // padding otherwise makes this sit low against the coin image beside it
+    // despite `alignItems: 'center'` on coinPill.
     coinPillText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.md,
       color: colors.ink,
       fontVariant: ['tabular-nums'],
+      textAlignVertical: 'center',
+      includeFontPadding: false,
     },
     // Same segmented-toggle shape as Settings' report-cadence picker
     // (reportSegmentWrap/reportSegment/reportSegmentActive) — Cards vs
@@ -577,13 +592,18 @@ function makeStyles(colors) {
       paddingHorizontal: spacing.xl,
       paddingBottom: 60,
     },
-    generalHint: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
+    // Dark, prominent title for the General tab's two sections (Coin Packs /
+    // Streak Freeze) — distinct from the small uppercase mutedMid
+    // `sectionLabel` used for the Cards tab's rarity-tier headers, since these
+    // two stand alone with no subtitle beneath them.
+    generalSectionTitle: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.lg,
+      color: colors.ink,
+      marginTop: spacing.md,
       marginBottom: spacing.md,
     },
-    sectionLabelSpaced: {
+    generalSectionTitleSpaced: {
       marginTop: spacing.xl,
     },
     packGrid: {
@@ -619,18 +639,21 @@ function makeStyles(colors) {
       color: colors.ink,
       textTransform: 'uppercase',
     },
-    packCoins: {
+    // Source art is a fixed 1536x1024 (1.5:1) canvas for every pack — sizing
+    // the frame to that same ratio means the whole canvas fills it with no
+    // letterboxing, regardless of how much each pile's own bounding box fills
+    // its canvas (that varies per pack, ~74-84% width / ~76-88% height).
+    packImage: {
+      width: 120,
+      height: 80,
+    },
+    packCoinsLine: {
       fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      letterSpacing: -0.4,
+      fontSize: fontSize.md,
+      letterSpacing: -0.2,
       color: colors.ink,
       marginTop: 6,
       fontVariant: ['tabular-nums'],
-    },
-    packCoinsLabel: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.xs,
-      color: colors.mutedMid,
     },
     packBuyBtn: {
       marginTop: spacing.md,
@@ -644,22 +667,21 @@ function makeStyles(colors) {
     packBuyText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.md,
-      color: colors.ink,
+      color: colors.brandText,
     },
     buyCoinsHint: {
       fontFamily: fontFamily.semibold,
       fontSize: 9,
-      color: colors.ink,
+      color: colors.brandText,
       marginTop: 1,
       opacity: 0.7,
     },
-    freezeIconTile: {
-      width: 44,
-      height: 44,
-      borderRadius: radii.iconTileLg,
-      backgroundColor: colors.iceBlueBg,
-      alignItems: 'center',
-      justifyContent: 'center',
+    // Bare illustration, no wrapping tile/bg — sized so the visible freeze
+    // shape (fills ~87.6% of its own square canvas) reads at roughly the same
+    // visual footprint the old 44px icon-in-tile occupied.
+    freezeIcon: {
+      width: 44 / 0.876,
+      height: 44 / 0.876,
     },
     freezeTextWrap: {
       flex: 1,
@@ -668,12 +690,6 @@ function makeStyles(colors) {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.lg,
       color: colors.ink,
-    },
-    freezeSubtitle: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginTop: 1,
     },
     freezeCount: {
       fontFamily: fontFamily.bold,
@@ -753,11 +769,6 @@ function makeStyles(colors) {
       marginTop: spacing.lg,
       marginBottom: spacing.xl,
     },
-    previewTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.heading,
-      color: colors.ink,
-    },
     // Floating bottom bar (Cards tab only) — replaces the old inline
     // previewActionRow per direct feedback; a persistent bar reachable
     // regardless of scroll position, rather than a button that scrolls
@@ -804,6 +815,12 @@ function makeStyles(colors) {
     actionButtonText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.sm,
+      color: colors.brandText,
+    },
+    // actionButtonDisabled swaps the bg to the neutral colors.chipBg, not
+    // colors.brand — brandText (tuned for the accent) is wrong there, so
+    // disabled/caption states pair this back with the plain mode-aware ink.
+    actionButtonTextDisabled: {
       color: colors.ink,
     },
     actionButtonRow: {
@@ -939,7 +956,7 @@ function makeStyles(colors) {
     dialogPrimaryButtonText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.lg,
-      color: colors.ink,
+      color: colors.brandText,
     },
     dialogSecondaryButton: {
       width: '100%',

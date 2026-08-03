@@ -23,7 +23,7 @@ export default function Opener() {
       bg="light"
       hero={
         <View style={styles.heroWrap}>
-          <OnboardingMascot image={KOBAN_WAVE} size={200} style={styles.mascotSpacing} />
+          <OnboardingMascot image={KOBAN_WAVE} size={210} style={styles.mascotSpacing} />
           <Text style={styles.hey}>Hi there, I'm Koban!</Text>
         </View>
       }

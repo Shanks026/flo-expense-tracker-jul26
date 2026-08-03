@@ -135,7 +135,7 @@ export default function Plans() {
                     <View style={styles.rowBetween}>
                       <View style={styles.rowLeft}>
                         <IconTile tone="brandSolid" size={44} radius={13}>
-                          <Flag size={21} color={colors.ink} fill={colors.ink} strokeWidth={2} />
+                          <Flag size={21} color={colors.brandText} fill={colors.brandText} strokeWidth={2} />
                         </IconTile>
                         <View>
                           <Text style={styles.planName}>{plan.name}</Text>
@@ -159,7 +159,7 @@ export default function Plans() {
                   <View style={styles.rowBetween}>
                     <View style={styles.rowLeft}>
                       <IconTile tone="brandSolid" size={44} radius={13}>
-                        <Flag size={21} color={colors.ink} fill={colors.ink} strokeWidth={2} />
+                        <Flag size={21} color={colors.brandText} fill={colors.brandText} strokeWidth={2} />
                       </IconTile>
                       <View>
                         <Text style={styles.planNameDark}>{plan.name}</Text>

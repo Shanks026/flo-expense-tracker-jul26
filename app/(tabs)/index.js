@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, CircleDollarSign, Snowflake, Receipt, Flame, ArrowLeftRight, Trophy, ShoppingBag } from 'lucide-react-native';
+import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -43,6 +43,14 @@ import useCardThemes from '../../hooks/useCardThemes';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useRewardBurst } from '../../components/RewardBurst';
 import { takePendingLoginReward } from '../../lib/pendingLoginReward';
+
+const KOBAN_COIN = require('../../assets/general/coin.png');
+const KOBAN_FREEZE = require('../../assets/general/freeze.png');
+const KOBAN_STREAK_FLAME = require('../../assets/general/streak.png');
+const KOBAN_STREAK_FLAME_LOCKED = require('../../assets/general/streak-locked.png');
+// Same fill-ratio correction as StreakFlameIcon.js/StreakDays.js — the source
+// flame only fills ~82.5% of its own square canvas height.
+const STREAK_FLAME_FILL_RATIO = 0.825;
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
@@ -121,7 +129,11 @@ export default function Home() {
   // just popping in with default zero values.
   const chipsLoading = rewardsLoading || !themeHydrated;
   const streakChipLoading = streakLoading || !themeHydrated;
-  const heroLoading = accountsLoading || !themeHydrated;
+  // Folds summariesLoading in too: the hero card now shows ONE card-shaped
+  // skeleton rather than per-element skeletons inside a real card, so its
+  // numbers being in flight is the same "not ready" state as its accounts
+  // being in flight — one gate, one skeleton.
+  const heroLoading = accountsLoading || summariesLoading || !themeHydrated;
 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
@@ -175,16 +187,11 @@ export default function Home() {
               <FadeIn>
                 <Pressable style={styles.itemStats} onPress={openRewardsHistory}>
                   <View style={styles.itemStatEntry}>
-                    <CircleDollarSign size={16} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+                    <Image source={KOBAN_COIN} style={styles.coinIcon} resizeMode="contain" />
                     <Text style={styles.itemStatText}>{coins.toLocaleString('en-IN')}</Text>
                   </View>
                   <View style={styles.itemStatEntry}>
-                    {/* Snowflake has no closed/fillable region (just radiating
-                        strokes) — `fill` is a harmless no-op here; a bolder
-                        strokeWidth is what actually reads as "filled/solid" for
-                        a line-only glyph like this, vs. CircleDollarSign's real
-                        fill above. */}
-                    <Snowflake size={16} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.4} />
+                    <Image source={KOBAN_FREEZE} style={styles.freezeIcon} resizeMode="contain" />
                     <Text style={styles.itemStatText}>{freezes}</Text>
                   </View>
                   <View style={styles.itemStatEntry}>
@@ -214,11 +221,10 @@ export default function Home() {
                       one warm accent in this header that must NOT be confused with
                       the bell's red alert dot beside it, which is why it's a true
                       orange rather than a red. */}
-                  <Flame
-                    size={17}
-                    color={streakLit ? colors.streak : colors.mutedLight}
-                    fill={streakLit ? colors.streak : 'transparent'}
-                    strokeWidth={2.2}
+                  <Image
+                    source={streakLit ? KOBAN_STREAK_FLAME : KOBAN_STREAK_FLAME_LOCKED}
+                    style={styles.streakFlameIcon}
+                    resizeMode="contain"
                   />
                   <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>
                     {streakCurrent}
@@ -268,10 +274,9 @@ export default function Home() {
           onSwitchAccount={setActiveAccount}
           onOpenSwitcher={openAccountSwitcher}
           summaries={summaries}
-          summariesLoading={summariesLoading}
           currency={currency}
           cardTheme={equippedTheme}
-          accountsLoading={heroLoading}
+          loading={heroLoading}
         />
 
         <ReportReadyCard />
@@ -439,11 +444,34 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: 5,
   },
+  // The illustrated coin only fills ~69.3% of its own 1024x1024 source canvas
+  // (measured via its alpha bounding box — it has a soft glow halo baked in,
+  // unlike the mascot art's ~60-80% fill), so the frame has to be sized UP
+  // from the 16px this is standing in for (16 / 0.693 ≈ 23), not set to 16
+  // directly, or the coin renders visibly smaller than its freeze/rank-badge
+  // siblings in this same row despite the frame numbers looking equal.
+  coinIcon: {
+    width: 23,
+    height: 23,
+  },
+  // Frame corrected for the freeze illustration's ~87.6% canvas fill (same
+  // FREEZE_FILL_RATIO measurement used everywhere else this art appears).
+  freezeIcon: {
+    width: 16 / 0.876,
+    height: 16 / 0.876,
+  },
+  // includeFontPadding/textAlignVertical — Android adds extra vertical
+  // padding to Text by default (the same font-metrics quirk fixed elsewhere
+  // in this app, e.g. AddTransactionSheet's amount input); without this, the
+  // text sits low enough against the adjacent icon/coin image that
+  // `alignItems: 'center'` on the row reads as if it were flex-end.
   itemStatText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
     letterSpacing: -0.2,
     color: colors.ink,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   // The current rank badge shown in place of the old Star, inside the shared
   // item-stats chip's level entry (per direct feedback). A touch larger than
@@ -469,12 +497,12 @@ function makeStyles(colors) {
     height: 46,
     borderRadius: 15,
   },
-  // Sits on the theme-accent avatar bg (colors.brand) — pinned dark, same
-  // assumption as Button's primary-text pin.
+  // Sits on the theme-accent avatar bg (colors.brand) — colors.brandText
+  // picks legible dark/light text per-accent (theme/themes.js).
   avatarText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   // Avatar lives here now, not in headerRow — freeing headerRow's left slot
   // for the item-stats/XP chips above. Subtitle is lib/greetings.js's real
@@ -517,11 +545,17 @@ function makeStyles(colors) {
     gap: 4,
     height: 44,
   },
+  streakFlameIcon: {
+    width: 17 / STREAK_FLAME_FILL_RATIO,
+    height: 17 / STREAK_FLAME_FILL_RATIO,
+  },
   streakCount: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
     letterSpacing: -0.2,
     color: colors.streakDeep,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   streakCountEmpty: {
     color: colors.mutedLight,

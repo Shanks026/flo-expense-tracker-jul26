@@ -23,7 +23,19 @@ import { lighten } from '../lib/color';
 // reads as "the next card," not a separate unrelated block.
 const GAP = 14;
 const SWIPE_THRESHOLD = 56;
-const EMPTY_SUMMARY = { in_hand_balance: 0, month_income: 0, month_expense: 0 };
+const EMPTY_SUMMARY = { in_hand_balance: 0, period_income: 0, period_expense: 0 };
+
+// The loading state is ONE skeleton block in the card's own shape — no
+// per-element skeletons for the name/balance/stats inside it (per direct
+// instruction: keep it minimal). Height is derived from the same tokens the
+// real card lays out with rather than a magic number, so the two can't drift
+// apart when the card's own spacing changes.
+const HERO_SKELETON_HEIGHT =
+  22 * 2 + // heroCardContent's paddingVertical
+  fontSize.lg + spacing.lg + // account name row + heroTopRow marginBottom
+  fontSize.xs + 1 + // "In Hand" label + its marginBottom
+  fontSize.amountLg * 1.2 + // the balance line
+  spacing.xl + fontSize.md * 1.3; // heroStatsRow marginTop + its content
 
 // The "In Hand"/"Income"/"Expenses" labels and the muted ₹ currency symbol
 // used theme.mutedColor (each theme's own textColor at reduced opacity) —
@@ -70,10 +82,9 @@ export default function AccountHeroCarousel({
   onSwitchAccount,
   onOpenSwitcher,
   summaries,
-  summariesLoading,
   currency,
   cardTheme,
-  accountsLoading,
+  loading,
 }) {
   const { colors } = useTheme();
   // Falls back to Ink (today's pre-feature look) if no theme is resolved
@@ -183,31 +194,17 @@ export default function AccountHeroCarousel({
     transform: [{ translateX: translateX.value }],
   }));
 
-  // No accounts to show yet (AccountContext still resolving, or the active
-  // theme hasn't hydrated — see Home's own accountsLoading) — a real card
-  // shape in skeleton form, not an empty viewport. Without this, the whole
-  // hero section visibly vanished for the loading window (accounts.map over
-  // an empty array renders nothing), then popped in once data arrived.
-  if (accountsLoading) {
+  // Nothing real to show yet — accounts still resolving, their summaries
+  // still in flight, or the active theme hasn't hydrated (Home folds all
+  // three into one `loading` flag). One card-shaped skeleton, not an empty
+  // viewport: without this the whole hero section visibly vanished for the
+  // loading window (accounts.map over an empty array renders nothing) and
+  // then popped in once data arrived.
+  if (loading) {
     return (
       <View>
         <View style={styles.viewport}>
-          <View style={[styles.heroCardShape, styles.heroCardContent, styles.heroSkeletonCard]}>
-            <View style={styles.heroTopRow}>
-              <Skeleton width={120} height={fontSize.lg} radius={6} style={styles.heroSkeletonMuted} />
-            </View>
-            <Skeleton width={70} height={fontSize.base} radius={6} style={styles.heroSkeletonMuted} />
-            <Skeleton
-              width={160}
-              height={fontSize.amountLg}
-              radius={8}
-              style={[styles.heroSkeletonMuted, { marginTop: spacing.xs, marginBottom: spacing.xl }]}
-            />
-            <View style={styles.heroStatsRow}>
-              <Skeleton width={90} height={fontSize.md} radius={6} style={styles.heroSkeletonMuted} />
-              <Skeleton width={90} height={fontSize.md} radius={6} style={styles.heroSkeletonMuted} />
-            </View>
-          </View>
+          <Skeleton width="100%" height={HERO_SKELETON_HEIGHT} radius={radii.cardLg} />
         </View>
       </View>
     );
@@ -237,46 +234,35 @@ export default function AccountHeroCarousel({
                       </View>
 
                       <Text style={[styles.heroLabel, { color: MUTED_LABEL_COLOR }]}>In Hand</Text>
-                      {summariesLoading ? (
-                        <Skeleton width={160} height={fontSize.amountLg} radius={8} style={{ marginTop: spacing.xs, backgroundColor: 'rgba(128,128,128,0.25)' }} />
-                      ) : (
-                        <AmountText
-                          value={summary.in_hand_balance}
-                          type="neutral"
-                          dark
-                          muteCurrency
-                          currency={currency}
-                          currencyColor={MUTED_LABEL_COLOR}
-                          size={fontSize.amountLg}
-                          adjustsFontSizeToFit
-                          numberOfLines={1}
-                          minimumFontScale={0.35}
-                          style={[styles.heroBalance, { color: theme.textColor }]}
-                        />
-                      )}
-                      {summariesLoading ? (
-                        <View style={styles.heroStatsRow}>
-                          <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: 'rgba(128,128,128,0.25)' }} />
-                          <Skeleton width={90} height={fontSize.md} radius={6} style={{ backgroundColor: 'rgba(128,128,128,0.25)' }} />
-                        </View>
-                      ) : (
-                        <View style={styles.heroStatsRow}>
-                          <View style={styles.heroStat}>
-                            <TrendingUp size={11} color={incomeIconColor} strokeWidth={2.8} />
-                            <View style={styles.heroStatTextGroup}>
-                              <Text style={[styles.heroStatValue, { color: theme.textColor }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>{formatAmount(summary.month_income, currency)}</Text>
-                              <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Income</Text>
-                            </View>
-                          </View>
-                          <View style={styles.heroStat}>
-                            <TrendingDown size={11} color={expenseIconColor} strokeWidth={2.8} />
-                            <View style={styles.heroStatTextGroup}>
-                              <Text style={[styles.heroStatValue, { color: theme.textColor }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>{formatAmount(summary.month_expense, currency)}</Text>
-                              <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Expenses</Text>
-                            </View>
+                      <AmountText
+                        value={summary.in_hand_balance}
+                        type="neutral"
+                        dark
+                        muteCurrency
+                        currency={currency}
+                        currencyColor={MUTED_LABEL_COLOR}
+                        size={fontSize.amountLg}
+                        adjustsFontSizeToFit
+                        numberOfLines={1}
+                        minimumFontScale={0.35}
+                        style={[styles.heroBalance, { color: theme.textColor }]}
+                      />
+                      <View style={styles.heroStatsRow}>
+                        <View style={styles.heroStat}>
+                          <TrendingUp size={11} color={incomeIconColor} strokeWidth={2.8} />
+                          <View style={styles.heroStatTextGroup}>
+                            <Text style={[styles.heroStatValue, { color: theme.textColor }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>{formatAmount(summary.period_income, currency)}</Text>
+                            <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Income</Text>
                           </View>
                         </View>
-                      )}
+                        <View style={styles.heroStat}>
+                          <TrendingDown size={11} color={expenseIconColor} strokeWidth={2.8} />
+                          <View style={styles.heroStatTextGroup}>
+                            <Text style={[styles.heroStatValue, { color: theme.textColor }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>{formatAmount(summary.period_expense, currency)}</Text>
+                            <Text style={[styles.heroStatLabel, { color: MUTED_LABEL_COLOR }]}>Expenses</Text>
+                          </View>
+                        </View>
+                      </View>
                     </View>
                   </CardThemeSurface>
                 </View>
@@ -340,20 +326,6 @@ function makeStyles(colors) {
     heroCardContent: {
       paddingVertical: 22,
       paddingHorizontal: 24,
-    },
-    // The loading-state stand-in for heroCardContent — full width (no
-    // viewportWidth measurement needed, there's no carousel to swipe yet)
-    // and a neutral themed surface instead of a card theme's own colors
-    // (which the loading state, by definition, doesn't have yet either).
-    heroSkeletonCard: {
-      width: '100%',
-      backgroundColor: colors.chipBg,
-    },
-    // Matches the muted-on-card-theme override the real balance/stats
-    // Skeletons already use below (summariesLoading branch) — same visual
-    // language whether the account itself or just its summary is loading.
-    heroSkeletonMuted: {
-      backgroundColor: 'rgba(128,128,128,0.25)',
     },
     // spacing.lg (16), up from spacing.md (12) — deliberately groups the
     // "which account" chrome (name + chevron) apart from the balance block

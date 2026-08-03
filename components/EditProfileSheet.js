@@ -145,7 +145,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
             </View>
           )}
           <View style={styles.cameraBadge}>
-            <Camera size={14} color={staticColors.ink} strokeWidth={2.2} />
+            <Camera size={14} color={colors.brandText} strokeWidth={2.2} />
           </View>
         </Pressable>
 
@@ -212,7 +212,7 @@ function makeStyles(colors) {
   avatarInitial: {
     fontFamily: fontFamily.extrabold,
     fontSize: 32,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   cameraBadge: {
     position: 'absolute',

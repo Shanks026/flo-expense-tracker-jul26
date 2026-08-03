@@ -78,7 +78,7 @@ export default function OnboardingCurrency() {
       progress={pos ? pos.index / pos.total : undefined}
       title="What currency do you use?"
       subtitle="You can add other currencies later, one account at a time."
-      scrollable
+      scrollableBody
       primaryLabel="Continue"
       primaryLoading={saving}
       onPrimary={handleNext}

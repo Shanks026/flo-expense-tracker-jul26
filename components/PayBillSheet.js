@@ -315,7 +315,7 @@ function makeStyles(colors) {
     flexShrink: 1,
   },
   accountOptionTextSelected: {
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   errorText: {
     fontFamily: fontFamily.semibold,

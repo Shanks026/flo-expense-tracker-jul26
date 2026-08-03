@@ -80,7 +80,7 @@ const ProUpsellSheet = forwardRef(function ProUpsellSheet(_props, ref) {
 
         <Pressable style={styles.cta} onPress={handleLevelUp}>
           <Text style={styles.ctaText}>Level up for {PRO_MONTHLY_EQUIVALENT}/mo</Text>
-          <ChevronRight size={18} color={staticColors.ink} strokeWidth={2.6} />
+          <ChevronRight size={18} color={colors.brandText} strokeWidth={2.6} />
         </Pressable>
       </BottomSheetView>
     </BottomSheetModal>
@@ -135,7 +135,7 @@ function makeStyles(colors) {
   ctaText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   });
 }

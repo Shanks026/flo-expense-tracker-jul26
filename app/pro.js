@@ -42,7 +42,7 @@ export default function Pro() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <View style={styles.crownTile}>
-            <Crown size={28} color={staticColors.ink} strokeWidth={2.2} fill={staticColors.ink} />
+            <Crown size={28} color={colors.brandText} strokeWidth={2.2} fill={colors.brandText} />
           </View>
           {isPro ? (
             <>
@@ -73,7 +73,7 @@ export default function Pro() {
                   >
                     <View style={styles.planLeft}>
                       <View style={[styles.radio, selected && styles.radioSelected]}>
-                        {selected && <Check size={12} color={staticColors.ink} strokeWidth={3} />}
+                        {selected && <Check size={12} color={colors.brandText} strokeWidth={3} />}
                       </View>
                       <View>
                         <Text style={styles.planLabel}>{plan.label}</Text>
@@ -224,7 +224,7 @@ function makeStyles(colors) {
   savingsBadgeText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.xs,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   cta: {
     height: 56,
@@ -236,7 +236,7 @@ function makeStyles(colors) {
   ctaText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.ink,
+    color: colors.brandText,
   },
   });
 }

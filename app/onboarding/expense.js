@@ -131,6 +131,7 @@ export default function OnboardingExpense() {
       bg="light"
       progress={pos ? pos.index / pos.total : undefined}
       title="Remember your most recent transaction?"
+      titleSize={24}
       subtitle="Optional. Log it now and see how fast it feels."
       scrollable
       primaryLabel="Add & Continue"

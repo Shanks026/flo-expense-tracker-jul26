@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
-import { Flame, CircleDollarSign, Snowflake, Star } from 'lucide-react-native';
+import { Snowflake, Star } from 'lucide-react-native';
 import Button from './Button';
 import Confetti from './Confetti';
 import StreakDays from './StreakDays';
@@ -16,8 +16,11 @@ import { pickRecap, recapEyebrow, recapCta } from '../lib/koban';
 import { claimMilestone } from '../lib/rewardsMutations';
 import { spinWheelFor, MILESTONE_REWARDS } from '../lib/rewards';
 import { STREAK_BADGE_ART } from '../lib/trophies';
+
+const KOBAN_STREAK = require('../assets/mascot/streak.png');
+const KOBAN_COIN = require('../assets/general/coin.png');
 import MilestoneSpinWheel from './MilestoneSpinWheel';
-import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors, fontFamily, fontSize, spacing } from '../theme/tokens';
 
 // Keyed BY USER, not per-device. It used to be a bare 'flo.streak.lastCelebrated',
 // which meant the "already celebrated today" flag was shared by every account
@@ -193,18 +196,19 @@ export default function StreakCelebration() {
             pill/calendar. Same split as RankUpCelebration/MilestoneSpinWheel. */}
         <View style={styles.content}>
           {/* The real illustrated streak badge (assets/streak/, STREAK_BADGE_ART
-              — same art the Trophy Room shows) for a milestone day, not the
-              generic Flame glyph this used before. Day 1 (isNewStreak) has no
-              badge art (MILESTONES starts at 3), so it keeps the Flame-in-tile
-              fallback — same "art if it exists, icon tile otherwise" rule
-              app/trophies.js already uses for every badge-backed group. */}
+              — same art the Trophy Room shows) for a milestone day. Day 1
+              (isNewStreak) has no badge art (MILESTONES starts at 3) — it
+              always falls to the illustrated Koban streak mascot instead of a
+              generic glyph, same "art if it exists, icon tile otherwise" rule
+              app/trophies.js uses, just with a mascot as the fallback rather
+              than a bare Flame icon now that this art exists. */}
           {STREAK_BADGE_ART[current] ? (
             <Animated.View entering={ZoomIn.duration(400)} style={styles.badgeWrap}>
               <Image source={STREAK_BADGE_ART[current]} style={styles.badgeArt} resizeMode="contain" />
             </Animated.View>
           ) : (
-            <Animated.View entering={ZoomIn.duration(400)} style={styles.iconTile}>
-              <Flame size={40} color={colors.streak} fill={colors.streak} strokeWidth={2} />
+            <Animated.View entering={ZoomIn.duration(400)} style={styles.badgeWrap}>
+              <Image source={KOBAN_STREAK} style={styles.badgeArt} resizeMode="contain" />
             </Animated.View>
           )}
 
@@ -247,7 +251,7 @@ export default function StreakCelebration() {
             <Text style={styles.rewardLabel}>You received</Text>
             <View style={styles.rewardRow}>
               <View style={styles.rewardEntry}>
-                <CircleDollarSign size={18} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
+                <Image source={KOBAN_COIN} style={styles.coinIcon} resizeMode="contain" />
                 <Text style={styles.rewardAmount}>+{contentRef.current.reward.coins} coins</Text>
               </View>
               {/* XP added 27-rank-ladder-rework.md Phase 1 — milestones now
@@ -309,31 +313,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconTile: {
-    width: 88,
-    height: 88,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(255,107,44,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xl,
-  },
   // The illustrated badge's own art carries its circular medal shape/
   // background (same as every other badge slot in this app) — no tinted
-  // fill/border-radius here, unlike iconTile's Flame-glyph fallback above.
-  // Matches RankUpCelebration's own badge size (140px) — per direct
-  // feedback, the earlier 80px (Trophy Room grid size) read as too small for
-  // a full-screen celebration; 140px is the right scale for this screen.
+  // fill/border-radius here. Was 140px (matching RankUpCelebration's own
+  // badge size, up from the earlier 80px Trophy Room grid size, per direct
+  // feedback at the time) — bumped again to 200px specifically for this
+  // screen once the illustrated streak mascot (day 1's fallback, shares this
+  // same style with the real STREAK_BADGE_ART medals) needed more presence.
   badgeWrap: {
-    width: 140,
-    height: 140,
+    width: 200,
+    height: 200,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
   },
   badgeArt: {
-    width: 140,
-    height: 140,
+    width: 200,
+    height: 200,
   },
   // Dialed back from fontSize.hero (30) per direct feedback — the varied
   // recap titles run longer than a rank name ("Streak holds at day 30" etc.),
@@ -395,10 +391,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  // 18 / 0.693 (the illustrated coin's measured ~69.3% canvas fill).
+  coinIcon: {
+    width: 26,
+    height: 26,
+  },
+  // includeFontPadding/textAlignVertical — Android's default extra font
+  // padding otherwise makes this sit low against the coin/Star/Snowflake
+  // icon beside it despite `alignItems: 'center'` on rewardEntry.
   rewardAmount: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
     color: colors.surface,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   buttonWrap: {
     width: '100%',

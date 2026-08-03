@@ -1,25 +1,24 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors as staticColors, radii, fontFamily, fontSize } from '../theme/tokens';
+import { radii, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
 export default function Pill({ label, tone = 'neutral', style }) {
   const { colors } = useTheme();
 
   // Same split as Button.js: `brand`'s bg tracks the active theme's accent;
-  // its text is pinned to static ink for reliable contrast against that
-  // accent (not the active theme's `colors.ink`, which Dark theme inverts to
-  // a light color). `dark` is used for a SELECTED filter/segment pill (report
-  // account tabs, transaction type filter, AnalyticsSegmentTabs) — plain UI
-  // chrome that should follow the active theme like the rest of a segmented
-  // control, not a pinned emphasis surface: it reads `colors.ink`/
-  // `colors.surface` reactively so it doesn't blend into Dark theme's own
-  // near-black screen the way a pinned near-black pill would. income/danger/
-  // warn are already semantic-locked (identical across every theme), so
-  // reading them from the active theme is safe. neutral/completed genuinely
-  // should follow the active theme — they're meant to blend into whatever
-  // screen they're on.
+  // its text uses `colors.brandText` (theme/themes.js), computed per-accent
+  // via WCAG contrast rather than pinned to one color. `dark` is used for a
+  // SELECTED filter/segment pill (report account tabs, transaction type
+  // filter, AnalyticsSegmentTabs) — plain UI chrome that should follow the
+  // active theme like the rest of a segmented control, not a pinned emphasis
+  // surface: it reads `colors.ink`/`colors.surface` reactively so it doesn't
+  // blend into Dark theme's own near-black screen the way a pinned near-black
+  // pill would. income/danger/warn are already semantic-locked (identical
+  // across every theme), so reading them from the active theme is safe.
+  // neutral/completed genuinely should follow the active theme — they're
+  // meant to blend into whatever screen they're on.
   const TONES = {
-    brand: { bg: colors.brand, text: staticColors.ink },
+    brand: { bg: colors.brand, text: colors.brandText },
     dark: { bg: colors.ink, text: colors.surface },
     income: { bg: colors.incomeBg, text: colors.income },
     danger: { bg: colors.dangerBg, text: colors.danger },

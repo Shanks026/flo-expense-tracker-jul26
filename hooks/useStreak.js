@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
 import { computeStreak } from '../lib/streak';
+import useLoadedFor from './useLoadedFor';
 
 // How far back to fetch. A streak longer than this reads as capped — an
 // accepted v1 limit (see 05-koban-engagement.md Phase 2), not a bug. Keeps the
@@ -76,14 +77,16 @@ export async function fetchStreak(userId) {
 // twice already in this codebase).
 export default function useStreak() {
   const { version } = useDataRefresh();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
   const [streak, setStreak] = useState(EMPTY);
-  const [loading, setLoading] = useState(true);
+  // See hooks/useLoadedFor.js — otherwise Home's streak chip reported "loaded"
+  // and painted an unlit zero-day streak while the real fetch was in flight.
+  const [loading, markLoaded] = useLoadedFor(userId, authLoading);
 
   const refetch = useCallback(async () => {
     setStreak(await fetchStreak(userId));
-    setLoading(false);
+    markLoaded(userId);
   }, [userId]);
 
   useEffect(() => {
