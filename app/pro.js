@@ -57,7 +57,7 @@ export default function Pro() {
           )}
         </View>
 
-        <ProBenefits style={styles.benefits} />
+        <ProBenefits dark style={styles.benefits} />
 
         {!isPro && (
           <>

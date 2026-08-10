@@ -5,7 +5,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, Trash2 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Button from './Button';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -37,6 +38,8 @@ export function useAddPlanSheet() {
 }
 
 const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -157,14 +160,14 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{editingId ? 'Edit Plan' : 'New Plan'}</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -243,7 +246,8 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -257,13 +261,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -275,16 +279,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   textInput: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: colors.surface,
+    color: colors.ink,
   },
   amountBox: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -301,7 +309,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.extrabold,
     fontSize: 22,
     letterSpacing: -0.3,
-    color: colors.surface,
+    color: colors.ink,
     flex: 1,
   },
   dateRowWrap: {
@@ -311,7 +319,9 @@ const styles = StyleSheet.create({
   },
   dateRow: {
     flex: 1,
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -324,14 +334,16 @@ const styles = StyleSheet.create({
   dateValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
-    color: colors.surface,
+    color: colors.ink,
     marginTop: 2,
   },
   collectRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -343,7 +355,7 @@ const styles = StyleSheet.create({
   collectTitle: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: colors.surface,
+    color: colors.ink,
   },
   collectSub: {
     fontFamily: fontFamily.medium,
@@ -371,4 +383,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.dangerStrong,
   },
-});
+  });
+}

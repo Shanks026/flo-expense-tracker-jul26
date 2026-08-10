@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Plus, Receipt } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, Receipt } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Card from '../components/Card';
+import Button from '../components/Button';
 import IconTile from '../components/IconTile';
 import Pill from '../components/Pill';
 import CategoryIcon from '../components/CategoryIcon';
@@ -33,6 +34,7 @@ export default function Bills() {
     paused: { iconTone: 'neutral', amountColor: colors.muted, pill: { label: 'Paused', tone: 'neutral' } },
   };
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { bills, loading } = useBills();
   const { openAddBill } = useAddBillSheet();
   const { openPayBill } = usePayBillSheet();
@@ -42,16 +44,10 @@ export default function Bills() {
     // button and SafeAreaView, the same shape as Settings and Analytics.
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-          <Text style={styles.title}>Bills</Text>
-        </View>
-        <Pressable style={styles.newButton} onPress={() => openAddBill()}>
-          <Plus size={15} color={colors.brand} strokeWidth={3} />
-          <Text style={styles.newButtonText}>New Bill</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
         </Pressable>
+        <Text style={styles.title}>Bills</Text>
       </View>
 
       <ScrollView
@@ -134,6 +130,13 @@ export default function Bills() {
           </FadeIn>
         )}
       </ScrollView>
+
+      {/* Fixed at the bottom, thumb-reachable — same move Plans and Budgets
+          already made away from a small header chip. No tab bar here (Bills is
+          a pushed screen), so the bottom safe area is handled explicitly. */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button title="New Bill" onPress={() => openAddBill()} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -150,12 +153,11 @@ function makeStyles(colors) {
     paddingHorizontal: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.md,
+  },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
   },
   backButton: {
     width: 40,
@@ -172,23 +174,6 @@ function makeStyles(colors) {
     fontSize: fontSize.display,
     letterSpacing: -0.3,
     color: colors.ink,
-  },
-  newButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    // Permanently-emphasized chip (same role as Card's `dark` prop) — reads
-    // colors.emphasisBg so it doesn't blend into Dark theme's own near-black
-    // screen the way a pinned near-black chip would.
-    backgroundColor: colors.emphasisBg,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: radii.pill,
-  },
-  newButtonText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: staticColors.surface,
   },
   scroll: {
     // Screen used to supply the horizontal padding; a bare SafeAreaView
@@ -247,7 +232,10 @@ function makeStyles(colors) {
     gap: spacing.sm,
   },
   payButton: {
-    // Permanently-emphasized chip, same convention as newButton above.
+    // Permanently-emphasized chip (same role as Card's `dark` prop) — reads
+    // colors.emphasisBg so it doesn't blend into Dark theme's own near-black
+    // screen, and its label stays pinned light since that surface is dark in
+    // both modes.
     backgroundColor: colors.emphasisBg,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,

@@ -47,12 +47,25 @@ will be** — the reasons are architectural, not a to-do list (full analysis in
 **Consequence for all future work**: this feature stays as-is for the author's
 own personal build **only**. It is **not** part of any store release, **not**
 the basis of the paid tier, and must **not** be counted on when sequencing
-monetisation or a store submission — the cross-platform paid backbone is AI
-(receipt scan + categorisation), per `IDEAS-subscription-and-store.md`. Do not
-re-propose gating, polishing, or store-hardening auto-detect; treat it as a
-frozen personal-use bonus. (The store-submission strip-list in that doc's Part 1
-still applies **if** a store build is ever cut with the module present — but the
-default is that it simply isn't shipped.)
+monetisation or a store submission. Do not re-propose gating, polishing, or
+store-hardening auto-detect; treat it as a frozen personal-use bonus. (The
+store-submission strip-list in that doc's Part 1 still applies **if** a store
+build is ever cut with the module present — but the default is that it simply
+isn't shipped.)
+
+> **Superseded 2026-08-10** — this section used to name AI (receipt scan +
+> categorisation) as the cross-platform paid backbone that replaces
+> auto-detect. **There is no AI in FLO and none is planned** (see the standing
+> rule below). Auto-detect is still unshippable; AI is simply no longer the
+> answer to what replaces it. Pro rests on the limits + full reports.
+
+**Standing rule — no AI features**: AI has been built and removed **twice** on
+direct instruction — `ai-interpret` (categorisation + receipt scanning,
+2026-07-22) and `ai-report-summary` (report insights, 2026-08-10: *"we dont
+want AI in the app. it doesnt work. plus it very slow"*). Do not propose,
+plan, or build a third. `IDEAS-ai-features.md` and the AI portions of
+`IDEAS-subscription-and-store.md` are **history, not a roadmap** — read them
+only to understand what was already tried.
 
 **Standing rule — installing a native-permission build for testing**
 (added 2026-07-12, `06-transaction-auto-detect.md`'s Phase 1 go/no-go round):
@@ -251,6 +264,7 @@ Supabase performance advisor flags.
 | 2026-07-22 | `add_profiles_tour_seen_at` | `28-onboarding-welcome-bundle.md`. Added `profiles.tour_seen_at` (nullable timestamptz, no default) + backfilled every existing row to `now()`. `handle_new_user` NOT changed (new signups get NULL). Was intended to gate an abandoned root-overlay tour; the tour became the final onboarding steps instead (gated by `onboarded_at`), so **this column is currently unused** — left in place, harmless, safe to drop later. No view recreated → no `security_invoker` step. |
 | 2026-07-22 | `remove_ai_receipt_scanning` | `13-ai-features.md` reverted — direct instruction to remove AI receipt scanning entirely. Dropped `transactions.receipt_path`/`receipt_data` (both all-NULL, verified before dropping — zero data loss) and the `ai_usage` table (1 row total, confirmed as a `categorise`-mode dev test, not `receipt` — `categorise` was never wired to any client UI either). Advisor clean after (only the 4 pre-existing WARNs). |
 | 2026-07-22 | `remove_ai_receipt_scanning_storage` | Same revert, follow-up: deleted the `receipts` storage bucket (0 objects, verified before deleting). Needed the `storage.allow_delete_query` GUC first — same standing rule as `fix_user_delete_trigger_storage_guard` above; a bare `DELETE FROM storage.buckets` hit the identical `protect_delete` trigger and rolled back the first attempt (which also had this in the same transaction as the column/table drops — split into two migrations after that failure). |
+| 2026-08-10 | `drop_ai_usage_table` | **AI removed from FLO entirely** (direct instruction — see the no-AI standing rule above). Dropped `ai_usage` a second time: it had been dropped by `remove_ai_receipt_scanning` (2026-07-22) and then recreated for the `ai-report-summary` metering cap. 4 rows at drop time, all dev tests of the report-summary path. Client side gone too: `lib/aiReportSummary.js`, the whole `supabase/functions/ai-report-summary/` source tree, `app/report.js`'s AI Insights section, and the `AI receipt scan` entry in `PRO_BENEFITS`. **Both AI Edge Functions (`ai-interpret`, `ai-report-summary`) are still ACTIVE on Supabase** — no MCP tool can delete a deployed function (same blocker recorded for `ai-interpret` in 2026-07-22); needs the Dashboard or `supabase functions delete <slug>`. Any provider API keys still set as function secrets should be revoked at the provider too. |
 | 2026-07-22 | `categories_unique_and_stop_auto_seed` | Onboarding-categories redesign (fixing a real, measured 2-3s wait on `app/onboarding/categories.js` — see the `categories` schema note above). Added `unique (user_id, name, type)` on `categories` (zero existing duplicates, verified before adding); redefined `handle_new_user` to drop its 6-row category insert entirely (kept the `accounts`/`profiles` inserts unchanged, same `SECURITY DEFINER`/`search_path` as before). Security advisor clean after (only the 4 pre-existing WARNs — `handle_new_user` itself isn't RPC-exposed, so it doesn't join the two `SECURITY DEFINER` WARNs). |
 
 **Still open, not fixed**: Security advisor flags leaked-password-protection

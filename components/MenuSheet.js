@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight } from 'lucide-react-native';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
@@ -111,8 +111,8 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
       // ▲▲▲ first = Pro (shorter), second = non-Pro (taller, fits Upgrade card)
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       {/* Three-part layout, only the middle part scrolls:
           1. Top section (pinned) — header, Level card, Upgrade card. None of
@@ -135,7 +135,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Menu</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -159,7 +159,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
           return (
             <Pressable key={item.key} style={styles.row} onPress={() => handlePress(item.route)}>
               <View style={styles.rowIcon}>
-                <Icon size={19} color={staticColors.surface} strokeWidth={2} />
+                <Icon size={19} color={colors.ink} strokeWidth={2} />
               </View>
               <Text style={styles.rowLabel}>{item.label}</Text>
             </Pressable>
@@ -181,7 +181,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
         <View style={styles.divider} />
         <Pressable style={styles.row} onPress={handleLogout}>
           <View style={styles.rowIcon}>
-            <LogOut size={19} color={staticColors.dangerStrong} strokeWidth={2} />
+            <LogOut size={19} color={colors.dangerStrong} strokeWidth={2} />
           </View>
           <Text style={[styles.rowLabel, styles.logoutLabel]}>Log Out</Text>
         </Pressable>
@@ -216,14 +216,14 @@ function makeStyles(colors) {
   // (spacing.xxl + insets.bottom) since it depends on the device's safe area.
   footer: {
     paddingHorizontal: spacing.xl,
-    backgroundColor: staticColors.ink,
+    backgroundColor: colors.bg,
   },
   // Static "scroll for more" hint between the scrollable region and the
   // footer — very muted, always rendered (no conditional visibility logic).
   scrollHintText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.xs,
-    color: staticColors.mutedDarker,
+    color: colors.mutedMid,
     textAlign: 'center',
     paddingVertical: 6,
   },
@@ -236,13 +236,13 @@ function makeStyles(colors) {
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -256,7 +256,7 @@ function makeStyles(colors) {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.iconTileBg,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -296,14 +296,14 @@ function makeStyles(colors) {
   rowLabel: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   logoutLabel: {
-    color: staticColors.dangerStrong,
+    color: colors.dangerStrong,
   },
   divider: {
     height: 1,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.borderSoft,
     marginVertical: spacing.sm,
   },
   });

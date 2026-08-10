@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Check, X } from 'lucide-react-native';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { CURRENCY_LIST, currencyMeta } from '../lib/currency';
 
-// Reused by AddAccountSheet, AddBillSheet (dark sheets) and app/settings.js (a
-// light pushed screen). `dark` swaps the inline variant's palette, mirroring
-// the `dark` prop convention AmountText/Card/ProgressBar already use
-// elsewhere. `renderTrigger(selectedMeta, toggle)` lets a caller supply its
-// own trigger row (Settings' icon-tile row shape) while still reusing the
-// shared open/close state and option list.
+// Reused by AddAccountSheet, AddBillSheet and app/settings.js (a light pushed
+// screen). `renderTrigger(selectedMeta, toggle)` lets a caller supply its own
+// trigger row (Settings' icon-tile row shape) while still reusing the shared
+// open/close state and option list.
 //
 // Two presentations, chosen per-caller via `variant`:
 // - 'inline' (default) — the trigger row expands in place into the full
@@ -26,20 +24,15 @@ import { CURRENCY_LIST, currencyMeta } from '../lib/currency';
 export default function CurrencyPicker({
   value,
   onChange,
-  dark = false,
   disabled = false,
   disabledReason,
   renderTrigger,
   variant = 'inline',
   style,
 }) {
-  // Only the dialog variant (Settings, a theme-reactive light screen) reads
-  // the active theme. The inline variant is only ever used inside AddAccount/
-  // AddBillSheet's permanently-dark chrome (`dark` is always true there), so
-  // its colors stay pinned to the static tokens — same reasoning as Card's
-  // `dark` prop.
   const { colors } = useTheme();
   const dialogStyles = useMemo(() => makeDialogStyles(colors), [colors]);
+  const inlineStyles = useMemo(() => makeInlineStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const selected = currencyMeta(value);
   const toggle = () => !disabled && setOpen((v) => !v);
@@ -50,20 +43,20 @@ export default function CurrencyPicker({
     close();
   }
 
-  const rowBg = dark ? staticColors.inkCard : staticColors.iconTileBg;
-  const valueColor = dark ? staticColors.surface : staticColors.ink;
-  const labelColor = staticColors.mutedMid;
+  const rowBg = colors.iconTileBg;
+  const valueColor = colors.ink;
+  const labelColor = colors.mutedMid;
 
   const trigger = renderTrigger ? (
     renderTrigger(selected, toggle)
   ) : (
     <Pressable
-      style={[styles.row, { backgroundColor: rowBg }, disabled && styles.rowDisabled]}
+      style={[inlineStyles.row, { backgroundColor: rowBg }, disabled && inlineStyles.rowDisabled]}
       onPress={toggle}
       disabled={disabled}
     >
-      <Text style={[styles.label, { color: labelColor }]}>Currency</Text>
-      <Text style={[styles.value, { color: valueColor }]}>
+      <Text style={[inlineStyles.label, { color: labelColor }]}>Currency</Text>
+      <Text style={[inlineStyles.value, { color: valueColor }]}>
         {selected.symbol} {selected.code}
       </Text>
     </Pressable>
@@ -73,7 +66,7 @@ export default function CurrencyPicker({
     return (
       <View style={style}>
         {trigger}
-        {disabled && disabledReason && <Text style={styles.hint}>{disabledReason}</Text>}
+        {disabled && disabledReason && <Text style={inlineStyles.hint}>{disabledReason}</Text>}
 
         <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
           <Pressable style={dialogStyles.overlay} onPress={close}>
@@ -117,22 +110,22 @@ export default function CurrencyPicker({
     <View style={style}>
       {trigger}
 
-      {disabled && disabledReason && <Text style={styles.hint}>{disabledReason}</Text>}
+      {disabled && disabledReason && <Text style={inlineStyles.hint}>{disabledReason}</Text>}
 
       {open && !disabled && (
-        <View style={[styles.list, { backgroundColor: rowBg }]}>
+        <View style={[inlineStyles.list, { backgroundColor: rowBg }]}>
           {CURRENCY_LIST.map((c, idx) => {
             const isSelected = c.code === value;
             return (
               <Pressable
                 key={c.code}
-                style={[styles.optionRow, idx < CURRENCY_LIST.length - 1 && styles.optionRowBorder]}
+                style={[inlineStyles.optionRow, idx < CURRENCY_LIST.length - 1 && inlineStyles.optionRowBorder]}
                 onPress={() => selectCode(c.code)}
               >
-                <Text style={[styles.optionSymbol, { color: valueColor }]}>{c.symbol}</Text>
+                <Text style={[inlineStyles.optionSymbol, { color: valueColor }]}>{c.symbol}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.optionCode, { color: valueColor }]}>{c.code}</Text>
-                  <Text style={styles.optionName}>{c.name}</Text>
+                  <Text style={[inlineStyles.optionCode, { color: valueColor }]}>{c.code}</Text>
+                  <Text style={inlineStyles.optionName}>{c.name}</Text>
                 </View>
                 {isSelected && <Check size={16} color={colors.brand} strokeWidth={2.8} />}
               </Pressable>
@@ -144,7 +137,8 @@ export default function CurrencyPicker({
   );
 }
 
-const styles = StyleSheet.create({
+function makeInlineStyles(colors) {
+  return StyleSheet.create({
   row: {
     borderRadius: 12,
     paddingHorizontal: spacing.md,
@@ -167,7 +161,7 @@ const styles = StyleSheet.create({
   hint: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.xs,
-    color: staticColors.mutedLight,
+    color: colors.mutedLight,
     marginTop: spacing.xs,
     paddingHorizontal: 2,
   },
@@ -184,7 +178,7 @@ const styles = StyleSheet.create({
   },
   optionRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128,128,128,0.15)',
+    borderBottomColor: colors.borderSoft,
   },
   optionSymbol: {
     width: 28,
@@ -199,15 +193,14 @@ const styles = StyleSheet.create({
   optionName: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.xs,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginTop: 1,
   },
-});
+  });
+}
 
 // Mirrors ReportPeriodPicker's dialog styles exactly (light surface, centred,
 // transparent+fade) — the established "this is a dialog, not a sheet" shape.
-// Only this half is theme-reactive (Settings' variant="dialog" usage); the
-// inline variant above is only ever rendered inside permanently-dark sheets.
 function makeDialogStyles(colors) {
   return StyleSheet.create({
   overlay: {

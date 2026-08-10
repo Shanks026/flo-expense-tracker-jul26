@@ -4,10 +4,18 @@ import { format } from 'date-fns';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { formatMoney } from '../lib/currency';
+import ChartAxis, { ChartGridlines, niceAxisMax } from './ChartAxis';
 
 const BAR_MAX_HEIGHT = 110;
 const MIN_BAR_HEIGHT = 4;
-const COLUMN_WIDTH = 40;
+// Columns now fill their slot and are separated by BAR_GAP, so the scrolling
+// variant's width is the old 40 pitch minus that gap — same rhythm as before,
+// just with the spacing expressed between columns instead of inside them.
+const BAR_GAP = spacing.sm;
+const COLUMN_WIDTH = 32;
+// dayColumn's own paddingVertical — the bar track starts that far down, so
+// gridlines and axis labels share the offset to stay aligned with the bars.
+const TRACK_TOP_OFFSET = spacing.sm;
 // Beyond this many bars, a fixed-width row would squeeze each bar too thin to
 // read — switch to a fixed-width horizontally-scrolling layout instead (used
 // by Analytics' Month/Custom ranges, which can be day-bucketed across a full
@@ -74,6 +82,9 @@ export default function IncomeExpenseChart({
     }),
     1
   );
+  // Bars scale against the rounded axis ceiling, not the raw max, so the
+  // tallest bar lands on whichever gridline its value actually falls under.
+  const axisMax = niceAxisMax(maxValue);
   const totalExpense = data.reduce((sum, d) => sum + d.expense, 0);
   const totalIncome = data.reduce((sum, d) => sum + d.income, 0);
 
@@ -107,9 +118,9 @@ export default function IncomeExpenseChart({
   const bars = data.map((bucket, index) => {
     const isSelected = index === selectedIndex;
     const expenseHeight =
-      visible.expense && bucket.expense > 0 ? Math.max((bucket.expense / maxValue) * BAR_MAX_HEIGHT, MIN_BAR_HEIGHT) : 0;
+      visible.expense && bucket.expense > 0 ? Math.max((bucket.expense / axisMax) * BAR_MAX_HEIGHT, MIN_BAR_HEIGHT) : 0;
     const incomeHeight =
-      visible.income && bucket.income > 0 ? Math.max((bucket.income / maxValue) * BAR_MAX_HEIGHT, MIN_BAR_HEIGHT) : 0;
+      visible.income && bucket.income > 0 ? Math.max((bucket.income / axisMax) * BAR_MAX_HEIGHT, MIN_BAR_HEIGHT) : 0;
     const key = format(bucket.date, 'yyyy-MM-dd');
 
     // Both bars share the same baseline (bottom = 0). The smaller value is
@@ -178,23 +189,34 @@ export default function IncomeExpenseChart({
 
       {data.length === 0 && emptyMessage ? (
         <Text style={styles.emptyText}>{emptyMessage}</Text>
-      ) : data.length > SCROLL_THRESHOLD ? (
-        // Opens scrolled to the END (most recent) rather than day 1 — the
-        // current week / latest bar sits at the right edge on open, and the
-        // user scrolls LEFT to see earlier in the period. onContentSizeChange
-        // (not a mount effect) so it re-anchors to the newest whenever the
-        // period or its data changes underneath it.
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chartAreaScroll}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-        >
-          {bars}
-        </ScrollView>
       ) : (
-        <View style={styles.chartArea}>{bars}</View>
+        // The axis column sits OUTSIDE the scroller so it stays pinned while
+        // the bars pan; the gridlines live in the plot area, which is the
+        // scroll viewport, so they span the visible width either way.
+        <View style={styles.plotRow}>
+          <ChartAxis max={axisMax} height={BAR_MAX_HEIGHT} top={TRACK_TOP_OFFSET} />
+          <View style={styles.plotArea}>
+            <ChartGridlines height={BAR_MAX_HEIGHT} top={TRACK_TOP_OFFSET} />
+            {data.length > SCROLL_THRESHOLD ? (
+              // Opens scrolled to the END (most recent) rather than day 1 — the
+              // current week / latest bar sits at the right edge on open, and the
+              // user scrolls LEFT to see earlier in the period. onContentSizeChange
+              // (not a mount effect) so it re-anchors to the newest whenever the
+              // period or its data changes underneath it.
+              <ScrollView
+                ref={scrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chartAreaScroll}
+                onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+              >
+                {bars}
+              </ScrollView>
+            ) : (
+              <View style={styles.chartArea}>{bars}</View>
+            )}
+          </View>
+        </View>
       )}
     </View>
   );
@@ -252,14 +274,27 @@ function makeStyles(colors) {
     height: 8,
     borderRadius: radii.pill,
   },
+  plotRow: {
+    flexDirection: 'row',
+  },
+  plotArea: {
+    flex: 1,
+  },
+  // A fixed `gap` between full-width columns rather than centring a
+  // percentage-width bar in each slot: that older shape left half a gutter
+  // outside the first and last bars, so the bar block sat inset from the
+  // gridlines it's measured against. Now the first bar's left edge and the
+  // last bar's right edge land exactly on the gridline span, and every
+  // inter-bar gap stays identical.
   chartArea: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-end',
+    gap: BAR_GAP,
   },
   chartAreaScroll: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    gap: BAR_GAP,
   },
   dayColumn: {
     alignItems: 'center',
@@ -276,7 +311,7 @@ function makeStyles(colors) {
   },
   barTrack: {
     height: BAR_MAX_HEIGHT,
-    width: '70%',
+    width: '100%',
     justifyContent: 'flex-end',
   },
   barLayer: {

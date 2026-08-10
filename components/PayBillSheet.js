@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, SkipForward } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Button from './Button';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -122,8 +122,8 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
@@ -131,7 +131,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
             Pay {bill?.name ?? ''}
           </Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -142,7 +142,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
             value={amount}
             onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
             placeholder="0"
-            placeholderTextColor={staticColors.mutedDarker}
+            placeholderTextColor={colors.mutedDarker}
             keyboardType="number-pad"
             style={styles.amountInput}
             autoFocus
@@ -201,7 +201,7 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
 
         <Button title="Mark as Paid" variant="primary" onPress={handleMarkPaid} loading={saving} style={{ marginTop: spacing.lg }} />
         <Pressable style={styles.skipRow} onPress={handleSkip} disabled={saving}>
-          <SkipForward size={16} color={staticColors.mutedMid} strokeWidth={2} />
+          <SkipForward size={16} color={colors.mutedMid} strokeWidth={2} />
           <Text style={styles.skipText}>Skip this cycle</Text>
         </Pressable>
       </BottomSheetScrollView>
@@ -226,24 +226,26 @@ function makeStyles(colors) {
     flex: 1,
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginBottom: spacing.sm,
   },
   amountBox: {
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -254,17 +256,19 @@ function makeStyles(colors) {
   amountCurrency: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.title,
-    color: staticColors.mutedDarker,
+    color: colors.mutedDarker,
   },
   amountInput: {
     fontFamily: fontFamily.extrabold,
     fontSize: 26,
     letterSpacing: -0.3,
-    color: staticColors.surface,
+    color: colors.ink,
     flex: 1,
   },
   row: {
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -275,12 +279,12 @@ function makeStyles(colors) {
   fieldLabelInline: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
   },
   rowValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.base,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   accountValueRow: {
     flexDirection: 'row',
@@ -300,18 +304,21 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
   accountOptionSelected: {
     backgroundColor: colors.brand,
+    borderWidth: 0,
   },
   accountOptionText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: staticColors.surface,
+    color: colors.ink,
     flexShrink: 1,
   },
   accountOptionTextSelected: {
@@ -320,7 +327,7 @@ function makeStyles(colors) {
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.dangerStrong,
+    color: colors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.md,
   },
@@ -335,7 +342,7 @@ function makeStyles(colors) {
   skipText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
   },
   });
 }

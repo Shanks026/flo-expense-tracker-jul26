@@ -121,7 +121,13 @@ export default function Personalize() {
         <Text style={styles.headerTitle}>Personalize</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        // Footer height (~81) + its own bottom inset, plus a comfortable gap
+        // so the last row clears the Equip bar instead of tucking under it.
+        contentContainerStyle={[styles.scroll, { paddingBottom: 105 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Not pinned (per direct feedback) — a full mini Home clone is a lot
             taller than the Shop's own hero-only preview, so keeping it in
             normal flow leaves the sections below actual room to scroll. */}
@@ -224,11 +230,14 @@ function makeStyles(colors) {
       letterSpacing: -0.3,
       color: colors.ink,
     },
+    // paddingBottom is applied inline (see the ScrollView) because it has to
+    // include the device's bottom inset — the footer's own height does, so a
+    // flat number here can't clear it. The old flat 110 was actually SHORTER
+    // than the footer on any device with a gesture bar: footer = paddingTop 12
+    // + button 56 + paddingBottom 12 + border 1 + inset (~34) ≈ 115, which is
+    // what buried the last card row's name label.
     scroll: {
       paddingHorizontal: spacing.xl,
-      // Extra clearance under the footer Equip button, same reasoning as
-      // Shop's floating-bar `scroll` padding.
-      paddingBottom: 110,
     },
     // Back inside the scroll's own contentContainerStyle (which already
     // supplies paddingHorizontal) — just needs separation from the section

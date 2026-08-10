@@ -322,13 +322,13 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Rewards</Text>
         <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-          <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+          <X size={16} color={colors.ink} strokeWidth={2.6} />
         </Pressable>
       </View>
 
@@ -339,7 +339,7 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator color={staticColors.surface} style={styles.loading} />
+            <ActivityIndicator color={colors.ink} style={styles.loading} />
           ) : (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
@@ -387,13 +387,13 @@ function makeStyles(colors) {
     headerTitle: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.xxl,
-      color: staticColors.surface,
+      color: colors.ink,
     },
     closeButton: {
       width: 32,
       height: 32,
       borderRadius: radii.pill,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: colors.chipBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -409,12 +409,12 @@ function makeStyles(colors) {
       fontSize: fontSize.md,
       letterSpacing: 0.2,
       textTransform: 'uppercase',
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
     },
     explainerText: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.sm,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       paddingHorizontal: spacing.xl,
       marginBottom: spacing.md,
     },
@@ -436,7 +436,7 @@ function makeStyles(colors) {
     balanceText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.display,
-      color: staticColors.surface,
+      color: colors.ink,
       fontVariant: ['tabular-nums'],
       textAlignVertical: 'center',
       includeFontPadding: false,
@@ -464,7 +464,9 @@ function makeStyles(colors) {
       gap: spacing.md,
       marginHorizontal: spacing.xl,
       marginBottom: spacing.md,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: radii.card,
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
@@ -483,12 +485,12 @@ function makeStyles(colors) {
     shopTitle: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.md,
-      color: staticColors.surface,
+      color: colors.ink,
     },
     shopSubtitle: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       marginTop: 1,
     },
     // The freeze card's own compact trailing Buy — distinct from the
@@ -505,6 +507,9 @@ function makeStyles(colors) {
     buyButtonDisabled: {
       opacity: 0.4,
     },
+    // Pinned dark, not colors.ink — this sits on colors.iceBlue, a fixed
+    // SEMANTIC color that doesn't invert with the mode, so the text needs to
+    // stay dark for contrast even in Dark mode (where colors.ink flips light).
     smallBuyButtonText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.sm,
@@ -516,7 +521,9 @@ function makeStyles(colors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: radii.card,
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.lg,
@@ -551,12 +558,12 @@ function makeStyles(colors) {
     levelLabel: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.md,
-      color: staticColors.surface,
+      color: colors.ink,
     },
     levelNumber: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.md,
-      color: staticColors.surface,
+      color: colors.ink,
     },
     // Below the progress bar, mirroring levelTopRow's row shape — remaining
     // XP (the "how much left" figure) at left, the absolute x/x fraction
@@ -569,18 +576,20 @@ function makeStyles(colors) {
     levelRemaining: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       fontVariant: ['tabular-nums'],
     },
     levelXp: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       fontVariant: ['tabular-nums'],
     },
     ladder: {
       marginHorizontal: spacing.xl,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: radii.card,
       paddingHorizontal: spacing.lg,
     },
@@ -596,7 +605,7 @@ function makeStyles(colors) {
     // badge grids; same idea here, just a tinted row instead of a tinted
     // badge (there's no separate locked/unlocked art distinction to carry it).
     ladderRowCurrent: {
-      backgroundColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: colors.chipBg,
       marginHorizontal: -spacing.md,
       paddingHorizontal: spacing.md,
     },
@@ -613,21 +622,21 @@ function makeStyles(colors) {
     ladderTitle: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.sm,
-      color: staticColors.surface,
+      color: colors.ink,
     },
     ladderReward: {
       fontFamily: fontFamily.medium,
       fontSize: fontSize.xs,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       marginTop: 2,
     },
     ladderTitleLocked: {
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
     },
     ladderLevel: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       fontVariant: ['tabular-nums'],
     },
     loading: {
@@ -641,7 +650,7 @@ function makeStyles(colors) {
       width: 56,
       height: 56,
       borderRadius: radii.pill,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: colors.iconTileBg,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.md,
@@ -649,7 +658,7 @@ function makeStyles(colors) {
     emptyText: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.lg,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       textAlign: 'center',
       paddingHorizontal: spacing.xl,
     },
@@ -668,12 +677,12 @@ function makeStyles(colors) {
     rowTitle: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.md,
-      color: staticColors.surface,
+      color: colors.ink,
     },
     rowSub: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       marginTop: 1,
     },
     rowAmount: {
@@ -683,12 +692,12 @@ function makeStyles(colors) {
       fontVariant: ['tabular-nums'],
     },
     rowAmountNegative: {
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
     },
     separator: {
       height: 1,
       marginHorizontal: spacing.xl,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: colors.borderSoft,
     },
   });
 }

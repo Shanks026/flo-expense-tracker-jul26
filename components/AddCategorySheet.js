@@ -4,7 +4,7 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import { X } from 'lucide-react-native';
 import Button from './Button';
 import CategoryIcon, { CATEGORY_ICON_KEYS, CATEGORY_COLORS } from './CategoryIcon';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -104,14 +104,14 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>New Category</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -120,7 +120,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
           value={name}
           onChangeText={setName}
           placeholder="e.g. Subscriptions"
-          placeholderTextColor={staticColors.mutedDarker}
+          placeholderTextColor={colors.mutedDarker}
           style={styles.textInput}
         />
 
@@ -140,7 +140,7 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
             const selected = key === icon;
             return (
               <Pressable key={key} style={[styles.iconOption, selected && styles.iconOptionSelected]} onPress={() => setIcon(key)}>
-                <CategoryIcon icon={key} size={20} color={selected ? colors.brandText : staticColors.surface} strokeWidth={2} />
+                <CategoryIcon icon={key} size={20} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
               </Pressable>
             );
           })}
@@ -183,35 +183,37 @@ function makeStyles(colors) {
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginBottom: spacing.sm,
     marginTop: spacing.md,
   },
   textInput: {
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   segmentWrap: {
     flexDirection: 'row',
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     borderRadius: 12,
     padding: 4,
   },
@@ -227,7 +229,7 @@ function makeStyles(colors) {
   segmentText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
   },
   segmentTextActive: {
     fontFamily: fontFamily.extrabold,
@@ -242,12 +244,15 @@ function makeStyles(colors) {
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconOptionSelected: {
     backgroundColor: colors.brand,
+    borderWidth: 0,
   },
   colorGrid: {
     flexDirection: 'row',
@@ -261,12 +266,12 @@ function makeStyles(colors) {
   },
   colorOptionSelected: {
     borderWidth: 3,
-    borderColor: staticColors.surface,
+    borderColor: colors.ink,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.dangerStrong,
+    color: colors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.md,
   },

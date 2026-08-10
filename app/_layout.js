@@ -18,7 +18,7 @@ import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { ThemeProvider, useTheme } from '../theme/ThemeContext';
 import { DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
-import { AccountProvider } from '../lib/AccountContext';
+import { AccountProvider, useAccount } from '../lib/AccountContext';
 import { ToastProvider, useToast } from '../components/Toast';
 import { RewardBurstProvider } from '../components/RewardBurst';
 import { AddTransactionSheetProvider, useAddTransactionSheet } from '../components/AddTransactionSheet';
@@ -30,6 +30,7 @@ import DueBillsModal from '../components/DueBillsModal';
 import StreakCelebration from '../components/StreakCelebration';
 import FreezePrompt from '../components/FreezePrompt';
 import RankUpCelebration from '../components/RankUpCelebration';
+import TrophyToast from '../components/TrophyToast';
 import OnboardingDevBack from '../components/OnboardingDevBack';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
 import { AddCategorySheetProvider } from '../components/AddCategorySheet';
@@ -102,11 +103,20 @@ function PushTokenSync() {
 // open and the next should be rare.
 function DetectedTransactionHandler() {
   const { session } = useAuth();
+  const { activeAccountId } = useAccount();
   const { openAdd } = useAddTransactionSheet();
   const { showToast } = useToast();
 
   const drain = useCallback(() => {
     if (!session) return;
+    // A session alone isn't enough: AccountContext nulls activeAccountId on
+    // every userId change and only refills it once the accounts fetch and an
+    // AsyncStorage read both resolve. Cold-starting into this handler beat
+    // that, so the sheet opened with no account to save into. Bailing BEFORE
+    // drainDetections() is the point — the detection stays queued rather than
+    // being consumed into a sheet that can't save it, and activeAccountId is
+    // in the dep list below, so resolving it re-runs this and drains then.
+    if (!activeAccountId) return;
     if (!isDetectionEnabled() || !hasNotificationAccess()) return;
 
     const pending = drainDetections();
@@ -117,7 +127,7 @@ function DetectedTransactionHandler() {
     if (rest.length) {
       showToast({ message: `${rest.length} more detected — add them manually`, variant: 'info' });
     }
-  }, [session, openAdd, showToast]);
+  }, [session, activeAccountId, openAdd, showToast]);
 
   useEffect(() => {
     drain();
@@ -408,6 +418,7 @@ function RootNavigator() {
                                     <StreakCelebration />
                                     <FreezePrompt />
                                     <RankUpCelebration />
+                                    <TrophyToast />
                                     {/* contentStyle matches the active theme's screen bg —
                                         without it, React Navigation's native-stack default
                                         (always white) paints for a frame during every push

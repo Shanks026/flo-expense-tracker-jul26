@@ -11,11 +11,13 @@ import CategoryIcon from '../components/CategoryIcon';
 import Pill from '../components/Pill';
 import ProgressBar from '../components/ProgressBar';
 import DonutChart from '../components/DonutChart';
+import CategoryBreakdownAccordion from '../components/CategoryBreakdownAccordion';
 import ReportPeriodPicker from '../components/ReportPeriodPicker';
 import { useToast } from '../components/Toast';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useAnalyticsData from '../hooks/useAnalyticsData';
+import { useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { useAccount } from '../lib/AccountContext';
 import { useAuth } from '../lib/AuthContext';
 import { buildTransactionsCsv, shareCsv } from '../lib/export';
@@ -63,6 +65,7 @@ export default function Report() {
   const { session } = useAuth();
   const { accounts, activeAccountId } = useAccount();
   const { showToast } = useToast();
+  const { openAdd } = useAddTransactionSheet();
   const { isPro, loading: entitlementLoading } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const userId = session?.user?.id ?? null;
@@ -350,19 +353,16 @@ export default function Report() {
               <DonutChart segments={donutSegments} total={totalExpense} currency={reportCurrency} />
             </Card>
             <Card style={styles.breakdownCard}>
-              {categoryBreakdown.map((entry, idx) => (
-                <View
-                  key={entry.category?.id ?? 'uncategorized'}
-                  style={[styles.breakdownRow, idx < categoryBreakdown.length - 1 && styles.rowBorder]}
-                >
-                  <View style={[styles.colorDot, { backgroundColor: getCategoryColor(entry.category) ?? colors.mutedLight }]} />
-                  <View style={styles.rowMid}>
-                    <Text style={styles.rowTitle}>{entry.category?.name ?? 'Uncategorized'}</Text>
-                    <Text style={styles.rowSub}>{entry.pct.toFixed(0)}% of total</Text>
-                  </View>
-                  <AmountText value={entry.amount} type="neutral" currency={reportCurrency} />
-                </View>
-              ))}
+              <CategoryBreakdownAccordion
+                entries={categoryBreakdown}
+                transactions={currencyScopedCurrent}
+                type="expense"
+                currency={reportCurrency}
+                onPressTransaction={openAdd}
+                accountFor={accountFor}
+                showAccountTags={showAccountTags}
+                renderRight={(entry) => <AmountText value={entry.amount} type="neutral" currency={reportCurrency} />}
+              />
             </Card>
           </>
         )}
@@ -644,35 +644,6 @@ function makeStyles(colors) {
     padding: 0,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 14,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: radii.pill,
-  },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  rowSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-    marginTop: 1,
   },
   emptyCard: {
     marginBottom: spacing.md,

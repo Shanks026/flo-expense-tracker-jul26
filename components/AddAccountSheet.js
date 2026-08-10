@@ -5,7 +5,8 @@ import { X, Trash2 } from 'lucide-react-native';
 import Button from './Button';
 import { CATEGORY_COLORS } from './CategoryIcon';
 import CurrencyPicker from './CurrencyPicker';
-import { colors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -35,6 +36,8 @@ export function useAddAccountSheet() {
 }
 
 const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -173,14 +176,14 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{editingId ? 'Edit Account' : 'New Account'}</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -219,7 +222,6 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
         <CurrencyPicker
           value={currency}
           onChange={setCurrency}
-          dark
           disabled={currencyLocked}
           disabledReason="Currency can't change once an account has transactions — create a new account instead"
           style={{ marginTop: spacing.md }}
@@ -245,7 +247,8 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   );
 });
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -259,13 +262,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: colors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -277,13 +280,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   textInput: {
-    backgroundColor: colors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: colors.surface,
+    color: colors.ink,
   },
   colorGrid: {
     flexDirection: 'row',
@@ -297,7 +302,7 @@ const styles = StyleSheet.create({
   },
   colorOptionSelected: {
     borderWidth: 3,
-    borderColor: colors.surface,
+    borderColor: colors.ink,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
@@ -319,4 +324,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.dangerStrong,
   },
-});
+  });
+}

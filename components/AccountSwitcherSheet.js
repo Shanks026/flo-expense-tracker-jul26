@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { Check, Pencil, X, TrendingUp, TrendingDown } from 'lucide-react-native';
 import Button from './Button';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAccount } from '../lib/AccountContext';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
@@ -46,6 +46,7 @@ function formatBalance(value, currency) {
 }
 
 function AccountCard({ account, summary, active, activeIconColor, onSelect, onEdit, styles }) {
+  const { colors } = useTheme();
   const currency = account.currency ?? 'INR';
   const balance = formatBalance(summary?.in_hand_balance ?? 0, currency);
 
@@ -64,7 +65,7 @@ function AccountCard({ account, summary, active, activeIconColor, onSelect, onEd
           )}
         </View>
         <Pressable style={styles.editButton} onPress={onEdit} hitSlop={8}>
-          <Pencil size={14} color={staticColors.mutedMid} strokeWidth={2} />
+          <Pencil size={14} color={colors.mutedMid} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -77,12 +78,12 @@ function AccountCard({ account, summary, active, activeIconColor, onSelect, onEd
 
       <View style={styles.cardStatsRow}>
         <View style={styles.statLine}>
-          <TrendingUp size={12} color={staticColors.mutedMid} strokeWidth={2.6} />
+          <TrendingUp size={12} color={colors.mutedMid} strokeWidth={2.6} />
           <Text style={styles.statValue}>{formatAmount(summary?.period_income ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Income</Text>
         </View>
         <View style={styles.statLine}>
-          <TrendingDown size={12} color={staticColors.mutedMid} strokeWidth={2.6} />
+          <TrendingDown size={12} color={colors.mutedMid} strokeWidth={2.6} />
           <Text style={styles.statValue}>{formatAmount(summary?.period_expense ?? 0, currency)}</Text>
           <Text style={styles.statLabel}>Expenses</Text>
         </View>
@@ -149,8 +150,8 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
       snapPoints={useMemo(() => ['85%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView
         style={{ flex: 1 }}
@@ -160,7 +161,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Accounts</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -198,18 +199,20 @@ function makeStyles(colors) {
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radii.cardLg,
     padding: spacing.xxl,
     marginBottom: spacing.md,
@@ -237,7 +240,7 @@ function makeStyles(colors) {
     fontSize: fontSize.lg,
     letterSpacing: -0.1,
     lineHeight: fontSize.lg,
-    color: staticColors.surface,
+    color: colors.ink,
     flexShrink: 1,
   },
   activePill: {
@@ -258,17 +261,17 @@ function makeStyles(colors) {
   cardLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
   },
   cardBalance: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.hero,
     letterSpacing: -0.4,
-    color: staticColors.surface,
+    color: colors.ink,
     marginTop: 0,
   },
   cardBalanceCurrency: {
-    color: staticColors.mutedDarker,
+    color: colors.mutedDarker,
   },
   cardStatsRow: {
     flexDirection: 'row',
@@ -284,12 +287,12 @@ function makeStyles(colors) {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
     letterSpacing: -0.2,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   statLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
   },
   });
 }

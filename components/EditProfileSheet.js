@@ -4,7 +4,7 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import * as ImagePicker from 'expo-image-picker';
 import { X, Camera } from 'lucide-react-native';
 import Button from './Button';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
@@ -125,14 +125,14 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -154,7 +154,7 @@ const EditProfileSheet = forwardRef(function EditProfileSheet(_props, ref) {
           value={fullName}
           onChangeText={setFullName}
           placeholder="Your name"
-          placeholderTextColor={staticColors.mutedDarker}
+          placeholderTextColor={colors.mutedDarker}
           style={styles.textInput}
         />
 
@@ -182,13 +182,13 @@ function makeStyles(colors) {
   headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.xl,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -222,30 +222,34 @@ function makeStyles(colors) {
     height: 30,
     borderRadius: radii.pill,
     backgroundColor: colors.brand,
+    // Matches the sheet's own background (not a foreground/text token) so
+    // this ring reads as a cutout around the badge, not a dark outline.
     borderWidth: 3,
-    borderColor: staticColors.ink,
+    borderColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginBottom: spacing.sm,
   },
   textInput: {
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.dangerStrong,
+    color: colors.dangerStrong,
     textAlign: 'center',
     marginTop: spacing.md,
   },

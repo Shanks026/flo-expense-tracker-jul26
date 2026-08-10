@@ -81,12 +81,10 @@ never data-model changes. See `.claude/features/14-subscription-pro.md`.
 
 - `send-push` — server push, driven by a cron reading `profiles.timezone` for
   local-time scheduling. `TimezoneSync` writes the device's real IANA zone.
-- `ai-interpret` (AI proxy: categorisation + receipt scanning) was **removed
-  entirely 2026-07-22** — see `.claude/features/13-ai-features.md`. Rebuild
-  later against an Anthropic key once there's revenue; don't resurrect the
-  Gemini-keyed version. The pattern it used (key never in the client, one
-  proxy Edge Function, entitlement + metering checks server-side) is still
-  the right shape for whatever AI feature comes next.
+- **No AI Edge Functions. `send-push` is the only one.** Two AI attempts have
+  now been removed on direct instruction — `ai-interpret` (categorisation +
+  receipt scanning, 2026-07-22) and `ai-report-summary` (report insights,
+  2026-08-10). See the standing rule below before proposing a third.
 
 ## Supabase / schema truth
 
@@ -105,11 +103,19 @@ via the Supabase MCP (`list_tables`, `list_migrations`; project
 
 ## Standing rules (from 00-index.md — do not re-litigate)
 
+- **No AI features. Do not propose or build one.** Removed twice on direct
+  instruction — `ai-interpret` (2026-07-22) and `ai-report-summary`
+  (2026-08-10, "we dont want AI in the app. it doesnt work. plus it very
+  slow"). The `IDEAS-ai-features.md` / `IDEAS-subscription-and-store.md`
+  reasoning that named AI the paid backbone is **superseded**; treat those
+  docs as history, not a plan. Pro's value is the limits + full reports
+  (`lib/pro.js`), not AI.
 - **Auto-detect is personal-use only, never shippable.** The notification-listener
   path (`modules/flo-notification-listener/`, `lib/detect.js`,
   `DetectedTransactionHandler`) is architecturally impossible on iOS and
   policy-fraught on Play. Do not propose gating, polishing, or store-hardening
-  it. The cross-platform paid backbone is AI, not auto-detect.
+  it. (This previously pointed at AI as the shippable alternative — that's no
+  longer the answer either; see the AI rule above.)
 - **Native-permission test builds** hit Play Protect + Android "Restricted
   settings" — install over `adb`/`expo run:android`, and enable "Allow
   restricted settings" per install. Details in `00-index.md`.

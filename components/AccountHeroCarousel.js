@@ -219,18 +219,21 @@ export default function AccountHeroCarousel({
               const summary = summaries[account.id] ?? EMPTY_SUMMARY;
               return (
                 <View key={account.id} style={[styles.slot, { width: viewportWidth || undefined, marginRight: GAP }]}>
+                  {/* The whole hero card opens the switcher, so the name row is
+                      a plain View — a nested Pressable would only shrink the
+                      tap target it already covers. */}
+                  <Pressable onPress={onOpenSwitcher}>
                   <CardThemeSurface theme={theme} style={styles.heroCardShape}>
                     <View style={styles.heroCardContent}>
                       <View style={styles.heroTopRow}>
-                        <Pressable style={styles.accountHeading} onPress={onOpenSwitcher} hitSlop={6}>
-                          <View style={[styles.accountColorLine, { backgroundColor: account.color }]} />
+                        <View style={styles.accountHeading}>
                           <View style={styles.accountNameRow}>
                             <Text style={[styles.accountName, { color: theme.textColor }]} numberOfLines={1}>
                               {account.name}
                             </Text>
                             <ChevronDown size={14} color={theme.mutedColor} strokeWidth={2.4} />
                           </View>
-                        </Pressable>
+                        </View>
                       </View>
 
                       <Text style={[styles.heroLabel, { color: MUTED_LABEL_COLOR }]}>In Hand</Text>
@@ -265,6 +268,7 @@ export default function AccountHeroCarousel({
                       </View>
                     </View>
                   </CardThemeSurface>
+                  </Pressable>
                 </View>
               );
             })}
@@ -342,15 +346,6 @@ function makeStyles(colors) {
       gap: 8,
       flexShrink: 1,
       paddingRight: spacing.sm,
-    },
-    // A left-border accent beside the name instead of a bar stacked above
-    // it — same 3px thickness as before, just rotated into a vertical
-    // border and sized to the name's own line height so it reads as
-    // "attached to the text" rather than a separate floating element.
-    accountColorLine: {
-      width: 3,
-      height: fontSize.lg,
-      borderRadius: radii.pill,
     },
     accountNameRow: {
       flexDirection: 'row',

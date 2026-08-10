@@ -80,7 +80,11 @@ export default function Home() {
   const currency = useCurrency();
   const { coins, freezes, level, xp, loading: rewardsLoading } = useRewards();
   const { current: rank } = rankFromXp(xp);
-  const { unseenCount: unseenTrophies } = useTrophies();
+  // The dot means "there's a reward waiting to be collected", not "there's
+  // something new to look at" — so it tracks UNCLAIMED rewards and survives
+  // opening the Trophy Room, clearing only once the reward is actually
+  // claimed. (unseenCount, the old source, cleared on mere viewing.)
+  const { unclaimedCount: unclaimedTrophies } = useTrophies();
   const { openRewardsHistory } = useRewardsHistorySheet();
   const { equippedTheme } = useCardThemes();
   const { showRewardBurst } = useRewardBurst();
@@ -237,7 +241,7 @@ export default function Home() {
                 the same way the bell does its alert dot. */}
             <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/trophies')}>
               <Trophy size={20} color={colors.ink} strokeWidth={2} />
-              {unseenTrophies > 0 && <View style={styles.bellDot} />}
+              {unclaimedTrophies > 0 && <View style={styles.bellDot} />}
             </Pressable>
             {/* Shop — moved out of the Menu sheet into the header (2026-07-26),
                 grouped with the Trophy button since both are gamification
@@ -253,6 +257,11 @@ export default function Home() {
         </View>
 
         <View style={styles.welcomeRow}>
+          {/* Avatar hidden for now — just the greeting. The Menu is still
+              reachable from the tab bar's Menu action, so nothing is stranded
+              by this. Styles (avatarWrap/avatar/avatarImage/avatarText) and
+              the useProfile()/Image imports are intentionally left in place
+              for an easy restore.
           <Pressable onPress={openMenu} style={styles.avatarWrap}>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
@@ -262,6 +271,7 @@ export default function Home() {
               </View>
             )}
           </Pressable>
+          */}
           <View style={styles.welcomeTextGroup}>
             <Text style={styles.welcomeTitle}>{greetingTitle}</Text>
             <Text style={styles.welcomeSubtitle}>{greetingSubtitle}</Text>
@@ -421,7 +431,11 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
+    // lg rather than xl since the avatar came out of welcomeRow below: the row
+    // is the same height either way, but a circular avatar filled that band
+    // visually where two lines of left-aligned text don't, so the old gap
+    // started reading as a hole.
+    marginBottom: spacing.lg,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -504,11 +518,13 @@ function makeStyles(colors) {
     fontSize: fontSize.xl,
     color: colors.brandText,
   },
-  // Avatar lives here now, not in headerRow — freeing headerRow's left slot
-  // for the item-stats/XP chips above. Subtitle is lib/greetings.js's real
-  // day/time-varied voice copy — the Money Level metric that once lived
-  // beneath it moved to the Menu sheet (18-gamification-ritual-and-ledger.md),
-  // so this stays exactly what it looks like: the greeting, nothing else.
+  // Greeting only — the avatar that used to lead this row is commented out in
+  // the JSX above (its Menu tap-target is redundant with TabBar's own Menu
+  // button). The row keeps its flexDirection/gap so restoring the avatar is
+  // just an uncomment. Subtitle is lib/greetings.js's real day/time-varied
+  // voice copy — the Money Level metric that once lived beneath it moved to
+  // the Menu sheet (18-gamification-ritual-and-ledger.md), so this stays
+  // exactly what it looks like: the greeting, nothing else.
   welcomeRow: {
     flexDirection: 'row',
     alignItems: 'center',

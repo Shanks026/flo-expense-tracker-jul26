@@ -7,7 +7,7 @@ import { X, Trash2, ChevronDown, ArrowLeftRight, Wallet, Crown } from 'lucide-re
 import { format, isToday, isYesterday } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
@@ -56,6 +56,7 @@ function formatDateLabel(date) {
 // the *other* field, dropped from these options so From and To can never be the
 // same account. Same inline-dropdown shape as the plan picker.
 function AccountField({ label, value, exclude, accounts, open, onToggle, onSelect, styles }) {
+  const { colors } = useTheme();
   const selected = accounts.find((a) => a.id === value);
   const options = accounts.filter((a) => a.id !== exclude);
   return (
@@ -67,7 +68,7 @@ function AccountField({ label, value, exclude, accounts, open, onToggle, onSelec
             {selected?.name ?? 'Select account'}
           </Text>
         </View>
-        <ChevronDown size={16} color={staticColors.muted} strokeWidth={2.4} />
+        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
       </Pressable>
       {open && (
         <View style={styles.planPicker}>
@@ -241,6 +242,17 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     },
   }));
 
+  // open() seeds accountId from activeAccountId ONCE, but AccountContext
+  // resets that to null on every userId change and only refills it after the
+  // accounts fetch plus an AsyncStorage read resolve. A sheet opened inside
+  // that window (the auto-detect drain on cold start is the usual way) would
+  // otherwise hold null for as long as it stays open. Only ever fills a blank
+  // — it never rewrites an account the user picked, and never touches an
+  // existing transaction's own account while editing.
+  useEffect(() => {
+    if (!accountId && activeAccountId) setAccountId(activeAccountId);
+  }, [accountId, activeAccountId]);
+
   function handleTypeChange(nextType) {
     setError(null);
     setType(nextType);
@@ -319,6 +331,17 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       setError('Enter an amount');
       return;
     }
+    // The DISPLAY row above falls back to activeAccount when accountId hasn't
+    // resolved (`selectedAccount`), but the insert used the raw state — so a
+    // sheet opened mid-hydration could read "Adding to Personal" while sending
+    // account_id: null, which the DB rejects (NOT NULL) as a raw Postgres
+    // message in the toast. Resolve it the same way the display does, and
+    // refuse the save outright rather than round-tripping a guaranteed failure.
+    const targetAccountId = accountId ?? activeAccountId;
+    if (!targetAccountId) {
+      setError('Still loading your account — try again in a moment');
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -336,7 +359,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     if (editingId) {
       ({ error: saveError } = await supabase.from('transactions').update(payload).eq('id', editingId));
     } else {
-      ({ error: saveError } = await supabase.from('transactions').insert({ ...payload, account_id: accountId }));
+      ({ error: saveError } = await supabase.from('transactions').insert({ ...payload, account_id: targetAccountId }));
       isNewEntry = !saveError;
     }
 
@@ -374,7 +397,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
 
     if (!editingId && type === 'expense') {
-      const budgetMsg = await budgetToastForSave({ categoryId, accountId });
+      const budgetMsg = await budgetToastForSave({ categoryId, accountId: targetAccountId });
       const planMsg = planId ? await planToastForSave({ planId }) : null;
       if (budgetMsg) showToast({ message: budgetMsg, variant: 'warn' });
       if (planMsg) showToast({ message: planMsg, variant: 'warn' });
@@ -415,8 +438,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#DADCD4', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
@@ -431,7 +454,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           </Text>
           <View style={styles.headerActions}>
             <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-              <X size={16} color={staticColors.ink} strokeWidth={2.6} />
+              <X size={16} color={colors.ink} strokeWidth={2.6} />
             </Pressable>
           </View>
         </View>
@@ -452,7 +475,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                   the chevron only appears when this row is actually
                   interactive. */}
               {!editingId && accounts.length >= 2 && (
-                <ChevronDown size={14} color={staticColors.mutedDarker} strokeWidth={2.4} />
+                <ChevronDown size={14} color={colors.mutedDarker} strokeWidth={2.4} />
               )}
             </Pressable>
             {accountPickerOpen && (
@@ -509,7 +532,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               value={amount}
               onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
               placeholder="0"
-              placeholderTextColor={staticColors.mutedLight}
+              placeholderTextColor={colors.mutedLight}
               keyboardType="number-pad"
               style={styles.amountInput}
             />
@@ -537,7 +560,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               />
               <View style={styles.swapRow}>
                 <Pressable style={styles.swapButton} onPress={handleSwapAccounts} hitSlop={8}>
-                  <ArrowLeftRight size={16} color={staticColors.ink} strokeWidth={2.4} />
+                  <ArrowLeftRight size={16} color={colors.ink} strokeWidth={2.4} />
                 </Pressable>
               </View>
               <AccountField
@@ -577,7 +600,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                 {isPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}
               </Text>
               <Pressable style={styles.transferEmptyButton} onPress={handleAddAccountForTransfer}>
-                {!isPro && <Crown size={15} color={staticColors.ink} strokeWidth={2.4} />}
+                {!isPro && <Crown size={15} color={colors.ink} strokeWidth={2.4} />}
                 <Text style={styles.transferEmptyButtonText}>{isPro ? 'Add an account' : 'Upgrade to Pro'}</Text>
               </Pressable>
             </View>
@@ -591,7 +614,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                 return (
                   <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
                     <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
-                      <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : staticColors.ink} strokeWidth={2} />
+                      <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
                     </View>
                     <Text style={[styles.chipLabel, !selected && styles.chipLabelInactive]} numberOfLines={1}>
                       {cat.name}
@@ -614,7 +637,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                       {selectedPlan?.name ?? 'None'}
                     </Text>
                   </View>
-                  <ChevronDown size={16} color={staticColors.muted} strokeWidth={2.4} />
+                  <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
                 </View>
               </Pressable>
             </View>
@@ -666,7 +689,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             value={note}
             onChangeText={setNote}
             placeholder="Add a note…"
-            placeholderTextColor={staticColors.mutedLight}
+            placeholderTextColor={colors.mutedLight}
             style={styles.noteInput}
           />
         </View>
@@ -676,7 +699,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         <Button title="Save" onPress={handleSave} loading={saving} style={{ marginTop: spacing.md }} />
         {editingId && (
           <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-            <Trash2 size={16} color={staticColors.danger} strokeWidth={2} />
+            <Trash2 size={16} color={colors.danger} strokeWidth={2} />
             <Text style={styles.deleteText}>{editingTransferId ? 'Delete Transfer' : 'Delete Transaction'}</Text>
           </Pressable>
         )}
@@ -701,7 +724,7 @@ function makeStyles(colors) {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.title,
     letterSpacing: -0.3,
-    color: staticColors.ink,
+    color: colors.ink,
   },
   headerActions: {
     flexDirection: 'row',
@@ -712,7 +735,7 @@ function makeStyles(colors) {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.chipBg,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -721,7 +744,7 @@ function makeStyles(colors) {
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 6,
-    backgroundColor: staticColors.chipBg,
+    backgroundColor: colors.chipBg,
     borderRadius: radii.pill,
     paddingHorizontal: 11,
     paddingVertical: 6,
@@ -735,15 +758,15 @@ function makeStyles(colors) {
   accountText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.xs,
-    color: staticColors.mutedDarker,
+    color: colors.mutedDarker,
   },
   accountName: {
     fontFamily: fontFamily.extrabold,
-    color: staticColors.ink,
+    color: colors.ink,
   },
   segmentWrap: {
     flexDirection: 'row',
-    backgroundColor: staticColors.chipBg,
+    backgroundColor: colors.chipBg,
     borderRadius: 14,
     padding: 4,
     marginBottom: spacing.xl,
@@ -755,16 +778,16 @@ function makeStyles(colors) {
     borderRadius: 11,
   },
   segmentActive: {
-    backgroundColor: staticColors.ink,
+    backgroundColor: colors.ink,
   },
   segmentText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
-    color: staticColors.muted,
+    color: colors.muted,
   },
   segmentTextActive: {
     fontFamily: fontFamily.extrabold,
-    color: staticColors.surface,
+    color: colors.surface,
   },
   amountWrap: {
     alignItems: 'center',
@@ -773,7 +796,7 @@ function makeStyles(colors) {
   amountLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginBottom: 2,
   },
   amountRow: {
@@ -785,20 +808,20 @@ function makeStyles(colors) {
   amountCurrency: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.amount,
-    color: staticColors.mutedLight,
+    color: colors.mutedLight,
   },
   amountInput: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.amountXl,
     letterSpacing: -0.6,
-    color: staticColors.ink,
+    color: colors.ink,
     minWidth: 80,
     textAlign: 'center',
   },
   sectionLabel: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
@@ -816,9 +839,9 @@ function makeStyles(colors) {
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -829,12 +852,12 @@ function makeStyles(colors) {
   chipLabel: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.xs,
-    color: staticColors.ink,
+    color: colors.ink,
     textAlign: 'center',
   },
   chipLabelInactive: {
     fontFamily: fontFamily.semibold,
-    color: staticColors.muted,
+    color: colors.muted,
   },
   dateAndPlanRow: {
     flexDirection: 'row',
@@ -842,17 +865,17 @@ function makeStyles(colors) {
     marginBottom: spacing.md,
   },
   dateRow: {
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
   },
   accountField: {
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
@@ -862,9 +885,9 @@ function makeStyles(colors) {
     marginBottom: spacing.sm,
   },
   transferDate: {
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
@@ -884,17 +907,17 @@ function makeStyles(colors) {
     width: 30,
     height: 30,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.chipBg,
+    backgroundColor: colors.chipBg,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   transferEmptyCard: {
     alignItems: 'center',
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     borderRadius: radii.card,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,
@@ -904,7 +927,7 @@ function makeStyles(colors) {
     width: 48,
     height: 48,
     borderRadius: radii.iconTileLg,
-    backgroundColor: staticColors.chipBg,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -912,12 +935,12 @@ function makeStyles(colors) {
   transferEmptyTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.lg,
-    color: staticColors.ink,
+    color: colors.ink,
   },
   transferEmptyBody: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: staticColors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 19,
     marginTop: spacing.xs,
@@ -927,7 +950,7 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: staticColors.ink,
+    backgroundColor: colors.ink,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
@@ -935,7 +958,7 @@ function makeStyles(colors) {
   transferEmptyButtonText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
-    color: staticColors.surface,
+    color: colors.surface,
   },
   planRowInner: {
     flexDirection: 'row',
@@ -943,7 +966,7 @@ function makeStyles(colors) {
     justifyContent: 'space-between',
   },
   fieldValuePlan: {
-    color: staticColors.income,
+    color: colors.income,
   },
   planPicker: {
     flexDirection: 'row',
@@ -955,37 +978,37 @@ function makeStyles(colors) {
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
   },
   planOptionSelected: {
-    backgroundColor: staticColors.ink,
-    borderColor: staticColors.ink,
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
   },
   planOptionText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.sm,
-    color: staticColors.muted,
+    color: colors.muted,
   },
   planOptionTextSelected: {
-    color: staticColors.surface,
+    color: colors.surface,
   },
   fieldLabel: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.xs,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
   },
   fieldValue: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.md,
-    color: staticColors.ink,
+    color: colors.ink,
     marginTop: 1,
   },
   noteRow: {
-    backgroundColor: staticColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: staticColors.border,
+    borderColor: colors.border,
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
@@ -994,14 +1017,14 @@ function makeStyles(colors) {
   noteInput: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.md,
-    color: staticColors.ink,
+    color: colors.ink,
     marginTop: 1,
     padding: 0,
   },
   errorText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.danger,
+    color: colors.danger,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
@@ -1016,7 +1039,7 @@ function makeStyles(colors) {
   deleteText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.base,
-    color: staticColors.danger,
+    color: colors.danger,
   },
   });
 }

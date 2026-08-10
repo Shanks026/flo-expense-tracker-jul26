@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { X, ChevronRight } from 'lucide-react-native';
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import ProBenefits from './ProBenefits';
@@ -63,13 +63,13 @@ const ProUpsellSheet = forwardRef(function ProUpsellSheet(_props, ref) {
       snapPoints={useMemo(() => ['58%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: staticColors.ink, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: '#3a3a3a', width: 44 }}
+      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
+      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
       <BottomSheetView style={styles.sheet}>
         <View style={styles.headerRow}>
           <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={staticColors.surface} strokeWidth={2.6} />
+            <X size={16} color={colors.ink} strokeWidth={2.6} />
           </Pressable>
         </View>
 
@@ -102,7 +102,7 @@ function makeStyles(colors) {
     width: 32,
     height: 32,
     borderRadius: radii.pill,
-    backgroundColor: staticColors.inkCard,
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -110,12 +110,12 @@ function makeStyles(colors) {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.hero,
     letterSpacing: -0.3,
-    color: staticColors.surface,
+    color: colors.ink,
   },
   subtitle: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
-    color: staticColors.mutedMid,
+    color: colors.mutedMid,
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
     lineHeight: 19,

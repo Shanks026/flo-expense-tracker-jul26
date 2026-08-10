@@ -1,19 +1,20 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Layers, Target, Calendar, FileText, Scan } from 'lucide-react-native';
+import { Layers, Target, Calendar, FileText } from 'lucide-react-native';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { PRO_BENEFITS } from '../lib/pro';
 
-const ICONS = { layers: Layers, target: Target, calendar: Calendar, fileText: FileText, scan: Scan };
+const ICONS = { layers: Layers, target: Target, calendar: Calendar, fileText: FileText };
 
-// Shared between ProUpsellSheet (top `limit` items) and app/pro.js (all of
-// them). Both host surfaces are permanently dark (staticColors.ink), so most
-// of this stays pinned — only the icon color follows the active theme's
-// accent, same as everywhere else in these sheets.
-export default function ProBenefits({ limit, style }) {
+// Shared between ProUpsellSheet (top `limit` items, now a theme-reactive
+// light-following sheet) and app/pro.js (all of them, still a permanently-dark
+// screen) — same `dark` convention as Card/AmountText/ProgressBar: default
+// false follows the active theme, `dark` pins the old dark-chrome palette for
+// pro.js's own surface.
+export default function ProBenefits({ limit, dark = false, style }) {
   const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => makeStyles(colors, dark), [colors, dark]);
   const items = limit ? PRO_BENEFITS.slice(0, limit) : PRO_BENEFITS;
 
   return (
@@ -36,7 +37,7 @@ export default function ProBenefits({ limit, style }) {
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(colors, dark) {
   return StyleSheet.create({
     list: {
       gap: spacing.lg,
@@ -50,7 +51,7 @@ function makeStyles(colors) {
       width: 40,
       height: 40,
       borderRadius: radii.iconTile,
-      backgroundColor: staticColors.inkCard,
+      backgroundColor: dark ? staticColors.inkCard : colors.iconTileBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -61,12 +62,12 @@ function makeStyles(colors) {
     title: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.lg,
-      color: staticColors.surface,
+      color: dark ? staticColors.surface : colors.ink,
     },
     body: {
       fontFamily: fontFamily.medium,
       fontSize: fontSize.sm,
-      color: staticColors.mutedMid,
+      color: colors.mutedMid,
       marginTop: 2,
       lineHeight: 17,
     },

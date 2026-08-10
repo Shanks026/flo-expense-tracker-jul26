@@ -14,6 +14,7 @@ import AnalyticsSegmentTabs from '../../components/AnalyticsSegmentTabs';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import DailySpendingChart from '../../components/DailySpendingChart';
 import DonutChart from '../../components/DonutChart';
+import CategoryBreakdownAccordion from '../../components/CategoryBreakdownAccordion';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import { useToast } from '../../components/Toast';
@@ -21,6 +22,7 @@ import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '..
 import { useTheme } from '../../theme/ThemeContext';
 import useAnalyticsData from '../../hooks/useAnalyticsData';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
+import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { buildTransactionsCsv, shareCsv } from '../../lib/export';
 import { formatMoney } from '../../lib/currency';
@@ -79,6 +81,7 @@ export default function Analytics() {
   const STATUS_COLOR = { healthy: colors.brand, warn: staticColors.warn, over: staticColors.danger };
   const { activeAccount, accounts } = useAccount();
   const { showToast } = useToast();
+  const { openAdd } = useAddTransactionSheet();
   const currency = useCurrency();
   const [segment, setSegment] = useState('overview');
   const [categoryType, setCategoryType] = useState('expense');
@@ -354,24 +357,19 @@ export default function Analytics() {
                   />
                 </Card>
                 <Card style={styles.rankedCard}>
-                  {categoryDeltas.map((entry, idx) => (
-                    <View
-                      key={entry.category?.id ?? 'uncategorized'}
-                      style={[styles.rankedRow, idx < categoryDeltas.length - 1 && styles.rowBorder]}
-                    >
-                      <View
-                        style={[styles.colorDot, { backgroundColor: getCategoryColor(entry.category) ?? colors.mutedLight }]}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rankedName}>{entry.category?.name ?? 'Uncategorized'}</Text>
-                        <Text style={styles.rankedPct}>{entry.pct.toFixed(0)}% of total</Text>
-                      </View>
+                  <CategoryBreakdownAccordion
+                    entries={categoryDeltas}
+                    transactions={current}
+                    type={categoryType}
+                    currency={currency}
+                    onPressTransaction={openAdd}
+                    renderRight={(entry) => (
                       <View style={{ alignItems: 'flex-end' }}>
                         <AmountText value={entry.amount} type="neutral" size={fontSize.md} currency={currency} />
                         <DeltaBadge delta={entry.delta} goodDirection={categoryType === 'expense' ? 'down' : 'up'} />
                       </View>
-                    </View>
-                  ))}
+                    )}
+                  />
                 </Card>
               </>
             )}
@@ -643,32 +641,6 @@ function makeStyles(colors) {
   rankedCard: {
     padding: 0,
     paddingHorizontal: spacing.lg,
-  },
-  rankedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 14,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: radii.pill,
-  },
-  rankedName: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  rankedPct: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-    marginTop: 1,
   },
   budgetCard: {
     marginBottom: spacing.md,

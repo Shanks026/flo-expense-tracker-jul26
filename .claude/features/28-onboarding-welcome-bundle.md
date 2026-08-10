@@ -4,7 +4,10 @@
 **Status**: 🚧 Both phases built (2026-07-22) — welcome bundle + celebration
 sequencing (Phase 1) and the "Know your space" tour (Phase 2). On-device
 verification pending; tour images are placeholders awaiting real screenshots.
-**Last Updated**: 2026-07-22
+**Tuned 2026-08-06**: bundle coins reduced 3,000 → 1,000 (user's call — 3,000
+was too much); freezes/theme unchanged. `WELCOME_BUNDLE` in `lib/rewards.js`
+is the only code change (all display surfaces read from it live).
+**Last Updated**: 2026-08-06
 
 ---
 
@@ -15,7 +18,7 @@ Two problems, one feature:
 1. **The early economy feels stingy.** Direct feedback: *"gating the users with
    just 25 coins and card themes worth 1000 is a turn off and possible churn."*
    A new user earns 25 coins for a first log with nothing to spend it on for a
-   long time. → A one-time **welcome bundle** (3,000 coins, 2 freezes, the
+   long time. → A one-time **welcome bundle** (1,000 coins, 2 freezes, the
    Glitch card theme), granted at onboarding completion and revealed on the
    "You're set" done screen.
 2. **New users don't know where things are.** Onboarding never shows them
@@ -93,7 +96,7 @@ see Data Model. Not dropped; harmless.)
 
 ### 1.2 Data Layer — built
 
-- **`WELCOME_BUNDLE`** (`lib/rewards.js`) — `{ coins: 3000, freezes: 2,
+- **`WELCOME_BUNDLE`** (`lib/rewards.js`) — `{ coins: 1000, freezes: 2,
   themeId: 'glitch' }`, the single source for both the grant and the done
   screen's display, with the full "why this bounded exception exists" comment.
 - **`claimWelcomeBundle()`** (`lib/rewardsMutations.js`) — idempotent upsert on
@@ -113,7 +116,7 @@ see Data Model. Not dropped; harmless.)
 
 - **`app/onboarding/done.js`** — redesigned per direct feedback: **white
   background, ink text** (was full-bleed brand lime), the **welcome bundle
-  revealed at the bottom by the CTA** (a chip-bg card: `+3,000` coins, `+2
+  revealed at the bottom by the CTA** (a chip-bg card: `+1,000` coins, `+2
   freezes`, a Glitch `CardThemeSurface` swatch), **Confetti kept**. Pinned to
   the static default palette (like `sign-in.js`), and still does NOT navigate
   on `finish()` (the gate owns the exit — preserving the 07 flicker fix).
@@ -284,7 +287,7 @@ profiles (existing)
 
 reward_events (existing, no schema change)
   ├─ source 'welcome_bundle', ref 'welcome_bundle' → one-time bundle grant
-  │     coins 3000 (+ freeze overflow), freezes 2 (clamped)
+  │     coins 1000 (+ freeze overflow), freezes 2 (clamped)
   └─ source 'theme_grant', ref 'glitch' → the bundle's card theme
         │  granted once in lib/onboarding.js finish() (on finish OR skip)
         ▼  revealed on app/onboarding/done.js; balance/ownership refetch via

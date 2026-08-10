@@ -1,10 +1,8 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import {
-  CircleDollarSign,
-  Snowflake,
-  Star,
-  Flame,
   Bell,
+  Trophy,
+  ShoppingBag,
   TrendingUp,
   TrendingDown,
   Home,
@@ -12,13 +10,32 @@ import {
   ChartColumn,
   Menu as MenuIcon,
   Plus,
+  ChevronDown,
 } from 'lucide-react-native';
 import CardThemeSurface from './CardThemeSurface';
 import AmountText from './AmountText';
 import CategoryIcon from './CategoryIcon';
+// Only the PURE helpers — ChartAxis/ChartGridlines themselves call useTheme()
+// and would paint the real active theme instead of the draft one, the same
+// reason Card/IconTile/AccountDots are hand-rolled below. niceAxisMax and
+// formatAxisValue take no colors, so the preview's axis numbers round and
+// abbreviate exactly like the real chart's.
+import { niceAxisMax, formatAxisValue, AXIS_INTERVALS, AXIS_WIDTH } from './ChartAxis';
+import { RANK_BADGE_ART } from '../lib/rewards';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { formatMoney } from '../lib/currency';
 import { lighten } from '../lib/color';
+
+// The same koban art the real header uses — plain image assets, no theme
+// dependency, so these are safe to reuse directly here.
+const KOBAN_COIN = require('../assets/general/coin.png');
+const KOBAN_FREEZE = require('../assets/general/freeze.png');
+const KOBAN_STREAK_FLAME = require('../assets/general/streak.png');
+// Fixed so the preview badge never changes with real progress (see PREVIEW_*
+// below — this mock is entirely deterministic). `tycoon` is the id whose title
+// is "Vanguard"; lib/rewards.js carries deliberate id/title drift, and the id
+// is what keys RANK_BADGE_ART.
+const PREVIEW_RANK_ID = 'tycoon';
 
 // A genuine miniature CLONE of the real Home screen (app/(tabs)/index.js) —
 // header chips, greeting, hero card, carousel dots, chart, half-visible
@@ -41,17 +58,26 @@ import { lighten } from '../lib/color';
 const PREVIEW_BALANCE = 42500;
 const PREVIEW_INCOME = 18200;
 const PREVIEW_EXPENSE = 9650;
-const PREVIEW_COINS = 12500;
+const PREVIEW_COINS = 3463;
 const PREVIEW_FREEZES = 3;
-const PREVIEW_LEVEL = 8;
-const PREVIEW_STREAK = 497;
+// Vanguard spans levels 35–49 on lib/rewards.js's curve (its 45000 minXp lands
+// at level 35), so the number beside the badge is picked from inside that band
+// — a Vanguard badge next to "8" would contradict itself.
+const PREVIEW_LEVEL = 38;
+const PREVIEW_STREAK = 67;
 
 // Fixed/deterministic — mirrors components/IncomeExpenseChart's own visual
-// grammar (bars + day labels, real BAR_MAX_HEIGHT) but a fixed dataset, not
-// live data or Math.random(), so the preview never jitters between renders.
-const BAR_HEIGHTS = [0.4, 0.7, 0.5, 0.9, 0.3, 0.6, 0.8];
+// grammar (bars + day labels + y-axis + gridlines, real BAR_MAX_HEIGHT) but a
+// fixed dataset, not live data or Math.random(), so the preview never jitters
+// between renders. Real VALUES rather than the old 0–1 height fractions, so
+// the axis can label them for real; niceAxisMax rounds these to exactly 1000,
+// which reproduces the previous fractions (400/1000 = 0.4, …) — the bars look
+// identical, they just now sit against a truthful scale.
+const BAR_VALUES = [400, 700, 500, 900, 300, 600, 800];
 const BAR_DAYS = ['Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon'];
 const BAR_MAX_HEIGHT = 110; // matches IncomeExpenseChart's real BAR_MAX_HEIGHT
+const BAR_GAP = spacing.sm; // matches IncomeExpenseChart's real BAR_GAP
+const BAR_AXIS_MAX = niceAxisMax(Math.max(...BAR_VALUES));
 
 const PREVIEW_TRANSACTIONS = [
   { name: 'Shopping', sub: '19 Jul · Shopping', amount: 350, icon: 'shopping' },
@@ -99,40 +125,48 @@ export default function PersonalizePreview({ colors, cardTheme, style }) {
         ]}
       >
         <View style={styles.content}>
+          {/* Bare counters and bare icon buttons — the real header dropped its
+              surface/border chip pills, so this has none either. Left is one
+              row of three koban entries (coins / freeze / rank badge + level);
+              right is streak, Trophy, Shop, Bell. */}
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
-              <View style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.chipEntry}>
-                  <CircleDollarSign size={13} color={colors.coinGold} fill={colors.coinGold} strokeWidth={1.5} />
-                  <Text style={[styles.chipText, { color: colors.ink }]}>{PREVIEW_COINS.toLocaleString('en-IN')}</Text>
+              <View style={styles.itemStats}>
+                <View style={styles.itemStatEntry}>
+                  <Image source={KOBAN_COIN} style={styles.coinIcon} resizeMode="contain" />
+                  <Text style={[styles.itemStatText, { color: colors.ink }]}>{PREVIEW_COINS.toLocaleString('en-IN')}</Text>
                 </View>
-                <View style={[styles.chipDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.chipEntry}>
-                  <Snowflake size={13} color={colors.iceBlue} fill={colors.iceBlue} strokeWidth={2.2} />
-                  <Text style={[styles.chipText, { color: colors.ink }]}>{PREVIEW_FREEZES}</Text>
+                <View style={styles.itemStatEntry}>
+                  <Image source={KOBAN_FREEZE} style={styles.freezeIcon} resizeMode="contain" />
+                  <Text style={[styles.itemStatText, { color: colors.ink }]}>{PREVIEW_FREEZES}</Text>
                 </View>
-              </View>
-              <View style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Star size={13} color={colors.brand} fill={colors.brand} strokeWidth={1.5} />
-                <Text style={[styles.chipText, { color: colors.ink }]}>LVL {PREVIEW_LEVEL}</Text>
+                <View style={styles.itemStatEntry}>
+                  <Image source={RANK_BADGE_ART[PREVIEW_RANK_ID]} style={styles.levelRankBadge} resizeMode="contain" />
+                  <Text style={[styles.itemStatText, { color: colors.ink }]}>{PREVIEW_LEVEL}</Text>
+                </View>
               </View>
             </View>
             <View style={styles.headerRight}>
-              <View style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Flame size={14} color={colors.streak} fill={colors.streak} strokeWidth={2.2} />
-                <Text style={[styles.chipText, { color: colors.streakDeep }]}>{PREVIEW_STREAK}</Text>
+              <View style={styles.streakChip}>
+                <Image source={KOBAN_STREAK_FLAME} style={styles.streakFlameIcon} resizeMode="contain" />
+                <Text style={[styles.streakCount, { color: colors.streakDeep }]}>{PREVIEW_STREAK}</Text>
               </View>
-              <View style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.headerIconButton}>
+                <Trophy size={16} color={colors.ink} strokeWidth={2} />
+              </View>
+              <View style={styles.headerIconButton}>
+                <ShoppingBag size={16} color={colors.ink} strokeWidth={2} />
+              </View>
+              <View style={styles.headerIconButton}>
                 <Bell size={16} color={colors.ink} strokeWidth={2} />
-                <View style={[styles.bellDot, { backgroundColor: colors.rose, borderColor: colors.surface }]} />
+                <View style={[styles.bellDot, { backgroundColor: colors.rose, borderColor: colors.bg }]} />
               </View>
             </View>
           </View>
 
+          {/* Greeting only — the avatar that used to lead this row is gone
+              from the real Home screen too. */}
           <View style={styles.welcomeRow}>
-            <View style={[styles.avatar, { backgroundColor: colors.brand }]}>
-              <Text style={[styles.avatarText, { color: colors.brandText }]}>F</Text>
-            </View>
             <View>
               <Text style={[styles.welcomeTitle, { color: colors.ink }]}>Good morning</Text>
               <Text style={[styles.welcomeSubtitle, { color: colors.muted }]}>Here's your money, at a glance.</Text>
@@ -141,9 +175,15 @@ export default function PersonalizePreview({ colors, cardTheme, style }) {
 
           <CardThemeSurface theme={cardTheme} style={styles.heroShape}>
             <View style={styles.heroContent}>
-              <Text style={[styles.heroName, { color: cardTheme.textColor }]} numberOfLines={1}>
-                Personal
-              </Text>
+              {/* Name + chevron, no leading colour stroke — the real hero card
+                  dropped that stroke, and the whole card is the switcher
+                  trigger now. */}
+              <View style={styles.heroNameRow}>
+                <Text style={[styles.heroName, { color: cardTheme.textColor }]} numberOfLines={1}>
+                  Personal
+                </Text>
+                <ChevronDown size={14} color={cardTheme.mutedColor} strokeWidth={2.4} />
+              </View>
               <Text style={[styles.heroLabel, { color: cardTheme.mutedColor }]}>In Hand</Text>
               <AmountText
                 value={PREVIEW_BALANCE}
@@ -192,15 +232,53 @@ export default function PersonalizePreview({ colors, cardTheme, style }) {
                 <Text style={[styles.totalValue, { color: colors.ink }]}>{formatMoney(PREVIEW_EXPENSE, 'INR')}</Text>
               </View>
             </View>
-            <View style={styles.chartArea}>
-              {BAR_HEIGHTS.map((h, i) => (
-                <View key={BAR_DAYS[i]} style={styles.barColumn}>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { height: Math.max(h * BAR_MAX_HEIGHT, 4), backgroundColor: colors.brand }]} />
-                  </View>
-                  <Text style={[styles.barDayLabel, { color: colors.mutedMid }]}>{BAR_DAYS[i]}</Text>
+            {/* Y-axis + dashed gridlines, hand-rolled against the DRAFT colors
+                for the reason given at the top of this file. Same grammar as
+                ChartAxis: 5 rules from baseline to max, labels centred on each
+                rule, dashes as a clipped segment row. */}
+            <View style={styles.plotRow}>
+              <View style={[styles.axis, { height: BAR_MAX_HEIGHT }]}>
+                {Array.from({ length: AXIS_INTERVALS + 1 }, (_, i) => (
+                  <Text
+                    key={i}
+                    style={[
+                      styles.axisLabel,
+                      { top: (i / AXIS_INTERVALS) * BAR_MAX_HEIGHT - 7, color: colors.mutedLight },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {formatAxisValue(BAR_AXIS_MAX - (i / AXIS_INTERVALS) * BAR_AXIS_MAX)}
+                  </Text>
+                ))}
+              </View>
+              <View style={styles.plotArea}>
+                <View style={[styles.gridWrap, { height: BAR_MAX_HEIGHT }]}>
+                  {Array.from({ length: AXIS_INTERVALS + 1 }, (_, i) => (
+                    <View key={i} style={[styles.gridRow, { top: (i / AXIS_INTERVALS) * BAR_MAX_HEIGHT }]}>
+                      <View style={styles.dashLine}>
+                        {Array.from({ length: 60 }, (_, d) => (
+                          <View key={d} style={[styles.dash, { backgroundColor: colors.border }]} />
+                        ))}
+                      </View>
+                    </View>
+                  ))}
                 </View>
-              ))}
+                <View style={styles.chartArea}>
+                  {BAR_VALUES.map((value, i) => (
+                    <View key={BAR_DAYS[i]} style={styles.barColumn}>
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            { height: Math.max((value / BAR_AXIS_MAX) * BAR_MAX_HEIGHT, 4), backgroundColor: colors.brand },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.barDayLabel, { color: colors.mutedMid }]}>{BAR_DAYS[i]}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
           </View>
 
@@ -260,7 +338,9 @@ const styles = StyleSheet.create({
   outer: {
     alignSelf: 'center',
     borderWidth: 1,
-    borderRadius: radii.cardLg,
+    // A touch tighter than radii.cardLg (26) — at this mock's scaled-down
+    // size that curve read as too round for a "phone screen" frame.
+    borderRadius: radii.card,
     overflow: 'hidden',
   },
   // transformOrigin '0%,0%' pins the scaled content's top-left corner to
@@ -283,11 +363,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.xl,
   },
-  // Header chips run noticeably smaller than the real Home screen's own
+  // The header runs noticeably smaller than the real Home screen's own
   // token-accurate sizes — per direct feedback, the real proportions
-  // overflowed/overlapped at this mock's DEVICE_WIDTH (four chips' real
-  // combined width exceeds what a 360-wide canvas has left after its own
-  // content padding). Everything else in this file stays token-accurate.
+  // overflowed/overlapped at this mock's DEVICE_WIDTH, and the real header has
+  // since grown two more buttons (Trophy, Shop), so the budget is tighter
+  // still: at real sizes the two clusters need ~370px of the 320px this canvas
+  // has after its content padding. Everything else in this file stays
+  // token-accurate; only these header metrics are scaled down.
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,45 +378,72 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 12,
   },
-  chip: {
+  itemStats: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 34,
-    paddingHorizontal: 8,
-    borderRadius: 11,
-    borderWidth: 1,
-    gap: 6,
+    gap: 10,
   },
-  chipEntry: {
+  itemStatEntry: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  chipDivider: {
-    width: 1,
-    height: 14,
-  },
-  chipText: {
+  itemStatText: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
     letterSpacing: -0.2,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
-  bellButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    borderWidth: 1,
+  coinIcon: {
+    width: 18,
+    height: 18,
+  },
+  // Same /0.876 canvas-fill correction the real header applies — the freeze
+  // art only fills ~87.6% of its own square, so a bare width would read
+  // smaller than the coin beside it.
+  freezeIcon: {
+    width: 14 / 0.876,
+    height: 14 / 0.876,
+  },
+  levelRankBadge: {
+    width: 16,
+    height: 16,
+  },
+  streakChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
+    height: 34,
+  },
+  // Matching /0.825 fill correction, same reason as freezeIcon.
+  streakFlameIcon: {
+    width: 14 / 0.825,
+    height: 14 / 0.825,
+  },
+  streakCount: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.sm,
+    letterSpacing: -0.2,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  headerIconButton: {
+    height: 34,
     justifyContent: 'center',
   },
   bellDot: {
     position: 'absolute',
     top: 6,
-    right: 6,
-    width: 9,
-    height: 9,
+    // Negative, like the real one — headerIconButton is content-sized now
+    // rather than a 34-wide centred box, so the dot hangs off the glyph's own
+    // top-right corner.
+    right: -2,
+    width: 8,
+    height: 8,
     borderRadius: radii.pill,
     borderWidth: 1.5,
   },
@@ -344,33 +453,28 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xl,
   },
-  // Shrunk from real Home's 46×46, then bumped back up a little (34 read as
-  // too small) — settled at 40×40 per direct feedback.
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-  },
+  // A step down from the real Home screen's heading/base pair — without the
+  // avatar beside it the greeting block was the heaviest thing on this mock
+  // after the hero card, which isn't the hierarchy the real screen has.
   welcomeTitle: {
     fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.heading,
+    fontSize: fontSize.xxl,
     letterSpacing: -0.2,
   },
   welcomeSubtitle: {
     fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
+    fontSize: fontSize.sm,
     marginTop: 2,
   },
   heroShape: {},
   heroContent: {
     paddingVertical: 22,
     paddingHorizontal: 24,
+  },
+  heroNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   heroName: {
     fontFamily: fontFamily.bold,
@@ -459,10 +563,51 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     letterSpacing: -0.2,
   },
+  plotRow: {
+    flexDirection: 'row',
+  },
+  plotArea: {
+    flex: 1,
+  },
+  axis: {
+    width: AXIS_WIDTH,
+    flexShrink: 0,
+  },
+  axisLabel: {
+    position: 'absolute',
+    right: 8,
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    textAlign: 'right',
+  },
+  gridWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+  },
+  gridRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  dashLine: {
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  dash: {
+    width: 3,
+    height: 1,
+    marginRight: 4,
+  },
+  // Gap between full-width columns, matching IncomeExpenseChart's own switch
+  // away from centring a narrower track in each slot — so the first and last
+  // bars sit flush with the gridline span.
   chartArea: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-end',
+    gap: BAR_GAP,
   },
   barColumn: {
     alignItems: 'center',
@@ -470,7 +615,7 @@ const styles = StyleSheet.create({
   },
   barTrack: {
     height: BAR_MAX_HEIGHT,
-    width: '60%',
+    width: '100%',
     justifyContent: 'flex-end',
   },
   barFill: {

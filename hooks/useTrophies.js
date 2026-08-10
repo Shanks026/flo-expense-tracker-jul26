@@ -1,18 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { subDays, format } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
-import useStreak from './useStreak';
+import { computeRuns, dayKey } from '../lib/streak';
+import useLoadedFor from './useLoadedFor';
 import { evaluateTrophies, hasPerfectMonth, isCategorizerStreak } from '../lib/trophies';
 import { TROPHY_REWARDS } from '../lib/rewards';
-
-// How far back the perfect-month/categorizer window queries reach. 400 days
-// (~13 months) covers "any completed calendar month" with margin, without
-// pulling a user's entire lifetime history — modest data volume, per this
-// app's own single-user scale.
-const HISTORY_WINDOW_DAYS = 400;
 
 const EMPTY_STATS = {
   txnCount: 0,
@@ -32,39 +26,56 @@ const EMPTY_STATS = {
 // not scoped to whichever account happens to be active. Deliberately does
 // NOT reuse useTransactions/usePlans/useBudgets: all three filter by
 // activeAccountId, which is exactly the wrong scope here.
-async function fetchStats(userId, streak) {
+async function fetchStats(userId) {
   if (!userId) return EMPTY_STATS;
 
-  const since = format(subDays(new Date(), HISTORY_WINDOW_DAYS), 'yyyy-MM-dd');
-
-  const [txnCountRes, historyRes, plansRes, noSpendCountRes, claimedTrophyRes] = await Promise.all([
+  const [txnCountRes, historyRes, plansRes, noSpendCountRes, claimedTrophyRes, coveredRes] = await Promise.all([
     // Exact-type filter (income/expense only) — same discipline as the
     // streak and every other aggregation in this app: transfers are
     // bookkeeping between a user's own accounts, not "logging".
     supabase.from('transactions').select('id', { count: 'exact', head: true }).in('type', ['income', 'expense']),
-    supabase
-      .from('transactions')
-      .select('created_at, category_id')
-      .in('type', ['income', 'expense'])
-      .gte('created_at', since),
+    // LIFETIME, deliberately unwindowed. This used to fetch a trailing 400
+    // days, which quietly made trophies expire: the longest-streak and
+    // perfect-month checks below are high-water marks ("did this EVER
+    // happen"), so any window at all means a real achievement un-earns itself
+    // and reverts to locked/grayscale once it ages past the cutoff. A trophy
+    // is permanent recognition — it can only be derived from all of history.
+    // Cheap at this app's single-user scale: two narrow columns, and even
+    // years of daily logging is a few thousand rows.
+    supabase.from('transactions').select('created_at, category_id').in('type', ['income', 'expense']),
     supabase.from('v_plans_with_totals').select('id').eq('status', 'completed'),
     // Lifetime, no date filter — same "not windowed" treatment as txnCount
     // above, since the `frugal` trophy's tiers (5/25/100) are a lifetime
-    // total, not bounded by HISTORY_WINDOW_DAYS (18-gamification-ritual-and-
-    // ledger.md Phase 3).
+    // total (18-gamification-ritual-and-ledger.md Phase 3).
     supabase.from('reward_events').select('id', { count: 'exact', head: true }).eq('source', 'no_spend'),
     // Which trophy claims already have a ledger row (21-achievement-rewards-
     // and-milestone-road.md Phase 2) — `ref` is the trophy tile's own id
     // (`${groupId}:${tier}`), matching lib/trophies.js's makeEntry() exactly.
     supabase.from('reward_events').select('ref').eq('source', 'trophy'),
+    // Days covered by a declared no-spend or a spent freeze — these count for
+    // streak CONTINUITY exactly like a logged day (see lib/streak.js), so the
+    // lifetime longest-run below has to union them in or a streak carried
+    // through a freeze would read as two shorter runs. `ref` already holds the
+    // local 'yyyy-MM-dd' key, the same shape dayKey() produces.
+    supabase.from('reward_events').select('ref').in('source', ['no_spend', 'freeze_used']),
   ]);
 
   const rows = historyRes.data ?? [];
 
+  // Lifetime high-water marks, computed with the SAME arithmetic the streak
+  // screen uses (lib/streak.js's computeRuns) — just over all of history
+  // instead of a 90-day window, which is the whole point: a trophy earned in
+  // March must still be earned in December.
+  const lifetimeDays = new Set(rows.map((r) => dayKey(new Date(r.created_at))));
+  for (const row of coveredRes.data ?? []) {
+    if (row.ref) lifetimeDays.add(row.ref);
+  }
+  const { longest, breaks } = computeRuns(lifetimeDays);
+
   return {
     txnCount: txnCountRes.count ?? 0,
-    longestStreak: streak.longest,
-    hasBreak: streak.breaks > 0,
+    longestStreak: longest,
+    hasBreak: breaks > 0,
     hasPerfectMonth: hasPerfectMonth(rows),
     isCategorizer: isCategorizerStreak(rows),
     completedPlans: plansRes.data?.length ?? 0,
@@ -80,18 +91,23 @@ function seenKey(userId) {
 
 export default function useTrophies() {
   const { version } = useDataRefresh();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
-  const streak = useStreak();
   const [stats, setStats] = useState(EMPTY_STATS);
-  const [statsLoading, setStatsLoading] = useState(true);
+  // See hooks/useLoadedFor.js — same loaded-for-which-user bookkeeping the
+  // other read hooks use, so the wall never reports "loaded" while holding
+  // EMPTY_STATS (which would paint every trophy locked for a beat).
+  const [statsLoading, markLoaded] = useLoadedFor(userId, authLoading);
   const [seen, setSeen] = useState(new Set());
 
+  // No longer depends on useStreak: its longest/breaks are window-scoped (90
+  // days) and using them here is exactly what made earned trophies revert to
+  // grayscale. fetchStats derives its own lifetime high-water marks instead,
+  // so this hook also stops issuing useStreak's duplicate query.
   const refetch = useCallback(async () => {
-    if (streak.loading) return;
-    setStats(await fetchStats(userId, streak));
-    setStatsLoading(false);
-  }, [userId, streak.loading, streak.longest, streak.breaks]);
+    setStats(await fetchStats(userId));
+    markLoaded(userId);
+  }, [userId]);
 
   useEffect(() => {
     refetch();
@@ -129,6 +145,17 @@ export default function useTrophies() {
     () => trophies.filter((t) => t.earned && !seen.has(t.id)).length,
     [trophies, seen]
   );
+  // Earned, carries a reward, and that reward hasn't been claimed yet — i.e.
+  // there is something to COLLECT, not merely something new to look at.
+  // Distinct from unseenCount on purpose: `seen` is a local AsyncStorage
+  // "you've laid eyes on this tile" flag that clears the moment the Trophy
+  // Room is opened, whereas this stays true until the user actually taps
+  // Claim and a reward_events row exists. A tile with no TROPHY_REWARDS entry
+  // is never counted — there's nothing to claim on it.
+  const unclaimedCount = useMemo(
+    () => trophies.filter((t) => t.earned && t.reward && !t.claimed).length,
+    [trophies]
+  );
 
   // Must be a genuine no-op when there's nothing new to mark — the caller
   // (app/trophies.js's useFocusEffect) can't fully control how often this
@@ -152,7 +179,8 @@ export default function useTrophies() {
     earnedCount,
     totalCount: trophies.length,
     unseenCount,
+    unclaimedCount,
     markAllSeen,
-    loading: streak.loading || statsLoading,
+    loading: statsLoading,
   };
 }
