@@ -678,17 +678,25 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                 <Text style={styles.fieldLabel}>Date</Text>
                 <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
               </Pressable>
-              <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
-                <View style={styles.planRowInner}>
-                  <View>
-                    <Text style={styles.fieldLabel}>Add to Plan</Text>
-                    <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
-                      {selectedPlan?.name ?? 'None'}
-                    </Text>
+              {/* Only when there's actually a plan to pick. A picker whose only
+                  option is "None" is pure noise — and it's noise every brand-new
+                  user meets first, since nobody has a plan on day one. With it
+                  gone, Date's flex:1 fills the row on its own. Same rule as the
+                  Split picker below and as the Transfer tab's own <2-accounts
+                  case. */}
+              {activePlans.length > 0 && (
+                <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
+                  <View style={styles.planRowInner}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Add to Plan</Text>
+                      <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
+                        {selectedPlan?.name ?? 'None'}
+                      </Text>
+                    </View>
+                    <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
                   </View>
-                  <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-                </View>
-              </Pressable>
+                </Pressable>
+              )}
             </View>
             {planPickerOpen && (
               <View style={styles.planPicker}>
@@ -1132,6 +1140,9 @@ function makeStyles(colors) {
     borderRadius: 14,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
+    // Breathing room above, so Note doesn't sit flush against the Plan/Split
+    // pickers — those are a related group of choices, Note is a separate thing.
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
   noteInput: {

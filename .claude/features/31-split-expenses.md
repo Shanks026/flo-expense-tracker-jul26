@@ -1132,6 +1132,58 @@ Native's `Alert` only renders three buttons reliably on Android):
 - `shareCsv` gained a `dialogTitle` parameter (defaulted, so the existing
   reports call site is untouched).
 
+**The pairwise view was built after all, and my reason for deferring it was
+wrong (2026-08-26).** Out of Scope below said a per-entry tracing view would
+"only differ when there are 2+ creditors, which is rare". The user's real Mysore
+trip disproved that. Its actual numbers:
+
+| Person | Paid | Their share | Net |
+|---|---|---|---|
+| Abishek | ₹6,838.00 | ₹1,367.60 | **+₹5,470.40** |
+| Stephin | ₹86.00 | ₹1,396.26 | −₹1,310.26 |
+| You | ₹51.00 | ₹1,384.60 | −₹1,333.60 |
+| Maaz / Srijish | ₹0 | ₹1,413.27 | −₹1,413.27 each |
+
+Three people paid, but **only Abishek is a net creditor** — so greedy netting
+correctly printed "everyone pays Abishek", and in doing so **silently absorbed
+the money the other two payers were owed.** The user fronted a ₹51 auto for
+three people, so Maaz and Srijish each owe *them* ₹17; that ₹34 was netted into
+their own Abishek debt (₹1,367.60 − ₹34 = ₹1,333.60) and never shown. The
+arithmetic was never wrong; the presentation hid a real debt. **The lesson: "one
+creditor" is not the same as "one payer", and it's the payer who wants to see
+their money.**
+
+Built, per direct instruction that a finance feature shouldn't hide its working:
+
+- **`computeDirectDebts`** in `lib/splitMath.js` — every debt traced to the
+  entry's payer, with mutual pairs netted against each other and settlements
+  cancelling debt in the direction paid. Overpaying flips the direction, which
+  is correct: overpay and you're owed.
+- **`explainBalances`** — the arithmetic in words, because nobody should
+  reverse-engineer why their figure is ₹1,333.60 rather than the ₹1,367.60 their
+  share came to. *"You owe ₹1,367.60 (Abishek ₹1,367.60) and are owed ₹34 (Maaz
+  ₹17, Srijish ₹17) — net ₹1,333.60 out of pocket."*
+- **Always visible, no "show details" toggle.** The detail is the primary
+  answer; the fewest-payments list stays underneath as *"Simplest way to
+  settle"*, which is what you'd actually pay and where the Settle buttons live.
+- **All three export formats carry both**, plus the explanations — it's a
+  document people check against each other's memory.
+- **Verified against the live rows**, including that the traced debts reconcile
+  exactly to the summary nets for every member, in integer paise.
+
+**Also fixed, found by that verification: `formatMoney` printed ₹1,367.6.**
+`maximumFractionDigits: 2` alone drops a trailing zero, and split shares are the
+first amounts in this app to routinely land on paise. Now a value *with* a
+fraction shows both decimals while whole rupees still show none — preserving
+`lib/currency.js`'s original stated intent (no forced "₹4.00") without ever
+printing a half-finished decimal. **App-wide change**, so any amount anywhere
+with a single decimal place gains its trailing zero.
+
+**One more note on that verification:** summing the per-member nets as rupee
+*floats* gives −9.09e-13, not 0. The invariant holds exactly in integer paise —
+which is precisely why `lib/splitMath.js` computes there and converts once at
+the edge. A test asserting `sum === 0` on floats will fail for correct code.
+
 **Scope of a "person", since it's a reasonable thing to wonder:**
 `split_people` is a **reusable, user-global contact list** — deliberately not
 per-split, and not account-scoped either (same as `categories`). You travel with

@@ -3,7 +3,12 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
 import { SPLIT_SELECT, normalizeSplit } from '../lib/splitShape';
-import { computeBalances, suggestPayments, membersChangedAfterSettling } from '../lib/splitMath';
+import {
+  computeBalances,
+  suggestPayments,
+  membersChangedAfterSettling,
+  computeDirectDebts,
+} from '../lib/splitMath';
 
 // One split, fully hydrated, with every derived figure the detail screen needs.
 // Same embedded select as useSplits, narrowed to one id.
@@ -21,6 +26,8 @@ export default function useSplit(splitId) {
     entries: [],
     settlements: [],
     balances: [],
+    directDebts: [],
+    debtOffsets: [],
     payments: [],
     changedAfterSettling: [],
   });
@@ -41,6 +48,8 @@ export default function useSplit(splitId) {
         entries: [],
         settlements: [],
         balances: [],
+        directDebts: [],
+        debtOffsets: [],
         payments: [],
         changedAfterSettling: [],
       });
@@ -50,12 +59,19 @@ export default function useSplit(splitId) {
 
     const { split, members, entries, settlements } = normalizeSplit(data, myUserId);
     const balances = computeBalances({ members, entries, settlements });
+    // Two answers to "who owes whom", both true and both shown (the detail is
+    // NOT hidden behind a toggle — see the detail screen's own comment):
+    //   directDebts — every debt traced to whoever paid. The honest picture.
+    //   payments    — the same money collapsed into the fewest transfers.
+    const { debts, offsets } = computeDirectDebts({ members, entries, settlements });
     setState({
       split,
       members,
       entries,
       settlements,
       balances,
+      directDebts: debts,
+      debtOffsets: offsets,
       payments: suggestPayments(balances),
       changedAfterSettling: membersChangedAfterSettling({ members, entries, settlements }),
     });

@@ -89,6 +89,52 @@ protections when tested via a non-Play-Store build, not one:
    future feature needing this permission class, until the app ships via
    Google Play — at which point neither protection applies.
 
+**Standing notes — building a local release APK** (added 2026-08-26, from the
+first full release build after `31-split-expenses.md`). `npx expo prebuild
+--platform android --clean` then `./gradlew.bat -p android assembleRelease`;
+output lands at `android/app/build/outputs/apk/release/app-release.apk`.
+
+1. **It is debug-signed, and that's intentional for testing.** Expo's template
+   sets `buildTypes.release { signingConfig signingConfigs.debug }`, so
+   `assembleRelease` produces a **real release build** (Hermes bytecode, no dev
+   server, no Metro) that is nonetheless installable with no keystore work.
+   Consequence: it will NOT upgrade over a differently-signed FLO already on the
+   device — uninstall first if `adb install -r` complains about signatures.
+2. **A clean build takes ~1h20m** (measured: 707 tasks, 110 MB APK). Almost all
+   of it is the New Architecture's C++ codegen, compiled for **all four ABIs**.
+   **Set `reactNativeArchitectures=arm64-v8a` in `android/gradle.properties`**
+   before any build you actually need quickly — real phones are arm64, and
+   dropping x86/x86_64 roughly halves both the time and the APK. Incremental
+   rebuilds are far cheaper, but **every `prebuild --clean` pays the full cost
+   again**, so don't reach for `--clean` reflexively.
+3. **`--clean` IS required after adding a native dependency**, though — a new
+   Expo module isn't autolinked into an existing `android/` (found live:
+   `expo-print` was missing until the prebuild). Verify with
+   `npx expo-modules-autolinking search -p android --json` rather than grepping
+   `android/`, which won't show it either way.
+4. **Don't judge permissions or services from `android/app/src/main/AndroidManifest.xml`.**
+   Library manifests merge at BUILD time, so the source manifest is misleadingly
+   sparse — it showed no `POST_NOTIFICATIONS` and no notification-listener
+   service, both of which are present in the final APK. The file to check is
+   `android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml`.
+   Verified there: `FloNotificationListenerService` +
+   `BIND_NOTIFICATION_LISTENER_SERVICE` merged from the local module's own
+   manifest, plus `POST_NOTIFICATIONS`/`RECEIVE_BOOT_COMPLETED`/`WAKE_LOCK`/
+   `CAMERA` from library manifests.
+5. **CMake warns about `CMAKE_OBJECT_PATH_MAX`** ("The build may not work
+   correctly") because the repo path is long and contains a space
+   (`…\Desktop\Claude Code\FLO`) and RN's codegen filenames are very long on
+   top. It completed fine, so treat it as noise **unless** a native compile
+   actually fails — in which case the fix is moving the repo somewhere short
+   (`C:\dev\flo`), not changing any build config. The limit is Windows'.
+6. **ProGuard/R8 is OFF** — `android.enableProguardInReleaseBuilds` isn't set,
+   so release builds aren't minified. Good for testing (no release-only
+   stripping surprises), and part of why the APK is 110 MB.
+7. **`android.package` is still `com.anonymous.flo`**, Expo's placeholder. Fine
+   for test APKs; it must become a real reverse-domain id before any store
+   submission, and changing it later forces a fresh install rather than an
+   upgrade.
+
 **Standing rule — local scheduled notifications are best-effort on OEM Android
 skins, not a FLO bug** (added 2026-07-12, `05-koban-engagement.md`'s Post-Phase-1
 Round 2): FLO does not hold `SCHEDULE_EXACT_ALARM` (Play-restricted to

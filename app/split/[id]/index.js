@@ -29,7 +29,7 @@ import useSplit from '../../../hooks/useSplit';
 import useSplitPeople from '../../../hooks/useSplitPeople';
 import useCurrency from '../../../hooks/useCurrency';
 import { formatMoney } from '../../../lib/currency';
-import { describePayment, buildSummaryText } from '../../../lib/splitMath';
+import { describePayment, buildSummaryText, explainBalances } from '../../../lib/splitMath';
 import { buildSplitCsv, shareCsv, buildSplitHtml, sharePdf } from '../../../lib/export';
 import {
   closeSplit,
@@ -70,6 +70,7 @@ export default function SplitDetail() {
     settlements,
     balances,
     payments,
+    directDebts,
     changedAfterSettling,
     memberById,
     balanceByMemberId,
@@ -108,13 +109,18 @@ export default function SplitDetail() {
   );
 
   // Mine first, always. The number you opened the screen for is your own.
-  const orderedPayments = useMemo(() => {
-    const mine = payments.filter(
+  const mineFirst = (list) => {
+    const mine = list.filter(
       (p) => memberById[p.fromMemberId]?.isSelf || memberById[p.toMemberId]?.isSelf
     );
-    const theirs = payments.filter((p) => !mine.includes(p));
-    return [...mine, ...theirs];
-  }, [payments, memberById]);
+    return [...mine, ...list.filter((p) => !mine.includes(p))];
+  };
+  const orderedPayments = useMemo(() => mineFirst(payments), [payments, memberById]);
+  const orderedDebts = useMemo(() => mineFirst(directDebts), [directDebts, memberById]);
+  const explanations = useMemo(
+    () => explainBalances({ members, debts: directDebts, formatAmount }),
+    [members, directDebts, currency]
+  );
 
   const entriesByDate = useMemo(() => {
     const groups = new Map();
@@ -154,6 +160,7 @@ export default function SplitDetail() {
       balances,
       payments: orderedPayments,
       settlements,
+      directDebts: orderedDebts,
       formatAmount,
       dateLabel: split?.occurredOn ? format(parseISO(split.occurredOn), 'd MMM') : null,
       formatDay: (iso) => format(parseISO(iso), 'd MMM'),
@@ -173,6 +180,8 @@ export default function SplitDetail() {
       balances,
       payments: orderedPayments,
       settlements,
+      directDebts: orderedDebts,
+      explanations,
       formatAmount,
       formatDay: (iso) => format(parseISO(iso), 'd MMM'),
     });
@@ -188,6 +197,8 @@ export default function SplitDetail() {
       balances,
       payments: orderedPayments,
       settlements,
+      directDebts: orderedDebts,
+      explanations,
     });
     // Spaces out of the filename — it travels through a share sheet and into
     // other apps' file pickers.
@@ -439,6 +450,50 @@ export default function SplitDetail() {
             </Pressable>
           )}
         </View>
+
+        {/* EVERY debt, traced to whoever paid — always visible, never behind a
+            "show details". This is a money feature: the person reading it needs
+            to see the working, not a single collapsed figure. It's also the only
+            place the ₹17 Maaz owes YOU for the auto you fronted is visible at
+            all; the fewest-payments view below nets it silently into your own
+            debt and never mentions it. */}
+        {entries.length > 0 && orderedDebts.length > 0 && (
+          <>
+            <Card style={styles.detailCard}>
+              <Text style={styles.detailHeading}>Every debt, traced to whoever paid</Text>
+              {orderedDebts.map((d, i) => {
+                const described = describePayment(d, memberById, { formatAmount });
+                return (
+                  <View
+                    key={`${d.fromMemberId}-${d.toMemberId}`}
+                    style={[styles.detailRow, i > 0 && styles.detailRowBorder]}
+                  >
+                    <Text style={[styles.detailText, described.involvesMe && styles.detailTextMine]}>
+                      {described.text}
+                    </Text>
+                  </View>
+                );
+              })}
+            </Card>
+
+            {/* The arithmetic in words. Nobody should have to reverse-engineer
+                why their figure is ₹1,333.60 and not the ₹1,367.60 their share
+                came to. */}
+            <Card style={styles.detailCard}>
+              <Text style={styles.detailHeading}>How that works out</Text>
+              {explanations.map((e) => (
+                <Text
+                  key={e.memberId}
+                  style={[styles.explainText, e.memberId === self?.id && styles.explainTextMine]}
+                >
+                  {e.text}
+                </Text>
+              ))}
+            </Card>
+
+            <Text style={styles.settleHeading}>Simplest way to settle</Text>
+          </>
+        )}
 
         <Card>
           {entries.length === 0 ? (
@@ -840,6 +895,53 @@ function makeStyles(colors) {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.heading,
       color: colors.ink,
+    },
+    detailCard: {
+      marginBottom: spacing.md,
+    },
+    detailHeading: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      color: colors.mutedMid,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: spacing.sm,
+    },
+    detailRow: {
+      paddingVertical: 7,
+    },
+    detailRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: colors.borderSoft,
+    },
+    detailText: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.md,
+      color: colors.mutedDarker,
+    },
+    detailTextMine: {
+      fontFamily: fontFamily.extrabold,
+      color: colors.ink,
+    },
+    explainText: {
+      fontFamily: fontFamily.medium,
+      fontSize: fontSize.base,
+      color: colors.mutedDarker,
+      lineHeight: 19,
+      marginBottom: spacing.sm,
+    },
+    explainTextMine: {
+      fontFamily: fontFamily.bold,
+      color: colors.ink,
+    },
+    settleHeading: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      color: colors.mutedMid,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: spacing.sm,
+      marginTop: spacing.sm,
     },
     textAction: {
       flexDirection: 'row',

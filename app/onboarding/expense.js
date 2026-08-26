@@ -197,17 +197,27 @@ export default function OnboardingExpense() {
           <Text style={styles.fieldLabel}>Date</Text>
           <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
         </Pressable>
-        <Pressable style={[styles.field, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
-          <View style={styles.planRowInner}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Add to Plan</Text>
-              <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
-                {selectedPlan?.name ?? 'None'}
-              </Text>
+        {/* Only when a plan exists to pick — which during onboarding is
+            essentially never, since a brand-new user hasn't made one yet. This
+            picker was permanently stuck showing "None" on the one screen where
+            first impressions matter most. Kept conditional rather than deleted
+            so the field parity with AddTransactionSheet noted at the top of this
+            file still holds for anyone who reaches here WITH a plan (e.g. a
+            re-run of onboarding on an established account). Date's flex:1 fills
+            the row on its own when it's gone. */}
+        {activePlans.length > 0 && (
+          <Pressable style={[styles.field, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
+            <View style={styles.planRowInner}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Add to Plan</Text>
+                <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
+                  {selectedPlan?.name ?? 'None'}
+                </Text>
+              </View>
+              <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
             </View>
-            <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-          </View>
-        </Pressable>
+          </Pressable>
+        )}
       </View>
 
       {showDatePicker && (
