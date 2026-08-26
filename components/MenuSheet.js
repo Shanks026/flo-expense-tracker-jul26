@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight } from 'lucide-react-native';
+import { Wallet, FileText, Flag, Receipt, Settings, LogOut, X, Crown, ChevronRight, Users } from 'lucide-react-native';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
@@ -41,6 +41,10 @@ export function useMenuSheet() {
 // rather than one being a tab and the other buried in this sheet.
 const ITEMS = [
   { key: 'plans', label: 'Plans', route: '/plans', icon: Flag },
+  // Splits sits next to Plans (2026-08-26, 31-split-expenses.md) — both are
+  // event-shaped: a trip is usually a plan AND a split, and splits.plan_id
+  // links the two. Adding a sixth row is what bumped the snapPoints below.
+  { key: 'splits', label: 'Splits', route: '/splits', icon: Users },
   { key: 'budgets', label: 'Budgets', route: '/budgets', icon: Wallet },
   { key: 'reports', label: 'Reports', route: '/report', icon: FileText },
   { key: 'bills', label: 'Bills', route: '/bills', icon: Receipt },
@@ -107,7 +111,8 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
       // uses (AddTransactionSheet, AddBudgetSheet, etc.). Tune either value
       // freely — no other line needs to change alongside it. (Picked without
       // an on-device measure here; adjust if either sits too tall/short.)
-      snapPoints={useMemo(() => (isPro ? ['66%'] : ['78%']), [isPro])}
+      // Both values bumped ~4% (2026-08-26) for the sixth row, Splits.
+      snapPoints={useMemo(() => (isPro ? ['70%'] : ['82%']), [isPro])}
       // ▲▲▲ first = Pro (shorter), second = non-Pro (taller, fits Upgrade card)
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

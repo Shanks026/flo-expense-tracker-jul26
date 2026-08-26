@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag } from 'lucide-react-native';
+import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag, Users } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -31,6 +31,7 @@ import { useMenuSheet } from '../../components/MenuSheet';
 import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
+import { isSettlement, settlementLabel } from '../../lib/settlements';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
@@ -383,6 +384,9 @@ export default function Home() {
             <Card style={styles.listCard}>
               {transactions.map((tx, idx) => {
                 const transfer = isTransfer(tx);
+                // Same substitution transfers already get — a settlement has no
+                // category, and without this it fell through to "Expense".
+                const settlement = isSettlement(tx);
                 return (
                   <Pressable
                     key={tx.id}
@@ -392,6 +396,8 @@ export default function Home() {
                     <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
                       {transfer ? (
                         <ArrowLeftRight size={20} color={colors.mutedDarker} strokeWidth={2} />
+                      ) : settlement ? (
+                        <Users size={20} color={colors.mutedDarker} strokeWidth={2} />
                       ) : (
                         <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
                       )}
@@ -399,13 +405,23 @@ export default function Home() {
                     <View style={styles.rowMid}>
                       <View style={styles.rowTitleWrap}>
                         <Text style={styles.rowTitle}>
-                          {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                          {transfer
+                            ? transferLabel(tx, accounts)
+                            : settlement
+                              ? settlementLabel(tx)
+                              : tx.category?.name ?? 'Uncategorized'}
                         </Text>
-                        {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                        {!transfer && !settlement && tx.plan?.name && (
+                          <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
+                        )}
                       </View>
                       <Text style={styles.rowSub}>
                         {format(new Date(tx.occurred_at), 'd MMM')} ·{' '}
-                        {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
+                        {transfer
+                          ? 'Transfer'
+                          : settlement
+                            ? 'Settled up'
+                            : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
                       </Text>
                     </View>
                     <AmountText value={tx.amount} type={tx.type} signed currency={currency} />

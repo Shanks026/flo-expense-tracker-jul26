@@ -24,6 +24,11 @@ import { RewardBurstProvider } from '../components/RewardBurst';
 import { AddTransactionSheetProvider, useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { AddBudgetSheetProvider } from '../components/AddBudgetSheet';
 import { AddPlanSheetProvider } from '../components/AddPlanSheet';
+import { AddSplitSheetProvider } from '../components/AddSplitSheet';
+import { AddSplitEntrySheetProvider } from '../components/AddSplitEntrySheet';
+import { AddSplitPersonSheetProvider } from '../components/AddSplitPersonSheet';
+import { SettleUpSheetProvider } from '../components/SettleUpSheet';
+import PendingInviteHandler from '../components/PendingInviteHandler';
 import { AddBillSheetProvider } from '../components/AddBillSheet';
 import { PayBillSheetProvider } from '../components/PayBillSheet';
 import DueBillsModal from '../components/DueBillsModal';
@@ -400,6 +405,16 @@ function RootNavigator() {
                   <AddTransactionSheetProvider>
                     <AddBudgetSheetProvider>
                       <AddPlanSheetProvider>
+                        {/* Split sheets (31-split-expenses.md). Plain
+                            providers, NOT headless Stack siblings — they need
+                            no useProfile()-style hook access, so they don't
+                            belong in that group below. Person must wrap Split:
+                            AddSplitSheet calls useAddSplitPersonSheet() so a
+                            new person can be created and selected in one go. */}
+                        <AddSplitPersonSheetProvider>
+                        <AddSplitSheetProvider>
+                        <AddSplitEntrySheetProvider>
+                        <SettleUpSheetProvider>
                         <AddBillSheetProvider>
                           <PayBillSheetProvider>
                             <EditProfileSheetProvider>
@@ -411,6 +426,7 @@ function RootNavigator() {
                                     <ThemeProfileSync />
                                     <TimezoneSync />
                                     <ShareIntentHandler />
+                                    <PendingInviteHandler />
                                     <NotificationSync />
                                     <PushTokenSync />
                                     <DetectedTransactionHandler />
@@ -438,6 +454,10 @@ function RootNavigator() {
                             </EditProfileSheetProvider>
                           </PayBillSheetProvider>
                         </AddBillSheetProvider>
+                        </SettleUpSheetProvider>
+                        </AddSplitEntrySheetProvider>
+                        </AddSplitSheetProvider>
+                        </AddSplitPersonSheetProvider>
                       </AddPlanSheetProvider>
                     </AddBudgetSheetProvider>
                   </AddTransactionSheetProvider>

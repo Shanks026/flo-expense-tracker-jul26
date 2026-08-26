@@ -276,18 +276,48 @@ The work is everywhere else:
   against FLO's everything-is-derived principle and would need stored state.
   Needs a proper think, not a quick build.
 - **Split transactions** (one purchase across categories) — real, not urgent.
+  **Still unbuilt, and NOT what `31-split-expenses.md` did** — same word, different
+  feature. That one splits a cost between *people*; this one splits a single
+  purchase between *categories* (one supermarket bill across Groceries and
+  Household). Nothing in 31 helps with it.
 - **Recurring income** (salary) — bills cover recurring *payments*; recurring
   income isn't modelled.
-- **Lending / IOU tracking** — common need in India (splitting with friends), but
-  it's a whole second ledger concept. The single-player version (I record
-  who owes me what for a shared expense, entirely inside my own ledger — no
-  other user accounts, no invites, no acceptance flow) stays true to FLO's
-  single-user grain and is the buildable version of this idea.
-- **Multi-user bill splitting** (raised 2026-07-18) — search for other FLO
-  users, invite them to a split, money deducts from their account once they
-  accept and pay (the "Splitwise-shaped" version, seen in a Play Store money
-  tracker with a maneki-neko icon). **Deliberately parked, not rejected** —
-  the blocker is timing, not the idea. Two reasons it's not now:
+- **Lending / IOU tracking** — ✅ **BUILT as `31-split-expenses.md` Phase 1**
+  (2026-08-26). This entry called the single-player version "the buildable
+  version of this idea" and that turned out to be exactly right: a split records
+  who owes what for a shared expense, people are local contacts rather than app
+  users, and the only thing that touches the ledger is settling up. The one
+  thing this entry didn't anticipate is the hard part — FLO tracks your balance
+  and Splitwise doesn't, so *how* a fronted payment enters the ledger is a real
+  modelling problem. See that doc's §2.4.
+- **Multi-user bill splitting** (raised 2026-07-18) — 🚧 **NO LONGER PARKED.
+  Built as `31-split-expenses.md` Phase 3** (2026-08-26): invite links,
+  membership-based RLS, join-by-link with ghost-claiming, role-aware editing.
+  **Read that doc before touching any of it**; the remainder (settlement
+  confirmation, activity-feed UI, push, duplicate detection) is listed in its
+  §3.5.
+
+  **What changed the call**, since the parking reasoning below was sound and
+  should not simply be forgotten:
+
+  1. **Ghost members removed the network dependency.** A split holds both real
+     FLO users and plain *names*, so it is fully usable at one real user and
+     merely gets better as people join — rather than being worthless until a
+     threshold is crossed. The trip that motivated the feature had at most one
+     FLO user in it.
+  2. **Invite links made it a growth mechanic rather than a beneficiary of
+     growth.** One invite into the group chat where the trip is already being
+     planned is four potential installs. The parking below assumed splitting had
+     to *wait* for DAU; the honest read is that it's a plausible *path* to DAU.
+  3. **The architecture objection was real and was paid, not dodged** — see the
+     four database lessons in `00-index.md`'s Shared Infrastructure Notes, each
+     of which cost a live failure. It also came out differently in one respect:
+     entries are **projections**, never cross-user reads of `transactions`, so
+     no policy on that table changed at all.
+
+  The counter-argument still stands and is why the remainder is unfinished: a
+  shared feature that confuses people on first contact burns those four installs
+  instead of keeping them. Original reasoning, preserved:
   (1) **architecture** — every table in FLO is `RLS auth.uid() = user_id`;
   every balance/budget/plan is derived from *only your own* `transactions`.
   A split needs shared mutable state one user's app can read/act on that

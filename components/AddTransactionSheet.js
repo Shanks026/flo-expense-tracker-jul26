@@ -17,6 +17,8 @@ import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
+import useSplits from '../hooks/useSplits';
+import { createEntryFromTransaction } from '../lib/splits';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
 import { claimDailyLog } from '../lib/rewardsMutations';
@@ -102,6 +104,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const { expenseCategories, incomeCategories } = useCategories();
   const { activePlans } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
+  // Only OPEN splits are offered — a closed split is frozen by definition
+  // (31-split-expenses.md Decision 7), so adding to it would be a surprise.
+  const { openSplits } = useSplits();
   const { isPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const { openAddAccount } = useAddAccountSheet();
@@ -113,6 +118,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const [categoryId, setCategoryId] = useState(null);
   const [planId, setPlanId] = useState(null);
   const [planPickerOpen, setPlanPickerOpen] = useState(false);
+  // Offered on NEW expenses only, never on an edit. An edit can't tell whether
+  // it already produced a split entry, so allowing it there would quietly
+  // create a second one every time the transaction was touched.
+  const [splitId, setSplitId] = useState(null);
+  const [splitPickerOpen, setSplitPickerOpen] = useState(false);
   // Which account a non-transfer entry saves into — was hardcoded to
   // activeAccountId at save time with no way to change it for THIS entry
   // (the old "Adding to X" row dismissed the whole sheet to open the real
@@ -138,6 +148,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   const selectedPlan = activePlans.find((p) => p.id === planId);
+  const selectedSplit = openSplits.find((s) => s.id === splitId);
   // Falls back to activeAccount only for the brief window before `open()`'s
   // setAccountId has run (or if accounts hasn't loaded yet) — once open,
   // accountId is always set explicitly by open() above.
@@ -154,6 +165,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     open(payload) {
       setError(null);
       setPlanPickerOpen(false);
+      // Never sticky: a split chosen for one expense must not silently apply to
+      // the next one logged from the same sheet.
+      setSplitId(null);
+      setSplitPickerOpen(false);
       setFromPickerOpen(false);
       setToPickerOpen(false);
       setAccountPickerOpen(false);
@@ -356,10 +371,21 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
     let saveError;
     let isNewEntry = false;
+    // The inserted row's id, needed only to cross-reference a split entry back
+    // to it (31-split-expenses.md Phase 2). `.select('id').single()` on the
+    // insert is the one behavioural change here — reading your own row straight
+    // back is already permitted by the table's `for all` RLS policy.
+    let newTransactionId = null;
     if (editingId) {
       ({ error: saveError } = await supabase.from('transactions').update(payload).eq('id', editingId));
     } else {
-      ({ error: saveError } = await supabase.from('transactions').insert({ ...payload, account_id: targetAccountId }));
+      const { data: inserted, error: insertError } = await supabase
+        .from('transactions')
+        .insert({ ...payload, account_id: targetAccountId })
+        .select('id')
+        .single();
+      saveError = insertError;
+      newTransactionId = inserted?.id ?? null;
       isNewEntry = !saveError;
     }
 
@@ -392,9 +418,32 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       else if (isNewClaim) showRewardBurst({ coins: earnedCoins, xp: earnedXp });
     }
 
+    // "Add to Split" (31-split-expenses.md Phase 2) — the "log it once, not
+    // twice" path. The transaction is already saved and stays saved; this only
+    // mirrors it into the split as an entry you paid for, split equally, all
+    // editable from the split afterwards. A failure here is reported on its own
+    // rather than implying the transaction didn't save, because it did.
+    let splitError = null;
+    if (!editingId && splitId && newTransactionId) {
+      ({ error: splitError } = await createEntryFromTransaction({
+        splitId,
+        transaction: {
+          id: newTransactionId,
+          amount: numericAmount,
+          occurred_at: payload.occurred_at,
+          note: payload.note,
+          category: categories.find((c) => c.id === categoryId) ?? null,
+        },
+      }));
+    }
+
     notifyChanged();
     modalRef.current?.dismiss();
-    showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
+    if (splitError) {
+      showToast({ message: `Transaction saved, but the split entry didn't: ${splitError.message}`, variant: 'error' });
+    } else {
+      showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
+    }
 
     if (!editingId && type === 'expense') {
       const budgetMsg = await budgetToastForSave({ categoryId, accountId: targetAccountId });
@@ -667,6 +716,71 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                   </Pressable>
                 ))}
               </View>
+            )}
+
+            {/* "Add to Split" (31-split-expenses.md Phase 2) — log the expense
+                once and have it show up in the split too, instead of typing it
+                in both places.
+
+                Expenses only, and new ones only. A split ENTRY is a shared
+                cost; money coming back to you is a settlement, which belongs in
+                SettleUpSheet where it can be matched to who paid you. And on an
+                edit there's no way to know whether an entry was already
+                created, so offering it would duplicate. */}
+            {type === 'expense' && !editingId && openSplits.length > 0 && (
+              <>
+                <Pressable style={styles.dateRow} onPress={() => setSplitPickerOpen((v) => !v)}>
+                  <View style={styles.planRowInner}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Add to Split</Text>
+                      <Text
+                        style={[styles.fieldValue, selectedSplit && styles.fieldValuePlan]}
+                        numberOfLines={1}
+                      >
+                        {selectedSplit?.name ?? 'None'}
+                      </Text>
+                    </View>
+                    <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+                  </View>
+                </Pressable>
+                {splitPickerOpen && (
+                  <View style={styles.planPicker}>
+                    <Pressable
+                      style={[styles.planOption, splitId === null && styles.planOptionSelected]}
+                      onPress={() => {
+                        setSplitId(null);
+                        setSplitPickerOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.planOptionText, splitId === null && styles.planOptionTextSelected]}>
+                        None
+                      </Text>
+                    </Pressable>
+                    {openSplits.map((s) => (
+                      <Pressable
+                        key={s.id}
+                        style={[styles.planOption, splitId === s.id && styles.planOptionSelected]}
+                        onPress={() => {
+                          setSplitId(s.id);
+                          setSplitPickerOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[styles.planOptionText, splitId === s.id && styles.planOptionTextSelected]}
+                          numberOfLines={1}
+                        >
+                          {s.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+                {selectedSplit && (
+                  <Text style={styles.splitHint}>
+                    Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
+                  </Text>
+                )}
+              </>
             )}
           </>
         )}
@@ -967,6 +1081,12 @@ function makeStyles(colors) {
   },
   fieldValuePlan: {
     color: colors.income,
+  },
+  splitHint: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.xs,
+    color: colors.mutedMid,
+    marginBottom: spacing.md,
   },
   planPicker: {
     flexDirection: 'row',

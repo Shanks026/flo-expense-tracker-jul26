@@ -131,11 +131,18 @@ export default function AmountText({
         // apart from income-green and expense-ink. Direction shows via the ± sign.
         transfer_in: dark ? staticColors.mutedLight : colors.mutedDarker,
         transfer_out: dark ? staticColors.mutedLight : colors.mutedDarker,
+        // A split settlement is the same kind of thing as a transfer for
+        // display purposes: money genuinely moved, but it is neither a gain
+        // nor a loss to account for. Same muted tone, direction via the ±.
+        // Crucially NOT income-green — the whole point of the settle types is
+        // that money coming back from a split isn't earnings.
+        settle_in: dark ? staticColors.mutedLight : colors.mutedDarker,
+        settle_out: dark ? staticColors.mutedLight : colors.mutedDarker,
       }[type];
 
   let prefix = '';
   if (isNegative) prefix = '−';
-  else if (signed) prefix = type === 'income' || type === 'transfer_in' ? '+' : '−';
+  else if (signed) prefix = type === 'income' || type === 'transfer_in' || type === 'settle_in' ? '+' : '−';
 
   // Muting the ₹ is a de-emphasis against a healthy figure — but on a negative
   // one it fought the number it belongs to, leaving a grey ₹ glued to a red

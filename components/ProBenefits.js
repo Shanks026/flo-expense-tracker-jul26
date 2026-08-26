@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Layers, Target, Calendar, FileText } from 'lucide-react-native';
+import { Layers, Target, Calendar, FileText, Users } from 'lucide-react-native';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { PRO_BENEFITS } from '../lib/pro';
 
-const ICONS = { layers: Layers, target: Target, calendar: Calendar, fileText: FileText };
+const ICONS = { layers: Layers, target: Target, calendar: Calendar, fileText: FileText, users: Users };
 
 // Shared between ProUpsellSheet (top `limit` items, now a theme-reactive
 // light-following sheet) and app/pro.js (all of them, still a permanently-dark

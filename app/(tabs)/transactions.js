@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, ArrowLeftRight, Users } from 'lucide-react-native';
 import { addMonths, subMonths, format, isToday, isYesterday } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -17,6 +17,7 @@ import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
+import { isSettlement, settlementLabel } from '../../lib/settlements';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
 
@@ -175,6 +176,12 @@ export default function Transactions() {
                 </View>
                 {group.items.map((tx, idx) => {
                   const transfer = isTransfer(tx);
+                  // A settlement has no category, so it takes the same
+                  // substitution a transfer row already does (31-split-
+                  // expenses.md §2.4). Without this it fell through the
+                  // `type === 'income' ? … : 'Expense'` ternary and rendered as
+                  // an expense, which is precisely what it isn't.
+                  const settlement = isSettlement(tx);
                   return (
                     <Pressable
                       key={tx.id}
@@ -184,6 +191,8 @@ export default function Transactions() {
                       <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
                         {transfer ? (
                           <ArrowLeftRight size={19} color={colors.mutedDarker} strokeWidth={2} />
+                        ) : settlement ? (
+                          <Users size={19} color={colors.mutedDarker} strokeWidth={2} />
                         ) : (
                           <CategoryIcon
                             icon={tx.category?.icon}
@@ -195,12 +204,22 @@ export default function Transactions() {
                       <View style={styles.rowMid}>
                         <View style={styles.rowTitleWrap}>
                           <Text style={styles.rowTitle}>
-                            {transfer ? transferLabel(tx, accounts) : tx.category?.name ?? 'Uncategorized'}
+                            {transfer
+                              ? transferLabel(tx, accounts)
+                              : settlement
+                                ? settlementLabel(tx)
+                                : tx.category?.name ?? 'Uncategorized'}
                           </Text>
-                          {!transfer && tx.plan?.name && <Pill label={tx.plan.name} tone="income" style={styles.planPill} />}
+                          {!transfer && !settlement && tx.plan?.name && (
+                            <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
+                          )}
                         </View>
                         <Text style={styles.rowSub}>
-                          {transfer ? 'Transfer' : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
+                          {transfer
+                            ? 'Transfer'
+                            : settlement
+                              ? (tx.note ?? 'Settled up')
+                              : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
                         </Text>
                       </View>
                       <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} currency={currency} />
