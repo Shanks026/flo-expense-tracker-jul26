@@ -45,6 +45,7 @@ import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet
 import { MenuSheetProvider } from '../components/MenuSheet';
 import { AlertsSheetProvider } from '../components/AlertsSheet';
 import { ProUpsellSheetProvider } from '../components/ProUpsellSheet';
+import AppErrorBoundary from '../components/AppErrorBoundary';
 import useIncomingShare from '../hooks/useIncomingShare';
 import useProfile from '../hooks/useProfile';
 import { parseTransactionSms } from '../lib/smsParser';
@@ -496,9 +497,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
+        {/* Root render-error boundary (32-safe-closed-test-build.md) — just
+            below ThemeProvider so its recovery screen is themed. */}
+        <AppErrorBoundary>
+          <AuthProvider>
+            <RootNavigator />
+          </AuthProvider>
+        </AppErrorBoundary>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
