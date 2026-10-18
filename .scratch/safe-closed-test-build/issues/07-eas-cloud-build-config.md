@@ -15,6 +15,10 @@ Spec: .claude/features/32-safe-closed-test-build.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-18: `eas.json` is now on `appVersionSource: remote`, and each base profile names its EAS environment (development, preview, production; the lite/full profiles inherit theirs). The Supabase URL and anon key were already set in the EAS **preview** environment. **Production is still missing them**: creating them from the agent was blocked, so add them by hand (values from `.env`). No remote version code exists yet; `android.versionCode: 2` stays in `app.json` so the first remote build seeds from it, and the `lite` profile's `autoIncrement` then takes it to 3. Drop `versionCode` from `app.json` once a remote version exists.
