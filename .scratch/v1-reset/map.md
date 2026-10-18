@@ -29,6 +29,7 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Notification cadence and weekly recap](issues/06-notifications-and-weekly-recap.md): server push only; one 21:00 nudge if nothing was logged, backing off at 3 and 7 ignored days; no morning push; a Monday 09:00 rule-based recap (push and Home card); bill reminders kept; 3 toggles in Settings; the report-ready stream removed.
 - [Design language direction: Ledger, not game; accents; System/Light/Dark](issues/04-design-language-direction.md): money screens ledger-calm and Koban only in character moments; lime used as a fill only; System/Light/Dark with no picker; Koban style A plus an optional lime scarf; a hard accessibility baseline; native headers, flat lists, 3 radii, a 6-step type ramp, lucide icons only.
 - [Mascot: rough vector cat prototype](issues/16-mascot-vector-prototype.md): ginger tabby, flat 2D, standing two-legged, with tube limbs merged into a pear body; approved face and expression set; a movement library plus prop poses; code-based (react-native-svg + Reanimated). Outline or editorial treatment is left to ticket 04.
 - [Onboarding target flow: 4-screen Google-first, anonymous-first?](issues/03-onboarding-target-flow.md): Google-first (email under Other options); opener → Google → first expense in the real Add sheet (skippable) → reminder ask → Home; tour becomes coach marks; cut screens deleted; anonymous-first goes post-launch.

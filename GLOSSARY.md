@@ -14,6 +14,10 @@
 
 **Character moment** — a screen or moment where Koban may appear: onboarding, empty states, coach marks, streak and milestones, the weekly recap. Never on top of a money figure.
 
+**Daily nudge** — the one evening push (21:00 local by default), sent only on days with nothing logged; it backs off when ignored.
+
+**Weekly recap** — Monday's rule-based summary of the previous week: total vs the week before, top categories, one observation, the streak.
+
 **Flagged off** — a feature hidden from v1 by a build-time switch: its UI is not shown and it records nothing new, but its code and every row of existing data stay. Not the same as removed.
 
 **Streak** — the run of consecutive days on which the user logged at least one entry. The one game mechanic in v1.
