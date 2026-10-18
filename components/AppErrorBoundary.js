@@ -1,4 +1,4 @@
-import { Component, Fragment, useMemo } from 'react';
+import { Component, Fragment, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,8 +14,22 @@ import { useTheme } from '../theme/ThemeContext';
 // including AuthProvider and the whole navigator.
 //
 // "Try again" bumps `resetKey`, which remounts the subtree from scratch.
-// "Go to Home" does the same and then replaces the route, on the next tick so
-// the remounted Stack exists to receive it.
+// "Go to Home" does the same and leaves a pending request that
+// RecoveryHomeRedirect (a sibling of <Stack>) carries out once the remounted
+// navigator exists. Navigating straight from here would fire while
+// RootNavigator still renders null waiting on auth, and the request would be
+// lost.
+let pendingHome = false;
+
+export function RecoveryHomeRedirect() {
+  useEffect(() => {
+    if (!pendingHome) return;
+    pendingHome = false;
+    router.replace('/');
+  }, []);
+  return null;
+}
+
 export default class AppErrorBoundary extends Component {
   state = { error: null, resetKey: 0 };
 
@@ -33,14 +47,8 @@ export default class AppErrorBoundary extends Component {
   };
 
   goHome = () => {
+    pendingHome = true;
     this.reset();
-    setTimeout(() => {
-      try {
-        router.replace('/');
-      } catch {
-        // Navigator not ready yet: the remount alone still recovers the app.
-      }
-    }, 0);
   };
 
   render() {

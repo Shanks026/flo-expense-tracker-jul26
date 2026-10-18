@@ -561,7 +561,15 @@ export default function Settings() {
             </>
           )}
 
-          <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
+          {/* Bottom borders here only when the dev-only push row follows —
+              otherwise these are the card's last rows. */}
+          <View
+            style={[
+              styles.row,
+              (__DEV__ && notifEnabled) || (notifEnabled && billReminders.enabled) ? styles.rowBorder : null,
+              !notifEnabled && styles.rowDisabled,
+            ]}
+          >
             <View style={styles.rowIcon}>
               <Receipt size={20} color={colors.ink} strokeWidth={2} />
             </View>
@@ -569,7 +577,7 @@ export default function Settings() {
             <Switch value={billReminders.enabled} onValueChange={handleToggleBillReminders} disabled={!notifEnabled} />
           </View>
           {notifEnabled && billReminders.enabled && (
-            <View style={[styles.subRow, styles.rowBorder]}>
+            <View style={[styles.subRow, __DEV__ && styles.rowBorder]}>
               <Text style={styles.subRowLabel}>Remind me</Text>
               <View style={styles.daysBeforeGroup}>
                 {DAYS_BEFORE_OPTIONS.map((days) => {

@@ -82,7 +82,7 @@ export default function Report() {
   // snap a free user's scope back to their active account whenever it drifts
   // (a downgrade with an "All"/other-account scope still selected, or the
   // active account itself changing elsewhere). Gated on entitlementLoading so
-  // this never fires against hasPro's default-false value before the real
+  // this never fires against isPro's default-false value before the real
   // entitlement is known, which would otherwise clip a genuine Pro user's
   // "All" scope for a frame on every mount.
   useEffect(() => {

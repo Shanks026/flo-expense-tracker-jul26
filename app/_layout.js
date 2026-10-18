@@ -45,7 +45,7 @@ import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet
 import { MenuSheetProvider } from '../components/MenuSheet';
 import { AlertsSheetProvider } from '../components/AlertsSheet';
 import { ProUpsellSheetProvider } from '../components/ProUpsellSheet';
-import AppErrorBoundary from '../components/AppErrorBoundary';
+import AppErrorBoundary, { RecoveryHomeRedirect } from '../components/AppErrorBoundary';
 import useIncomingShare from '../hooks/useIncomingShare';
 import useProfile from '../hooks/useProfile';
 import { parseTransactionSms } from '../lib/smsParser';
@@ -436,6 +436,7 @@ function RootNavigator() {
                                     <FreezePrompt />
                                     <RankUpCelebration />
                                     <TrophyToast />
+                                    <RecoveryHomeRedirect />
                                     {/* contentStyle matches the active theme's screen bg —
                                         without it, React Navigation's native-stack default
                                         (always white) paints for a frame during every push
