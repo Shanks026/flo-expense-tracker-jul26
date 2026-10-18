@@ -29,6 +29,8 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Play Billing on Expo SDK 54 without RevenueCat](issues/19-play-billing-research.md): `expo-iap` (pinned) with `play-verify` and `play-rtdn` Edge Functions, plus a daily reconcile and a `play_purchases` ledger feeding `entitlements`; 15% fee on subscriptions; India developers pay GST themselves; the package id must be fixed before billing.
+- [Monetisation: Pro with Play Billing before production](issues/08-monetisation-timing.md): Pro visible and purchasable at production; billing ships as a closed-test fix build; gates kept (plans removed); ₹99/mo, ₹399/yr with a 7-day trial, ₹999 lifetime; no paywall in onboarding; direct Play Billing with Supabase verification (no RevenueCat); India only.
 - [Home information architecture and tab structure](issues/05-home-ia-and-tabs.md): tabs Home · Transactions · (+) · Insights · More; Home = hero, then the Today strip, the 7-day chart, the recap card, recent transactions and bills; Insights absorbs Reports; More holds the rest, with Settings regrouped; the hero gets a skin slot for post-launch seasonal skins.
 - [v1 scope for Plans, split sharing and multi-currency](issues/07-v1-scope-plans-splits-currency.md): Plans and collecting mode flagged off; the solo Splits core kept, invites flagged off; the currency picker hidden (INR default); PDF deferred; other secondary features kept; a one-tap no-spend day counts toward the streak.
 - [Notification cadence and weekly recap](issues/06-notifications-and-weekly-recap.md): server push only; one 21:00 nudge if nothing was logged, backing off at 3 and 7 ignored days; no morning push; a Monday 09:00 rule-based recap (push and Home card); bill reminders kept; 3 toggles in Settings; the report-ready stream removed.
@@ -45,7 +47,6 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 - **Play Console content:** the Data safety answers, the demo account for reviewers, the financial-features declaration label, content rating. Waits on [Privacy policy + account-deletion pages](issues/15-privacy-and-deletion-pages.md).
 - **Closed-test recruitment and run:** how to find 15–20 testers, the Google Group, what testers are asked to do, and the fix-build cadence. Waits on [Safe closed-test build](issues/01-safe-closed-test-build.md).
-- **Post-launch backlog boundary:** what is explicitly v1.1 (RevenueCat, re-enabling Plans/invites, anonymous-first sign-up, widget, EAS Update, SDK upgrade). Waits on [v1 scope for Plans, splits, multi-currency](issues/07-v1-scope-plans-splits-currency.md) and [Monetisation timing](issues/08-monetisation-timing.md).
 
 ## Out of scope
 
@@ -57,4 +58,4 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
   They are already decided (audit §3, §8 items 1–2).
 - **The seasonal card-skin Store and its admin portal:** the first feature after launch (decided in [Home IA](issues/05-home-ia-and-tabs.md)). v1 only builds the hero's skin slot.
-- **The production rollout and post-launch work:** the staged rollout, RevenueCat/Play Billing, iOS. These come after this map's destination.
+- **The production rollout and post-launch work:** the staged rollout, iOS. These come after this map's destination.
