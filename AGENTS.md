@@ -120,3 +120,19 @@ via the Supabase MCP (`list_tables`, `list_migrations`; project
   settings" — install over `adb`/`expo run:android`, and enable "Allow
   restricted settings" per install. Details in `00-index.md`.
 - Local scheduled notifications are best-effort on OEM Android skins — not a bug.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown: tickets and wayfinder maps live under `.scratch/<effort>/`; specs live in `.claude/features/`. See `docs/agents/issue-tracker.md`.
+
+Specs produced by `/to-spec` are written as `.claude/features/NN-<slug>.md` in the flo-feature template; the flo-feature rule (planning doc before feature code) is satisfied by that file.
+
+### Triage labels
+
+Default five roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as `Status:` lines. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
