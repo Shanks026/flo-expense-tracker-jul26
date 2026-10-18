@@ -21,3 +21,7 @@ Spec: .claude/features/32-safe-closed-test-build.md
 - [ ] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-18: Not started, waiting on the human console steps. `google-services.json` still has a single client for `com.anonymous.flo`, so changing the package id now would fail every native build: the Google Services Gradle plugin errors with "No matching client found for package name". Unblock it by registering `app.floexpense.tracker` and `app.floexpense.tracker.personal` as Android apps in the Firebase project, downloading the combined `google-services.json` into the repo root, and uploading the FCM V1 service-account key in EAS credentials for both package ids.
