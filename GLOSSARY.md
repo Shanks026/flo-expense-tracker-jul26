@@ -18,6 +18,8 @@
 
 **Weekly recap** — Monday's rule-based summary of the previous week: total vs the week before, top categories, one observation, the streak.
 
+**Card skin** — a purchasable decoration for the Home hero card (for example a seasonal Christmas skin), sold alone or in bundles in the Store. Never changes how a money figure reads.
+
 **Flagged off** — a feature hidden from v1 by a build-time switch: its UI is not shown and it records nothing new, but its code and every row of existing data stay. Not the same as removed.
 
 **Streak** — the run of consecutive days on which the user logged at least one entry or marked a no-spend day. The one game mechanic in v1.

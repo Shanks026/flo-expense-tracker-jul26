@@ -22,3 +22,7 @@ Grill:
 - When does billing land: v1.1, or during the closed test?
 
 Refs: audit §2 P0 Pro has no billing, §4 P0 coin packs, §6 P0 payments stubbed, P2 RevenueCat.
+
+## Context added 2026-10-18 (from [05](05-home-ia-and-tabs.md))
+
+The first post-launch feature is a **Store** that sells seasonal card skins and bundles for real money via Play Billing (no coins), managed through a later admin portal. Billing therefore has to support one-time purchases as well as Pro. Weigh that when deciding when billing lands.

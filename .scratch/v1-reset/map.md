@@ -29,6 +29,7 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Home information architecture and tab structure](issues/05-home-ia-and-tabs.md): tabs Home · Transactions · (+) · Insights · More; Home = hero, then the Today strip, the 7-day chart, the recap card, recent transactions and bills; Insights absorbs Reports; More holds the rest, with Settings regrouped; the hero gets a skin slot for post-launch seasonal skins.
 - [v1 scope for Plans, split sharing and multi-currency](issues/07-v1-scope-plans-splits-currency.md): Plans and collecting mode flagged off; the solo Splits core kept, invites flagged off; the currency picker hidden (INR default); PDF deferred; other secondary features kept; a one-tap no-spend day counts toward the streak.
 - [Notification cadence and weekly recap](issues/06-notifications-and-weekly-recap.md): server push only; one 21:00 nudge if nothing was logged, backing off at 3 and 7 ignored days; no morning push; a Monday 09:00 rule-based recap (push and Home card); bill reminders kept; 3 toggles in Settings; the report-ready stream removed.
 - [Design language direction: Ledger, not game; accents; System/Light/Dark](issues/04-design-language-direction.md): money screens ledger-calm and Koban only in character moments; lime used as a fill only; System/Light/Dark with no picker; Koban style A plus an optional lime scarf; a hard accessibility baseline; native headers, flat lists, 3 radii, a 6-step type ramp, lucide icons only.
@@ -55,4 +56,5 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
   - delete the still-ACTIVE `ai-interpret` / `ai-report-summary` Edge Functions and their keys.
 
   They are already decided (audit §3, §8 items 1–2).
+- **The seasonal card-skin Store and its admin portal:** the first feature after launch (decided in [Home IA](issues/05-home-ia-and-tabs.md)). v1 only builds the hero's skin slot.
 - **The production rollout and post-launch work:** the staged rollout, RevenueCat/Play Billing, iOS. These come after this map's destination.
