@@ -238,11 +238,8 @@ export default function SignIn() {
             </Pressable>
           </View>
 
-          {!isSignUp && (
-            <Pressable style={styles.forgotRow}>
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </Pressable>
-          )}
+          {/* "Forgot password?" removed until the forgot-password spec ships
+              (32-safe-closed-test-build.md) — it was a dead link. */}
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -394,15 +391,6 @@ function makeStyles(colors) {
     fontSize: fontSize.xl,
     color: colors.ink,
     height: '100%',
-  },
-  forgotRow: {
-    alignItems: 'flex-end',
-    marginTop: spacing.md,
-  },
-  forgotText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.muted,
   },
   errorText: {
     fontFamily: fontFamily.semibold,

@@ -588,7 +588,9 @@ export default function Settings() {
             </View>
           )}
 
-          {notifEnabled && (
+          {/* Dev-only: the push registration status + "Send test" link
+              (32-safe-closed-test-build.md — no debug UI for testers). */}
+          {__DEV__ && notifEnabled && (
             <View style={styles.row}>
               <View style={styles.rowIcon}>
                 <Send size={20} color={colors.ink} strokeWidth={2} />
@@ -775,7 +777,8 @@ export default function Settings() {
                     <Switch value={detectEnabled} onValueChange={handleToggleDetect} disabled={!detectAccess} />
                   </View>
 
-                  {detectEnabled && (
+                  {/* Dev-only: the detection debug log. */}
+                  {__DEV__ && detectEnabled && (
                     <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowDetectionLog}>
                       <View style={styles.rowIcon}>
                         <Receipt size={20} color={colors.ink} strokeWidth={2} />
