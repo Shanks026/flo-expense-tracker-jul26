@@ -18,7 +18,7 @@
 //                                cadence (weekly/monthly) is due today, at
 //                                their configured time.
 //                            Requires the x-cron-secret header to match the
-//                            CRON_SECRET function secret.
+//                            Vault secret send_push_cron_secret.
 //   { }                    — Phase 1's manual test-send, kept for continued
 //                            debugging. Sends only to the caller's own
 //                            devices, resolved from their access token.
@@ -413,12 +413,14 @@ Deno.serve(async (req: Request) => {
 
   // verify_jwt alone is not auth here: the anon key is a validly-signed
   // project JWT and ships in the app bundle, so anyone holding it got past
-  // the gateway. The cron path now needs a shared secret only pg_cron knows
-  // (vault secret → x-cron-secret header), and fails closed if the function
-  // secret isn't set.
+  // the gateway. The cron path now needs a shared secret only pg_cron knows:
+  // the Vault secret send_push_cron_secret, sent as the x-cron-secret header
+  // and read back here through a service-role-only RPC. Fails closed if the
+  // secret can't be read.
   if (body?.mode === 'cron') {
-    const cronSecret = Deno.env.get('CRON_SECRET');
-    if (!cronSecret || !safeEqual(req.headers.get('x-cron-secret') ?? '', cronSecret)) {
+    const { data: cronSecret, error: secretError } = await supabase.rpc('get_send_push_cron_secret');
+    if (secretError) console.error('send-push: cron secret read failed:', secretError.message);
+    if (!cronSecret || !safeEqual(req.headers.get('x-cron-secret') ?? '', cronSecret as string)) {
       return json({ error: 'unauthorized' }, 401);
     }
     const result = await runCron(supabase);

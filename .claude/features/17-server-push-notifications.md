@@ -752,48 +752,44 @@ holding the anon key could:
   `lib/pushToken.js`'s `sendTestPush` needs no change, because
   `functions.invoke` already attaches the signed-in user's token.
 - **Cron path.** It now requires an `x-cron-secret` header equal to the
-  `CRON_SECRET` function secret (constant-time compare). If `CRON_SECRET` is
-  unset it fails closed with 401.
+  Vault secret `send_push_cron_secret` (constant-time compare). The function
+  reads the secret back through `public.get_send_push_cron_secret()`, a
+  `SECURITY DEFINER` RPC that only `service_role` can execute. So there is
+  no function secret to keep in sync, and if the secret can't be read the
+  call fails closed with 401.
 
-**Rollout. Run these in this order, so reminders never stop:**
-1. Create the shared secret in Vault (SQL editor):
-   ```sql
-   SELECT vault.create_secret(encode(gen_random_bytes(32), 'hex'), 'send_push_cron_secret');
-   SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'send_push_cron_secret';
-   ```
-2. Set that value as the function secret `CRON_SECRET` (Dashboard → Edge
-   Functions → Secrets, or `supabase secrets set CRON_SECRET=...`).
-3. Reschedule the cron job with the extra header. Keep its current
-   `Authorization` value: read it first with
-   `SELECT jobid, command FROM cron.job WHERE jobname = 'send-reminders';`
-   ```sql
-   SELECT cron.unschedule('send-reminders');
-   SELECT cron.schedule(
-     'send-reminders',
-     '*/15 * * * *',
-     $$
-     SELECT net.http_post(
-       url := 'https://uergtlcfpwajztqgncim.supabase.co/functions/v1/send-push',
-       headers := jsonb_build_object(
-         'Authorization', 'Bearer <anon key, unchanged from the current job>',
-         'Content-Type', 'application/json',
-         'x-cron-secret', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'send_push_cron_secret')
-       ),
-       body := '{"mode":"cron"}'::jsonb
-     );
-     $$
-   );
-   ```
-   The old function ignores the extra header, so this step is safe before
-   the deploy.
-4. Deploy `send-push`, keeping `verify_jwt: true`.
+**Rolled out 2026-10-18, entirely through the Supabase MCP:**
+1. Migration `send_push_cron_secret`:
+   - creates the Vault secret in-database
+     (`encode(gen_random_bytes(32),'hex')`; the value is never printed);
+   - creates `get_send_push_cron_secret()` with `search_path = ''`,
+     revokes it from `PUBLIC`/`anon`/`authenticated`, and grants it to
+     `service_role`;
+   - adds the `x-cron-secret` header to the `send-reminders` job in place
+     with `cron.alter_job` + `replace()`, so its `Authorization` value is
+     untouched.
 
-**Verify after deploying:**
-- [ ] `POST {"mode":"cron"}` with only the anon key returns 401.
-- [ ] `POST {"userId":"<someone else>"}` with only the anon key returns 401.
-- [ ] Settings → "Send test notification" still arrives on your own device.
-- [ ] The next 15-minute cron tick returns 200: check `net._http_response`,
-      or that `reminder_sends` gains rows at a reminder time.
+   It ran before the deploy, because the old function ignores the extra
+   header.
+2. `send-push` deployed as **v9** with `verify_jwt: true`.
+
+**Verified:**
+- [x] `POST {"mode":"cron"}` with only the anon key returns 401.
+- [x] Cron with a wrong `x-cron-secret` returns 401.
+- [x] `POST {"userId":"<someone else>"}` with only the anon key returns 401.
+- [x] `POST {}` with only the anon key returns 401.
+- [x] The privilege check shows `anon` and `authenticated` cannot execute
+      `get_send_push_cron_secret()`, and `service_role` can.
+- [x] The security advisor raises nothing new.
+- [x] The next 15-minute cron tick returns 200 in `net._http_response` (13:30, 14:00 UTC on v9).
+- [x] Settings → "Send test" arrives on a signed-in device: Medium_Phone_API_29
+      emulator, test account flotest@gmail.com, delivered through FCM on
+      `flo.reminders.nudge`, and the function log shows 200.
+
+**Still deployed but removed from the repo:** `ai-interpret` and
+`ai-report-summary` are both still ACTIVE (verify_jwt on), even though the
+code was deleted on 2026-07-22 and 2026-08-10. The MCP can't delete
+functions, so this needs the Dashboard or `supabase functions delete`.
 
 ## Data Model Summary (Final State After All Phases)
 
