@@ -18,6 +18,8 @@
 
 **Moment** — anything that interrupts the user unasked: a full-screen celebration, a modal or a toast. Moments go through one queue that shows one at a time, with at most one full-screen takeover per session.
 
+**Onboarding** — the first-run flow from opener to Home: opener, Google, first expense, reminder ask. A user is *onboarded* once they reach Home; onboarded users never see onboarding again.
+
 **Economy** — the flagged-off reward layer: coins, XP, ranks, trophies, spin wheel, shop, card themes, coin packs.
 
 **Closed test** — Play's required pre-production track: at least 12 testers opted in for 14 consecutive days before production access can be requested.
