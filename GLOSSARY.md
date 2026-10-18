@@ -20,7 +20,9 @@
 
 **Flagged off** — a feature hidden from v1 by a build-time switch: its UI is not shown and it records nothing new, but its code and every row of existing data stay. Not the same as removed.
 
-**Streak** — the run of consecutive days on which the user logged at least one entry. The one game mechanic in v1.
+**Streak** — the run of consecutive days on which the user logged at least one entry or marked a no-spend day. The one game mechanic in v1.
+
+**No-spend day** — a day the user explicitly marks as "nothing spent" with one tap. It counts as a streak day.
 
 **Streak freeze** — protection for a single missed day. Earned automatically (one per 7-day run, at most 2 held) and spent automatically when a day is missed; never bought.
 
