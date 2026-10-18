@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Crown, Check } from 'lucide-react-native';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
@@ -9,13 +9,23 @@ import { PRO_PRICING } from '../lib/pro';
 import useEntitlement from '../hooks/useEntitlement';
 import ProBenefits from '../components/ProBenefits';
 import { useToast } from '../components/Toast';
+import { FLAGS } from '../lib/flags';
 
 const PLAN_ORDER = ['monthly', 'annual', 'lifetime'];
 
 // Doubles as the paywall placeholder (no payment integrated yet — see
 // 14-subscription-pro.md). Reached from the menu's "Upgrade to Pro" row and
 // from ProUpsellSheet's "Level up" button.
-export default function Pro() {
+//
+// While billing is flagged off (lib/flags.js) the route itself is closed:
+// every entry point is already hidden, and a stray deep link lands on Home
+// instead of a price list.
+export default function ProRoute() {
+  if (!FLAGS.billing) return <Redirect href="/" />;
+  return <Pro />;
+}
+
+function Pro() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();

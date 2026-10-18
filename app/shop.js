@@ -16,6 +16,7 @@ import useRewards from '../hooks/useRewards';
 import { CARD_THEMES, TIERS, LOCKED_TIERS, TIER_LABELS, getTheme } from '../lib/cardThemes';
 import { FREEZE_COST, freezeCapForRank, rankFromXp } from '../lib/rewards';
 import { COIN_PACKS } from '../lib/coins';
+import { FLAGS } from '../lib/flags';
 import { buyTheme, equipTheme } from '../lib/cardThemeMutations';
 import { buyFreeze } from '../lib/rewardsMutations';
 import { lighten } from '../lib/color';
@@ -263,25 +264,31 @@ export default function Shop() {
         // Coin-pack Buy is stubbed to a toast (no payments yet); the freeze is
         // a real coin spend and works normally.
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.generalScroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.generalSectionTitle}>Coin Packs</Text>
-          <View style={styles.packGrid}>
-            {COIN_PACKS.map((pack) => (
-              <Pressable key={pack.id} style={styles.packCard} onPress={() => handleBuyCoins(pack)}>
-                {pack.popular && (
-                  <View style={styles.packBadge}>
-                    <Text style={styles.packBadgeText}>Popular</Text>
-                  </View>
-                )}
-                <Image source={COIN_PACK_ART[pack.coins]} style={styles.packImage} resizeMode="contain" />
-                <Text style={styles.packCoinsLine}>{pack.coins.toLocaleString('en-IN')} coins</Text>
-                <View style={styles.packBuyBtn}>
-                  <Text style={styles.packBuyText}>{pack.price}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
+          {/* Coin packs are real-money purchases — hidden while billing is
+              flagged off (lib/flags.js), so coins stay earn-only. */}
+          {FLAGS.billing && (
+            <>
+              <Text style={styles.generalSectionTitle}>Coin Packs</Text>
+              <View style={styles.packGrid}>
+                {COIN_PACKS.map((pack) => (
+                  <Pressable key={pack.id} style={styles.packCard} onPress={() => handleBuyCoins(pack)}>
+                    {pack.popular && (
+                      <View style={styles.packBadge}>
+                        <Text style={styles.packBadgeText}>Popular</Text>
+                      </View>
+                    )}
+                    <Image source={COIN_PACK_ART[pack.coins]} style={styles.packImage} resizeMode="contain" />
+                    <Text style={styles.packCoinsLine}>{pack.coins.toLocaleString('en-IN')} coins</Text>
+                    <View style={styles.packBuyBtn}>
+                      <Text style={styles.packBuyText}>{pack.price}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
 
-          <Text style={[styles.generalSectionTitle, styles.generalSectionTitleSpaced]}>Streak Freeze</Text>
+          <Text style={[styles.generalSectionTitle, FLAGS.billing && styles.generalSectionTitleSpaced]}>Streak Freeze</Text>
           <View style={styles.freezeCard}>
             <Image source={KOBAN_FREEZE} style={styles.freezeIcon} resizeMode="contain" />
             <View style={styles.freezeTextWrap}>

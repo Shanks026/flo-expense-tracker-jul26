@@ -23,6 +23,7 @@ import {
 } from '../lib/rewards';
 import { getTheme } from '../lib/cardThemes';
 import { useDataRefresh } from '../lib/DataRefreshContext';
+import { FLAGS } from '../lib/flags';
 
 // Every source this ledger will ever record, across every phase of
 // 18-gamification-ritual-and-ledger.md — not just the ones Phase 2 earns yet.
@@ -215,9 +216,12 @@ const RewardsHistorySheet = forwardRef(function RewardsHistorySheet(_props, ref)
         <Text style={styles.explainerText}>
           Coins buy card themes in the Shop — Common through Legendary.
         </Text>
-        <Pressable style={styles.buyButton} onPress={handleBuyCoinsPress}>
-          <Text style={styles.buyButtonText}>Buy coins</Text>
-        </Pressable>
+        {/* Hidden while billing is flagged off — coins are earn-only. */}
+        {FLAGS.billing && (
+          <Pressable style={styles.buyButton} onPress={handleBuyCoinsPress}>
+            <Text style={styles.buyButtonText}>Buy coins</Text>
+          </Pressable>
+        )}
 
         {/* Freeze */}
         <View style={[styles.sectionHeaderRow, styles.sectionSpacing]}>
