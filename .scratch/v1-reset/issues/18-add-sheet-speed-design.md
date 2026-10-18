@@ -3,7 +3,7 @@
 Map: [../map.md](../map.md)
 Type: grilling
 Labels: wayfinder:grilling
-Status: open
+Status: resolved
 Blocked by: 
 
 ## Question
@@ -20,3 +20,43 @@ Grill:
 - **After Save:** what happens next. The streak moment and the "Nice one" Koban go through the moment queue from [02](02-gamification-scope.md).
 
 Refs: audit §1 P0 "Make logging take 3 taps", §5 P0 "Speed up the Add sheet".
+
+## Answer
+
+Grilled with the user on 2026-10-18.
+
+**1. Default category:**
+1. On a share-import, the **merchant memory** from [09](09-share-import-v1-scope.md) wins.
+2. Otherwise, the most-used category **at this time of day** over the last 30 days.
+3. Otherwise, the most-used category overall.
+4. For a brand-new user, **Food**.
+
+**2. Category grid:**
+- a **4×2 grid of the top 8**, directly under the amount, ordered by frequency;
+- a **"More"** tile opens the full list;
+- new users start with Food, Groceries, Transport, Shopping, Bills, Health, Fun and Other;
+- onboarding's first expense uses the same grid.
+
+**3. Entering and saving:**
+- the amount is focused as soon as the sheet opens, on a **decimal keypad**;
+- **Save is pinned above the keyboard** and enabled once the amount is above 0;
+- the target is **+ → digits → Save = 3 taps** when the default is right;
+- no "Save & add another" in v1.
+
+**4. Layout:**
+- a 2-way **Expense | Income** toggle, with Expense as the default;
+- one collapsed **Details** row holding:
+  - the date: **Today** and **Yesterday** chips plus a picker;
+  - a note or merchant;
+  - the account (only with 2+ accounts);
+  - a split (only once a split exists).
+
+Plans are gone, and Transfer is no longer on the toggle ([07](07-v1-scope-plans-splits-currency.md)).
+
+**5. After Save:**
+- the sheet closes with a light haptic;
+- a toast reads **"Logged ₹X · Food"** with **Undo** (5 s);
+- then the moment queue ([02](02-gamification-scope.md)) may show the streak moment or the "Nice one" Koban;
+- no reward burst, and budget warnings go to the bell ([05](05-home-ia-and-tabs.md)).
+
+**6. Measurement:** `seconds_to_save` (sheet open → Save) is a property on `expense_logged` ([17](17-analytics-event-plan-and-consent.md)). Timing only. The target is a median under 5 s.
