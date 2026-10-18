@@ -29,6 +29,7 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Safe closed-test build: what goes in the first AAB](issues/01-safe-closed-test-build.md): today's master plus a safety list (auto-detect out, prices and Buy hidden, gates lifted, forgot-password hidden, tour skipped, dev rows hidden, build-config fixes, an error boundary, the new package id); needs tasks 14 and 15 and the P0 track first; no analytics.
 - [Post-launch backlog boundary](issues/20-post-launch-backlog-boundary.md): 9 candidates recorded with triggers (EAS Update, skin Store, widget, anonymous-first, split invites, Goals, global, SDK 57+, iOS); the user picks what to act on, and whether any come before launch, after the v1 reset is built.
 - [Add sheet speed design (3-tap logging)](issues/18-add-sheet-speed-design.md): time-of-day default category (merchant memory first); a top-8 4×2 grid plus More; decimal keypad with Save pinned; Expense|Income toggle plus a collapsed Details row; Undo toast after Save; `seconds_to_save` measured.
 - [Analytics event plan and consent placement](issues/17-analytics-event-plan-and-consent.md): opt-in switch on the opener (events queued until sign-in); activation is the first expense within 24h; D1/D7/D30 and weekly active loggers; 15 content-free events; SQL views read in the Supabase dashboard; 13-month retention.
@@ -50,7 +51,6 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 ## Not yet specified
 
 - **Play Console content:** the Data safety answers, the demo account for reviewers, the financial-features declaration label, content rating. Waits on [Privacy policy + account-deletion pages](issues/15-privacy-and-deletion-pages.md).
-- **Closed-test recruitment and run:** how to find 15–20 testers, the Google Group, what testers are asked to do, and the fix-build cadence. Waits on [Safe closed-test build](issues/01-safe-closed-test-build.md).
 
 ## Out of scope
 
