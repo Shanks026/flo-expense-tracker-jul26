@@ -26,12 +26,13 @@
       "googleServicesFile": "./google-services.json",
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ],
-      "versionCode": 2,
-      "androidNavigationBar": {
-        "enforceContrast": false
-      }
+      "versionCode": 2
+    },
+    "androidNavigationBar": {
+      "enforceContrast": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
