@@ -11,6 +11,16 @@ Tickets and wayfinder maps for this repo live as markdown files in `.scratch/`.
 - That file satisfies the flo-feature rule (planning doc before feature code).
 - When a skill says "read the spec", read the `.claude/features/` file the
   ticket links to.
+- `/to-tickets` also writes `.scratch/<feature-slug>/spec.md` as a **pointer
+  stub** only, so the tracer board (below) finds the feature and its title:
+
+  ```markdown
+  # <spec title, same as the .claude/features doc's heading>
+
+  Spec: .claude/features/NN-<slug>.md
+  ```
+
+  Never put spec content in the stub; the `.claude/features/` doc is the spec.
 
 ## Conventions
 
@@ -18,6 +28,35 @@ Tickets and wayfinder maps for this repo live as markdown files in `.scratch/`.
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file. Each ticket links its spec (`Spec: .claude/features/NN-<slug>.md`) near the top.
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- Every implementation ticket ends with a `## Tracer` section (see below). Wayfinder tickets (with a `Type:` line) do not get one.
+
+## Tracer board
+
+The `tracer` mod (installed user-wide from `thmp-pnpm/mods/tracer`; `/tracer`
+opens the pane) tracks each feature's tickets as dependency waves. It reads
+`.scratch/<feature-slug>/spec.md` + `issues/*.md` (`Blocked by:` / `Status:`
+lines) and skips folders that hold only a wayfinder `map.md`. End every
+implementation ticket with:
+
+```markdown
+## Tracer
+
+- [ ] Code implementation
+- [ ] Verified (emulator check)
+- [ ] Green signal
+```
+
+**FLO override of the mod's built-in rule:** the mod says Verified means
+"`pnpm lint` and `pnpm build` pass and the screens check out in the browser".
+FLO has no lint, build or test script and no web target. Here, tick
+`Verified` only when the app has been rebuilt (`npx expo run:android`, or a
+`lite-preview` build) and the changed screens/flows check out on the
+**Medium_Phone_API_29** emulator with the `flotest@gmail.com` account; for a
+Supabase-only change, when the migration's effect is verified via the
+Supabase MCP. Everything else in the mod's rules stands: start only tickets
+whose blockers have their green signal, tick `Code implementation` when the
+code is written, never tick `Green signal` or set `Status: resolved` yourself
+— the person does that in the Tracer pane.
 
 ## When a skill says "publish to the issue tracker"
 

@@ -129,6 +129,8 @@ Local markdown: tickets and wayfinder maps live under `.scratch/<effort>/`; spec
 
 Specs produced by `/to-spec` are written as `.claude/features/NN-<slug>.md` in the flo-feature template; the flo-feature rule (planning doc before feature code) is satisfied by that file.
 
+Each implementation ticket ends with a `## Tracer` checklist for the user-wide `tracer` mod (`/tracer` pane); in FLO, "Verified" means an emulator check, not lint/build. See the "Tracer board" section of `docs/agents/issue-tracker.md`.
+
 ### Triage labels
 
 Default five roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as `Status:` lines. See `docs/agents/triage-labels.md`.
