@@ -29,6 +29,7 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Gamification scope: streak-only vs keep some economy](issues/02-gamification-scope.md): streak only, with auto-earned and auto-spent freezes (max 2) and milestones at 7/30/100/365; the economy is flagged off at build time in both builds, with no data touched; one moment queue (1 takeover per session).
 - [Analytics: PostHog vs a Supabase events table under DPDP](issues/10-analytics-posthog-vs-events-table.md): first-party Supabase `events` table (user direction, no PostHog); opt-in, no amounts or merchants, behind a `lib/analytics.js` wrapper.
 - [Supabase anonymous auth and Google identity linking](issues/11-anonymous-auth-google-linking.md): feasible, same user id; native Google ID token → `linkIdentity`; PKCE via expo-crypto polyfill; no merge if the Google account already exists.
 - [Custom SMTP options for forgot-password](issues/12-custom-smtp-forgot-password.md): Resend on a cheap registered domain; reset by a 6-digit OTP code typed in-app, no deep link.

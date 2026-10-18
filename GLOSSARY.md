@@ -8,4 +8,16 @@
 
 **Safe closed-test build** — the first lite build fit to start Play's closed test: auto-detect excluded and no price or Buy button shown. It need not contain the v1 reset; the reset reaches testers as later builds during the test.
 
+**Flagged off** — a feature hidden from v1 by a build-time switch: its UI is not shown and it records nothing new, but its code and every row of existing data stay. Not the same as removed.
+
+**Streak** — the run of consecutive days on which the user logged at least one entry. The one game mechanic in v1.
+
+**Streak freeze** — protection for a single missed day. Earned automatically (one per 7-day run, at most 2 held) and spent automatically when a day is missed; never bought.
+
+**Milestone** — a streak length worth a celebration: day 7, 30, 100 and 365. Day 1 ("streak started") is a celebration but not a milestone.
+
+**Moment** — anything that interrupts the user unasked: a full-screen celebration, a modal or a toast. Moments go through one queue that shows one at a time, with at most one full-screen takeover per session.
+
+**Economy** — the flagged-off reward layer: coins, XP, ranks, trophies, spin wheel, shop, card themes, coin packs.
+
 **Closed test** — Play's required pre-production track: at least 12 testers opted in for 14 consecutive days before production access can be requested.
