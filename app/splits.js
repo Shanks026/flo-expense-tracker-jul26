@@ -32,7 +32,7 @@ export default function Splits() {
   const router = useRouter();
   const { openSplits, closedSplits, loading } = useSplits();
   const { openAddSplit } = useAddSplitSheet();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const currency = useCurrency();
 
@@ -42,7 +42,7 @@ export default function Splits() {
   // caps concurrency rather than usage. Same count-then-gate shape as
   // plans.js's own handleNewPlan.
   async function handleNewSplit() {
-    if (!isPro) {
+    if (!hasPro) {
       const { count } = await supabase
         .from('splits')
         .select('id', { count: 'exact', head: true })

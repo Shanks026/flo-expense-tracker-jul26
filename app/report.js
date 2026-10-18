@@ -66,7 +66,7 @@ export default function Report() {
   const { accounts, activeAccountId } = useAccount();
   const { showToast } = useToast();
   const { openAdd } = useAddTransactionSheet();
-  const { isPro, loading: entitlementLoading } = useEntitlement();
+  const { hasPro, loading: entitlementLoading } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const userId = session?.user?.id ?? null;
 
@@ -82,16 +82,16 @@ export default function Report() {
   // snap a free user's scope back to their active account whenever it drifts
   // (a downgrade with an "All"/other-account scope still selected, or the
   // active account itself changing elsewhere). Gated on entitlementLoading so
-  // this never fires against isPro's default-false value before the real
+  // this never fires against hasPro's default-false value before the real
   // entitlement is known, which would otherwise clip a genuine Pro user's
   // "All" scope for a frame on every mount.
   useEffect(() => {
-    if (entitlementLoading || isPro || !activeAccountId) return;
+    if (entitlementLoading || hasPro || !activeAccountId) return;
     if (accountFilter !== activeAccountId) setAccountFilter(activeAccountId);
-  }, [entitlementLoading, isPro, activeAccountId, accountFilter]);
+  }, [entitlementLoading, hasPro, activeAccountId, accountFilter]);
 
   function handleAccountFilterSelect(id) {
-    if (!isPro && id !== activeAccountId) {
+    if (!hasPro && id !== activeAccountId) {
       openProUpsell('Full reports are a Pro feature');
       return;
     }
@@ -194,7 +194,7 @@ export default function Report() {
   // every account's transactions for the period, a specific tab exports just
   // that account's, matching what the report is actually showing.
   async function handleExport() {
-    if (!isPro) {
+    if (!hasPro) {
       openProUpsell('Full reports are a Pro feature');
       return;
     }
@@ -255,7 +255,7 @@ export default function Report() {
           ) : (
             <Download size={18} color={colors.ink} strokeWidth={2.2} />
           )}
-          {!isPro && <ProBadge variant="overlay" size={16} />}
+          {!hasPro && <ProBadge variant="overlay" size={16} />}
         </Pressable>
       </View>
 
@@ -283,12 +283,12 @@ export default function Report() {
             style={styles.accountTabsScroll}
           >
             <Pressable style={styles.accountTab} onPress={() => handleAccountFilterSelect('all')}>
-              {!isPro && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
+              {!hasPro && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
               <Pill label="All" tone={accountFilter === 'all' ? 'dark' : 'neutral'} />
             </Pressable>
             {accounts.map((a) => (
               <Pressable key={a.id} style={styles.accountTab} onPress={() => handleAccountFilterSelect(a.id)}>
-                {!isPro && a.id !== activeAccountId && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
+                {!hasPro && a.id !== activeAccountId && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
                 <Pill label={a.name} tone={accountFilter === a.id ? 'dark' : 'neutral'} />
               </Pressable>
             ))}

@@ -102,7 +102,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
   const { summaries } = useAllAccountSummaries();
   const { openAddAccount } = useAddAccountSheet();
   const { showToast } = useToast();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
 
   const orderedAccounts = useMemo(() => {
@@ -131,7 +131,7 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
 
   function handleNewAccount() {
     modalRef.current?.dismiss();
-    if (!isPro && accounts.length >= FREE_LIMITS.accounts) {
+    if (!hasPro && accounts.length >= FREE_LIMITS.accounts) {
       openProUpsell('Free includes 1 account');
       return;
     }

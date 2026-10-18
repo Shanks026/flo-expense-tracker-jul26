@@ -76,7 +76,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const currency = useCurrency();
   const { showToast } = useToast();
   const { expenseCategories } = useCategories();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const [editingId, setEditingId] = useState(null);
   const [amount, setAmount] = useState('');
@@ -165,7 +165,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   // already-custom period (editing an existing custom budget, e.g. after a
   // downgrade) is a no-op, not a new gate, per the create-time-only rule.
   function handleSelectPeriod(value) {
-    if (value === 'custom' && !isPro && periodType !== 'custom') {
+    if (value === 'custom' && !hasPro && periodType !== 'custom') {
       openProUpsell('Custom periods are a Pro feature');
       return;
     }
@@ -230,7 +230,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
               style={[styles.segment, periodType === value && styles.segmentActive]}
               onPress={() => handleSelectPeriod(value)}
             >
-              {value === 'custom' && !isPro && (
+              {value === 'custom' && !hasPro && (
                 <Crown size={11} color={colors.mutedMid} strokeWidth={2.4} style={styles.segmentCrown} />
               )}
               <Text style={[styles.segmentText, periodType === value && styles.segmentTextActive]}>{label}</Text>

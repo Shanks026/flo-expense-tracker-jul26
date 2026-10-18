@@ -39,12 +39,12 @@ export default function Plans() {
   const { plans, loading } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
   const { openAddPlan } = useAddPlanSheet();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const currency = useCurrency();
 
   async function handleNewPlan() {
-    if (!isPro) {
+    if (!hasPro) {
       const { count } = await supabase.from('plans').select('id', { count: 'exact', head: true });
       if ((count ?? 0) >= FREE_LIMITS.plans) {
         openProUpsell('Free includes 1 plan');

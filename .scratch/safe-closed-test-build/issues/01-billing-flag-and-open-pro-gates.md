@@ -15,6 +15,6 @@ Spec: .claude/features/32-safe-closed-test-build.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal

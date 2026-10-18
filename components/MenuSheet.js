@@ -51,7 +51,7 @@ const ITEMS = [
   // Both Trophies (2026-07-21) and Shop (2026-07-26) moved OUT of this sheet
   // into dedicated Home header buttons (beside the bell). The menu is now
   // just navigation rows + the optional Upgrade card, so it also got shorter
-  // — see the isPro-conditional snapPoints below.
+  // — see the hasPro-conditional snapPoints below.
   { key: 'settings', label: 'Settings', route: '/settings', icon: Settings },
 ];
 
@@ -63,7 +63,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
   const handleSheetChange = useSheetBackHandler(modalRef);
   const router = useRouter();
   const { signOut } = useAuth();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
 
   useImperativeHandle(ref, () => ({
     open() {
@@ -112,7 +112,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
       // freely — no other line needs to change alongside it. (Picked without
       // an on-device measure here; adjust if either sits too tall/short.)
       // Both values bumped ~4% (2026-08-26) for the sixth row, Splits.
-      snapPoints={useMemo(() => (isPro ? ['70%'] : ['82%']), [isPro])}
+      snapPoints={useMemo(() => (hasPro ? ['70%'] : ['82%']), [hasPro])}
       // ▲▲▲ first = Pro (shorter), second = non-Pro (taller, fits Upgrade card)
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}
@@ -144,7 +144,7 @@ const MenuSheet = forwardRef(function MenuSheet(_props, ref) {
           </Pressable>
         </View>
 
-        {!isPro && (
+        {!hasPro && (
           <Pressable style={styles.upgradeCard} onPress={() => handlePress('/pro')}>
             <View style={styles.upgradeIconTile}>
               <Crown size={20} color={colors.brandText} strokeWidth={2.2} fill={colors.brandText} />

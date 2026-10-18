@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
+import { FLAGS } from '../lib/flags';
 
 // The client's Pro truth. A missing entitlements row reads as Free — this is
 // deliberate (see 14-subscription-pro.md §Data model), not an error state.
@@ -29,5 +30,8 @@ export default function useEntitlement() {
     refetch();
   }, [refetch, version]);
 
-  return { isPro, loading };
+  // `hasPro` is what gates read: with billing flagged off (lib/flags.js) there
+  // is nothing to buy, so every gate passes. `isPro` stays the real
+  // entitlement, for surfaces that show actual Pro status.
+  return { isPro, hasPro: isPro || !FLAGS.billing, loading };
 }

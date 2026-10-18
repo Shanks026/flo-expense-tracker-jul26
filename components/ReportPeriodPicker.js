@@ -21,7 +21,7 @@ import { useProUpsellSheet } from './ProUpsellSheet';
 export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const [customOpen, setCustomOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -39,7 +39,7 @@ export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
   }
 
   function handleCustomToggle() {
-    if (!isPro) {
+    if (!hasPro) {
       handleClose();
       openProUpsell('Full reports are a Pro feature');
       return;
@@ -87,7 +87,7 @@ export default function ReportPeriodPicker({ open, value, onClose, onChange }) {
 
           <Pressable style={[styles.optionRow, styles.customToggleRow]} onPress={handleCustomToggle}>
             <View style={styles.customToggleLeft}>
-              {!isPro && <Crown size={13} color={colors.mutedDarker} strokeWidth={2.4} />}
+              {!hasPro && <Crown size={13} color={colors.mutedDarker} strokeWidth={2.4} />}
               <Text style={[styles.optionText, isCustomActive && styles.optionTextActive]}>Custom range</Text>
             </View>
             {isCustomActive && <Check size={18} color={colors.income} strokeWidth={2.8} />}

@@ -107,7 +107,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // Only OPEN splits are offered — a closed split is frozen by definition
   // (31-split-expenses.md Decision 7), so adding to it would be a surprise.
   const { openSplits } = useSplits();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const { openAddAccount } = useAddAccountSheet();
 
@@ -276,7 +276,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     setCategoryId(list[0]?.id ?? null);
   }
 
-  // Transfer's empty state (< 2 accounts) — same isPro gate shape as
+  // Transfer's empty state (< 2 accounts) — same hasPro gate shape as
   // handleScanReceipt used to have (13-ai-features.md, removed 2026-07-22):
   // free users hit the upsell, Pro users go straight to Add Account.
   // Dismisses this sheet first, same as the existing "Adding to <account>"
@@ -284,7 +284,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // trip to another sheet, not a stack of two.
   function handleAddAccountForTransfer() {
     modalRef.current?.dismiss();
-    if (!isPro) {
+    if (!hasPro) {
       openProUpsell('Multiple accounts is a Pro feature');
       return;
     }
@@ -636,7 +636,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           ) : (
             // < 2 accounts — a transfer is structurally impossible, so instead
             // of showing From/To fields with nothing to pick, prompt for the
-            // one thing that actually unblocks it. isPro gates WHICH sheet:
+            // one thing that actually unblocks it. hasPro gates WHICH sheet:
             // free → upsell (a 2nd account is a Pro feature, FREE_LIMITS.accounts
             // = 1), Pro → straight to Add Account.
             <View style={styles.transferEmptyCard}>
@@ -646,11 +646,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               <Text style={styles.transferEmptyTitle}>Add a second account</Text>
               <Text style={styles.transferEmptyBody}>
                 Transfers move money between two of your own accounts.{' '}
-                {isPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}
+                {hasPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}
               </Text>
               <Pressable style={styles.transferEmptyButton} onPress={handleAddAccountForTransfer}>
-                {!isPro && <Crown size={15} color={colors.ink} strokeWidth={2.4} />}
-                <Text style={styles.transferEmptyButtonText}>{isPro ? 'Add an account' : 'Upgrade to Pro'}</Text>
+                {!hasPro && <Crown size={15} color={colors.ink} strokeWidth={2.4} />}
+                <Text style={styles.transferEmptyButtonText}>{hasPro ? 'Add an account' : 'Upgrade to Pro'}</Text>
               </Pressable>
             </View>
           )

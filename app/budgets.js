@@ -43,12 +43,12 @@ export default function Budgets() {
   const router = useRouter();
   const { budgets, loading } = useBudgets();
   const { openAddBudget } = useAddBudgetSheet();
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const currency = useCurrency();
 
   async function handleNewBudget() {
-    if (!isPro) {
+    if (!hasPro) {
       const { count } = await supabase.from('budgets').select('id', { count: 'exact', head: true });
       if ((count ?? 0) >= FREE_LIMITS.budgets) {
         openProUpsell('Free includes 2 budgets');

@@ -113,7 +113,7 @@ export default function AccountHeroCarousel({
   const incomeIconColor = lighten(accentSource, 0.65);
   const expenseIconColor = incomeIconColor;
   const styles = makeStyles(colors);
-  const { isPro } = useEntitlement();
+  const { hasPro } = useEntitlement();
   const { openAddAccount } = useAddAccountSheet();
   const { openProUpsell } = useProUpsellSheet();
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -154,7 +154,7 @@ export default function AccountHeroCarousel({
   }
 
   function handleAddAccountPress() {
-    if (!isPro && accounts.length >= FREE_LIMITS.accounts) {
+    if (!hasPro && accounts.length >= FREE_LIMITS.accounts) {
       openProUpsell('Free includes 1 account');
     } else {
       openAddAccount();
