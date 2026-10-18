@@ -8,6 +8,8 @@
 
 **Safe closed-test build** — the first lite build fit to start Play's closed test: auto-detect excluded and no price or Buy button shown. It need not contain the v1 reset; the reset reaches testers as later builds during the test.
 
+**Koban** — FLO's mascot: a curious, helpful ginger tabby cat who stands on two legs.
+
 **Flagged off** — a feature hidden from v1 by a build-time switch: its UI is not shown and it records nothing new, but its code and every row of existing data stay. Not the same as removed.
 
 **Streak** — the run of consecutive days on which the user logged at least one entry. The one game mechanic in v1.

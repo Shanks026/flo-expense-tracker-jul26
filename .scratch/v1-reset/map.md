@@ -29,6 +29,7 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Mascot: rough vector cat prototype](issues/16-mascot-vector-prototype.md): ginger tabby, flat 2D, standing two-legged, with tube limbs merged into a pear body; approved face and expression set; a movement library plus prop poses; code-based (react-native-svg + Reanimated). Outline or editorial treatment is left to ticket 04.
 - [Onboarding target flow: 4-screen Google-first, anonymous-first?](issues/03-onboarding-target-flow.md): Google-first (email under Other options); opener → Google → first expense in the real Add sheet (skippable) → reminder ask → Home; tour becomes coach marks; cut screens deleted; anonymous-first goes post-launch.
 - [Gamification scope: streak-only vs keep some economy](issues/02-gamification-scope.md): streak only, with auto-earned and auto-spent freezes (max 2) and milestones at 7/30/100/365; the economy is flagged off at build time in both builds, with no data touched; one moment queue (1 takeover per session).
 - [Analytics: PostHog vs a Supabase events table under DPDP](issues/10-analytics-posthog-vs-events-table.md): first-party Supabase `events` table (user direction, no PostHog); opt-in, no amounts or merchants, behind a `lib/analytics.js` wrapper.
