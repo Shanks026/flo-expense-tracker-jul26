@@ -733,6 +733,68 @@ positive. Deployed as `send-push` v5.
 
 ---
 
+## Security hardening — caller auth (2026-10-18)
+
+**The gap.** `verify_jwt: true` was treated as auth, but the anon key is a
+validly-signed project JWT and ships in the app bundle (Phase 2's "Vault
+avoided entirely" note relies on exactly that for pg_cron). So anyone
+holding the anon key could:
+- call `{ "userId": "<any uuid>" }` to push the test notification to another
+  user's devices, and learn whether that user has push tokens;
+- call `{ "mode": "cron" }` to start a full cron run at will. That run is
+  idempotent via `reminder_sends`, so no double-sends, only load and Expo
+  quota.
+
+**The fix, in `supabase/functions/send-push/index.ts`:**
+- **Test path.** The user now comes from the caller's access token
+  (`getCallerId` → `auth.getUser()` with the request's `Authorization`
+  header). `body.userId` is ignored and a bare anon-key bearer gets 401.
+  `lib/pushToken.js`'s `sendTestPush` needs no change, because
+  `functions.invoke` already attaches the signed-in user's token.
+- **Cron path.** It now requires an `x-cron-secret` header equal to the
+  `CRON_SECRET` function secret (constant-time compare). If `CRON_SECRET` is
+  unset it fails closed with 401.
+
+**Rollout. Run these in this order, so reminders never stop:**
+1. Create the shared secret in Vault (SQL editor):
+   ```sql
+   SELECT vault.create_secret(encode(gen_random_bytes(32), 'hex'), 'send_push_cron_secret');
+   SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'send_push_cron_secret';
+   ```
+2. Set that value as the function secret `CRON_SECRET` (Dashboard → Edge
+   Functions → Secrets, or `supabase secrets set CRON_SECRET=...`).
+3. Reschedule the cron job with the extra header. Keep its current
+   `Authorization` value: read it first with
+   `SELECT jobid, command FROM cron.job WHERE jobname = 'send-reminders';`
+   ```sql
+   SELECT cron.unschedule('send-reminders');
+   SELECT cron.schedule(
+     'send-reminders',
+     '*/15 * * * *',
+     $$
+     SELECT net.http_post(
+       url := 'https://uergtlcfpwajztqgncim.supabase.co/functions/v1/send-push',
+       headers := jsonb_build_object(
+         'Authorization', 'Bearer <anon key, unchanged from the current job>',
+         'Content-Type', 'application/json',
+         'x-cron-secret', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'send_push_cron_secret')
+       ),
+       body := '{"mode":"cron"}'::jsonb
+     );
+     $$
+   );
+   ```
+   The old function ignores the extra header, so this step is safe before
+   the deploy.
+4. Deploy `send-push`, keeping `verify_jwt: true`.
+
+**Verify after deploying:**
+- [ ] `POST {"mode":"cron"}` with only the anon key returns 401.
+- [ ] `POST {"userId":"<someone else>"}` with only the anon key returns 401.
+- [ ] Settings → "Send test notification" still arrives on your own device.
+- [ ] The next 15-minute cron tick returns 200: check `net._http_response`,
+      or that `reminder_sends` gains rows at a reminder time.
+
 ## Data Model Summary (Final State After All Phases)
 
 ```

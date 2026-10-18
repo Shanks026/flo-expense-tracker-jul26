@@ -17,8 +17,11 @@
 //                              - report_ready (Phase 3) — whoever's report
 //                                cadence (weekly/monthly) is due today, at
 //                                their configured time.
-//   { "userId": "<uuid>" } — Phase 1's manual single-user test-send, kept
-//                            for continued debugging.
+//                            Requires the x-cron-secret header to match the
+//                            CRON_SECRET function secret.
+//   { }                    — Phase 1's manual test-send, kept for continued
+//                            debugging. Sends only to the caller's own
+//                            devices, resolved from their access token.
 //
 // Uses the service-role key (auto-injected as SUPABASE_SERVICE_ROLE_KEY by
 // the Edge Functions runtime — never set this as a secret manually) so it
@@ -357,6 +360,34 @@ async function sendReportReady(supabase: ReturnType<typeof createClient>) {
   return sent;
 }
 
+// Constant-time string compare for the cron secret, so the check can't be
+// probed a character at a time via response timing.
+function safeEqual(a: string, b: string) {
+  const enc = new TextEncoder();
+  const x = enc.encode(a);
+  const y = enc.encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+// Resolves the signed-in user behind the request's Authorization header.
+// A bare anon-key bearer has no user, so getUser() fails and this returns
+// null — which is exactly the caller the test-send path must reject.
+async function getCallerId(req: Request) {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) return null;
+  const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+  const { data, error } = await userClient.auth.getUser();
+  if (error || !data?.user) return null;
+  return data.user.id;
+}
+
 async function runCron(supabase: ReturnType<typeof createClient>) {
   const [nudges, bills, reports] = await Promise.all([
     sendNudges(supabase),
@@ -380,14 +411,25 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+  // verify_jwt alone is not auth here: the anon key is a validly-signed
+  // project JWT and ships in the app bundle, so anyone holding it got past
+  // the gateway. The cron path now needs a shared secret only pg_cron knows
+  // (vault secret → x-cron-secret header), and fails closed if the function
+  // secret isn't set.
   if (body?.mode === 'cron') {
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    if (!cronSecret || !safeEqual(req.headers.get('x-cron-secret') ?? '', cronSecret)) {
+      return json({ error: 'unauthorized' }, 401);
+    }
     const result = await runCron(supabase);
     return json(result);
   }
 
-  // Phase 1's manual test-send path.
-  const userId = body?.userId as string | undefined;
-  if (!userId) return json({ error: 'userId_or_cron_mode_required' }, 400);
+  // Phase 1's manual test-send path — only ever to the caller's own devices.
+  // The user comes from the caller's access token, never the request body
+  // (body.userId is still sent by lib/pushToken.js and is ignored).
+  const userId = await getCallerId(req);
+  if (!userId) return json({ error: 'unauthorized' }, 401);
 
   const { data: tokens, error } = await supabase.from('push_tokens').select('token').eq('user_id', userId);
   if (error) {
