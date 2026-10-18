@@ -55,14 +55,19 @@ export default function Splits() {
     openAddSplit();
   }
 
-  function positionLabel(myNet) {
+  // Leads with what you PAY, exactly like the detail hero — the actionable
+  // number, and the only way the list and the detail can't show two different
+  // figures for one split. A net is deliberately NOT the headline here: you may
+  // not owe that figure to anyone (you might owe one person more while two
+  // others owe you back), which is what made "You owe ₹1,333.60" misleading.
+  function positionLabel({ myPays, myNet }) {
+    if (myPays > 0) return { text: `You pay ${formatMoney(myPays, currency)}`, color: colors.danger };
     if (myNet > 0) return { text: `You're owed ${formatMoney(myNet, currency)}`, color: colors.income };
-    if (myNet < 0) return { text: `You owe ${formatMoney(Math.abs(myNet), currency)}`, color: colors.danger };
     return { text: 'Settled up', color: colors.mutedMid };
   }
 
   function renderSplit(split, { closed }) {
-    const position = positionLabel(split.myNet);
+    const position = positionLabel(split);
     // A split with no entries is not "settled up" — there's nothing to settle.
     // Saying so in the big position type was actively misleading on a split
     // that had just been created.

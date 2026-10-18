@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useAuth } from '../lib/AuthContext';
+import useLoadedFor from './useLoadedFor';
 import { SPLIT_SELECT, normalizeSplit } from '../lib/splitShape';
-import { computeBalances } from '../lib/splitMath';
+import { computeBalances, computeDirectDebts, groupDebtsByDebtor } from '../lib/splitMath';
 
 // The Splits list, account-scoped (Decision 10: a settlement transaction has to
 // land in an account, so the split should already know which one).
@@ -22,16 +23,21 @@ import { computeBalances } from '../lib/splitMath';
 // exposing total + my_net, and the list should stop hydrating entries at all.
 export default function useSplits() {
   const { version } = useDataRefresh();
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, loading: accountsLoading } = useAccount();
   const { session } = useAuth();
   const myUserId = session?.user?.id ?? null;
   const [splits, setSplits] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Same reasoning as useSplit's: a plain boolean never goes back to true when
+  // the account CHANGES, so this reported "loaded" while still holding the
+  // previous account's splits. Cosmetic here rather than harmful, but it also
+  // feeds AddTransactionSheet's split picker, where a stale list would offer a
+  // split from an account you're no longer in.
+  const [loading, markLoaded] = useLoadedFor(activeAccountId, accountsLoading);
 
   const refetch = useCallback(async () => {
     if (!activeAccountId) {
       setSplits([]);
-      setLoading(false);
+      markLoaded(null);
       return;
     }
 
@@ -60,6 +66,11 @@ export default function useSplits() {
           const balances = computeBalances({ members, entries, settlements });
           const self = members.find((m) => m.isSelf);
           const total = entries.reduce((acc, e) => acc + e.amount, 0);
+          // The list leads with the same figure the detail hero does — what you
+          // actually pay — so the two can't show different numbers for one
+          // split. Cheap: the entries and shares are already hydrated here.
+          const { debts } = computeDirectDebts({ members, entries, settlements });
+          const myGroup = groupDebtsByDebtor({ members, debts }).find((g) => g.isSelf) ?? null;
           return {
             ...split,
             memberCount: members.length,
@@ -71,12 +82,15 @@ export default function useSplits() {
             myNet: self
               ? Math.round((balances.find((b) => b.memberId === self.id)?.net ?? 0) * 100) / 100
               : 0,
+            // What you hand over, before anything coming back to you. 0 when you
+            // owe nobody.
+            myPays: myGroup?.owesTotal ?? 0,
           };
           })
       );
     }
-    setLoading(false);
-  }, [activeAccountId, myUserId]);
+    markLoaded(activeAccountId);
+  }, [activeAccountId, myUserId, markLoaded]);
 
   useEffect(() => {
     refetch();

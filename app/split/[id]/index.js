@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Share, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ import {
   Link2,
   ListPlus,
   FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../../../components/Card';
@@ -29,8 +31,13 @@ import useSplit from '../../../hooks/useSplit';
 import useSplitPeople from '../../../hooks/useSplitPeople';
 import useCurrency from '../../../hooks/useCurrency';
 import { formatMoney } from '../../../lib/currency';
-import { describePayment, buildSummaryText, explainBalances } from '../../../lib/splitMath';
-import { buildSplitCsv, shareCsv, buildSplitHtml, sharePdf } from '../../../lib/export';
+import {
+  buildSummaryText,
+  explainBalances,
+  groupDebtsByDebtor,
+  groupCreditsByCreditor,
+} from '../../../lib/splitMath';
+import { buildSplitCsv, shareCsv, buildSplitHtml, sharePdf, exportFilename } from '../../../lib/export';
 import {
   closeSplit,
   reopenSplit,
@@ -62,6 +69,9 @@ export default function SplitDetail() {
   const { openAddSplitPerson } = useAddSplitPersonSheet();
   const { openSettleUp } = useSettleUpSheet();
   const [tab, setTab] = useState('entries');
+  // Collapsed by default — the traced-debt list above it is the answer; this is
+  // the working behind it, wanted on demand rather than as a wall of prose.
+  const [workingOpen, setWorkingOpen] = useState(false);
 
   const {
     split,
@@ -69,7 +79,6 @@ export default function SplitDetail() {
     entries,
     settlements,
     balances,
-    payments,
     directDebts,
     changedAfterSettling,
     memberById,
@@ -83,6 +92,16 @@ export default function SplitDetail() {
     isSharedWithMe,
     loading,
   } = useSplit(id);
+
+  // Back to the list the moment this split stops existing — deleting one from
+  // the edit sheet used to leave you stranded on a dead screen. Same shape as
+  // app/plan/[id]/history.js's own guard, and it fires for a split deleted
+  // anywhere, not just from here. Gated on `loading` so it can't trigger during
+  // the fetch: useSplit now reports loading until the data for THIS id lands,
+  // so `!split` here genuinely means gone rather than not-yet-arrived.
+  useEffect(() => {
+    if (!loading && !split) router.back();
+  }, [loading, split]);
 
   const isClosed = split?.status === 'closed';
   // The RLS policies are the real enforcement (verified with two accounts); this
@@ -115,11 +134,46 @@ export default function SplitDetail() {
     );
     return [...mine, ...list.filter((p) => !mine.includes(p))];
   };
-  const orderedPayments = useMemo(() => mineFirst(payments), [payments, memberById]);
   const orderedDebts = useMemo(() => mineFirst(directDebts), [directDebts, memberById]);
+  // Two self-labels, and the distinction matters:
+  //   IN-APP  "Chris (You)" — your own row has to be findable among five names.
+  //   EXPORTS "Chris"       — a shared PDF or WhatsApp message saying "You owe
+  //                           ₹1,367.60" is unattributable to whoever reads it.
+  const selfLabelApp = self?.name ?? 'You';
+  const selfLabelExport = self?.shortName ?? self?.name ?? 'They';
+
+  // The on-screen answer: traced debts, grouped under whoever owes them.
+  const debtGroups = useMemo(
+    () => groupDebtsByDebtor({ members, debts: directDebts, selfName: selfLabelApp }),
+    [members, directDebts, selfLabelApp]
+  );
+  const myGroup = debtGroups.find((g) => g.isSelf) ?? null;
+  // NO selfName here, deliberately — that's what selects first person, so the
+  // accordion addresses the reader ("You pay … and are owed …"). The group cards
+  // above still show "Chris (You)", because there the subject is a name.
   const explanations = useMemo(
     () => explainBalances({ members, debts: directDebts, formatAmount }),
     [members, directDebts, currency]
+  );
+  // The receipt side: who collects, and from whom. Every debt appears in both
+  // this and debtGroups — deliberately, because "what do I pay" and "what am I
+  // owed" are different questions and the second had no home at all.
+  const creditGroups = useMemo(
+    () => groupCreditsByCreditor({ members, debts: directDebts, selfName: selfLabelApp }),
+    [members, directDebts, selfLabelApp]
+  );
+  // Rebuilt for documents, where nobody is "you".
+  const exportGroups = useMemo(
+    () => groupDebtsByDebtor({ members, debts: directDebts, selfName: selfLabelExport }),
+    [members, directDebts, selfLabelExport]
+  );
+  const exportCreditGroups = useMemo(
+    () => groupCreditsByCreditor({ members, debts: directDebts, selfName: selfLabelExport }),
+    [members, directDebts, selfLabelExport]
+  );
+  const exportExplanations = useMemo(
+    () => explainBalances({ members, debts: directDebts, formatAmount, selfName: selfLabelExport }),
+    [members, directDebts, currency, selfLabelExport]
   );
 
   const entriesByDate = useMemo(() => {
@@ -131,9 +185,17 @@ export default function SplitDetail() {
     return [...groups.entries()];
   }, [entries]);
 
-  // Two formats, and the choice is worth offering rather than guessing: text
-  // goes into the group chat where four people who don't have FLO can read it,
-  // and CSV goes to whoever wants to check the arithmetic in a spreadsheet.
+  // "Mysore Trip (22 Aug 2026).pdf" — the split's own name and a readable date,
+  // because this is what the recipient sees in their Downloads list. Formatted
+  // here rather than in lib/export.js so the date goes through date-fns and the
+  // account's own locale, like every other date in the app.
+  const exportName = (extension) =>
+    exportFilename({
+      name: split?.name,
+      dateLabel: split?.occurredOn ? format(parseISO(split.occurredOn), 'd MMM yyyy') : null,
+      extension,
+    });
+
   // Three formats, split by intent rather than crammed into one menu (React
   // Native's Alert only renders three buttons reliably on Android):
   //   Share  -> send it to people. Text for the group chat, PDF for a proper
@@ -158,7 +220,9 @@ export default function SplitDetail() {
       members,
       entries,
       balances,
-      payments: orderedPayments,
+      debtGroups: exportGroups,
+      creditGroups: exportCreditGroups,
+      selfName: selfLabelExport,
       settlements,
       directDebts: orderedDebts,
       formatAmount,
@@ -178,15 +242,30 @@ export default function SplitDetail() {
       members,
       entries,
       balances,
-      payments: orderedPayments,
+      debtGroups: exportGroups,
+      creditGroups: exportCreditGroups,
+      selfName: selfLabelExport,
       settlements,
       directDebts: orderedDebts,
-      explanations,
+      explanations: exportExplanations,
       formatAmount,
       formatDay: (iso) => format(parseISO(iso), 'd MMM'),
     });
-    const { unsupported } = await sharePdf(html, 'Share split');
-    if (unsupported) showToast({ message: "This device can't share files", variant: 'error' });
+    // try/catch, because without one ANY throw in here became an unhandled
+    // rejection inside an Alert's onPress — no share sheet, no error, nothing.
+    // A silent failure is the worst outcome: it looks like the feature simply
+    // doesn't exist. Surface the real message instead.
+    try {
+      const { unsupported, namedFallback } = await sharePdf(html, exportName('pdf'), 'Share split');
+      if (unsupported) showToast({ message: "This device can't share files", variant: 'error' });
+      // Says so rather than leaving you to wonder why the file is called
+      // "a1b2c3d4.pdf" — the previous version failed here silently.
+      else if (namedFallback) {
+        showToast({ message: 'Shared, but the file kept its generated name', variant: 'info' });
+      }
+    } catch (error) {
+      showToast({ message: `Couldn't create the PDF: ${error?.message ?? error}`, variant: 'error' });
+    }
   }
 
   async function shareAsCsv() {
@@ -195,21 +274,20 @@ export default function SplitDetail() {
       members,
       entries,
       balances,
-      payments: orderedPayments,
+      debtGroups: exportGroups,
+      creditGroups: exportCreditGroups,
+      selfName: selfLabelExport,
       settlements,
       directDebts: orderedDebts,
-      explanations,
+      explanations: exportExplanations,
     });
-    // Spaces out of the filename — it travels through a share sheet and into
-    // other apps' file pickers.
-    const safeName = split.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
-    const { unsupported } = await shareCsv(
-      `${safeName || 'split'}-${split.occurredOn}.csv`,
-      csv,
-      'Export split'
-    );
-    if (unsupported) {
-      showToast({ message: "This device can't share files", variant: 'error' });
+    // Same reasoning as shareAsPdf's — this path also writes a file and can
+    // throw, and it also runs from a Pressable with nothing catching it.
+    try {
+      const { unsupported } = await shareCsv(exportName('csv'), csv, 'Export split');
+      if (unsupported) showToast({ message: "This device can't share files", variant: 'error' });
+    } catch (error) {
+      showToast({ message: `Couldn't create the file: ${error?.message ?? error}`, variant: 'error' });
     }
   }
 
@@ -341,20 +419,11 @@ export default function SplitDetail() {
     );
   }
 
-  if (!split) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-        </View>
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>This split no longer exists.</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Deleting a split leaves this screen pointed at nothing. Go back to the list
+  // rather than sitting on a "no longer exists" dead end — same behaviour as
+  // app/plan/[id]/history.js, and it covers deletion from the edit sheet as well
+  // as a split deleted from somewhere else.
+  if (!split) return null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -425,17 +494,45 @@ export default function SplitDetail() {
             </>
           ) : (
             <>
-              <Text style={styles.heroPositionLabel}>
-                {myNet > 0 ? "You're owed" : myNet < 0 ? 'You owe' : 'All square'}
-              </Text>
-              <Text
-                style={[
-                  styles.heroPosition,
-                  { color: myNet > 0 ? colors.brand : myNet < 0 ? colors.dangerStrong : staticColors.surface },
-                ]}
-              >
-                {myNet === 0 ? 'Settled up' : formatAmount(Math.abs(myNet))}
-              </Text>
+              {/* WHAT YOU PAY is the headline, because it's the number you act
+                  on — the same reason the debt cards lead with a total to pay.
+                  The net is a consequence of it, not a rival to it, so it moves
+                  into the sub-line next to the money coming back, where the two
+                  read as one thought.
+                  When you owe nothing at all there's no payment to lead with, so
+                  the headline becomes what you're owed. */}
+              {myGroup ? (
+                <>
+                  <Text style={styles.heroPositionLabel}>You pay</Text>
+                  <Text style={[styles.heroPosition, { color: colors.dangerStrong }]}>
+                    {formatAmount(myGroup.owesTotal)}
+                  </Text>
+                  {myGroup.owedTotal > 0 && (
+                    <Text style={styles.heroSub}>
+                      {formatAmount(myGroup.owedTotal)} comes back to you ·{' '}
+                      {myNet === 0
+                        ? 'all square overall'
+                        : `${formatAmount(Math.abs(myNet))} ${
+                            myNet < 0 ? 'out of pocket' : 'owed to you overall'
+                          }`}
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.heroPositionLabel}>
+                    {myNet > 0 ? "You're owed" : 'All square'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.heroPosition,
+                      { color: myNet > 0 ? colors.brand : staticColors.surface },
+                    ]}
+                  >
+                    {myNet > 0 ? formatAmount(myNet) : 'Settled up'}
+                  </Text>
+                </>
+              )}
             </>
           )}
         </Card>
@@ -457,88 +554,210 @@ export default function SplitDetail() {
             place the ₹17 Maaz owes YOU for the auto you fronted is visible at
             all; the fewest-payments view below nets it silently into your own
             debt and never mentions it. */}
-        {entries.length > 0 && orderedDebts.length > 0 && (
+        {entries.length > 0 && debtGroups.length > 0 && (
           <>
-            <Card style={styles.detailCard}>
-              <Text style={styles.detailHeading}>Every debt, traced to whoever paid</Text>
-              {orderedDebts.map((d, i) => {
-                const described = describePayment(d, memberById, { formatAmount });
-                return (
-                  <View
-                    key={`${d.fromMemberId}-${d.toMemberId}`}
-                    style={[styles.detailRow, i > 0 && styles.detailRowBorder]}
-                  >
-                    <Text style={[styles.detailText, described.involvesMe && styles.detailTextMine]}>
-                      {described.text}
+            {/* One block per person who owes, so every debt appears exactly
+                once and reads like a statement rather than a flat list of
+                sentences. The group total is what they owe in full; the net line
+                appears only for someone who is ALSO owed money, and is the
+                figure they'd actually hand over. That net is what the separate
+                "simplest way to settle" section used to show — folding it in
+                here removed a whole duplicate list that showed the same pair
+                two different amounts. */}
+            <Text style={styles.subSectionHeading}>Who pays what</Text>
+            {debtGroups.map((g) => (
+              <Card key={g.memberId} style={styles.groupCard}>
+                {/* Header: avatar, name, and the total right-aligned with a
+                    caption under it. Captions carry the meaning so the numbers
+                    can stand alone — a prose sentence in a money view reads as
+                    an apology for the layout. */}
+                <View style={styles.groupHeader}>
+                  <View style={[styles.groupAvatar, { backgroundColor: g.color ?? colors.brand }]}>
+                    <Text style={styles.groupAvatarText}>{memberInitial(g)}</Text>
+                  </View>
+                  <View style={styles.groupHeaderText}>
+                    <Text style={[styles.groupName, g.isSelf && styles.groupNameMine]} numberOfLines={1}>
+                      {g.name}
+                    </Text>
+                    <Text style={styles.groupCaption}>
+                      {g.verb} {g.owes.length} {g.owes.length === 1 ? 'person' : 'people'}
                     </Text>
                   </View>
-                );
-              })}
-            </Card>
+                  <View style={styles.groupHeaderAmount}>
+                    <Text style={[styles.groupTotal, g.isSelf && styles.groupTotalMine]}>
+                      {formatAmount(g.owesTotal)}
+                    </Text>
+                    <Text style={styles.groupCaption}>total to pay</Text>
+                  </View>
+                </View>
 
-            {/* The arithmetic in words. Nobody should have to reverse-engineer
-                why their figure is ₹1,333.60 and not the ₹1,367.60 their share
-                came to. */}
+                <View style={styles.groupDivider} />
+
+                {/* Column headers, because a bare name beside an amount doesn't
+                    say which way the money goes. Under "Stephin is owed
+                    ₹57.34", a row reading "Srijish ₹28.67" was being read as
+                    "Srijish is owed" when it means "Srijish owes Stephin".
+                    Two words of chrome remove the ambiguity entirely. */}
+                <View style={styles.groupColHeader}>
+                  <Text style={styles.groupColLabel}>To</Text>
+                  <Text style={styles.groupColLabel}>Amount</Text>
+                </View>
+
+                {g.owes.map((d) => {
+                  const involvesMe = g.isSelf || memberById[d.toMemberId]?.isSelf;
+                  return (
+                    <View key={d.toMemberId} style={styles.groupRow}>
+                      <Text style={styles.groupRowName} numberOfLines={1}>
+                        {d.toName}
+                      </Text>
+                      {involvesMe && !isClosed && (
+                        <Pressable
+                          style={styles.settlePill}
+                          onPress={() =>
+                            openSettleUp({
+                              split,
+                              from: memberById[g.memberId],
+                              to: memberById[d.toMemberId],
+                              suggestedAmount: d.amount,
+                            })
+                          }
+                        >
+                          <Text style={styles.settlePillText}>Settle</Text>
+                        </Pressable>
+                      )}
+                      <Text style={styles.groupRowAmount}>{formatAmount(d.amount)}</Text>
+                    </View>
+                  );
+                })}
+
+                {/* NO net figure in this card, deliberately. The card answers
+                    one question — how much does this person pay, and to whom —
+                    and the header total is the answer. A "net to pay" line
+                    directly under a "total to pay" header put two different
+                    numbers behind the same words, and only one of them is what
+                    you actually hand over: you really do owe Abishek ₹1,367.60,
+                    and Maaz separately owes you ₹17.
+                    Netting is a different question — your out-of-pocket
+                    position — and it belongs to the hero, which is about you,
+                    with the per-person arithmetic in the accordion below. */}
+                {/* No "also owed ₹34" aside here any more — "Who is owed" below
+                    is that fact's proper home, with its own card and total. */}
+
+                {changedAfterSettling.includes(g.memberId) && (
+                  <View style={styles.changedRow}>
+                    <AlertTriangle size={12} color={colors.warn} strokeWidth={2.4} />
+                    <Text style={styles.changedText}>Changed after settling</Text>
+                  </View>
+                )}
+              </Card>
+            ))}
+
+            {/* WHO IS OWED — the mirror. Without it the screen only answered
+                "what do I pay": the person owed the most in the split had no
+                block of their own, and someone like Stephin (who paid AND is
+                owed) had their credit reduced to a muted aside. */}
+            {creditGroups.length > 0 && (
+              <>
+                <Text style={styles.subSectionHeading}>Who is owed</Text>
+                {creditGroups.map((c) => (
+                  <Card key={`credit-${c.memberId}`} style={styles.groupCard}>
+                    <View style={styles.groupHeader}>
+                      <View style={[styles.groupAvatar, { backgroundColor: c.color ?? colors.brand }]}>
+                        <Text style={styles.groupAvatarText}>{memberInitial(c)}</Text>
+                      </View>
+                      <View style={styles.groupHeaderText}>
+                        <Text style={styles.groupName} numberOfLines={1}>
+                          {c.name}
+                        </Text>
+                        <Text style={styles.groupCaption}>
+                          owed by {c.owedBy.length} {c.owedBy.length === 1 ? 'person' : 'people'}
+                        </Text>
+                      </View>
+                      <View style={styles.groupHeaderAmount}>
+                        <Text style={[styles.groupTotal, c.isSelf && styles.groupTotalCredit]}>
+                          {formatAmount(c.owedTotal)}
+                        </Text>
+                        <Text style={styles.groupCaption}>to collect</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.groupDivider} />
+
+                    <View style={styles.groupColHeader}>
+                      <Text style={styles.groupColLabel}>From</Text>
+                      <Text style={styles.groupColLabel}>Amount</Text>
+                    </View>
+
+                    {c.owedBy.map((d) => {
+                      const involvesMe = c.isSelf || memberById[d.fromMemberId]?.isSelf;
+                      return (
+                        <View key={d.fromMemberId} style={styles.groupRow}>
+                          <Text style={styles.groupRowName} numberOfLines={1}>
+                            {d.fromName}
+                          </Text>
+                          {involvesMe && !isClosed && (
+                            <Pressable
+                              style={styles.settlePill}
+                              onPress={() =>
+                                openSettleUp({
+                                  split,
+                                  from: memberById[d.fromMemberId],
+                                  to: memberById[c.memberId],
+                                  suggestedAmount: d.amount,
+                                })
+                              }
+                            >
+                              <Text style={styles.settlePillText}>Settle</Text>
+                            </Pressable>
+                          )}
+                          <Text style={styles.groupRowAmount}>{formatAmount(d.amount)}</Text>
+                        </View>
+                      );
+                    })}
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {/* The arithmetic in words, behind an accordion. Nobody should have
+                to reverse-engineer why their figure is ₹1,333.60 and not the
+                ₹1,367.60 their share came to — but they shouldn't have to read
+                five sentences to see the debts either. Collapsed by default;
+                the exports always include it in full. */}
             <Card style={styles.detailCard}>
-              <Text style={styles.detailHeading}>How that works out</Text>
-              {explanations.map((e) => (
-                <Text
-                  key={e.memberId}
-                  style={[styles.explainText, e.memberId === self?.id && styles.explainTextMine]}
-                >
-                  {e.text}
-                </Text>
-              ))}
+              <Pressable style={styles.accordionHeader} onPress={() => setWorkingOpen((v) => !v)}>
+                <Text style={styles.detailHeading}>Each person's position</Text>
+                {workingOpen ? (
+                  <ChevronUp size={16} color={colors.mutedMid} strokeWidth={2.4} />
+                ) : (
+                  <ChevronDown size={16} color={colors.mutedMid} strokeWidth={2.4} />
+                )}
+              </Pressable>
+              {workingOpen &&
+                explanations.map((e) => (
+                  <Text
+                    key={e.memberId}
+                    style={[styles.explainText, e.memberId === self?.id && styles.explainTextMine]}
+                  >
+                    {e.text}
+                  </Text>
+                ))}
             </Card>
 
-            <Text style={styles.settleHeading}>Simplest way to settle</Text>
           </>
         )}
 
-        <Card>
-          {entries.length === 0 ? (
-            <Text style={styles.emptyText}>Add an entry and the split works itself out.</Text>
-          ) : orderedPayments.length === 0 ? (
-            <Text style={styles.emptyText}>Everyone's square. Nothing left to settle.</Text>
-          ) : (
-            orderedPayments.map((payment, i) => {
-              const described = describePayment(payment, memberById, { formatAmount });
-              const changed =
-                changedAfterSettling.includes(payment.fromMemberId) ||
-                changedAfterSettling.includes(payment.toMemberId);
-              return (
-                <View key={`${payment.fromMemberId}-${payment.toMemberId}`} style={[styles.balanceRow, i > 0 && styles.rowDivider]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.balanceText, described.involvesMe && styles.balanceTextMine]}>
-                      {described.text}
-                    </Text>
-                    {changed && (
-                      <View style={styles.changedRow}>
-                        <AlertTriangle size={12} color={colors.warn} strokeWidth={2.4} />
-                        <Text style={styles.changedText}>Changed after settling</Text>
-                      </View>
-                    )}
-                  </View>
-                  {described.involvesMe && !isClosed && (
-                    <Pressable
-                      style={styles.settleButton}
-                      onPress={() =>
-                        openSettleUp({
-                          split,
-                          from: memberById[payment.fromMemberId],
-                          to: memberById[payment.toMemberId],
-                          suggestedAmount: payment.amount,
-                        })
-                      }
-                    >
-                      <Text style={styles.settleButtonText}>Settle</Text>
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })
-          )}
-        </Card>
+        {/* The only remaining flat block, and only for the states the groups
+            can't express: nothing recorded yet, or nothing left to owe. */}
+        {(entries.length === 0 || debtGroups.length === 0) && (
+          <Card>
+            <Text style={styles.emptyText}>
+              {entries.length === 0
+                ? 'Add an entry and the split works itself out.'
+                : "Everyone's square. Nothing left to settle."}
+            </Text>
+          </Card>
+        )}
 
         {/* Separate from Share on purpose: this is "get the data out", not
             "send it to someone". The CSV is a matrix — one row per entry, one
@@ -831,12 +1050,6 @@ function makeStyles(colors) {
       paddingHorizontal: spacing.xl,
       paddingTop: spacing.md,
     },
-    centered: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.xl,
-    },
     hero: {
       marginBottom: spacing.lg,
       padding: spacing.xl,
@@ -875,6 +1088,12 @@ function makeStyles(colors) {
       letterSpacing: -0.8,
       marginTop: 2,
     },
+    heroSub: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.base,
+      color: staticColors.mutedMid,
+      marginTop: spacing.sm,
+    },
     // Sits where heroPosition's big figure would be, but reads as a prompt
     // rather than a number — nothing has been added, so there's nothing loud
     // to say. Pinned static (on Card's `dark` surface), like heroMeta.
@@ -897,7 +1116,137 @@ function makeStyles(colors) {
       color: colors.ink,
     },
     detailCard: {
+      marginBottom: spacing.lg,
+      padding: spacing.xl,
+    },
+    // Generous padding and a full spacing.lg between cards. The previous
+    // version packed a header, rows and a prose line into Card's default 16pt
+    // with 8pt rows — legible but airless. Tricount's balance list works
+    // because each person gets room.
+    groupCard: {
+      marginBottom: spacing.lg,
+      padding: spacing.xl,
+    },
+    groupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    // Sized to FLO's own card scale, not Tricount's: 30pt avatar against
+    // plans.js's 44pt IconTile for a whole plan, and fontSize.xxl for the name
+    // exactly like planName. The airy LAYOUT is the borrowed idea; the type
+    // scale stays the app's.
+    groupAvatar: {
+      width: 30,
+      height: 30,
+      borderRadius: radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    groupAvatarText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.base,
+      // On an arbitrary person colour from CATEGORY_COLORS, several of which are
+      // dark — same deliberate exception as SplitMemberChip's avatar.
+      color: '#FFFFFF',
+    },
+    groupHeaderText: {
+      flex: 1,
+      gap: 2,
+    },
+    groupHeaderAmount: {
+      alignItems: 'flex-end',
+      gap: 2,
+    },
+    groupName: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.xxl,
+      color: colors.ink,
+    },
+    groupNameMine: {
+      color: colors.ink,
+    },
+    groupCaption: {
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.xs,
+      color: colors.mutedMid,
+    },
+    groupTotal: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.xxl,
+      color: colors.ink,
+      fontVariant: ['tabular-nums'],
+    },
+    groupTotalMine: {
+      color: colors.danger,
+    },
+    // Money coming TO you reads green, the same semantic the rest of the app
+    // uses for income.
+    groupTotalCredit: {
+      color: colors.income,
+    },
+    subSectionHeading: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      color: colors.mutedMid,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginTop: spacing.sm,
       marginBottom: spacing.md,
+    },
+    groupColHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 2,
+    },
+    groupColLabel: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.xs,
+      color: colors.mutedLight,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    groupDivider: {
+      height: 1,
+      backgroundColor: colors.borderSoft,
+      marginVertical: spacing.lg,
+    },
+    // 13pt of vertical padding per row rather than 8 — the single biggest
+    // contributor to the cramped feel.
+    groupRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: 7,
+    },
+    groupRowName: {
+      flex: 1,
+      fontFamily: fontFamily.semibold,
+      fontSize: fontSize.md,
+      color: colors.mutedDarker,
+    },
+    groupRowAmount: {
+      fontFamily: fontFamily.bold,
+      fontSize: fontSize.md,
+      color: colors.ink,
+      fontVariant: ['tabular-nums'],
+    },
+    settlePill: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: radii.pill,
+      backgroundColor: colors.brandBg,
+    },
+    settlePillText: {
+      fontFamily: fontFamily.extrabold,
+      fontSize: fontSize.xs,
+      color: colors.brand,
+    },
+    accordionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
     detailHeading: {
       fontFamily: fontFamily.bold,
@@ -906,22 +1255,6 @@ function makeStyles(colors) {
       textTransform: 'uppercase',
       letterSpacing: 0.6,
       marginBottom: spacing.sm,
-    },
-    detailRow: {
-      paddingVertical: 7,
-    },
-    detailRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: colors.borderSoft,
-    },
-    detailText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.mutedDarker,
-    },
-    detailTextMine: {
-      fontFamily: fontFamily.extrabold,
-      color: colors.ink,
     },
     explainText: {
       fontFamily: fontFamily.medium,
@@ -933,15 +1266,6 @@ function makeStyles(colors) {
     explainTextMine: {
       fontFamily: fontFamily.bold,
       color: colors.ink,
-    },
-    settleHeading: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.xs,
-      color: colors.mutedMid,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-      marginBottom: spacing.sm,
-      marginTop: spacing.sm,
     },
     textAction: {
       flexDirection: 'row',
@@ -957,27 +1281,11 @@ function makeStyles(colors) {
       fontSize: fontSize.base,
       color: colors.ink,
     },
-    balanceRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      paddingVertical: spacing.sm,
-    },
     rowDivider: {
       borderTopWidth: 1,
       borderTopColor: colors.borderSoft,
       marginTop: spacing.sm,
       paddingTop: spacing.md,
-    },
-    balanceText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.mutedDarker,
-    },
-    balanceTextMine: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
     },
     changedRow: {
       flexDirection: 'row',
@@ -990,17 +1298,6 @@ function makeStyles(colors) {
       fontSize: fontSize.xs,
       color: colors.warn,
     },
-    settleButton: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: radii.pill,
-      backgroundColor: colors.brand,
-    },
-    settleButtonText: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.base,
-      color: colors.brandText,
-    },
     dateLabel: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.sm,
@@ -1009,7 +1306,8 @@ function makeStyles(colors) {
       marginTop: spacing.sm,
     },
     entryCard: {
-      marginBottom: spacing.sm,
+      marginBottom: spacing.md,
+      padding: spacing.lg,
     },
     entryTitleRow: {
       flexDirection: 'row',
@@ -1037,7 +1335,7 @@ function makeStyles(colors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingVertical: 11,
     },
     entryDescription: {
       fontFamily: fontFamily.extrabold,

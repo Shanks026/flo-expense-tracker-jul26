@@ -1184,6 +1184,165 @@ with a single decimal place gains its trailing zero.
 which is precisely why `lib/splitMath.js` computes there and converts once at
 the edge. A test asserting `sum === 0` on floats will fail for correct code.
 
+**Stale-split bug — a NEW split showed the OLD split's numbers (found on device
+2026-08-26, and it was mis-filing data, not just mis-displaying).**
+
+Reported as "created a new split with the same name and the previous entries'
+calculation affected the new one". The stored data was innocent: every entry's
+shares summed exactly to its amount, zero drift, nothing edited. The fault was
+in `useSplit`, which tracked loading with a plain `useState(true)`:
+
+- A bare boolean is **never set back to true when `splitId` CHANGES**, so
+  arriving at split B while holding split A's state reported *loaded* and
+  rendered A's entries, totals and balances under B's header. With two splits
+  sharing a name, that is indistinguishable from a broken calculation.
+- **Worse than the display**: `entryCtx` on the detail screen is memoised off
+  that state, so tapping "Add Entry" inside that window passed the OLD split's
+  id to `save_split_entry` and **filed the entry into the wrong split**.
+
+`hooks/useLoadedFor.js` already existed for exactly this class of mistake — its
+own comment describes it ("the pre-resolution pass legitimately runs, stores an
+empty result, and sets loading=false — and nothing ever set it back to true").
+It just hadn't been used here. Both `useSplit` (keyed on `splitId`) and
+`useSplits` (keyed on `activeAccountId`, with `accountsLoading` as `blockedBy`)
+now use it. `useSplit` additionally stamps its state with `forSplitId` and hands
+back the empty shape when it doesn't match the requested id — **safe by
+construction rather than by consumer discipline**, since one consumer ignoring
+`loading` was what turned a flicker into mis-filed data.
+
+**Lesson for any future read hook here: if it fetches on a key, that key
+belongs in `useLoadedFor`. A boolean cannot express "this data is for a
+different key".**
+
+Also fixed alongside it:
+
+- **Deleting a split now returns to the list.** It previously left the detail
+  screen sitting on a "This split no longer exists" dead end. Same
+  `if (!loading && !record) router.back()` guard `app/plan/[id]/history.js`
+  already uses — and it's only trustworthy *because* of the loading fix above,
+  or it would fire mid-fetch.
+- **The two who-owes-whom sections became one, grouped by debtor** (on the
+  observation that they looked like duplicates). They were never identical —
+  the traced list carries the small inter-person debts (Maaz owes Stephin
+  ₹28.67) that greedy netting dissolves — **but on a one-creditor trip they read
+  as the same thing, and worse, showed the same pair two different amounts on
+  one screen** (You→Abishek ₹1,367.60 traced vs ₹1,333.60 netted). One list
+  showing two numbers for one pair is a worse failure than one list showing one.
+  Now: one block per person who owes, each debt listed, the group total, and a
+  net line **only** where they're also owed money — that net being exactly what
+  the deleted section used to say. Every debt appears exactly once (verified),
+  and the group totals reconcile to the summary nets in paise (verified).
+  `suggestPayments` is no longer rendered anywhere; it stays exported and tested
+  in case a fewest-transfers view is ever wanted back. **The CSV stays flat and
+  tabular** — grouping is a reading aid for a document and fights a data file
+  meant to be sorted and pivoted; the app and the PDF group, the spreadsheet
+  doesn't.
+- **"To pay" vs "net to pay" was a real conflation, and the fix was to separate
+  the two questions by surface.** The card header read `₹1,367.60 · total to
+  pay` and a row directly underneath read `Net to pay ₹1,333.60` — two numbers
+  behind the same words, and only one of them is money you hand over. **You
+  genuinely do owe Abishek ₹1,367.60; Maaz separately owes you ₹17.** Netting is
+  a different question — your out-of-pocket position — and it was also being
+  shown a third way ("You owe ₹1,333.60") on the hero and the list card, which
+  is the framing that made the numbers look inconsistent. Now:
+  - **Debt cards answer one question**: how much does this person pay, and to
+    whom. The header total is the answer; there is no net figure in the card.
+    A quiet aside notes "others owe you ₹34 separately" where relevant.
+  - **The hero owns the net**, labelled **"You're out of pocket"** rather than
+    "You owe", with a sub-line spelling out `You pay ₹1,367.60 · ₹34.00 comes
+    back to you` whenever gross and net differ — so the hero can never look
+    like it contradicts the cards.
+  - **The list card** says `Out of pocket ₹1,333.60` for the same reason.
+  - The accordion keeps the full per-person arithmetic, where "out of pocket"
+    was already the wording.
+  **Lesson: a net and a payment are different facts and must never share a
+  label. If two numbers on one screen can both be read as "what I pay", one of
+  them is in the wrong place.**
+- **Two voices, selected by one parameter — the app addresses you, a document
+  names you.** `explainBalances`/`groupDebtsByDebtor`/`buildSummaryText` take an
+  optional `selfName`:
+  - **Omitted → first person.** The app talks to its reader: *"You pay ₹1,367.60
+    (Abishek ₹1,367.60) and are owed ₹34 back — ₹1,333.60 out of pocket."*
+  - **Supplied → third person with that name.** *"Chris pays … and is owed …"*
+  A shared PDF or WhatsApp message saying **"You owe ₹1,367.60" is
+  unattributable** — four other people read it and "you" means someone else. The
+  test suite now asserts **no `You/you/your` survives in the text, PDF or CSV**,
+  so a pronoun can't creep back unnoticed.
+  **`groupDebtsByDebtor` is third person in BOTH cases**, because there the
+  subject is a name: in-app `"Chris (You) owes 3 people"` (so your own row is
+  findable among five), in exports `"Chris owes"`. A name takes a third-person
+  verb wherever it appears — that's the rule that keeps the two surfaces from
+  needing separate grammar.
+  Two leaks were only caught by testing for them: `buildSummaryText` called
+  `explainBalances` **internally** without forwarding `selfName` (giving the
+  ungrammatical *"You pays ₹180"* in a shared document), and the PDF's aside
+  hardcoded `'you'`.
+- **The hero leads with what you PAY, not the net.** `You pay ₹1,367.60`, with
+  `₹34.00 comes back to you · ₹1,333.60 out of pocket` beneath it. The payment is
+  the number you act on; the net is a consequence of it, so it belongs in the
+  sub-line next to the money coming back where the two read as one thought. The
+  **list card** was extended (`useSplits` now computes `myPays`) to lead the same
+  way — otherwise the list and the detail showed two different figures for one
+  split, which is the inconsistency that started this whole thread.
+- **"Who is owed" was missing entirely, and that was a reporting gap rather than
+  a styling one.** Grouping only by debtor answered "what do I pay" and never
+  "what am I owed": **the person owed ₹5,470.40 — the largest fact in the whole
+  split — had no block of his own**, appearing only as rows inside other
+  people's cards, and someone who both paid and was owed had their credit
+  reduced to a 10px muted aside. Verified it wasn't clipping or pagination by
+  rendering the HTML and grepping it — the data was present, just buried.
+  `groupCreditsByCreditor` is the mirror of `groupDebtsByDebtor`, and the screen,
+  the shared text and the PDF now all carry **Who pays what** *and* **Who is
+  owed**. Every debt appears in both, deliberately: one is a bill, the other a
+  receipt. The pay-card aside was removed once the fact had a proper home — no
+  stating the same thing twice in two framings.
+- **Rows needed a DIRECTION label.** Under "Stephin is owed ₹57.34", a row
+  reading "Srijish ₹28.67" was read as *Srijish being owed* when it means
+  *Srijish owes Stephin*. Reported as a maths error; the maths was right (only
+  the three people who spent money have credit groups). Fixed with `To`/`From`
+  column headers in the app and PDF, and `to `/`from ` prefixes in the plain
+  text where there are no columns. **A name beside an amount does not say which
+  way the money moves — always label the direction.**
+- **A grammar trap in the default**: `groupDebtsByDebtor` hardcoded the
+  third-person verb, so omitting `selfName` produced **"You owes"** / **"You is
+  owed"**. No real caller hits it (the app and exports both pass a label), but a
+  default that renders broken English is a trap for the next caller. Both group
+  builders now take a first-person verb for the bare-pronoun fallback, and the
+  test asserts neither string can appear.
+- **Export filenames are the split's own name, and the PDF needed a rename to
+  get one.** `Print.printToFileAsync` names its output itself — a random id like
+  `a1b2c3d4-….pdf` — and takes no filename option, so the only way to control
+  what a recipient sees is to **rename the file it produced** before sharing it.
+  `File.rename()` (checked against the installed type defs alongside
+  move/copy/delete/exists) does that; a stale file from a previous export of the
+  same split is deleted first, because `rename` throws on a collision rather
+  than overwriting. Both formats now produce
+  **`Mysore Trip (22 Aug 2026).pdf`** — real capitalisation, real spaces, a
+  readable date — via a shared `exportFilename()`. The date is formatted in the
+  screen through date-fns rather than in `lib/export.js`, like every other date
+  in the app. Only genuinely illegal characters plus the `\x00-\x1f` control
+  range are stripped; hyphens, ampersands and apostrophes are legal and are kept.
+- **Orphaned headings in the PDF read as an empty section.** "Who is owed"
+  appeared blank because `break-inside: avoid` on the group blocks pushed the
+  first block to the next page, stranding the heading at the bottom of the
+  previous one. The content was never missing — verified by rendering the HTML
+  and grepping it. Fixed with `h2 { break-after: avoid }`, plus
+  `thead { display: table-header-group }` so the 13-row × 5-person entries
+  matrix repeats its column headers on page 2, `tr { break-inside: avoid }`, and
+  orphans/widows on the explanation list. **Multi-page is fine; a label
+  separated from its data is not.**
+- **A standing audit for the exports** lives in the scratchpad approach used
+  here: render all three formats from the real trip and assert every entry
+  description, every member name, the settlement, no pronouns, no
+  `undefined`/`NaN`/`[object`, all section headings present, the pay-view and
+  owed-view covering the same debt set, and **every row of the CSV matrix
+  summing to its own entry amount**. That last one is the check that would catch
+  a shares bug in an export nobody is reading closely.
+- **"Each person's position" is an accordion**, collapsed by default: the traced
+  debt list is the answer, the prose is the working, wanted on demand. **The
+  exports still carry it in full, unconditionally** — a document should not hide
+  its arithmetic.
+
 **Scope of a "person", since it's a reasonable thing to wonder:**
 `split_people` is a **reusable, user-global contact list** — deliberately not
 per-split, and not account-scoped either (same as `categories`). You travel with
