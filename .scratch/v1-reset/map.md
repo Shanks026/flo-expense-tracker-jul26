@@ -29,6 +29,7 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 <!-- one line per closed ticket: [title](issues/NN-slug.md): gist -->
 
+- [Design language direction: Ledger, not game; accents; System/Light/Dark](issues/04-design-language-direction.md): money screens ledger-calm and Koban only in character moments; lime used as a fill only; System/Light/Dark with no picker; Koban style A plus an optional lime scarf; a hard accessibility baseline; native headers, flat lists, 3 radii, a 6-step type ramp, lucide icons only.
 - [Mascot: rough vector cat prototype](issues/16-mascot-vector-prototype.md): ginger tabby, flat 2D, standing two-legged, with tube limbs merged into a pear body; approved face and expression set; a movement library plus prop poses; code-based (react-native-svg + Reanimated). Outline or editorial treatment is left to ticket 04.
 - [Onboarding target flow: 4-screen Google-first, anonymous-first?](issues/03-onboarding-target-flow.md): Google-first (email under Other options); opener → Google → first expense in the real Add sheet (skippable) → reminder ask → Home; tour becomes coach marks; cut screens deleted; anonymous-first goes post-launch.
 - [Gamification scope: streak-only vs keep some economy](issues/02-gamification-scope.md): streak only, with auto-earned and auto-spent freezes (max 2) and milestones at 7/30/100/365; the economy is flagged off at build time in both builds, with no data touched; one moment queue (1 takeover per session).
@@ -39,7 +40,6 @@ Every v1 scope, UX and design decision in the audit is settled. Each area has a 
 
 ## Not yet specified
 
-- **Add-sheet speed design:** smart default category, the top-8 grid, the pinned Save, and how the first expense in onboarding uses the real sheet. Waits on [Gamification scope](issues/02-gamification-scope.md) and [Design language direction](issues/04-design-language-direction.md).
 - **Play Console content:** the Data safety answers, the demo account for reviewers, the financial-features declaration label, content rating. Waits on [Privacy policy + account-deletion pages](issues/15-privacy-and-deletion-pages.md).
 - **Closed-test recruitment and run:** how to find 15–20 testers, the Google Group, what testers are asked to do, and the fix-build cadence. Waits on [Safe closed-test build](issues/01-safe-closed-test-build.md).
 - **Post-launch backlog boundary:** what is explicitly v1.1 (RevenueCat, re-enabling Plans/invites, anonymous-first sign-up, widget, EAS Update, SDK upgrade). Waits on [v1 scope for Plans, splits, multi-currency](issues/07-v1-scope-plans-splits-currency.md) and [Monetisation timing](issues/08-monetisation-timing.md).

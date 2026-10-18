@@ -10,6 +10,10 @@
 
 **Koban** — FLO's mascot: a curious, helpful ginger tabby cat who stands on two legs.
 
+**Money screen** — any screen whose job is showing the user's money (Home figures, transactions, budgets, reports). Ledger-calm: numbers first, no decoration.
+
+**Character moment** — a screen or moment where Koban may appear: onboarding, empty states, coach marks, streak and milestones, the weekly recap. Never on top of a money figure.
+
 **Flagged off** — a feature hidden from v1 by a build-time switch: its UI is not shown and it records nothing new, but its code and every row of existing data stay. Not the same as removed.
 
 **Streak** — the run of consecutive days on which the user logged at least one entry. The one game mechanic in v1.
