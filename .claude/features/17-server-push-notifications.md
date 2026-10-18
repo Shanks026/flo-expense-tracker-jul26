@@ -617,8 +617,8 @@ None new.
 - [x] `getPushTokenStatus`/`sendTestPush` added to `lib/pushToken.js`; passes a syntax check.
 - [x] Settings' new push-status row wired up (status text + test-send button), re-checked on mount/foreground.
 - [x] `@supabase/supabase-js` client version (`2.110.2`) confirmed to support `functions.invoke`.
-- [ ] **On-device, needs your machine:** the status row correctly shows "registered" once `push_tokens` has a row for this device.
-- [ ] **On-device:** tapping "Send test" delivers a real push (same as Phase 1's curl test, but from inside the app).
+- [x] **On-device, needs your machine:** the status row correctly shows "registered" once `push_tokens` has a row for this device. (2026-10-18, Medium_Phone_API_29 emulator: "This device is registered.")
+- [x] **On-device:** tapping "Send test" delivers a real push (same as Phase 1's curl test, but from inside the app). (2026-10-18, emulator, app in foreground, after the send-push auth hardening)
 - [ ] **On-device:** the row correctly shows "Needs a development build" in Expo Go, and "Not registered yet" before sign-in/registration completes.
 
 **→ Stop here. Show the result and wait for approval.**
