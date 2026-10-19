@@ -8,13 +8,17 @@ Spec: .claude/features/32-safe-closed-test-build.md
 
 **Status:** ready-for-agent
 
-- [ ] One flags module exists, exposing `billing` (off) as a static build-time boolean
-- [ ] With billing off, a Free account can create 2+ accounts, 3+ budgets, 2+ plans and 2+ splits with no wall and no upsell sheet
-- [ ] The entitlement read path and the Free limits are unchanged; turning `billing` on in a local dev build brings the existing gates back
-- [ ] No data-model or schema change
+- [x] One flags module exists, exposing `billing` (off) as a static build-time boolean
+- [x] With billing off, a Free account can create 2+ accounts, 3+ budgets, 2+ plans and 2+ splits with no wall and no upsell sheet
+- [x] The entitlement read path and the Free limits are unchanged; turning `billing` on in a local dev build brings the existing gates back
+- [x] No data-model or schema change
 
 ## Tracer
 
 - [x] Code implementation
-- [ ] Verified (emulator check)
+- [x] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-19: Verified on Medium_Phone_API_29 (lite debug build, flotest@gmail.com, Free, no entitlements row): created a 2nd account, budgets 2 and 3, plans 1 and 2, splits 1 and 2 with no wall or upsell. DB showed 2 accounts / 3 budgets / 2 plans. With `billing: true` hot-reloaded, New Split opened the upsell ("Level up for ₹58/mo"); flag reverted, no diff.

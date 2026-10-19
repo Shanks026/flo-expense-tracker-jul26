@@ -8,14 +8,18 @@ Spec: .claude/features/32-safe-closed-test-build.md
 
 **Status:** ready-for-agent
 
-- [ ] A render error forced in a dev build shows the recovery screen with the error message
-- [ ] "Try again" remounts the app and, once the error is gone, the app works normally
-- [ ] "Go to Home" lands on Home with a working app
+- [x] A render error forced in a dev build shows the recovery screen with the error message
+- [x] "Try again" remounts the app and, once the error is gone, the app works normally
+- [x] "Go to Home" lands on Home with a working app
 - [ ] A release build shows the screen without the error message
-- [ ] The screen follows the active theme (no hardcoded colours) and no third-party SDK is added
+- [x] The screen follows the active theme (no hardcoded colours) and no third-party SDK is added
 
 ## Tracer
 
 - [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-19: A forced render error in the Trophies screen (dev build) showed the themed recovery screen with the error message. "Go to Home" landed on a working Home (Menu, Budgets opened); "Try again" remounted the app to a working Home once the error was gone. Temporary throw removed. Not yet checked: release build without the error message (ticket 08). Seen in passing: the status-bar icons are white on the light recovery screen.

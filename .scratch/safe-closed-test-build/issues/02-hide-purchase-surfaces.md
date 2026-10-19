@@ -8,14 +8,18 @@ Spec: .claude/features/32-safe-closed-test-build.md
 
 **Status:** ready-for-agent
 
-- [ ] The Menu shows no Pro banner, and nothing navigates to the Pro screen (a direct deep link to it lands somewhere safe, not on a price)
-- [ ] The report and period pickers show no Pro locks, badges or upgrade prompts
-- [ ] The Shop's General tab shows no coin packs, prices or Buy buttons; buying card themes with coins still works
-- [ ] A walk of Home, Menu, Settings, Shop, Reports and every former Pro trigger shows no price or Buy button
-- [ ] Turning `billing` on in a local dev build restores every surface
+- [x] The Menu shows no Pro banner, and nothing navigates to the Pro screen (a direct deep link to it lands somewhere safe, not on a price)
+- [x] The report and period pickers show no Pro locks, badges or upgrade prompts
+- [x] The Shop's General tab shows no coin packs, prices or Buy buttons; buying card themes with coins still works
+- [x] A walk of Home, Menu, Settings, Shop, Reports and every former Pro trigger shows no price or Buy button
+- [x] Turning `billing` on in a local dev build restores every surface
 
 ## Tracer
 
 - [x] Code implementation
-- [ ] Verified (emulator check)
+- [x] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-19: Verified on Medium_Phone_API_29 (lite debug build): Menu has no Pro banner; period picker and report export show no locks; `flo:///pro` redirects to Home; Shop General shows only the coin-priced Streak Freeze; bought the Blueprint card theme for 400 coins (1,000 → 600). With `billing: true`, the Menu "Upgrade to Pro" banner and the Pro screen prices came back; flag reverted.
