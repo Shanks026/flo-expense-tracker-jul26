@@ -17,7 +17,7 @@ Sending can be direct in this ticket; the persisted offline queue is ticket 02.
 
 - [x] With consent off (the default), opening the app and using it writes zero rows to `events`
 - [x] Turning the switch on in Settings → Data & export writes `profiles.analytics_consent = true` with a change timestamp, and the next app open writes an `app_open` row with the user's id, app version and session id
-- [ ] Turning the switch off stops new rows immediately
+- [x] Turning the switch off stops new rows immediately
 - [ ] A `track` call with an unknown name, or with props outside the vocabulary, sends nothing extra: unknown names are dropped and unexpected props are stripped
 - [ ] A failing insert (for example a bad network) shows no error and doesn't slow the UI
 - [x] Via the Supabase MCP: an authenticated user can't select any `events` rows, even their own, and can't insert a row for another user
@@ -29,7 +29,7 @@ Sending can be direct in this ticket; the persisted offline queue is ticket 02.
 ## Tracer
 
 - [x] Code implementation
-- [ ] Verified (emulator check)
+- [x] Verified (emulator check)
 - [ ] Green signal
 
 ## Comments
@@ -43,3 +43,5 @@ Sending can be direct in this ticket; the persisted offline queue is ticket 02.
   - a new session id on user change;
   - a failed write only reverts its own toggle.
 - 2026-10-19: Re-checked after the fixes: consent off gave zero rows on a cold start; with the switch on, a 5 s trip away and the Settings deep link added nothing, and a 35 s trip added one `app_open`. Not re-checked after the fixes, because the emulator's bundle download from Metro kept failing (`ProtocolException: Expected leading [0-9a-fA-F] character`): the cold-start `app_open` with consent on, and switching off. Not exercised on the device: dropping unknown names and props, and a failing insert. Both are handled in code and shown no error.
+- 2026-10-19: Committed as `4a888c1`. Verified stays open until those two emulator checks pass.
+- 2026-10-19: Both remaining checks pass after a cold boot of the emulator and a Metro restart in CI mode (watch mode failed to start, which seems to be what broke the bundle download). With consent on, a cold start gave exactly one `app_open`. Switched off at 08:56:22 (`analytics_consent_changed_at` stamped): a 35 s trip away and a cold start added zero rows.
