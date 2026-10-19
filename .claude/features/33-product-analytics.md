@@ -71,6 +71,15 @@ A first-party event pipeline inside Supabase:
 
 **Retention:** a pg_cron job deletes events older than **13 months**, daily.
 
+**As built (ticket 04, migration `product_analytics_views`, 2026-10-19):**
+- The views live in a private `analytics` schema. The Data API doesn't expose it, and client grants and schema usage are revoked. Read them in the dashboard's SQL editor (`select * from analytics.retention`).
+- Two helper views:
+  - `logging_days`: one row per user per local day (from `profiles.timezone`) with a log or a no-spend day.
+  - `signups`: each user's first `signup_completed`.
+- Retention counts a user only once day N is over. Nudge → log uses a 60-minute window.
+- Pro conversion is split into `pro_conversion_by_trigger` and `pro_purchases_by_product`. A purchase is attributed to the sheet view only when it happens in the same session.
+- The `events-retention` job runs at `30 20 * * *` UTC (02:00 IST). It deletes by `created_at` (server time), so a wrong device clock can't keep a row alive.
+
 **Client wrapper (new module): `track(name, props)`.** Named `lib/track.js`, because `lib/analytics.js` already exists as the chart-math module.
 - **The event vocabulary is fixed in one place:** `app_open`, `onboarding_step_viewed {step}`, `signup_completed {method}`, `expense_logged {source, category_was_prefilled, seconds_to_save}`, `no_spend_marked`, `share_import {result}`, `nudge_opened {type}`, `recap_viewed`, `streak_milestone {days}`, `freeze_used`, `feature_opened {feature}`, `pro_sheet_viewed {trigger}`, `purchase_started {product}`, `purchase_completed {product}`.
 - **Unknown names and unexpected props are dropped,** so a careless call can't leak content.
