@@ -53,6 +53,7 @@ import { useNotificationSync } from '../lib/notifications';
 import { usePushTokenSync } from '../lib/pushToken';
 import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
 import { getIntroSeen, setIntroSeen as persistIntroSeen } from '../lib/onboardingDraft';
+import { loadTrackingConsent, startTrackingSession, track } from '../lib/track';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -276,6 +277,60 @@ function TimezoneSync() {
   return null;
 }
 
+// Android reports 'background' for any pause of the activity: the Google
+// sign-in tab, a share sheet, a permission dialog, a detour to system
+// settings. A return only counts as a new app open after this long away.
+const NEW_OPEN_AFTER_MS = 30 * 1000;
+
+// Sibling of <Stack>, same placement as TimezoneSync (needs useAuth()). Loads
+// the profile's analytics consent into lib/track.js on sign-in and on every
+// app open, and records one `app_open` per cold start and per real return
+// from the background (33-product-analytics.md). Each open waits for the
+// consent read, so it's judged against the real choice rather than the
+// unknown-means-off default.
+function AnalyticsSync() {
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+  const coldStartPending = useRef(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    startTrackingSession();
+    loadTrackingConsent(userId).then(() => {
+      if (cancelled || !coldStartPending.current) return;
+      coldStartPending.current = false;
+      track('app_open');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    let backgroundedAt = null;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background') {
+        backgroundedAt = Date.now();
+        return;
+      }
+      if (next !== 'active' || backgroundedAt === null) return;
+      const away = Date.now() - backgroundedAt;
+      backgroundedAt = null;
+      if (away < NEW_OPEN_AFTER_MS) return;
+      const uid = userIdRef.current;
+      startTrackingSession();
+      loadTrackingConsent(uid).then(() => {
+        if (userIdRef.current === uid) track('app_open');
+      });
+    });
+    return () => sub.remove();
+  }, []);
+
+  return null;
+}
+
 function ThemeProfileSync() {
   const { session } = useAuth();
   const { profile } = useProfile();
@@ -426,6 +481,7 @@ function RootNavigator() {
                                     <OnboardingGate />
                                     <ThemeProfileSync />
                                     <TimezoneSync />
+                                    <AnalyticsSync />
                                     <ShareIntentHandler />
                                     <PendingInviteHandler />
                                     <NotificationSync />

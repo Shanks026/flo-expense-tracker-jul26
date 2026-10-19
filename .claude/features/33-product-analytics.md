@@ -54,6 +54,11 @@ A first-party event pipeline inside Supabase:
 - Indexed on `(name, occurred_at)` and `(user_id, occurred_at)`.
 - **RLS:** authenticated users may **insert only their own rows**. There's **no select, update or delete** for clients. The views and the dashboard read through the service role or owner.
 - **Consent flag:** `profiles.analytics_consent` (boolean, default false), plus a timestamp of the last change. It's the source of truth across devices once the user signs in.
+- **As built (ticket 01, migration `product_analytics_events`, 2026-10-19):**
+  - `id` is a uuid. `name` must match `^[a-z_]{1,40}$`, and `props` must be a JSON object of at most 512 bytes.
+  - The timestamp is `profiles.analytics_consent_changed_at`, stamped by a trigger.
+  - The insert policy also requires the user's own `analytics_consent = true`, so a client that's stale or mid-toggle can't write after an opt-out.
+  - Grants are revoked from `anon` and `authenticated`, apart from `INSERT` for `authenticated`.
 
 **Views** (`security_invoker`, so the dashboard reads with the owner's rights):
 - activation (first `expense_logged` within 24 h of `signup_completed`);

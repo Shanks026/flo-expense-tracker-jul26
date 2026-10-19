@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert, Send } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert, Send, ChartColumn } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
@@ -16,6 +16,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import useProfile from '../hooks/useProfile';
 import useCurrency from '../hooks/useCurrency';
 import useEntitlement from '../hooks/useEntitlement';
+import useAnalyticsConsent from '../hooks/useAnalyticsConsent';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
@@ -102,6 +103,7 @@ export default function Settings() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPro } = useEntitlement();
   const { showToast } = useToast();
+  const { consent: analyticsConsent, setConsent: setAnalyticsConsent } = useAnalyticsConsent();
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -341,6 +343,11 @@ export default function Settings() {
   // `profiles` directly on its own cron tick.
   async function handleToggleDailyReminders(value) {
     await updateProfile({ reminders_enabled: value }, { silent: true });
+  }
+
+  async function handleToggleAnalytics(value) {
+    const { error } = await setAnalyticsConsent(value);
+    if (error) showToast({ message: 'Could not save your choice. Try again.', variant: 'error' });
   }
 
   async function handleReminderTimeChange(_event, selected) {
@@ -810,6 +817,22 @@ export default function Settings() {
             </Card>
           </>
         )}
+
+        <Text style={styles.sectionLabel}>Data & export</Text>
+        <Card style={styles.rowsCard}>
+          <View style={styles.row}>
+            <View style={styles.rowIcon}>
+              <ChartColumn size={20} color={colors.ink} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>Share anonymous usage</Text>
+              <Text style={styles.rowHint}>
+                Helps improve FLO. Only which features you use, never amounts, notes or names.
+              </Text>
+            </View>
+            <Switch value={analyticsConsent} onValueChange={handleToggleAnalytics} />
+          </View>
+        </Card>
 
         <Pressable style={styles.deleteButton} onPress={() => { setDeleteError(null); setConfirmVisible(true); }}>
           <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
