@@ -53,7 +53,7 @@ import { useNotificationSync } from '../lib/notifications';
 import { usePushTokenSync } from '../lib/pushToken';
 import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
 import { getIntroSeen, setIntroSeen as persistIntroSeen } from '../lib/onboardingDraft';
-import { loadTrackingConsent, startTrackingSession, track } from '../lib/track';
+import { flushEvents, loadTrackingConsent, startTrackingSession, track } from '../lib/track';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -287,7 +287,8 @@ const NEW_OPEN_AFTER_MS = 30 * 1000;
 // app open, and records one `app_open` per cold start and per real return
 // from the background (33-product-analytics.md). Each open waits for the
 // consent read, so it's judged against the real choice rather than the
-// unknown-means-off default.
+// unknown-means-off default. Going to the background also sends whatever
+// the offline queue is holding.
 function AnalyticsSync() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -313,6 +314,7 @@ function AnalyticsSync() {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'background') {
         backgroundedAt = Date.now();
+        flushEvents();
         return;
       }
       if (next !== 'active' || backgroundedAt === null) return;
