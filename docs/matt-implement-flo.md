@@ -6,6 +6,55 @@
 
 ---
 
+## Where things stand (2026-10-19, end of session)
+
+Read this before anything else. The ticket files are the source of truth: each has a `## Comments` log of what was checked and what's open.
+
+### Working preferences the person set this session
+- **Emulator checks are paused.** Don't drive the emulator unless the person asks. Verify through the Supabase MCP and code review instead, list any open emulator checks in the ticket, and leave `Verified` unticked.
+- **Don't wait for the green signal.** Tick `Code implementation` (and `Verified` when true) yourself, tell the person in one line that a ticket is ready for green, and move on to the next ticket. The tracer mod refuses any Claude edit that ticks `Green signal` or sets `Status: resolved`. Don't bypass that guard.
+- Still ask before every commit, push and Supabase migration (Step 6).
+
+### Spec 32: safe closed-test build (`.scratch/safe-closed-test-build/`)
+| Ticket | State | What's left |
+|---|---|---|
+| 01 billing flag, open Pro gates | Code ✓ Verified ✓ | Green signal (person) |
+| 02 hide purchase surfaces | Code ✓ Verified ✓ | Green signal (person) |
+| 03 remove dead ends / dev UI | Code ✓ | Google sign-in not exercised; release-build Settings rows (checked in 08) |
+| 04 root error boundary | Code ✓ | Release build hides the error message (checked in 08) |
+| 05 package id `app.floexpense.tracker` | Not started | Blocked on human console steps: both Firebase Android apps registered (combined `google-services.json`) and the FCM V1 key uploaded to EAS for both ids |
+| 06 manifest and deps cleanup | Code ✓ | Profile-photo picking still works without CAMERA (emulator) |
+| 07 EAS cloud builds that boot | Code ✓ | EAS env vars for preview and production, a cloud `lite-preview` build that boots and signs in, increasing version codes |
+| 08 release-candidate check | Not started | Blocked by 01–07: lite AAB manifest check plus a full emulator walk on a release build |
+
+### Spec 33: product analytics (`.scratch/product-analytics/`)
+| Ticket | State | What's left |
+|---|---|---|
+| 01 consent-gated pipeline + `app_open` | Code ✓ Verified ✓ (`4a888c1`, `e3adf68`) | Green signal (person) |
+| 04 dashboard views + 13-month retention | Code ✓ Verified ✓ via MCP (`e59b948`) | Green signal (person) |
+| 02 offline queue | Code ✓ (`54065cb`) | Emulator: consent-off-while-queued, background-only flush, 500 limit, offline cold start using the cached consent |
+| 03 opener opt-in + pre-sign-in queue | Not started, next | Blocked by 02. Switch goes on today's opener (`app/onboarding/intro/opener.js`); spec 35 carries it over |
+
+Live Supabase now has:
+- `events` (insert-only RLS, consent-gated);
+- `profiles.analytics_consent` and `analytics_consent_changed_at`;
+- a private `analytics` schema with 10 views;
+- the pg_cron job `events-retention`.
+
+Details are in `00-index.md` (schema and migrations) and the spec's "As built" notes.
+
+### Environment notes (this machine)
+- **Metro:**
+  - Watch mode fails to start (file-watcher timeout), so run `CI=1 npx expo start --dev-client --port 8082` and restart it after every code change.
+  - Port 8081 belongs to McAfee.
+- **Bundle downloads:**
+  - Over `10.0.2.2:8082` the download breaks intermittently (`ProtocolException: Expected leading [0-9a-fA-F] character`).
+  - Fix: `adb reverse tcp:8082 tcp:8082` with `debug_http_host` set to `localhost:8082` in the app's shared prefs. This is already set on the emulator, and the tunnel survives the emulator's wifi being off.
+- **adb:** calls can hang for minutes. Run long emulator sequences in the background and wait on a marker line.
+- **Test account:** the emulator is signed in as `testtwo@gmail.com`, consent on, with one offline `app_open` still queued.
+
+---
+
 ## Start of session (agent)
 
 1. Read this file, `AGENTS.md`, `.claude/features/00-index.md` (its standing rules) and §0 + §8 of the audit doc. Read nothing else up front.
