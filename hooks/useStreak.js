@@ -26,7 +26,7 @@ export async function fetchStreak(userId) {
   // created_at, NOT occurred_at — see lib/streak.js's comment. occurred_at is
   // user-editable, so backfilling receipts would fabricate a streak.
   const since = format(subDays(new Date(), WINDOW_DAYS), 'yyyy-MM-dd');
-  const [txnResult, noSpendResult, frozenResult] = await Promise.all([
+  const [txnResult, noSpendResult, frozenResult, marksResult] = await Promise.all([
     supabase
       .from('transactions')
       .select('created_at, type, amount')
@@ -46,6 +46,10 @@ export async function fetchStreak(userId) {
     // String comparison on `ref` works for the >= since bound because
     // zero-padded ISO dates sort lexicographically in chronological order.
     supabase.from('reward_events').select('ref').eq('source', 'freeze_used').gte('ref', since),
+    // The streak's own store (34-streak-only.md). New no-spend and freeze
+    // days land here; the two reward_events reads above stay so legacy
+    // history, written before the economy was flagged off, still counts.
+    supabase.from('streak_marks').select('day, kind').in('kind', ['no_spend', 'freeze_used']).gte('day', since),
   ]);
 
   if (txnResult.error) return computeStreak([], new Map(), new Date());
@@ -56,12 +60,15 @@ export async function fetchStreak(userId) {
   // date that's somehow both (matches lib/streak.js's own documented
   // logged > frozen > nospend precedence).
   const coveredDates = new Map();
+  const marks = marksResult.error ? [] : marksResult.data ?? [];
   if (!noSpendResult.error) {
     for (const row of noSpendResult.data ?? []) coveredDates.set(row.ref, 'nospend');
   }
+  for (const row of marks) if (row.kind === 'no_spend') coveredDates.set(row.day, 'nospend');
   if (!frozenResult.error) {
     for (const row of frozenResult.data ?? []) coveredDates.set(row.ref, 'frozen');
   }
+  for (const row of marks) if (row.kind === 'freeze_used') coveredDates.set(row.day, 'frozen');
 
   return computeStreak(txnResult.data ?? [], coveredDates, new Date());
 }
