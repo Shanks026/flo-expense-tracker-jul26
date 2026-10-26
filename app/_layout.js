@@ -16,6 +16,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { ThemeProvider, useTheme, MODE_PREFERENCES, DEFAULT_MODE_PREFERENCE } from '../theme/ThemeContext';
+import { fontFamily, type } from '../theme/tokens';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider, useAccount } from '../lib/AccountContext';
 import { ToastProvider, useToast } from '../components/Toast';
@@ -529,7 +530,25 @@ function RootNavigator() {
                                         transition before the destination screen's own themed
                                         background takes over. Invisible on Brand (already
                                         near-white) but a visible white flash on Dark. */}
-                                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                                    {/* Native headers (37-design-system-and-koban.md): off by
+                                        default, themed here, and turned on per pushed screen
+                                        below as each one drops its hand-drawn header. Tabs and
+                                        full-screen flows (onboarding, sign-in) keep none. The
+                                        native back button and the system back gesture come
+                                        with it. */}
+                                    <Stack
+                                      screenOptions={{
+                                        headerShown: false,
+                                        contentStyle: { backgroundColor: colors.bg },
+                                        headerStyle: { backgroundColor: colors.bg },
+                                        headerTintColor: colors.ink,
+                                        headerTitleStyle: { fontFamily: fontFamily.extrabold, fontSize: type.title, color: colors.ink },
+                                        headerShadowVisible: false,
+                                      }}
+                                    >
+                                      <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
+                                      <Stack.Screen name="streak" options={{ headerShown: true, title: 'Streak' }} />
+                                    </Stack>
                                   </AlertsSheetProvider>
                                 </MenuSheetProvider>
                                 </RewardsHistorySheetProvider>

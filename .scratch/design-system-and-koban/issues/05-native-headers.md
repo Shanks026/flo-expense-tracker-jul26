@@ -17,6 +17,14 @@ Spec: .claude/features/37-design-system-and-koban.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- The root `Stack` in `app/_layout.js` keeps `headerShown: false` by default and now themes the native header for any screen that turns it on: the theme `bg` background, ink tint and back arrow, a Manrope extrabold `type.title` title, and no shadow. Because the default stays off, screens that still draw their own header can't get a second one, and tabs, onboarding and sign-in show none.
+- `settings` and `streak` turn it on with `<Stack.Screen options={{ headerShown: true, title }}>`. Both dropped their hand-drawn header, back button and header styles, and `SafeAreaView` no longer pads the top (the native header handles the status-bar inset); a small `paddingTop` keeps a gap under the header.
+- `BackButton` (ticket 04) is now only for screens that still draw their own header; later specs move those screens to the native header as they touch them.
+- Open (emulator checks paused): the back arrow and the system gesture on both screens, no double headers anywhere, light and dark, and TalkBack on the back button ("Navigate up").

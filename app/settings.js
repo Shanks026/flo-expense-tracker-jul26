@@ -29,7 +29,6 @@ import {
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import BackButton from '../components/BackButton';
 import IconButton from '../components/IconButton';
 import Row, { RowGroup } from '../components/Row';
 import SegmentedChoice from '../components/SegmentedChoice';
@@ -467,14 +466,7 @@ export default function Settings() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Settings
-        </Text>
-      </View>
-
+    <SafeAreaView style={styles.safe} edges={[]}>
       {/* Flat grouped lists built from the shared Row/RowGroup
           (37-design-system-and-koban.md): 48dp+ targets, a role and label on
           every control, pressed feedback. The profile card stays the one
@@ -861,22 +853,9 @@ function makeStyles(colors) {
     flex: 1,
     backgroundColor: colors.bg,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    // The back button's 48dp target carries its own padding.
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: type.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
   scroll: {
+    // The native header sits above; this is the gap below it.
+    paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sectionLg,
   },

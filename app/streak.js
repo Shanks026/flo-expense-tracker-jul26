@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Snowflake, Flag } from 'lucide-react-native';
+import { Snowflake, Flag } from 'lucide-react-native';
 import {
   format,
   startOfMonth,
@@ -59,12 +58,11 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export default function StreakScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const router = useRouter();
   const { current, loggedToday, isNewStreak, history, freezesHeld, loading } = useStreak();
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={styles.loading}>
           <ActivityIndicator color={colors.ink} />
         </View>
@@ -91,14 +89,7 @@ export default function StreakScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Streak</Text>
-      </View>
-
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Count and label left; the cat on the right is a large top-anchored
             poster cropped by the card's bottom edge (see the HERO_CAT_*
@@ -216,31 +207,9 @@ function makeStyles(colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
   scroll: {
+    // The native header sits above; this is the gap below it.
+    paddingTop: spacing.sm,
     paddingHorizontal: spacing.xl,
     paddingBottom: 60,
   },
