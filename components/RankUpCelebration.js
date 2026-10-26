@@ -14,7 +14,7 @@ import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
 import { claimRank } from '../lib/rewardsMutations';
 import { getTheme } from '../lib/cardThemes';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import { setMomentActive, useOtherMomentActive } from '../lib/moments';
+import { setMomentBlocker as setMomentActive, useOtherMomentActive } from '../lib/momentQueue';
 
 // A root-mounted celebration for crossing a Rank threshold
 // (18-gamification-ritual-and-ledger.md Phase 5). Full-screen, pinned-dark

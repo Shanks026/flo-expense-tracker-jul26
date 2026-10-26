@@ -1,6 +1,19 @@
 import { useCallback, useEffect } from 'react';
 import { useActiveMoment, finishMoment } from '../lib/momentQueue';
 import { DueBillsMoment } from './DueBillsModal';
+import { StreakCelebrationMoment } from './StreakCelebration';
+import { useToast } from './Toast';
+
+// An ambient moment: a toast (payload = showToast's options), shown and
+// finished straight away so the queue moves on while it's on screen.
+function ToastMoment({ payload, onDone }) {
+  const { showToast } = useToast();
+  useEffect(() => {
+    showToast(payload);
+    onDone();
+  }, []);
+  return null;
+}
 
 // Renders whichever moment lib/momentQueue.js says is on now, one at a time.
 // Each kind maps to a renderer that takes `payload` and `onDone`; onDone ends
@@ -9,6 +22,8 @@ import { DueBillsMoment } from './DueBillsModal';
 // the toast provider so ambient moments can use it.
 const RENDERERS = {
   'bills-due': DueBillsMoment,
+  streak: StreakCelebrationMoment,
+  toast: ToastMoment,
 };
 
 export default function MomentHost() {

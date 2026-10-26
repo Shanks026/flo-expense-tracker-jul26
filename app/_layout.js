@@ -34,7 +34,7 @@ import { PayBillSheetProvider } from '../components/PayBillSheet';
 import DueBillsSource from '../components/DueBillsModal';
 import MomentHost from '../components/MomentHost';
 import { loadMomentsFor, setMomentBlocker, startMomentSession } from '../lib/momentQueue';
-import StreakCelebration from '../components/StreakCelebration';
+import StreakCelebrationSource from '../components/StreakCelebration';
 import StreakFreezeSync from '../components/StreakFreezeSync';
 import RankUpCelebration from '../components/RankUpCelebration';
 import TrophyToast from '../components/TrophyToast';
@@ -519,7 +519,7 @@ function RootNavigator() {
                                     <MomentQueueSync />
                                     <DueBillsSource />
                                     <MomentHost />
-                                    <StreakCelebration />
+                                    <StreakCelebrationSource />
                                     <StreakFreezeSync />
                                     {FLAGS.economy && <RankUpCelebration />}
                                     {FLAGS.economy && <TrophyToast />}

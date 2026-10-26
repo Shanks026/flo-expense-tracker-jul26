@@ -6,7 +6,7 @@ import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '..
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useFreezeRecovery from '../hooks/useFreezeRecovery';
-import { setMomentActive } from '../lib/moments';
+import { setMomentBlocker as setMomentActive } from '../lib/momentQueue';
 
 const KOBAN_FREEZE = require('../assets/general/freeze.png');
 // Freeze illustration fills ~87.6% of its own square canvas — corrected so

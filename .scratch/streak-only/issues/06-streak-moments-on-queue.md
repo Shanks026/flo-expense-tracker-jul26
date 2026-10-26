@@ -20,6 +20,17 @@ Spec: .claude/features/34-streak-only.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- `components/StreakCelebration.js` is split like the bills modal. `StreakCelebrationSource` (mounted in `app/_layout.js`) enqueues a `streak` celebration once today's log makes it day 1 or a 7/30/100/365 milestone, with the id `streak-start:<date>` or `streak-milestone:<n>:<date>` and a snapshot payload (count, flags, the last 7 history days). It expires at the end of tomorrow. `StreakCelebrationMoment` renders it from the snapshot. 419 → ~190 lines.
+- Removed: the milestone payout and reward block, the spin-wheel chain, the RewardBurst wait, the old per-user `flo.streak.lastCelebrated` key, the `FORCE_SHOW_FOR_TESTING` override, and its own onboarding/other-moment checks (the queue's blockers and caps do that now).
+- A milestone tracks `streak_milestone { days }` when it shows; day 1 doesn't.
+- "We saved your streak" is an ambient `toast` moment (`StreakFreezeSync` enqueues it with the id `freeze-saved:<day>`). `MomentHost` gained the `streak` and `toast` renderers.
+- `lib/moments.js` is deleted. The flagged-off `RankUpCelebration` and the unmounted `FreezePrompt` now import the blocker API from `lib/momentQueue.js`.
+- With bills due on a milestone day, bills (actionable) show first and use the session's takeover; the celebration waits for the next session (covered by the ticket 05 queue scenarios).
+- Open (emulator checks paused): the day-1 moment once, a seeded day-7 milestone once, bills-then-celebration across sessions, no spin wheel, and the event landing.
