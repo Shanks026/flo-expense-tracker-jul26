@@ -1,9 +1,8 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo, useCallback, createContext, useContext } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { X, Trash2, ChevronDown, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
+import { X, Trash2, ChevronDown, ChevronUp, MoreHorizontal, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
 import { format, isToday, isYesterday } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
@@ -15,6 +14,8 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
+import useCategoryUsage from '../hooks/useCategoryUsage';
+import { rankCategories, defaultCategoryId, gridCategories, GRID_SIZE } from '../lib/categoryDefaults';
 import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import useSplits from '../hooks/useSplits';
@@ -103,6 +104,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const { showToast } = useToast();
   const { showRewardBurst } = useRewardBurst();
   const { expenseCategories, incomeCategories } = useCategories();
+  const { expenseHistory, incomeHistory } = useCategoryUsage();
   const { activePlans } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
   // Only OPEN splits are offered — a closed split is frozen by definition
@@ -156,6 +158,18 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const savedRef = useRef(false);
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
+  // The smart default and the grid's order (36-add-sheet-3-tap.md), from the
+  // user's own recent logs. `showAllCategories` is the More tile's expansion.
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const rankedCategories = useMemo(
+    () => rankCategories(categories, type === 'income' ? incomeHistory : expenseHistory, type),
+    [categories, type, incomeHistory, expenseHistory]
+  );
+  function defaultCategoryFor(nextType) {
+    const list = nextType === 'income' ? incomeCategories : expenseCategories;
+    const history = nextType === 'income' ? incomeHistory : expenseHistory;
+    return defaultCategoryId(list, history, nextType);
+  }
   const selectedPlan = activePlans.find((p) => p.id === planId);
   const selectedSplit = openSplits.find((s) => s.id === splitId);
   // Falls back to activeAccount only for the brief window before `open()`'s
@@ -184,6 +198,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       setFromPickerOpen(false);
       setToPickerOpen(false);
       setAccountPickerOpen(false);
+      setShowAllCategories(false);
       // Autofocus the amount field ONLY for a genuinely blank entry (the ⊕
       // tab, no payload at all) — that's the one case where typing the amount
       // is obviously the user's next move. Every other path already has an
@@ -236,8 +251,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setEditingTransferId(null);
         setType(prefillType);
         setAmount(payload?.amount ? String(Math.round(payload.amount)) : '');
-        const prefillList = prefillType === 'expense' ? expenseCategories : incomeCategories;
-        setCategoryId(prefillList[0]?.id ?? null);
+        // An explicit categoryId wins; otherwise the smart default.
+        setCategoryId(payload?.categoryId ?? (prefillType === 'transfer' ? null : defaultCategoryFor(prefillType)));
         // Defaults to the active account, same as before — now changeable
         // via the inline dropdown before saving, instead of fixed.
         setAccountId(activeAccountId);
@@ -280,12 +295,20 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     if (!accountId && activeAccountId) setAccountId(activeAccountId);
   }, [accountId, activeAccountId]);
 
+  // Same idea for the category: a sheet opened before the categories loaded
+  // (the onboarding first expense, right after sign-up) gets its default once
+  // they arrive. Only a blank new entry; never an edit or a transfer.
+  useEffect(() => {
+    if (categoryId || editingId || type === 'transfer' || !categories.length) return;
+    setCategoryId(defaultCategoryFor(type));
+  }, [categoryId, editingId, type, categories.length]);
+
   function handleTypeChange(nextType) {
     setError(null);
     setType(nextType);
+    setShowAllCategories(false);
     if (nextType === 'transfer') return; // transfers have no category
-    const list = nextType === 'expense' ? expenseCategories : incomeCategories;
-    setCategoryId(list[0]?.id ?? null);
+    setCategoryId(defaultCategoryFor(nextType));
   }
 
   // Transfer's empty state (< 2 accounts) — same hasPro gate shape as
@@ -681,11 +704,21 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         ) : (
           <>
             <Text style={styles.sectionLabel}>CATEGORY</Text>
-            <ScrollView key={type} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {categories.map((cat) => {
+            {/* Top 8 as a 4×2 grid plus More (36-add-sheet-3-tap.md); More
+                expands every category of this type in place, and picking one
+                there collapses back with it swapped into the grid. */}
+            <View style={styles.chipGrid}>
+              {(showAllCategories ? rankedCategories : gridCategories(rankedCategories, categoryId)).map((cat) => {
                 const selected = cat.id === categoryId;
                 return (
-                  <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
+                  <Pressable
+                    key={cat.id}
+                    style={styles.chip}
+                    onPress={() => {
+                      setCategoryId(cat.id);
+                      setShowAllCategories(false);
+                    }}
+                  >
                     <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
                       <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
                     </View>
@@ -695,7 +728,21 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                   </Pressable>
                 );
               })}
-            </ScrollView>
+              {rankedCategories.length > GRID_SIZE && (
+                <Pressable style={styles.chip} onPress={() => setShowAllCategories((v) => !v)}>
+                  <View style={styles.chipIcon}>
+                    {showAllCategories ? (
+                      <ChevronUp size={22} color={colors.ink} strokeWidth={2} />
+                    ) : (
+                      <MoreHorizontal size={22} color={colors.ink} strokeWidth={2} />
+                    )}
+                  </View>
+                  <Text style={[styles.chipLabel, styles.chipLabelInactive]} numberOfLines={1}>
+                    {showAllCategories ? 'Less' : 'More'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
 
             <View style={styles.dateAndPlanRow}>
               <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
@@ -971,15 +1018,16 @@ function makeStyles(colors) {
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  chipRow: {
+  chipGrid: {
     flexDirection: 'row',
-    gap: 14,
+    flexWrap: 'wrap',
+    rowGap: 14,
     paddingBottom: spacing.lg,
   },
   chip: {
     alignItems: 'center',
     gap: 6,
-    width: 60,
+    width: '25%',
   },
   chipIcon: {
     width: 52,
