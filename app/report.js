@@ -26,6 +26,7 @@ import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import ProBadge from '../components/ProBadge';
 import { formatMoney } from '../lib/currency';
+import { FLAGS } from '../lib/flags';
 import {
   computeDelta,
   computeSavingsRate,
@@ -413,7 +414,7 @@ export default function Report() {
           })
         )}
 
-        {scopedPlans.length > 0 && (
+        {FLAGS.plans && scopedPlans.length > 0 && (
           <>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Plans</Text>

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Flag, Check } from 'lucide-react-native';
 import { format } from 'date-fns';
@@ -23,6 +23,7 @@ import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
 import { formatMoney } from '../lib/currency';
 import useCurrency from '../hooks/useCurrency';
+import { FLAGS } from '../lib/flags';
 
 function dateRangeLabel(plan) {
   if (!plan.start_date && !plan.end_date) return null;
@@ -32,7 +33,13 @@ function dateRangeLabel(plan) {
   return format(new Date(plan.start_date ?? plan.end_date), 'MMM d, yyyy');
 }
 
+// Plans flagged off (lib/flags.js): a deep link here lands on Home.
 export default function Plans() {
+  if (!FLAGS.plans) return <Redirect href="/" />;
+  return <PlansScreen />;
+}
+
+function PlansScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();

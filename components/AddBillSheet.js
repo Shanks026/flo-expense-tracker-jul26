@@ -18,6 +18,7 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useProfile from '../hooks/useProfile';
 import CurrencyPicker from './CurrencyPicker';
 import { destructiveHaptic } from '../lib/haptics';
+import { FLAGS } from '../lib/flags';
 
 const AddBillSheetContext = createContext(null);
 
@@ -90,7 +91,8 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
         setEditingId(null);
         setName('');
         setAmount('');
-        setCurrency(profile?.currency ?? DEFAULT_CURRENCY);
+        // Currency picker flagged off (lib/flags.js): new bills are INR.
+        setCurrency(FLAGS.currencyPicker ? (profile?.currency ?? DEFAULT_CURRENCY) : DEFAULT_CURRENCY);
         setCadence('monthly');
         setNextDueDate(new Date());
         setDateTouched(false);
@@ -208,7 +210,9 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
           />
         </View>
 
-        <CurrencyPicker value={currency} onChange={setCurrency} style={{ marginTop: spacing.md }} />
+        {FLAGS.currencyPicker && (
+          <CurrencyPicker value={currency} onChange={setCurrency} style={{ marginTop: spacing.md }} />
+        )}
 
         <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Repeats</Text>
         <View style={styles.segmentWrap}>

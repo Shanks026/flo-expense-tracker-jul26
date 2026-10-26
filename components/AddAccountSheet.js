@@ -15,6 +15,7 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useProfile from '../hooks/useProfile';
 import { DEFAULT_CURRENCY } from '../lib/currency';
 import { destructiveHaptic } from '../lib/haptics';
+import { FLAGS } from '../lib/flags';
 
 const AddAccountSheetContext = createContext(null);
 
@@ -83,7 +84,8 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
         setName('');
         setDescription('');
         setColor(CATEGORY_COLORS[0]);
-        setCurrency(profile?.currency ?? DEFAULT_CURRENCY);
+        // Currency picker flagged off (lib/flags.js): new accounts are INR.
+        setCurrency(FLAGS.currencyPicker ? (profile?.currency ?? DEFAULT_CURRENCY) : DEFAULT_CURRENCY);
         setCurrencyLocked(false);
         modalRef.current?.present();
       }
@@ -227,13 +229,15 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
           })}
         </View>
 
-        <CurrencyPicker
-          value={currency}
-          onChange={setCurrency}
-          disabled={currencyLocked}
-          disabledReason="Currency can't change once an account has transactions — create a new account instead"
-          style={{ marginTop: spacing.md }}
-        />
+        {FLAGS.currencyPicker && (
+          <CurrencyPicker
+            value={currency}
+            onChange={setCurrency}
+            disabled={currencyLocked}
+            disabledReason="Currency can't change once an account has transactions — create a new account instead"
+            style={{ marginTop: spacing.md }}
+          />
+        )}
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 

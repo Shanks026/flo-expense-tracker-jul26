@@ -514,22 +514,25 @@ export default function Settings() {
         <RowGroup title="General">
           {/* value is the EFFECTIVE display currency (useCurrency →
               activeAccount.currency), matching what the app actually shows,
-              not profiles.currency (which only seeds new accounts). */}
-          <CurrencyPicker
-            value={currency}
-            onChange={handleCurrencyChange}
-            variant="dialog"
-            renderTrigger={(selected, toggle) => (
-              <Row
-                icon={CircleDollarSign}
-                title="Currency"
-                hint="Shown across the app"
-                value={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
-                onPress={toggle}
-                chevron={false}
-              />
-            )}
-          />
+              not profiles.currency (which only seeds new accounts). Hidden
+              while the currency picker is flagged off (lib/flags.js). */}
+          {FLAGS.currencyPicker && (
+            <CurrencyPicker
+              value={currency}
+              onChange={handleCurrencyChange}
+              variant="dialog"
+              renderTrigger={(selected, toggle) => (
+                <Row
+                  icon={CircleDollarSign}
+                  title="Currency"
+                  hint="Shown across the app"
+                  value={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
+                  onPress={toggle}
+                  chevron={false}
+                />
+              )}
+            />
+          )}
           <Row icon={Grid2x2} title="Manage Categories" onPress={() => router.push('/manage-categories')} />
           {/* Personalize is economy (lib/flags.js). */}
           {FLAGS.economy && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}

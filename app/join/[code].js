@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Users, ChevronLeft } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
@@ -15,6 +15,7 @@ import { useDataRefresh } from '../../lib/DataRefreshContext';
 import { useToast } from '../../components/Toast';
 import { previewInvite, joinSplit } from '../../lib/splits';
 import { setPendingInvite, clearPendingInvite } from '../../lib/pendingInvite';
+import { FLAGS } from '../../lib/flags';
 
 // Deep-link target for `flo://join/<code>` (expo-router resolves the scheme from
 // app.json, so no manual Linking listener is needed).
@@ -22,7 +23,15 @@ import { setPendingInvite, clearPendingInvite } from '../../lib/pendingInvite';
 // Deliberately NOT under app/split/ — a `split/join/CODE` path would sit
 // alongside `split/[id]/…` and rely on static-beats-dynamic segment precedence.
 // A top-level /join has no such ambiguity.
+//
+// Split invites flagged off (lib/flags.js): the link lands on Home and no code
+// is parked.
 export default function JoinSplit() {
+  if (!FLAGS.splitInvites) return <Redirect href="/" />;
+  return <JoinSplitScreen />;
+}
+
+function JoinSplitScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { code } = useLocalSearchParams();

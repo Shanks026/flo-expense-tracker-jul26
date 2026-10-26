@@ -21,6 +21,7 @@ import { isTransfer, transferLabel } from '../../lib/transfers';
 import { isSettlement, settlementLabel } from '../../lib/settlements';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
+import { FLAGS } from '../../lib/flags';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -211,7 +212,7 @@ export default function Transactions() {
                                 ? settlementLabel(tx)
                                 : tx.category?.name ?? 'Uncategorized'}
                           </Text>
-                          {!transfer && !settlement && tx.plan?.name && (
+                          {FLAGS.plans && !transfer && !settlement && tx.plan?.name && (
                             <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
                           )}
                         </View>

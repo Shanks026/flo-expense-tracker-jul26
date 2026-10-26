@@ -55,6 +55,7 @@ import { useAddSplitEntrySheet } from '../../../components/AddSplitEntrySheet';
 import { useAddSplitPersonSheet } from '../../../components/AddSplitPersonSheet';
 import { useSettleUpSheet } from '../../../components/SettleUpSheet';
 import { destructiveHaptic } from '../../../lib/haptics';
+import { FLAGS } from '../../../lib/flags';
 
 export default function SplitDetail() {
   const { colors } = useTheme();
@@ -903,14 +904,19 @@ export default function SplitDetail() {
               <>
                 {/* The growth mechanic, and the reason this feature is buildable
                     at one real user: a split works fine with nobody else on
-                    FLO (they're just names), and gets better as people join. */}
-                <Pressable style={styles.inviteRow} onPress={handleInvite}>
-                  <Share2 size={15} color={colors.brandText} strokeWidth={2.4} />
-                  <Text style={styles.inviteText}>Invite people to this split</Text>
-                </Pressable>
-                <Pressable onPress={handleRevokeInvites}>
-                  <Text style={styles.revokeText}>Turn off the invite link</Text>
-                </Pressable>
+                    FLO (they're just names), and gets better as people join.
+                    Flagged off in v1 (lib/flags.js splitInvites). */}
+                {FLAGS.splitInvites && (
+                  <>
+                    <Pressable style={styles.inviteRow} onPress={handleInvite}>
+                      <Share2 size={15} color={colors.brandText} strokeWidth={2.4} />
+                      <Text style={styles.inviteText}>Invite people to this split</Text>
+                    </Pressable>
+                    <Pressable onPress={handleRevokeInvites}>
+                      <Text style={styles.revokeText}>Turn off the invite link</Text>
+                    </Pressable>
+                  </>
+                )}
 
                 <View style={styles.addPeopleWrap}>
                   {addablePeople.map((p) => (

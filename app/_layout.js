@@ -512,7 +512,7 @@ function RootNavigator() {
                                     <TimezoneSync />
                                     <AnalyticsSync />
                                     <ShareIntentHandler />
-                                    <PendingInviteHandler />
+                                    {FLAGS.splitInvites && <PendingInviteHandler />}
                                     <NotificationSync />
                                     <PushTokenSync />
                                     <DetectedTransactionHandler />

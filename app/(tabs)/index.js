@@ -420,7 +420,7 @@ export default function Home() {
                               ? settlementLabel(tx)
                               : tx.category?.name ?? 'Uncategorized'}
                         </Text>
-                        {!transfer && !settlement && tx.plan?.name && (
+                        {FLAGS.plans && !transfer && !settlement && tx.plan?.name && (
                           <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
                         )}
                       </View>

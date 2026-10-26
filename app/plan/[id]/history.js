@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -16,13 +16,20 @@ import { useTheme } from '../../../theme/ThemeContext';
 import { formatMoney } from '../../../lib/currency';
 import { usePlan } from '../../../hooks/usePlans';
 import useCurrency from '../../../hooks/useCurrency';
+import { FLAGS } from '../../../lib/flags';
 import usePlanCandidates from '../../../hooks/usePlanCandidates';
 import useCategories from '../../../hooks/useCategories';
 import { supabase } from '../../../lib/supabase';
 import { useDataRefresh } from '../../../lib/DataRefreshContext';
 import { useToast } from '../../../components/Toast';
 
+// Plans flagged off (lib/flags.js): a deep link here lands on Home.
 export default function PlanHistory() {
+  if (!FLAGS.plans) return <Redirect href="/" />;
+  return <PlanHistoryScreen />;
+}
+
+function PlanHistoryScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams();

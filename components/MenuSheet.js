@@ -9,6 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
+import { FLAGS } from '../lib/flags';
 
 const MenuSheetContext = createContext(null);
 
@@ -40,7 +41,7 @@ export function useMenuSheet() {
 // (both pushed screens with the same thumb-reachable bottom "New X" button),
 // rather than one being a tab and the other buried in this sheet.
 const ITEMS = [
-  { key: 'plans', label: 'Plans', route: '/plans', icon: Flag },
+  ...(FLAGS.plans ? [{ key: 'plans', label: 'Plans', route: '/plans', icon: Flag }] : []),
   // Splits sits next to Plans (2026-08-26, 31-split-expenses.md) — both are
   // event-shaped: a trip is usually a plan AND a split, and splits.plan_id
   // links the two. Adding a sixth row is what bumped the snapPoints below.

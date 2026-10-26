@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Pencil } from 'lucide-react-native';
 import { format } from 'date-fns';
@@ -22,6 +22,7 @@ import useCollectingPlan from '../../../hooks/useCollectingPlan';
 import { useAddTransactionSheet } from '../../../components/AddTransactionSheet';
 import { formatMoney } from '../../../lib/currency';
 import useCurrency from '../../../hooks/useCurrency';
+import { FLAGS } from '../../../lib/flags';
 import { useAddPlanSheet } from '../../../components/AddPlanSheet';
 import { supabase } from '../../../lib/supabase';
 import { setPlanCollecting } from '../../../lib/plans';
@@ -37,7 +38,13 @@ function dateRangeLabel(plan) {
   return format(new Date(plan.start_date ?? plan.end_date), 'MMM d, yyyy');
 }
 
+// Plans flagged off (lib/flags.js): a deep link here lands on Home.
 export default function PlanDetail() {
+  if (!FLAGS.plans) return <Redirect href="/" />;
+  return <PlanDetailScreen />;
+}
+
+function PlanDetailScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams();

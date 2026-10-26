@@ -6,6 +6,7 @@ import usePlans from './usePlans';
 import useReportDue from './useReportDue';
 import { formatMoney } from '../lib/money';
 import { isBudgetEnded } from '../lib/budgets';
+import { FLAGS } from '../lib/flags';
 
 const PLAN_ENDING_SOON_DAYS = 7;
 // 'info' (added 11-reports.md Phase 2) sorts after danger/warn — a report
@@ -85,11 +86,13 @@ export default function useAlerts() {
           status === 'over'
             ? `Over by ${formatMoney(budget.spent - budget.amount)}`
             : `${Math.round((budget.spent / budget.amount) * 100)}% used ${BUDGET_PERIOD_PHRASE[budget.period_type] ?? 'this period'}`,
-        route: '/budgets',
+        // Straight to the budget that tripped (38-home-insights-more.md): the
+        // bell is where budget warnings live now that saves don't toast.
+        route: `/budget/${budget.id}`,
       });
     }
 
-    for (const plan of plans) {
+    for (const plan of FLAGS.plans ? plans : []) {
       if (plan.status !== 'active') continue;
 
       if (plan.target_amount && plan.total_spent > plan.target_amount) {

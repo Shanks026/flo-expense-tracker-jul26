@@ -15,6 +15,7 @@ import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useSplitPeople from '../hooks/useSplitPeople';
 import usePlans from '../hooks/usePlans';
+import { FLAGS } from '../lib/flags';
 import { createSplit, updateSplit, deleteSplit } from '../lib/splits';
 import { useAddSplitPersonSheet } from './AddSplitPersonSheet';
 import { destructiveHaptic } from '../lib/haptics';
@@ -234,13 +235,16 @@ const AddSplitSheet = forwardRef(function AddSplitSheet(_props, ref) {
 
           {/* Optional link to a plan. The Mysore plan and the Mysore split are
               the same real event, so a settlement transaction produced by this
-              split lands in that plan automatically. */}
-          <Pressable style={styles.row} onPress={() => setPlanPickerOpen((v) => !v)}>
-            <Text style={styles.fieldLabelInline}>Plan (optional)</Text>
-            <Text style={styles.rowValue}>{selectedPlan?.name ?? 'None'}</Text>
-          </Pressable>
+              split lands in that plan automatically. Hidden while Plans are
+              flagged off; an existing split keeps its plan_id. */}
+          {FLAGS.plans && (
+            <Pressable style={styles.row} onPress={() => setPlanPickerOpen((v) => !v)}>
+              <Text style={styles.fieldLabelInline}>Plan (optional)</Text>
+              <Text style={styles.rowValue}>{selectedPlan?.name ?? 'None'}</Text>
+            </Pressable>
+          )}
 
-          {planPickerOpen && (
+          {FLAGS.plans && planPickerOpen && (
             <View style={styles.planList}>
               <Pressable
                 style={styles.planOption}

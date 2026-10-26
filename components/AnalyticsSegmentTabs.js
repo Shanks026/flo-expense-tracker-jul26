@@ -1,13 +1,14 @@
 import { ScrollView, Pressable, StyleSheet } from 'react-native';
 import Pill from './Pill';
 import { spacing } from '../theme/tokens';
+import { FLAGS } from '../lib/flags';
 
 const SEGMENTS = [
   { key: 'overview', label: 'Overview' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'categories', label: 'Categories' },
   { key: 'budgets', label: 'Budgets' },
-  { key: 'plans', label: 'Plans' },
+  ...(FLAGS.plans ? [{ key: 'plans', label: 'Plans' }] : []),
 ];
 
 export default function AnalyticsSegmentTabs({ active, onChange }) {
