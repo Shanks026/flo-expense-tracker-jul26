@@ -22,6 +22,7 @@ import { createEntryFromTransaction } from '../lib/splits';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
 import { claimDailyLog } from '../lib/rewardsMutations';
+import { track } from '../lib/track';
 import { useRewardBurst } from './RewardBurst';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
@@ -145,6 +146,14 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // Per-open, from the payload: `source` tags the `expense_logged` event
+  // (33-product-analytics.md; 'manual' unless the opener says otherwise), and
+  // `onDone({ saved })` runs once when the sheet closes — onboarding's first
+  // expense (35-onboarding-v3.md) moves on from there. Refs, not state: they
+  // only matter at save and dismiss time.
+  const sourceRef = useRef('manual');
+  const onDoneRef = useRef(null);
+  const savedRef = useRef(false);
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   const selectedPlan = activePlans.find((p) => p.id === planId);
@@ -163,6 +172,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
   useImperativeHandle(ref, () => ({
     open(payload) {
+      sourceRef.current = payload?.source ?? 'manual';
+      onDoneRef.current = payload?.onDone ?? null;
+      savedRef.current = false;
       setError(null);
       setPlanPickerOpen(false);
       // Never sticky: a split chosen for one expense must not silently apply to
@@ -406,7 +418,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     // backfilled past-dated entry still counts as logging TODAY. Never fails
     // the save if the claim errors — the transaction itself already
     // succeeded by this point.
+    const inOnboarding = sourceRef.current === 'onboarding';
     if (isNewEntry) {
+      savedRef.current = true;
+      if (type === 'expense') track('expense_logged', { source: sourceRef.current });
       const { error: rewardError, isNewClaim, coins: earnedCoins, xp: earnedXp } = await claimDailyLog(
         format(new Date(), 'yyyy-MM-dd')
       );
@@ -414,8 +429,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // Only the FIRST log of the day is a genuine new claim (the daily coin/
       // XP earn is flat per day, not per transaction) — the celebration is
       // for that moment, not for every subsequent transaction logged the same
-      // day, which would cheapen it into background noise.
-      else if (isNewClaim) showRewardBurst({ coins: earnedCoins, xp: earnedXp });
+      // day, which would cheapen it into background noise. Never during
+      // onboarding (35-onboarding-v3.md); the claim itself still lands.
+      else if (isNewClaim && !inOnboarding) showRewardBurst({ coins: earnedCoins, xp: earnedXp });
     }
 
     // "Add to Split" (31-split-expenses.md Phase 2) — the "log it once, not
@@ -445,7 +461,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
     }
 
-    if (!editingId && type === 'expense') {
+    if (!editingId && type === 'expense' && !inOnboarding) {
       const budgetMsg = await budgetToastForSave({ categoryId, accountId: targetAccountId });
       const planMsg = planId ? await planToastForSave({ planId }) : null;
       if (budgetMsg) showToast({ message: budgetMsg, variant: 'warn' });
@@ -475,6 +491,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     showToast({ message: editingTransferId ? 'Transfer deleted' : 'Transaction deleted', variant: 'success' });
   }
 
+  // Hands the outcome to whoever opened the sheet, once per open.
+  const handleDismiss = useCallback(() => {
+    const onDone = onDoneRef.current;
+    onDoneRef.current = null;
+    onDone?.({ saved: savedRef.current });
+  }, []);
+
   const renderBackdrop = useCallback(
     (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
     []
@@ -484,6 +507,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
+      onDismiss={handleDismiss}
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

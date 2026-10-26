@@ -4,6 +4,7 @@ import { useToast } from './Toast';
 import { useAuth } from '../lib/AuthContext';
 import { useRewardBurst } from './RewardBurst';
 import useTrophies from '../hooks/useTrophies';
+import useProfile from '../hooks/useProfile';
 
 // Keyed BY USER, same standing rule as StreakCelebration's own celebrated-today
 // flag (00-index.md): a bare device-wide key would let account A's earned set
@@ -25,6 +26,8 @@ export default function TrophyToast() {
   const { showToast } = useToast();
   const { isBursting } = useRewardBurst();
   const { trophies, loading } = useTrophies();
+  const { profile } = useProfile();
+  const onboarded = !!profile?.onboarded_at;
 
   // The set of trophy ids already announced to THIS user. Held in a ref, not
   // state: it's written from inside the effect below, and putting it in state
@@ -69,6 +72,10 @@ export default function TrophyToast() {
     // over the screen, so a toast fired now competes with it. The effect
     // re-evaluates once this flips false and the toast lands right after.
     if (isBursting) return;
+    // No celebrations during onboarding (35-onboarding-v3.md). Waiting means a
+    // trophy earned by the onboarding expense joins the silent baseline below
+    // instead of toasting on arrival at Home.
+    if (!onboarded) return;
 
     const earnedIds = trophies.filter((t) => t.earned).map((t) => t.id);
 
@@ -106,7 +113,7 @@ export default function TrophyToast() {
     } else {
       showToast({ message: `${fresh.length} new achievements unlocked`, variant: 'success' });
     }
-  }, [userId, loading, trophies, isBursting, showToast]);
+  }, [userId, loading, trophies, isBursting, showToast, onboarded]);
 
   return null;
 }

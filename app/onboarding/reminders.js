@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
 import { colors, radii } from '../../theme/tokens';
@@ -23,6 +24,8 @@ import { registerPushToken } from '../../lib/pushToken';
 // their column default; without a token nothing is delivered anyway.
 export default function OnboardingReminders() {
   const { session } = useAuth();
+  // Set by the first-expense step after a save, for the "Logged." opener.
+  const { logged } = useLocalSearchParams();
   const { updateProfile } = useProfile();
   const { finish, working: finishing } = useOnboarding();
   const [asking, setAsking] = useState(false);
@@ -56,7 +59,7 @@ export default function OnboardingReminders() {
           <Bell size={30} color={colors.incomeAccent} strokeWidth={2} />
         </View>
       }
-      title="Want a 9 pm nudge?"
+      title={logged ? 'Logged. Want a 9 pm nudge?' : 'Want a 9 pm nudge?'}
       // Not "one reminder": send-push still sends the morning nudge too
       // until spec 39 removes it.
       subtitle="A reminder to log your day, so your streak keeps going. You can change it anytime in Settings."

@@ -9,6 +9,7 @@ import Button from './Button';
 import Confetti from './Confetti';
 import StreakDays from './StreakDays';
 import useStreak from '../hooks/useStreak';
+import useProfile from '../hooks/useProfile';
 import { useRewardBurst } from './RewardBurst';
 import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -68,6 +69,8 @@ export default function StreakCelebration() {
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const userId = session?.user?.id ?? null;
+  const { profile } = useProfile();
+  const onboarded = !!profile?.onboarded_at;
 
   // The gate. It used to fire on the first transaction of EVERY day — a
   // full-screen takeover on an ordinary Tuesday, which trains the user to
@@ -94,16 +97,12 @@ export default function StreakCelebration() {
       return;
     }
     if (!session || !userId || loading || !loggedToday) return;
-    // The day-1 streak celebration is DELIBERATELY allowed to fire during
-    // onboarding (28-onboarding-welcome-bundle.md, direct decision): onboarding's
-    // balance.js/expense.js insert a real transaction, and the user wants the
-    // streak moment to land right after that action — so this is NOT gated on
-    // onboarded_at. It fires once, at whichever point the first transaction
-    // happens: during onboarding if they log there, or later on Home (via the
-    // Add sheet) if they skipped those steps. The AsyncStorage "already
-    // celebrated today" key below is what stops it re-showing. (The RANK
-    // celebration is the opposite — it DOES wait for onboarded_at, so the
-    // Saver reward lands on Home, not mid-onboarding.)
+    // Waits for onboarded_at (35-onboarding-v3.md: no celebrations during
+    // onboarding — this reverses the 28-onboarding-welcome-bundle.md call). A
+    // first expense logged in onboarding is celebrated once the user reaches
+    // Home, where this effect re-runs. The AsyncStorage "already celebrated
+    // today" key below is what stops it re-showing.
+    if (!onboarded) return;
     if (!worthCelebrating) return;
     // Ordering fix (18-gamification-ritual-and-ledger.md Phase 3, found on-
     // device): this is a full-screen Modal, which renders in its own native
@@ -160,7 +159,7 @@ export default function StreakCelebration() {
         setWheelDay(spinWheelFor(current) ? current : null);
         setVisible(true);
       });
-  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting]);
+  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting, onboarded]);
 
   // Dismissing the celebration hands off to the spin wheel (day 30/50 only,
   // wheelDay is null otherwise) instead of just closing — two sequential
