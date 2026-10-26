@@ -8,6 +8,8 @@ Spec: .claude/features/37-design-system-and-koban.md
 - `loop` off plays a pose once and settles in idle.
 - Poses combine with any mood, and are still with reduced motion (holding the pose's key frame).
 
+**Art is a placeholder:** the agreed round-5 Koban is used for now; the person will replace it with their own illustrations later. Keep the art behind the component's props so the swap touches no placement.
+
 **Blocked by:** 09 (Koban moods). Both edit the same component.
 
 **Status:** ready-for-agent

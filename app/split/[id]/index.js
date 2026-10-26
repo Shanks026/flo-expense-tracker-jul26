@@ -1074,13 +1074,13 @@ function makeStyles(colors) {
     heroMeta: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.base,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       marginTop: 1,
     },
     heroPositionLabel: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.base,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
     },
     heroPosition: {
       fontFamily: fontFamily.extrabold,
@@ -1091,7 +1091,7 @@ function makeStyles(colors) {
     heroSub: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.base,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       marginTop: spacing.sm,
     },
     // Sits where heroPosition's big figure would be, but reads as a prompt
@@ -1100,7 +1100,7 @@ function makeStyles(colors) {
     heroEmpty: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.md,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       marginTop: 3,
     },
     sectionHeader: {
@@ -1241,7 +1241,7 @@ function makeStyles(colors) {
     settlePillText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.xs,
-      color: colors.brand,
+      color: colors.brandStrong,
     },
     accordionHeader: {
       flexDirection: 'row',

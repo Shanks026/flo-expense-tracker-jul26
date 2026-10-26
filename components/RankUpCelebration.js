@@ -265,7 +265,7 @@ function makeStyles() {
     body: {
       fontFamily: fontFamily.medium,
       fontSize: fontSize.md,
-      color: colors.mutedMid,
+      color: colors.mutedOnDark,
       textAlign: 'center',
       lineHeight: 22,
       marginBottom: spacing.xxl,
@@ -284,7 +284,7 @@ function makeStyles() {
     themeLabel: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.xs,
-      color: colors.mutedDarker,
+      color: colors.mutedOnDarkDarker,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       marginBottom: spacing.sm,

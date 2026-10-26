@@ -49,11 +49,11 @@ export default function SplitMemberChip({
       <Text style={styles.name} numberOfLines={1}>
         {member.name}
       </Text>
-      {/* The accent itself, not `brandText`. brandText is the contrast colour
+      {/* brandStrong, not `brandText`. brandText is the contrast colour
           computed for text sitting ON a solid `brand` fill — but this check sits
-          on `brandBg`, a pale tint, where the accent is what reads as "selected"
-          and matches the chip's own brand-coloured border. */}
-      {showCheck && selected && <Check size={13} color={colors.brand} strokeWidth={3} />}
+          on `brandBg`, a pale tint, where a brand colour reads as "selected";
+          brandStrong is the one legible on it (lime itself is a fill only). */}
+      {showCheck && selected && <Check size={13} color={colors.brandStrong} strokeWidth={3} />}
     </View>
   );
 

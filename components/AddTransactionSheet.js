@@ -708,7 +708,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               // other account is gone, since the Details link needs 2+.
               <View style={styles.transferEmptyCard}>
                 <View style={styles.transferEmptyIcon}>
-                  <Wallet size={22} color={colors.brand} strokeWidth={2} />
+                  <Wallet size={22} color={colors.brandStrong} strokeWidth={2} />
                 </View>
                 <Text style={styles.transferEmptyTitle}>Add a second account</Text>
                 <Text style={styles.transferEmptyBody}>

@@ -40,6 +40,11 @@ export const MODES = {
       // cards, "New X" chip buttons) — pinned near-black so it pops against
       // a light screen, the same role sheet chrome already plays.
       emphasisBg: '#101010',
+      // Lime is a fill only (spec 37): it's 1.6:1 on white. For the rare
+      // brand-coloured text or thin icon on a surface that follows the mode,
+      // use brandStrong — a deep olive here (5.7:1 on bg), the lime itself in
+      // dark mode. On a permanently dark surface, plain `brand` stays right.
+      brandStrong: '#4F6B00',
     },
   },
   dark: {
@@ -59,7 +64,7 @@ export const MODES = {
       iconTileBg: '#202020',
       muted: '#8f9389',
       mutedMid: '#9fa398',
-      mutedLight: '#75786f',
+      mutedLight: '#878a81', // 5.6:1 on bg (was 4.4:1)
       mutedDarker: '#c4c7bd',
       chevron: '#54564f',
       completedBg: '#1e1e1e',
@@ -70,6 +75,7 @@ export const MODES = {
       // match the same bg every other card uses in dark mode rather than
       // inventing a separate "elevated" shade.
       emphasisBg: '#161616',
+      brandStrong: '#BBDC12', // see light mode's brandStrong
       // income/incomeAccent are brightened rather than light mode's
       // medium-dark olive (#5f8a15/#7B8B0C) — that olive was tuned for
       // contrast against a white screen and reads muddy/too-dark against a

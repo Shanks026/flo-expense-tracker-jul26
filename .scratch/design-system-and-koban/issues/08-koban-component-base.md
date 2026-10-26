@@ -10,6 +10,8 @@ Spec: .claude/features/37-design-system-and-koban.md
 - With reduced motion on, he's still.
 - A development-only gallery screen shows him at several sizes on light and dark. It never appears in store builds.
 
+**Art is a placeholder:** the agreed round-5 Koban is used for now; the person will replace it with their own illustrations later. Keep the art behind the component's props so the swap touches no placement.
+
 **Blocked by:** None (can start immediately)
 
 **Status:** ready-for-agent

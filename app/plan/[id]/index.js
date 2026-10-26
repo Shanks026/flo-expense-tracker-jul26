@@ -314,7 +314,7 @@ function makeStyles(colors) {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
     // Sits on Card's `dark` prop — pinned.
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
   },
   summaryAmountRow: {
     flexDirection: 'row',
@@ -325,7 +325,7 @@ function makeStyles(colors) {
   targetText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.lg,
-    color: staticColors.mutedDarker,
+    color: staticColors.mutedOnDarkDarker,
   },
   progressWrap: {
     marginVertical: spacing.lg,
@@ -338,7 +338,7 @@ function makeStyles(colors) {
   progressPercent: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
   },
   remainingText: {
     fontFamily: fontFamily.extrabold,

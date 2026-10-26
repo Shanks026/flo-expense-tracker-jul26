@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
-    color: colors.mutedMid,
+    color: colors.mutedOnDark,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: spacing.xxl,

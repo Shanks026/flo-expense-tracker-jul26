@@ -11,13 +11,24 @@ export const colors = {
   chipBg: '#EDEEE9',
   iconTileBg: '#F0F1EC',
 
-  muted: '#8a8e84',
-  mutedMid: '#9a9e94',
-  mutedLight: '#b0b3aa',
-  mutedDarker: '#6b6f66',
+  // Muted text, all at least 4.5:1 on bg and surface (37-design-system-and-
+  // koban.md; were 2.0–3.3:1). Still ordered darkest → lightest:
+  // mutedDarker 6.7, muted 5.5, mutedMid 5.0, mutedLight 4.6 (on bg).
+  // chevron stays a light, decorative glyph colour, never text.
+  muted: '#62665d',
+  mutedMid: '#686c63',
+  mutedLight: '#6e7268',
+  mutedDarker: '#55594f',
+  // Muted greys for text on a permanently dark surface (Card dark, hero
+  // cards, celebration screens) — the pre-spec-37 values, which already read
+  // well on near-black (mutedOnDark 7.0:1, mutedOnDarkLight 9.4:1 on ink).
+  // mutedOnDarkDarker (3.6:1) is for the dimmed currency symbol only.
+  mutedOnDark: '#9a9e94',
+  mutedOnDarkLight: '#b0b3aa',
+  mutedOnDarkDarker: '#6b6f66',
   chevron: '#c4c7bd',
 
-  income: '#5f8a15',
+  income: '#4C7311', // 5.2:1 on bg (was 3.8:1)
   incomeBg: '#EEF4CE',
   incomeAccent: '#7B8B0C',
 

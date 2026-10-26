@@ -68,7 +68,7 @@ export default function JoinSplit() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.centered}>
           <IconTile tone="brand" size={56} radius={18}>
-            <Users size={26} color={colors.brand} strokeWidth={2.2} />
+            <Users size={26} color={colors.brandStrong} strokeWidth={2.2} />
           </IconTile>
           <Text style={styles.title}>You've been invited to a split</Text>
           <Text style={styles.body}>
@@ -300,7 +300,7 @@ function makeStyles(colors) {
     claimHint: {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.base,
-      color: colors.brand,
+      color: colors.brandStrong,
     },
   });
 }

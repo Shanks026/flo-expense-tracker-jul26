@@ -67,7 +67,7 @@ function makeStyles(colors) {
     sub: {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.sm,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       marginTop: 1,
     },
   });

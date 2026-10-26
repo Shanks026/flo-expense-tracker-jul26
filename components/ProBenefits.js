@@ -24,7 +24,7 @@ export default function ProBenefits({ limit, dark = false, style }) {
         return (
           <View key={item.title} style={styles.row}>
             <View style={styles.iconTile}>
-              <Icon size={18} color={colors.brand} strokeWidth={2.2} />
+              <Icon size={18} color={dark ? colors.brand : colors.brandStrong} strokeWidth={2.2} />
             </View>
             <View style={styles.textWrap}>
               <Text style={styles.title}>{item.title}</Text>

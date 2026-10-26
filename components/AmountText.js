@@ -29,7 +29,7 @@ export default function AmountText({
   // Overrides the muted currency-symbol tint for a positive amount only —
   // for AccountHeroCarousel's themed hero card (19-card-themes.md), whose
   // background/text swap per equipped theme, so the fixed
-  // staticColors.mutedDarker/colors.mutedLight default clashes on several
+  // staticColors.mutedOnDarkDarker/colors.mutedLight default clashes on several
   // themes. Every other AmountText call site omits this and keeps the
   // original computed tone.
   currencyColor,
@@ -129,15 +129,15 @@ export default function AmountText({
         neutral: dark ? staticColors.surface : colors.ink,
         // A transfer is neither a gain nor a loss — a muted tone keeps it clearly
         // apart from income-green and expense-ink. Direction shows via the ± sign.
-        transfer_in: dark ? staticColors.mutedLight : colors.mutedDarker,
-        transfer_out: dark ? staticColors.mutedLight : colors.mutedDarker,
+        transfer_in: dark ? staticColors.mutedOnDarkLight : colors.mutedDarker,
+        transfer_out: dark ? staticColors.mutedOnDarkLight : colors.mutedDarker,
         // A split settlement is the same kind of thing as a transfer for
         // display purposes: money genuinely moved, but it is neither a gain
         // nor a loss to account for. Same muted tone, direction via the ±.
         // Crucially NOT income-green — the whole point of the settle types is
         // that money coming back from a split isn't earnings.
-        settle_in: dark ? staticColors.mutedLight : colors.mutedDarker,
-        settle_out: dark ? staticColors.mutedLight : colors.mutedDarker,
+        settle_in: dark ? staticColors.mutedOnDarkLight : colors.mutedDarker,
+        settle_out: dark ? staticColors.mutedOnDarkLight : colors.mutedDarker,
       }[type];
 
   let prefix = '';
@@ -148,7 +148,12 @@ export default function AmountText({
   // one it fought the number it belongs to, leaving a grey ₹ glued to a red
   // amount. A negative reading should be red all the way through, so the
   // currency simply takes the amount's own colour.
-  const resolvedCurrencyColor = isNegative ? color : (currencyColor ?? (dark ? staticColors.mutedDarker : colors.mutedLight));
+  const resolvedCurrencyColor = isNegative ? color : (currencyColor ?? (dark ? staticColors.mutedOnDarkDarker : colors.mutedLight));
+
+  // Income and expense are never told apart by colour alone (spec 37): a
+  // signed amount shows + or −, and TalkBack hears what kind it is.
+  const kindLabel = signed ? SIGNED_LABELS[type] : null;
+  const accessibilityLabel = `${kindLabel ? `${kindLabel} ` : ''}${isNegative ? 'minus ' : ''}${currencySymbol(currency)}${formatAmountNumber(value, currency)}`;
 
   return (
     <Text
@@ -156,6 +161,7 @@ export default function AmountText({
       adjustsFontSizeToFit={adjustsFontSizeToFit}
       numberOfLines={numberOfLines}
       minimumFontScale={minimumFontScale}
+      accessibilityLabel={accessibilityLabel}
     >
       {prefix}
       <Text style={muteCurrency ? { color: resolvedCurrencyColor } : null}>{currencySymbol(currency)}</Text>
@@ -163,6 +169,15 @@ export default function AmountText({
     </Text>
   );
 }
+
+const SIGNED_LABELS = {
+  income: 'Income',
+  expense: 'Expense',
+  transfer_in: 'Transfer in',
+  transfer_out: 'Transfer out',
+  settle_in: 'Settlement in',
+  settle_out: 'Settlement out',
+};
 
 const styles = StyleSheet.create({
   text: {

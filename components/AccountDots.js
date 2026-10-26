@@ -59,7 +59,7 @@ function Dot({ active, edge, brand }) {
       width: size,
       height: size,
       borderRadius: size / 2,
-      backgroundColor: interpolateColor(p.value, [0, 1], [staticColors.mutedMid, brand]),
+      backgroundColor: interpolateColor(p.value, [0, 1], [staticColors.mutedOnDark, brand]),
     };
   });
 

@@ -371,7 +371,7 @@ function makeStyles(colors) {
       fontFamily: fontFamily.bold,
       fontSize: fontSize.xs,
       letterSpacing: 0.3,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       marginBottom: 1,
     },
     heroBalance: {
@@ -431,7 +431,7 @@ function makeStyles(colors) {
       fontFamily: fontFamily.semibold,
       fontSize: fontSize.xs,
       letterSpacing: 0.3,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       flexShrink: 1,
     },
     // Fills the slot's full stretched height (matched to the real hero
@@ -468,7 +468,7 @@ function makeStyles(colors) {
     addSubtitle: {
       fontFamily: fontFamily.medium,
       fontSize: fontSize.sm,
-      color: staticColors.mutedMid,
+      color: staticColors.mutedOnDark,
       lineHeight: fontSize.sm * 1.4,
     },
     addCta: {

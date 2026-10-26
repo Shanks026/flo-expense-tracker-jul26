@@ -8,3 +8,4 @@ Decisions made while ticketing (2026-10-26):
 - Settings is the tracer screen for the shared components (04) and native headers (05), because tickets 01 and 02 already touch it.
 - Koban is split into body and motion (08), moods (09) and poses (10), because the drawing is the hard part. 09 and 10 edit the same files, so they run in a line.
 - Ticket 01 also fixes the gap left by spec 34 ticket 04, where hiding Personalize removed the Light/Dark switch.
+- **Koban art is a placeholder (2026-10-26, the person):** build tickets 08–11 with the agreed round-5 design, which the person will later replace with their own illustrations. Keep the drawing inside the Koban component behind its props (`mood`, `pose`, `size`, `surface`, `scarf`, `loop`), so swapping the art changes no placement.

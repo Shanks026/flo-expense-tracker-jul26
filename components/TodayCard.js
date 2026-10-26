@@ -77,7 +77,7 @@ export default function TodayCard() {
         <View style={styles.row}>
           <IconTile tone={closed ? 'brand' : 'neutral'} size={44} radius={radii.iconTile}>
             {closed ? (
-              <CircleCheck size={20} color={colors.brand} strokeWidth={2} />
+              <CircleCheck size={20} color={colors.brandStrong} strokeWidth={2} />
             ) : (
               <Wallet size={20} color={colors.mutedDarker} strokeWidth={2} />
             )}

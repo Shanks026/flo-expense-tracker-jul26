@@ -284,7 +284,7 @@ function makeStyles(colors) {
   planSubDark: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
     marginTop: 1,
   },
   progressWrap: {

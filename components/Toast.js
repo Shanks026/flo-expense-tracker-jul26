@@ -163,7 +163,7 @@ function makeStyles(colors) {
     actionText: {
       fontFamily: fontFamily.extrabold,
       fontSize: fontSize.base,
-      color: colors.brand,
+      color: colors.brandStrong,
     },
   });
 }

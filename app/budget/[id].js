@@ -175,7 +175,7 @@ export default function BudgetDetail() {
                     {tx.note ? ` · ${tx.note}` : ''}
                   </Text>
                 </View>
-                <AmountText value={tx.amount} type="expense" currency={currency} />
+                <AmountText value={tx.amount} type="expense" signed currency={currency} />
               </Pressable>
             ))}
           </Card>
@@ -267,12 +267,12 @@ function makeStyles(colors) {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
     // Sits on Card's `dark` prop — pinned.
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
   },
   summaryLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
   },
   progressWrap: {
     marginVertical: spacing.lg,
@@ -285,7 +285,7 @@ function makeStyles(colors) {
   spentText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
   },
   daysText: {
     fontFamily: fontFamily.extrabold,

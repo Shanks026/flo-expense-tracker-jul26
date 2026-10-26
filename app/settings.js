@@ -986,7 +986,7 @@ function makeStyles(colors) {
   profileEmail: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.base,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
     marginTop: 2,
   },
   rowsCard: {
@@ -1035,7 +1035,7 @@ function makeStyles(colors) {
   pushTestLink: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
-    color: colors.brand,
+    color: colors.brandStrong,
   },
   pushTestLinkDisabled: {
     color: colors.mutedMid,

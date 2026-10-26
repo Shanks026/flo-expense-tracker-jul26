@@ -133,7 +133,7 @@ export default function Transactions() {
         style={{ flex: 1 }}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandStrong} colors={[colors.brandStrong]} />}
       >
         {loading ? (
           <Card style={styles.dayCard}>
@@ -293,7 +293,7 @@ function makeStyles(colors) {
   summaryLabelDark: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.xs,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
     marginBottom: 2,
   },
   summaryLabelLight: {

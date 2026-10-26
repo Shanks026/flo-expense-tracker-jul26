@@ -82,7 +82,7 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
         {alerts.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <CircleCheck size={26} color={colors.brand} strokeWidth={2} />
+              <CircleCheck size={26} color={colors.brandStrong} strokeWidth={2} />
             </View>
             <Text style={styles.emptyText}>You're all caught up.</Text>
           </View>

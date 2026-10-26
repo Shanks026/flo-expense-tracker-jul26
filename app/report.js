@@ -314,7 +314,7 @@ export default function Report() {
             ) : (
               <>
                 {expenseDelta.direction === 'down' ? (
-                  <TrendingDown size={14} color={colors.brand} strokeWidth={2.6} />
+                  <TrendingDown size={14} color={colors.brandStrong} strokeWidth={2.6} />
                 ) : (
                   <TrendingUp size={14} color={colors.dangerStrong} strokeWidth={2.6} />
                 )}
@@ -590,7 +590,7 @@ function makeStyles(colors) {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.base,
     // Sits on Card's `dark` prop (permanently-dark surface) — pinned.
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
   },
   headlineDeltaRow: {
     flexDirection: 'row',
@@ -601,7 +601,7 @@ function makeStyles(colors) {
   headlineDeltaText: {
     fontFamily: fontFamily.semibold,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
     flexShrink: 1,
   },
   statsCard: {

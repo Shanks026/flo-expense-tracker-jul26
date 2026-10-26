@@ -127,7 +127,7 @@ export default function CurrencyPicker({
                   <Text style={[inlineStyles.optionCode, { color: valueColor }]}>{c.code}</Text>
                   <Text style={inlineStyles.optionName}>{c.name}</Text>
                 </View>
-                {isSelected && <Check size={16} color={colors.brand} strokeWidth={2.8} />}
+                {isSelected && <Check size={16} color={colors.brandStrong} strokeWidth={2.8} />}
               </Pressable>
             );
           })}

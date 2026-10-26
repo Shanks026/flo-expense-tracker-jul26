@@ -160,7 +160,7 @@ function makeStyles(colors) {
   subtitle: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
     textAlign: 'center',
     marginTop: spacing.sm,
     lineHeight: 20,
@@ -196,7 +196,7 @@ function makeStyles(colors) {
     height: 22,
     borderRadius: radii.pill,
     borderWidth: 1.5,
-    borderColor: staticColors.mutedDarker,
+    borderColor: staticColors.mutedOnDarkDarker,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -212,7 +212,7 @@ function makeStyles(colors) {
   planSub: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.sm,
-    color: staticColors.mutedMid,
+    color: staticColors.mutedOnDark,
     marginTop: 1,
   },
   planPriceWrap: {

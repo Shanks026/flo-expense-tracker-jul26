@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.md,
-    color: colors.mutedMid,
+    color: colors.mutedOnDark,
     textAlign: 'center',
     marginBottom: spacing.xxl,
   },
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-    color: colors.mutedMid,
+    color: colors.mutedOnDark,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
