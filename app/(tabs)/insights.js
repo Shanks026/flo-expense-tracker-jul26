@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
-import { TrendingUp, TrendingDown, Download } from 'lucide-react-native';
-import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, isAfter, format } from 'date-fns';
+import { TrendingUp, TrendingDown, Download, Crown } from 'lucide-react-native';
+import { subDays, differenceInCalendarDays, isAfter, format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import IconTile from '../../components/IconTile';
@@ -10,43 +10,39 @@ import AmountText from '../../components/AmountText';
 import CategoryIcon from '../../components/CategoryIcon';
 import Pill from '../../components/Pill';
 import ProgressBar from '../../components/ProgressBar';
-import AnalyticsFilterBar from '../../components/AnalyticsFilterBar';
-import AnalyticsSegmentTabs from '../../components/AnalyticsSegmentTabs';
+import ProBadge from '../../components/ProBadge';
+import InsightsPeriodControl, { periodBounds } from '../../components/InsightsPeriodControl';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
-import DailySpendingChart from '../../components/DailySpendingChart';
 import DonutChart from '../../components/DonutChart';
 import CategoryBreakdownAccordion from '../../components/CategoryBreakdownAccordion';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import { useToast } from '../../components/Toast';
+import { useProUpsellSheet } from '../../components/ProUpsellSheet';
 // Static palette (theme/tokens) only for danger/warn, which are the same in both modes.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii, hitTarget } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import useAnalyticsData from '../../hooks/useAnalyticsData';
+import useEntitlement from '../../hooks/useEntitlement';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { buildTransactionsCsv, shareCsv } from '../../lib/export';
 import { formatMoney } from '../../lib/currency';
-import useCurrency from '../../hooks/useCurrency';
 import { track } from '../../lib/track';
 import {
   computeTrend,
   computeDelta,
   computeSavingsRate,
   computeBiggestTransaction,
-  computeDailySpending,
   computeCategoryBreakdown,
   computeCategoryDeltas,
   getCategoryColor,
   computeBudgetPeriods,
   computeConsistencyFlag,
-  computeRangeSpentByPlan,
-  computePlanPace,
 } from '../../lib/analytics';
 
-const PACE_LABEL = { on_track: 'On track', over_pace: 'Over pace', under_pace: 'Under pace' };
-const PACE_TONE = { on_track: 'income', under_pace: 'neutral', over_pace: 'danger' };
+const ALL = 'all';
 
 function sumByType(transactions, type) {
   return transactions.filter((tx) => tx.type === type).reduce((sum, tx) => sum + tx.amount, 0);
@@ -72,6 +68,11 @@ function DeltaBadge({ delta, goodDirection = 'up' }) {
   );
 }
 
+// Insights (38-home-insights-more.md): Analytics with Reports folded in. One
+// period control, then everything for that period on one scroll: the summary,
+// the trend, where it went, budget progress and the biggest transaction.
+// Custom ranges, the all-accounts view and CSV are Pro (open while the
+// billing flag is off — useEntitlement's hasPro).
 export default function Insights() {
   const { colors } = useTheme();
   // A tab stays mounted, so count each visit, not the first mount.
@@ -82,41 +83,109 @@ export default function Insights() {
   );
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { refreshing, onRefresh } = usePullToRefresh();
-  // Healthy uses the active theme's accent, not the income green — matches
-  // Budgets and Plans' active-plan card, so "healthy" reads as one
-  // consistent color with the progress bar (ProgressBar.js's healthy fill
-  // is already colors.brand). Can't live at module scope since it needs the
-  // active theme's colors.
+  // Healthy uses the active theme's accent, matching Budgets and ProgressBar's
+  // own healthy fill (colors.brand).
   const STATUS_COLOR = { healthy: colors.brand, warn: staticColors.warn, over: staticColors.danger };
-  const { activeAccount, accounts } = useAccount();
+  const { activeAccountId, accounts } = useAccount();
   const { showToast } = useToast();
   const { openAdd } = useAddTransactionSheet();
-  const currency = useCurrency();
-  const [segment, setSegment] = useState('overview');
+  const { hasPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
+  const params = useLocalSearchParams();
   const [categoryType, setCategoryType] = useState('expense');
   const [mode, setMode] = useState('month');
-  const [month, setMonth] = useState(new Date());
+  const [anchor, setAnchor] = useState(new Date());
   const [customFrom, setCustomFrom] = useState(subDays(new Date(), 6));
   const [customTo, setCustomTo] = useState(new Date());
+  const [scope, setScope] = useState(null);
   const [exporting, setExporting] = useState(false);
 
-  const { from, to } = useMemo(() => {
-    if (mode === 'month') {
-      return { from: startOfMonth(month), to: endOfMonth(month) };
+  // Home's 7-day chart opens Insights on this week (`period=week`); `at` is a
+  // fresh value per tap, so a second tap still lands even if the param hasn't
+  // changed.
+  useEffect(() => {
+    if (params.period === 'week' || params.period === 'month') {
+      setMode(params.period);
+      setAnchor(new Date());
     }
-    return { from: customFrom, to: customTo };
-  }, [mode, month, customFrom, customTo]);
+  }, [params.period, params.at]);
 
-  const { current, prior, budgets, plans, loading } = useAnalyticsData({ from, to });
+  // The scope follows the active account until the person picks another one,
+  // and falls back to it if that choice stops being allowed or existing.
+  const effectiveScope =
+    scope && (scope === activeAccountId || (hasPro && (scope === ALL || accounts.some((a) => a.id === scope))))
+      ? scope
+      : activeAccountId;
 
-  // Scope follows the screen: Analytics is deliberately per-active-account
-  // (unlike the all-accounts report), so its export stays scoped the same
-  // way — `current` here already only ever contains activeAccountId's rows.
+  const { from, to } = useMemo(
+    () => periodBounds(mode, anchor, customFrom, customTo),
+    [mode, anchor, customFrom, customTo]
+  );
+
+  // Always the all-accounts fetch; the account chips are a view filter over
+  // it, never a second query.
+  const { current, prior, budgets, loading } = useAnalyticsData({ from, to, allAccounts: true });
+
+  function accountFor(accountId) {
+    return accounts.find((a) => a.id === accountId) ?? null;
+  }
+
+  const scopedCurrent = useMemo(
+    () => (effectiveScope === ALL ? current : current.filter((tx) => tx.account_id === effectiveScope)),
+    [current, effectiveScope]
+  );
+  const scopedPrior = useMemo(
+    () => (effectiveScope === ALL ? prior : prior.filter((tx) => tx.account_id === effectiveScope)),
+    [prior, effectiveScope]
+  );
+  const scopedBudgets = useMemo(
+    () => (effectiveScope === ALL ? budgets : budgets.filter((b) => b.account_id === effectiveScope)),
+    [budgets, effectiveScope]
+  );
+
+  // Summing ₹ and $ is meaningless, so in the all-accounts view with accounts
+  // in more than one currency, the SUMS narrow to the active account's
+  // currency (15-currency-going-global.md §The all-accounts edge). Budget rows
+  // each render in their own account's currency and aren't summed.
+  const isMultiCurrency = useMemo(() => new Set(accounts.map((a) => a.currency ?? 'INR')).size > 1, [accounts]);
+  const scopeCurrency =
+    effectiveScope === ALL ? (accountFor(activeAccountId)?.currency ?? 'INR') : (accountFor(effectiveScope)?.currency ?? 'INR');
+  const narrowCurrency = effectiveScope === ALL && isMultiCurrency;
+  const sumCurrent = useMemo(
+    () => (narrowCurrency ? scopedCurrent.filter((tx) => (accountFor(tx.account_id)?.currency ?? 'INR') === scopeCurrency) : scopedCurrent),
+    [scopedCurrent, narrowCurrency, scopeCurrency, accounts]
+  );
+  const sumPrior = useMemo(
+    () => (narrowCurrency ? scopedPrior.filter((tx) => (accountFor(tx.account_id)?.currency ?? 'INR') === scopeCurrency) : scopedPrior),
+    [scopedPrior, narrowCurrency, scopeCurrency, accounts]
+  );
+
+  function handleModeChange(next) {
+    if (next === 'custom' && !hasPro) {
+      openProUpsell('Custom ranges are a Pro feature');
+      return;
+    }
+    setMode(next);
+  }
+
+  function handleScopeSelect(id) {
+    if (!hasPro && id !== activeAccountId) {
+      openProUpsell('Full reports are a Pro feature');
+      return;
+    }
+    setScope(id);
+  }
+
+  // Export follows the scope on screen: all accounts, or just the one chosen.
   async function handleExport() {
+    if (!hasPro) {
+      openProUpsell('CSV export is a Pro feature');
+      return;
+    }
     setExporting(true);
     try {
-      const csv = buildTransactionsCsv(current, accounts);
-      const filename = `flo-analytics-${format(from, 'yyyy-MM-dd')}_${format(to, 'yyyy-MM-dd')}.csv`;
+      const csv = buildTransactionsCsv(scopedCurrent, accounts);
+      const filename = `flo-insights-${format(from, 'yyyy-MM-dd')}_${format(to, 'yyyy-MM-dd')}.csv`;
       const result = await shareCsv(filename, csv);
       if (result.unsupported) {
         showToast({ message: 'Sharing is not available on this device', variant: 'error' });
@@ -128,55 +197,37 @@ export default function Insights() {
     }
   }
 
-  const totalIncome = useMemo(() => sumByType(current, 'income'), [current]);
-  const totalExpense = useMemo(() => sumByType(current, 'expense'), [current]);
+  const totalIncome = useMemo(() => sumByType(sumCurrent, 'income'), [sumCurrent]);
+  const totalExpense = useMemo(() => sumByType(sumCurrent, 'expense'), [sumCurrent]);
   const netSaved = totalIncome - totalExpense;
 
-  const priorIncome = useMemo(() => sumByType(prior, 'income'), [prior]);
-  const priorExpense = useMemo(() => sumByType(prior, 'expense'), [prior]);
-  const priorNet = priorIncome - priorExpense;
+  const priorIncome = useMemo(() => sumByType(sumPrior, 'income'), [sumPrior]);
+  const priorExpense = useMemo(() => sumByType(sumPrior, 'expense'), [sumPrior]);
 
   const incomeDelta = computeDelta(totalIncome, priorIncome);
   const expenseDelta = computeDelta(totalExpense, priorExpense);
-  const netDelta = computeDelta(netSaved, priorNet);
+  const netDelta = computeDelta(netSaved, priorIncome - priorExpense);
   const savingsRate = computeSavingsRate(totalIncome, totalExpense);
-  const biggest = computeBiggestTransaction(current);
+  const biggest = computeBiggestTransaction(sumCurrent);
 
-  // The trend chart ends at today for an in-progress period (current month, or
-  // a custom range extending to/past today) rather than the period's calendar
-  // end — otherwise the current month renders ~10 trailing empty future-day
-  // bars and today wouldn't sit at the chart's right edge. Past periods are
-  // unaffected (their `to` is already before today). Only the CHART end is
-  // clamped; `to` elsewhere (data fetch, totals, prior period, export) stays
-  // the full selected period.
-  // Memoized on `to` (not recomputed every render) — a bare `new Date()` here
-  // would be a fresh object each render and defeat trendData's own useMemo.
+  // The trend ends at today for a period still in progress, so the current
+  // week or month doesn't trail empty future-day bars. Only the chart is
+  // clamped; totals, the prior period and export use the full period.
   const chartEnd = useMemo(() => {
     const now = new Date();
     return isAfter(to, now) ? now : to;
   }, [to]);
   const granularity = differenceInCalendarDays(chartEnd, from) + 1 <= 31 ? 'day' : 'week';
-  const trendData = useMemo(() => computeTrend(current, from, chartEnd), [current, from, chartEnd]);
-  // IncomeExpenseChart expects { date, income, expense }; computeTrend
-  // returns { bucketStart, income, expense } — mapped here rather than
-  // renaming computeTrend's own field, since lib/analytics.js is a shared
-  // utility this screen isn't necessarily the only consumer of.
   const chartData = useMemo(
-    () => trendData.map((b) => ({ date: b.bucketStart, income: b.income, expense: b.expense })),
-    [trendData]
+    () =>
+      computeTrend(sumCurrent, from, chartEnd).map((b) => ({ date: b.bucketStart, income: b.income, expense: b.expense })),
+    [sumCurrent, from, chartEnd]
   );
 
-  // Trailing 7-day per-date window ending on today (or the period's end for a
-  // past month) — see computeDailySpending. Depends on from/to too now, since
-  // the window is anchored to the selected period's bounds, not just the txns.
-  const dailySpendingData = useMemo(() => computeDailySpending(current, from, to), [current, from, to]);
-  const expenseCount = useMemo(() => current.filter((tx) => tx.type === 'expense').length, [current]);
-  const avgExpense = expenseCount > 0 ? totalExpense / expenseCount : 0;
-
-  const categoryBreakdown = useMemo(() => computeCategoryBreakdown(current, categoryType), [current, categoryType]);
+  const categoryBreakdown = useMemo(() => computeCategoryBreakdown(sumCurrent, categoryType), [sumCurrent, categoryType]);
   const categoryDeltas = useMemo(
-    () => computeCategoryDeltas(categoryBreakdown, prior, categoryType),
-    [categoryBreakdown, prior, categoryType]
+    () => computeCategoryDeltas(categoryBreakdown, sumPrior, categoryType),
+    [categoryBreakdown, sumPrior, categoryType]
   );
   const donutSegments = useMemo(
     () =>
@@ -187,19 +238,29 @@ export default function Insights() {
     [categoryDeltas]
   );
 
+  const budgetRows = scopedBudgets
+    .map((budget) => ({ budget, periods: computeBudgetPeriods(budget, scopedCurrent, from, to) }))
+    .filter((r) => r.periods.length > 0);
+
   return (
     <Screen padded={false}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Insights</Text>
-          {activeAccount && <Text style={styles.headerSubtitle}>{activeAccount.name}</Text>}
-        </View>
-        <Pressable style={styles.exportButton} onPress={handleExport} disabled={exporting}>
+        <Text style={[styles.headerTitle, { flex: 1 }]} accessibilityRole="header">
+          Insights
+        </Text>
+        <Pressable
+          style={styles.exportButton}
+          onPress={handleExport}
+          disabled={exporting}
+          accessibilityRole="button"
+          accessibilityLabel="Export CSV"
+        >
           {exporting ? (
             <ActivityIndicator size="small" color={colors.ink} />
           ) : (
             <Download size={18} color={colors.ink} strokeWidth={2.2} />
           )}
+          {!hasPro && <ProBadge variant="overlay" size={16} />}
         </Pressable>
       </View>
 
@@ -209,24 +270,42 @@ export default function Insights() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandStrong} colors={[colors.brandStrong]} />}
       >
-        <AnalyticsFilterBar
+        <InsightsPeriodControl
           mode={mode}
-          onModeChange={setMode}
-          month={month}
-          onMonthChange={setMonth}
+          onModeChange={handleModeChange}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
           customFrom={customFrom}
           customTo={customTo}
           onCustomFromChange={setCustomFrom}
           onCustomToChange={setCustomTo}
+          customLocked={!hasPro}
         />
 
-        <View style={{ marginTop: spacing.lg, marginBottom: spacing.lg }}>
-          <AnalyticsSegmentTabs active={segment} onChange={setSegment} />
-        </View>
+        {accounts.length > 1 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scopeRow} style={styles.scopeScroll}>
+            {[{ id: ALL, name: 'All accounts' }, ...accounts].map((a) => (
+              <Pressable
+                key={a.id}
+                style={styles.scopeChip}
+                onPress={() => handleScopeSelect(a.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: effectiveScope === a.id }}
+              >
+                {!hasPro && a.id !== activeAccountId && <Crown size={11} color={colors.mutedDarker} strokeWidth={2.4} />}
+                <Pill label={a.name} tone={effectiveScope === a.id ? 'dark' : 'neutral'} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
+        {narrowCurrency && (
+          <Text style={styles.note}>Totals shown in {scopeCurrency}; accounts in other currencies are excluded.</Text>
+        )}
 
         {loading ? (
-          <>
-            <Card style={styles.heroCard}>
+          <View style={styles.sections}>
+            <Card style={styles.card}>
               <View style={styles.heroRow}>
                 {[0, 1, 2].map((i) => (
                   <View key={i} style={styles.heroItem}>
@@ -236,53 +315,139 @@ export default function Insights() {
                 ))}
               </View>
             </Card>
-            <Card style={styles.chartCard}>
+            <Card style={styles.card}>
               <Skeleton height={140} radius={radii.card} />
             </Card>
-          </>
+          </View>
         ) : (
-        <FadeIn>
-        {segment === 'overview' && (
-          <>
-            <Card style={styles.heroCard}>
+          <FadeIn style={styles.sections}>
+            <Card style={styles.card}>
               <View style={styles.heroRow}>
                 <View style={styles.heroItem}>
-                  <Text style={styles.heroLabel}>Income</Text>
-                  <AmountText value={totalIncome} type="income" size={fontSize.xl} currency={currency} />
-                  <DeltaBadge delta={incomeDelta} goodDirection="up" />
-                </View>
-                <View style={styles.heroItem}>
-                  <Text style={styles.heroLabel}>Expense</Text>
-                  <AmountText value={totalExpense} type="neutral" size={fontSize.xl} currency={currency} />
+                  <Text style={styles.heroLabel}>Spent</Text>
+                  <AmountText value={totalExpense} type="neutral" size={fontSize.xl} currency={scopeCurrency} />
                   <DeltaBadge delta={expenseDelta} goodDirection="down" />
                 </View>
                 <View style={styles.heroItem}>
-                  <Text style={styles.heroLabel}>Net Saved</Text>
-                  <AmountText value={netSaved} type={netSaved < 0 ? 'danger' : 'neutral'} size={fontSize.xl} currency={currency} />
+                  <Text style={styles.heroLabel}>Received</Text>
+                  <AmountText value={totalIncome} type="income" size={fontSize.xl} currency={scopeCurrency} />
+                  <DeltaBadge delta={incomeDelta} goodDirection="up" />
+                </View>
+                <View style={styles.heroItem}>
+                  <Text style={styles.heroLabel}>Net saved</Text>
+                  <AmountText value={netSaved} type={netSaved < 0 ? 'danger' : 'neutral'} size={fontSize.xl} currency={scopeCurrency} />
                   <DeltaBadge delta={netDelta} goodDirection="up" />
                 </View>
               </View>
               {savingsRate !== null && (
                 <View style={styles.savingsRow}>
-                  <Text style={styles.savingsLabel}>Savings Rate</Text>
+                  <Text style={styles.savingsLabel}>Savings rate</Text>
                   <Text style={styles.savingsValue}>{savingsRate.toFixed(0)}%</Text>
                 </View>
               )}
             </Card>
 
-            <Card style={styles.chartCard}>
+            <Card style={styles.card}>
               <IncomeExpenseChart
                 data={chartData}
                 granularity={granularity}
                 showPeriodLabel
                 emptyMessage="No transactions in this period."
-                currency={currency}
+                currency={scopeCurrency}
               />
             </Card>
 
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Where it went</Text>
+              <View style={styles.typeToggleWrap}>
+                {['expense', 'income'].map((t) => (
+                  <Pressable
+                    key={t}
+                    style={[styles.typeSegment, categoryType === t && styles.typeSegmentActive]}
+                    onPress={() => setCategoryType(t)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: categoryType === t }}
+                  >
+                    <Text style={[styles.typeSegmentText, categoryType === t && styles.typeSegmentTextActive]}>
+                      {t === 'expense' ? 'Spent' : 'Received'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+            {categoryDeltas.length === 0 ? (
+              <Card style={styles.card}>
+                <Text style={styles.emptyText}>Nothing {categoryType === 'expense' ? 'spent' : 'received'} in this period.</Text>
+              </Card>
+            ) : (
+              <>
+                <Card style={styles.card}>
+                  <DonutChart
+                    segments={donutSegments}
+                    total={categoryType === 'expense' ? totalExpense : totalIncome}
+                    currency={scopeCurrency}
+                  />
+                </Card>
+                <Card style={[styles.card, styles.rankedCard]}>
+                  <CategoryBreakdownAccordion
+                    entries={categoryDeltas}
+                    transactions={sumCurrent}
+                    type={categoryType}
+                    currency={scopeCurrency}
+                    onPressTransaction={openAdd}
+                    renderRight={(entry) => (
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <AmountText value={entry.amount} type="neutral" size={fontSize.md} currency={scopeCurrency} />
+                        <DeltaBadge delta={entry.delta} goodDirection={categoryType === 'expense' ? 'down' : 'up'} />
+                      </View>
+                    )}
+                  />
+                </Card>
+              </>
+            )}
+
+            {budgetRows.length > 0 && (
+              <>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Budgets</Text>
+                </View>
+                {budgetRows.map(({ budget, periods }) => {
+                  const budgetCurrency = accountFor(budget.account_id)?.currency ?? scopeCurrency;
+                  return (
+                    <Card key={budget.id} style={styles.card}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.budgetName}>{budget.name}</Text>
+                        {computeConsistencyFlag(periods) && <Pill label="Frequently over" tone="danger" />}
+                      </View>
+                      {periods.map((p) => {
+                        const progress = p.limit > 0 ? p.spent / p.limit : 0;
+                        const periodLabel =
+                          budget.period_type === 'calendar_month'
+                            ? format(p.periodStart, 'MMMM yyyy')
+                            : `${format(p.periodStart, 'd MMM')} – ${format(p.periodEnd, 'd MMM')}`;
+                        return (
+                          <View key={p.periodStart.toISOString()} style={styles.periodRow}>
+                            <View style={styles.rowBetween}>
+                              <Text style={styles.periodLabel}>{periodLabel}</Text>
+                              <Text style={[styles.periodAmount, { color: STATUS_COLOR[p.status] }]}>
+                                {formatMoney(p.spent, budgetCurrency)} / {formatMoney(p.limit, budgetCurrency)}
+                              </Text>
+                            </View>
+                            <View style={{ marginTop: 6 }}>
+                              <ProgressBar progress={progress} status={p.status} />
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </Card>
+                  );
+                })}
+              </>
+            )}
+
             {biggest && (
-              <Card style={styles.biggestCard}>
-                <Text style={styles.sectionTitle}>Biggest Transaction</Text>
+              <Card style={styles.card}>
+                <Text style={styles.cardLabel}>Biggest transaction</Text>
                 <View style={styles.biggestRow}>
                   <IconTile tone={biggest.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
                     <CategoryIcon
@@ -292,186 +457,14 @@ export default function Insights() {
                     />
                   </IconTile>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.biggestName}>{biggest.category?.name ?? 'Uncategorized'}</Text>
+                    <Text style={styles.biggestName}>{biggest.note || biggest.category?.name || 'Uncategorized'}</Text>
                     <Text style={styles.biggestDate}>{format(new Date(biggest.occurred_at), 'd MMM yyyy')}</Text>
                   </View>
-                  <AmountText value={biggest.amount} type={biggest.type} signed size={fontSize.lg} currency={currency} />
+                  <AmountText value={biggest.amount} type={biggest.type} signed size={fontSize.lg} currency={scopeCurrency} />
                 </View>
               </Card>
             )}
-          </>
-        )}
-
-        {segment === 'transactions' && (
-          <>
-            <Card style={styles.chartCard}>
-              <IncomeExpenseChart
-                data={chartData}
-                granularity={granularity}
-                showPeriodLabel
-                emptyMessage="No transactions in this period."
-                currency={currency}
-              />
-            </Card>
-            <Card style={styles.chartCard}>
-              <DailySpendingChart data={dailySpendingData} currency={currency} />
-            </Card>
-            <Card style={styles.statsCard}>
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Text style={styles.heroLabel}>Avg. Expense</Text>
-                  <AmountText value={avgExpense} type="neutral" size={fontSize.xl} currency={currency} />
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.heroLabel}>Transactions</Text>
-                  <Text style={styles.statCount}>{current.length}</Text>
-                </View>
-              </View>
-            </Card>
-          </>
-        )}
-
-        {segment === 'categories' && (
-          <>
-            <View style={styles.typeToggleWrap}>
-              <Pressable
-                style={[styles.typeSegment, categoryType === 'expense' && styles.typeSegmentActive]}
-                onPress={() => setCategoryType('expense')}
-              >
-                <Text style={[styles.typeSegmentText, categoryType === 'expense' && styles.typeSegmentTextActive]}>
-                  Expense
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.typeSegment, categoryType === 'income' && styles.typeSegmentActive]}
-                onPress={() => setCategoryType('income')}
-              >
-                <Text style={[styles.typeSegmentText, categoryType === 'income' && styles.typeSegmentTextActive]}>
-                  Income
-                </Text>
-              </Pressable>
-            </View>
-
-            {categoryDeltas.length === 0 ? (
-              <Card style={{ marginTop: spacing.md }}>
-                <Text style={styles.emptyText}>No {categoryType} transactions in this period.</Text>
-              </Card>
-            ) : (
-              <>
-                <Card style={styles.chartCard}>
-                  <DonutChart
-                    segments={donutSegments}
-                    total={categoryType === 'expense' ? totalExpense : totalIncome}
-                    currency={currency}
-                  />
-                </Card>
-                <Card style={styles.rankedCard}>
-                  <CategoryBreakdownAccordion
-                    entries={categoryDeltas}
-                    transactions={current}
-                    type={categoryType}
-                    currency={currency}
-                    onPressTransaction={openAdd}
-                    renderRight={(entry) => (
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <AmountText value={entry.amount} type="neutral" size={fontSize.md} currency={currency} />
-                        <DeltaBadge delta={entry.delta} goodDirection={categoryType === 'expense' ? 'down' : 'up'} />
-                      </View>
-                    )}
-                  />
-                </Card>
-              </>
-            )}
-          </>
-        )}
-
-        {segment === 'budgets' && (
-          <>
-            {budgets.length === 0 ? (
-              <Card style={{ marginTop: spacing.lg }}>
-                <Text style={styles.emptyText}>No budgets yet.</Text>
-              </Card>
-            ) : (
-              budgets.map((budget) => {
-                const periods = computeBudgetPeriods(budget, current, from, to);
-                if (periods.length === 0) return null;
-                const isConsistent = computeConsistencyFlag(periods);
-
-                return (
-                  <Card key={budget.id} style={styles.budgetCard}>
-                    <View style={styles.rowBetween}>
-                      <Text style={styles.budgetName}>{budget.name}</Text>
-                      {isConsistent && <Pill label="Frequently over" tone="danger" />}
-                    </View>
-                    {periods.map((p) => {
-                      const progress = p.limit > 0 ? p.spent / p.limit : 0;
-                      const periodLabel =
-                        budget.period_type === 'calendar_month'
-                          ? format(p.periodStart, 'MMMM yyyy')
-                          : `${format(p.periodStart, 'd MMM')} – ${format(p.periodEnd, 'd MMM')}`;
-                      return (
-                        <View key={p.periodStart.toISOString()} style={styles.periodRow}>
-                          <View style={styles.rowBetween}>
-                            <Text style={styles.periodLabel}>{periodLabel}</Text>
-                            <Text style={[styles.periodAmount, { color: STATUS_COLOR[p.status] }]}>
-                              {formatMoney(p.spent, currency)} / {formatMoney(p.limit, currency)}
-                            </Text>
-                          </View>
-                          <View style={{ marginTop: 6 }}>
-                            <ProgressBar progress={progress} status={p.status} />
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </Card>
-                );
-              })
-            )}
-          </>
-        )}
-
-        {segment === 'plans' && (
-          <>
-            {plans.length === 0 ? (
-              <Card style={{ marginTop: spacing.lg }}>
-                <Text style={styles.emptyText}>No plans yet.</Text>
-              </Card>
-            ) : (
-              plans.map((plan) => {
-                const hasTarget = plan.target_amount != null;
-                const progress = hasTarget && plan.target_amount > 0 ? plan.total_spent / plan.target_amount : 0;
-                const rangeSpent = computeRangeSpentByPlan(plan, current);
-                const pace = computePlanPace(plan);
-
-                return (
-                  <Card key={plan.id} style={styles.budgetCard}>
-                    <View style={styles.rowBetween}>
-                      <Text style={styles.budgetName}>{plan.name}</Text>
-                      {pace && <Pill label={PACE_LABEL[pace]} tone={PACE_TONE[pace]} />}
-                    </View>
-                    {hasTarget && (
-                      <View style={{ marginTop: spacing.md }}>
-                        <ProgressBar progress={progress} status="healthy" />
-                        <View style={[styles.rowBetween, { marginTop: 6 }]}>
-                          <Text style={styles.periodLabel}>{Math.round(progress * 100)}% of target</Text>
-                          <Text style={styles.periodLabel}>
-                            {formatMoney(plan.total_spent, currency)} /{' '}
-                            {formatMoney(plan.target_amount, currency)}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                    <View style={styles.planRangeRow}>
-                      <Text style={styles.periodLabel}>Spent in this period</Text>
-                      <AmountText value={rangeSpent} type="neutral" size={fontSize.md} currency={currency} />
-                    </View>
-                  </Card>
-                );
-              })
-            )}
-          </>
-        )}
-        </FadeIn>
+          </FadeIn>
         )}
       </ScrollView>
     </Screen>
@@ -489,8 +482,8 @@ function makeStyles(colors) {
     paddingBottom: spacing.md,
   },
   exportButton: {
-    width: 40,
-    height: 40,
+    width: hitTarget,
+    height: hitTarget,
     borderRadius: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -504,17 +497,33 @@ function makeStyles(colors) {
     letterSpacing: -0.3,
     color: colors.ink,
   },
-  headerSubtitle: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
   scroll: {
     paddingHorizontal: spacing.xl,
     paddingBottom: 120,
   },
-  heroCard: {
+  scopeScroll: {
+    marginTop: spacing.md,
+    flexGrow: 0,
+  },
+  scopeRow: {
+    gap: spacing.sm,
+  },
+  scopeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: hitTarget,
+  },
+  note: {
+    fontFamily: fontFamily.semibold,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+    marginTop: spacing.sm,
+  },
+  sections: {
+    marginTop: spacing.lg,
+  },
+  card: {
     marginBottom: spacing.md,
   },
   heroRow: {
@@ -568,13 +577,20 @@ function makeStyles(colors) {
     fontSize: fontSize.lg,
     color: colors.ink,
   },
-  chartCard: {
-    marginBottom: spacing.md,
-  },
-  biggestCard: {
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
   sectionTitle: {
+    fontFamily: fontFamily.extrabold,
+    fontSize: fontSize.xxl,
+    letterSpacing: -0.2,
+    color: colors.ink,
+  },
+  cardLabel: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
     color: colors.mutedMid,
@@ -602,37 +618,17 @@ function makeStyles(colors) {
     color: colors.muted,
     textAlign: 'center',
   },
-  statsCard: {
-    marginBottom: spacing.md,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    flex: 1,
-    gap: 4,
-  },
-  statCount: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-    letterSpacing: -0.4,
-  },
   typeToggleWrap: {
     flexDirection: 'row',
     backgroundColor: colors.chipBg,
     borderRadius: 14,
     padding: 4,
-    marginBottom: spacing.md,
-    alignSelf: 'flex-start',
-    minWidth: 200,
   },
   typeSegment: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
     borderRadius: 11,
   },
   typeSegmentActive: {
@@ -640,7 +636,7 @@ function makeStyles(colors) {
   },
   typeSegmentText: {
     fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
+    fontSize: fontSize.sm,
     color: colors.muted,
   },
   typeSegmentTextActive: {
@@ -651,8 +647,10 @@ function makeStyles(colors) {
     padding: 0,
     paddingHorizontal: spacing.lg,
   },
-  budgetCard: {
-    marginBottom: spacing.md,
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   budgetName: {
     fontFamily: fontFamily.extrabold,
@@ -673,15 +671,6 @@ function makeStyles(colors) {
   periodAmount: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.sm,
-  },
-  planRangeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
   },
   });
 }

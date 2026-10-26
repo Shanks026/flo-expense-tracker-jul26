@@ -3,18 +3,12 @@ import { format, differenceInCalendarDays } from 'date-fns';
 import useBills, { billStatus } from './useBills';
 import useBudgets, { budgetStatus } from './useBudgets';
 import usePlans from './usePlans';
-import useReportDue from './useReportDue';
 import { formatMoney } from '../lib/money';
 import { isBudgetEnded } from '../lib/budgets';
 import { FLAGS } from '../lib/flags';
 
 const PLAN_ENDING_SOON_DAYS = 7;
-// 'info' (added 11-reports.md Phase 2) sorts after danger/warn — a report
-// being ready is good news, not a problem, and shouldn't outrank an overdue
-// bill or a blown budget for attention.
-const SEVERITY_ORDER = { danger: 0, warn: 1, info: 2 };
-
-const CADENCE_TITLE = { weekly: 'Weekly report ready', monthly: 'Monthly report ready' };
+const SEVERITY_ORDER = { danger: 0, warn: 1 };
 
 const BUDGET_PERIOD_PHRASE = {
   calendar_week: 'this week',
@@ -30,21 +24,9 @@ export default function useAlerts() {
   const { bills, loading: billsLoading } = useBills();
   const { budgets, loading: budgetsLoading } = useBudgets();
   const { plans, loading: plansLoading } = usePlans();
-  const { due: reportDue } = useReportDue();
 
   const alerts = useMemo(() => {
     const list = [];
-
-    if (reportDue) {
-      list.push({
-        id: 'report-due',
-        kind: 'report',
-        severity: 'info',
-        title: CADENCE_TITLE[reportDue.cadence],
-        subtitle: reportDue.period.label,
-        route: '/report',
-      });
-    }
 
     for (const bill of bills) {
       if (!bill.is_active) continue;
@@ -120,7 +102,7 @@ export default function useAlerts() {
     }
 
     return list.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
-  }, [bills, budgets, plans, reportDue]);
+  }, [bills, budgets, plans]);
 
   return { alerts, count: alerts.length, loading: billsLoading || budgetsLoading || plansLoading };
 }

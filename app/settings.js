@@ -12,7 +12,6 @@ import {
   Sunrise,
   Moon,
   Bell,
-  FileText,
   Receipt,
   Landmark,
   BatteryWarning,
@@ -22,15 +21,11 @@ import {
   ChartColumn,
   CalendarClock,
   CalendarDays,
-  Clock,
-  Minus,
-  Plus,
   Cat,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import IconButton from '../components/IconButton';
 import Row, { RowGroup } from '../components/Row';
 import SegmentedChoice from '../components/SegmentedChoice';
 import Skeleton from '../components/Skeleton';
@@ -70,32 +65,12 @@ import {
   DEFAULT_ALLOWED_PACKAGES,
   WATCHED_APP_LABELS,
 } from '../lib/detect';
-import { getReportSettings, setReportSettings, DEFAULT_REPORT_SETTINGS } from '../lib/reports';
 import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
 import { RESET_PERIOD_OPTIONS } from '../lib/periods';
 import AppearanceToggle from '../components/AppearanceToggle';
 import { destructiveHaptic } from '../lib/haptics';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
-
-const CADENCE_OPTIONS = [
-  { value: 'off', label: 'Off' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-];
-
-// value follows JS/date-fns Date#getDay() convention (0=Sun..6=Sat), matching
-// lib/reports.js's `weekday`. Displayed Monday-first, same convention as
-// weekStartsOn:1 elsewhere in the app.
-const WEEKDAY_CHIPS = [
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
-  { value: 0, label: 'Sun' },
-];
 
 // NOT new Date(0, 0, 0, hour, minute) — that resolves to Dec 31, 1899, and
 // India's timezone database applies the *historical* Madras Time offset
@@ -158,12 +133,9 @@ export default function Settings() {
   // DateTimePicker result should write back to.
   const [timePickerField, setTimePickerField] = useState(null);
 
-  const [reportSettings, setReportSettingsState] = useState(DEFAULT_REPORT_SETTINGS);
-  const [showReportTimePicker, setShowReportTimePicker] = useState(false);
-
   // 30-summary-reset-period.md — governs the period Home's hero card and the
   // account switcher sum Income/Expenses over. Read straight off `profile`
-  // (no local state mirror needed, unlike reportSettings above — this has no
+  // (no local state mirror needed — this has no
   // AsyncStorage/server-cron side that needs a separate persisted copy).
   const [showResetDatePicker, setShowResetDatePicker] = useState(false);
   const resetPeriod = profile?.reset_period ?? 'monthly';
@@ -188,18 +160,6 @@ export default function Settings() {
 
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
   const initial = fullName?.[0]?.toUpperCase() ?? '?';
-
-  useEffect(() => {
-    getReportSettings().then(setReportSettingsState);
-  }, []);
-
-  async function persistReportSettings(partial) {
-    const next = await setReportSettings(partial);
-    setReportSettingsState(next);
-    // No local reschedule needed — setReportSettings mirrors to `profiles`
-    // itself (17-server-push-notifications.md Phase 3), and the server
-    // reads that directly on its own cron tick.
-  }
 
   // Switching INTO Custom for the first time (no anchor set yet) defaults the
   // start date to today, not null — lands on a concrete, immediately-visible
@@ -647,75 +607,6 @@ export default function Settings() {
           />
         )}
 
-        <RowGroup title="Reports">
-          <Row icon={FileText} title="Cadence">
-            <SegmentedChoice
-              accessibilityLabel="Report cadence"
-              options={CADENCE_OPTIONS}
-              value={reportSettings.cadence}
-              onChange={(cadence) => persistReportSettings({ cadence })}
-            />
-          </Row>
-          {reportSettings.cadence === 'weekly' && (
-            <Row icon={CalendarDays} title="Day">
-              <SegmentedChoice
-                accessibilityLabel="Report day"
-                options={WEEKDAY_CHIPS}
-                value={reportSettings.weekday}
-                onChange={(weekday) => persistReportSettings({ weekday })}
-              />
-            </Row>
-          )}
-          {reportSettings.cadence === 'monthly' && (
-            <Row
-              icon={CalendarDays}
-              title="Day of month"
-              right={
-                <View style={styles.dayStepper}>
-                  <IconButton
-                    icon={Minus}
-                    size={18}
-                    accessibilityLabel="Earlier day of month"
-                    disabled={reportSettings.dayOfMonth <= 1}
-                    onPress={() => persistReportSettings({ dayOfMonth: Math.max(1, reportSettings.dayOfMonth - 1) })}
-                  />
-                  <Text style={styles.dayStepperValue} accessibilityLabel={`Day ${reportSettings.dayOfMonth}`}>
-                    {reportSettings.dayOfMonth}
-                  </Text>
-                  <IconButton
-                    icon={Plus}
-                    size={18}
-                    accessibilityLabel="Later day of month"
-                    disabled={reportSettings.dayOfMonth >= 31}
-                    onPress={() => persistReportSettings({ dayOfMonth: Math.min(31, reportSettings.dayOfMonth + 1) })}
-                  />
-                </View>
-              }
-            />
-          )}
-          {reportSettings.cadence !== 'off' && (
-            <Row
-              icon={Clock}
-              title="At"
-              value={format(timeOnToday(reportSettings.hour, reportSettings.minute), 'h:mm a')}
-              onPress={() => setShowReportTimePicker(true)}
-            />
-          )}
-        </RowGroup>
-
-        {showReportTimePicker && (
-          <DateTimePicker
-            value={timeOnToday(reportSettings.hour, reportSettings.minute)}
-            mode="time"
-            display="default"
-            onChange={(_event, selected) => {
-              setShowReportTimePicker(false);
-              if (!selected) return;
-              persistReportSettings({ hour: selected.getHours(), minute: selected.getMinutes() });
-            }}
-          />
-        )}
-
         <RowGroup title="Summary Period">
           <Row icon={CircleDollarSign} title="Income & Expenses reset">
             <SegmentedChoice
@@ -925,17 +816,6 @@ function makeStyles(colors) {
     fontSize: fontSize.base,
     color: staticColors.mutedOnDark,
     marginTop: 2,
-  },
-  dayStepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dayStepperValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: type.bodyLg,
-    color: colors.ink,
-    minWidth: 20,
-    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,

@@ -10,7 +10,6 @@ import AmountText from '../../components/AmountText';
 import CategoryIcon from '../../components/CategoryIcon';
 import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import Pill from '../../components/Pill';
-import ReportReadyCard from '../../components/ReportReadyCard';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import HomeHero from '../../components/HomeHero';
@@ -175,8 +174,6 @@ export default function Home() {
           resetPeriod={profile?.reset_period}
           loading={heroLoading}
         />
-
-        <ReportReadyCard />
 
         {/* Close-the-day ritual (18-gamification-ritual-and-ledger.md Phase 3) */}
         <TodayCard />
