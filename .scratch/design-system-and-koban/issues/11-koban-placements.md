@@ -26,6 +26,18 @@ Spec: .claude/features/37-design-system-and-koban.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- **Onboarding opener:** `<Koban pose="hello" mood="happy" scarf>` (136 dp) replaces the "hey" PNG.
+- **Coach marks:** a 40 dp Koban in the `tip` pose replaces the PNG in the bubble.
+- **Streak screen hero:** a 92 dp Koban stands at the card's right edge (only his ground shadow is cropped), replacing the cropped poster PNG and its alpha-bbox geometry. His mood follows the streak: happy once today is logged, curious while the streak waits for today, sleepy at 0. He sits beside the day count, never a money figure.
+- **Streak celebration:** `jump` + `joy` + scarf on a milestone and `hello` + `happy` on day 1 replace the 3D badge art (`STREAK_BADGE_ART`). The surface is always dark.
+- Each placement passes `surface` (the theme's mode, or dark on the celebration), so his ground shadow suits the background. Reduced motion stills him everywhere (inside the component).
+- **Empty states:** none shows a mascot today (`assets/mascot/budget.png` was unused), so there was nothing to swap. Specs 38/39 can place Koban as they design their empty states.
+- `components/OnboardingMascot.js` was removed (no users left). The raster images stay in `assets/`. The only remaining raster mascot is in the flagged-off Trophy Room.
+- Open (emulator checks paused): each placement on the device in light and dark, no overlap with figures, still with reduced motion.

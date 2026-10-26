@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
-import OnboardingMascot from '../../../components/OnboardingMascot';
+import Koban from '../../../components/koban/Koban';
 import { useToast } from '../../../components/Toast';
 import { fontFamily, fontSize, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
@@ -11,7 +11,6 @@ import { setIntroSeen } from '../../../lib/onboardingDraft';
 import { track, trackStepViewed } from '../../../lib/track';
 import useAnalyticsConsent from '../../../hooks/useAnalyticsConsent';
 
-const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
 
 // The opener (35-onboarding-v3.md) — the whole pre-auth intro now. Koban, one
 // line of value, and Continue with Google; email sign-up sits behind "Other
@@ -24,7 +23,7 @@ const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
 // through wait in the queue; the first sign-in copies it to a new account's
 // profile (lib/track.js).
 export default function Opener() {
-  const { colors } = useTheme();
+  const { colors, modeId } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { showToast } = useToast();
@@ -71,7 +70,7 @@ export default function Opener() {
       bg="light"
       hero={
         <View style={styles.heroWrap}>
-          <OnboardingMascot image={KOBAN_WAVE} size={190} style={styles.mascotSpacing} />
+          <Koban size={136} pose="hello" mood="happy" scarf surface={modeId} style={styles.mascotSpacing} />
           <Text style={styles.value}>Know where your money goes, a few seconds a day.</Text>
         </View>
       }

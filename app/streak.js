@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Snowflake, Flag, Flame } from 'lucide-react-native';
 import {
@@ -14,34 +14,22 @@ import {
   isAfter,
 } from 'date-fns';
 import Card from '../components/Card';
+import Koban from '../components/koban/Koban';
 import IconTile from '../components/IconTile';
 import { StreakFlame } from '../components/StreakDays';
 import useStreak from '../hooks/useStreak';
 import { streakHeadline } from '../lib/koban';
 import { MILESTONES, MAX_FREEZES } from '../lib/streak';
 
-const KOBAN_STREAK = require('../assets/mascot/streak.png');
 import { fontFamily, fontSize, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
 
-// Hero mascot geometry — the cat is a POSTER on the card's right edge: large,
-// anchored to the top, and deliberately CROPPED by the card's bottom edge
-// (`hero` sets `overflow: 'hidden'`) so only its top half shows, exactly like
-// a poster whose bottom runs off the frame. Everything below is derived from
-// KOBAN_STREAK's own alpha-bbox — measured, not eyeballed: within its square
-// canvas the art occupies 21.3%→84.7% vertically and 22.1%→78.5%
-// horizontally, so a frame offset has to account for that transparent margin
-// or the visible cat lands nowhere near where the numbers say.
+// Koban stands at the hero card's right edge (37-design-system-and-koban.md),
+// beside the day count — never on a money figure. His width; the card is
+// tall enough that only the ground shadow is cropped.
 const HERO_CARD_MIN_HEIGHT = 132;
-const HERO_CAT_FRAME = 276;
-const HERO_CAT_CONTENT_TOP = 0.213;
-const HERO_CAT_CONTENT_RIGHT = 0.785;
-// Start the visible art ~6px below the card's top edge; whatever falls past
-// the card's bottom (the cat's legs + the lower flame) gets cropped away.
-const HERO_CAT_TOP = 6 - HERO_CAT_CONTENT_TOP * HERO_CAT_FRAME;
-// Land the flame's right tip ~14px inside the card's right edge.
-const HERO_CAT_RIGHT = 14 - (1 - HERO_CAT_CONTENT_RIGHT) * HERO_CAT_FRAME;
+const HERO_KOBAN_SIZE = 92;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 // The streak's own screen — the destination behind Home's header flame.
@@ -52,7 +40,7 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // day as logged, no-spend or frozen. The Milestones tab, its badge wall and
 // reward sheet, and the manual "use a freeze" card went with the economy.
 export default function StreakScreen() {
-  const { colors } = useTheme();
+  const { colors, modeId } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { current, loggedToday, isNewStreak, history, freezesHeld, loading } = useStreak();
 
@@ -87,9 +75,8 @@ export default function StreakScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Count and label left; the cat on the right is a large top-anchored
-            poster cropped by the card's bottom edge (see the HERO_CAT_*
-            geometry above). */}
+        {/* Count and label left; Koban on the right, happy once today is
+            logged, curious while the streak waits for today, asleep at 0. */}
         <Card style={styles.hero}>
           <View style={styles.heroText}>
             <View style={styles.heroCountRow}>
@@ -99,7 +86,12 @@ export default function StreakScreen() {
             {/* "day streak" regardless of count: "days streak" is not English. */}
             <Text style={[styles.caption, !lit && styles.captionEmpty]}>day streak!</Text>
           </View>
-          <Image source={KOBAN_STREAK} style={styles.heroCatPoster} resizeMode="contain" />
+          <Koban
+            size={HERO_KOBAN_SIZE}
+            mood={loggedToday ? 'happy' : lit ? 'curious' : 'sleepy'}
+            surface={modeId}
+            style={styles.heroKoban}
+          />
         </Card>
 
         <Text style={styles.headline}>{streakHeadline({ current, loggedToday, isNewStreak })}</Text>
@@ -215,30 +207,24 @@ function makeStyles(colors) {
     paddingVertical: spacing.xl,
     marginBottom: spacing.lg,
     minHeight: HERO_CARD_MIN_HEIGHT,
-    // The whole point of the poster treatment — crops the oversized mascot at
-    // the card's own rounded edges so only its top half shows.
+    // Crops Koban's ground shadow at the card's rounded bottom edge.
     overflow: 'hidden',
   },
   heroText: {
     flex: 1,
-    // The mascot is absolutely positioned (out of flow), so the text needs its
-    // own right inset or the count/caption would run underneath it.
-    paddingRight: HERO_CAT_FRAME * (HERO_CAT_CONTENT_RIGHT - 0.35),
+    // Koban is absolutely positioned (out of flow), so the text keeps clear
+    // of him.
+    paddingRight: HERO_KOBAN_SIZE,
   },
   heroCountRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  // See the HERO_CAT_* geometry block at the top of this file — top-anchored
-  // and oversized on purpose so the card's bottom edge slices through the cat,
-  // leaving only its top half on the card like a cropped poster.
-  heroCatPoster: {
+  heroKoban: {
     position: 'absolute',
-    top: HERO_CAT_TOP,
-    right: HERO_CAT_RIGHT,
-    width: HERO_CAT_FRAME,
-    height: HERO_CAT_FRAME,
+    right: spacing.md,
+    bottom: -10,
   },
   count: {
     fontFamily: fontFamily.extrabold,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { View, Text, Image, Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import Koban from './koban/Koban';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
@@ -8,7 +9,6 @@ import useProfile from '../hooks/useProfile';
 import { useRewardBurst } from './RewardBurst';
 import { useAnyMomentActive } from '../lib/momentQueue';
 
-const KOBAN = require('../assets/mascot/hey_screen.png');
 
 // Coach marks (35-onboarding-v3.md): a Koban moment that rings one element,
 // says one line, and goes away on a tap — shown once per mark, per user, and
@@ -66,7 +66,7 @@ function useSeen(userId, id) {
 // `active`: the owning screen's own condition (e.g. "on Home", "has logged").
 // `after`: another mark's id that must be seen first.
 export default function CoachMark({ id, targetRef, text, active = true, after = null }) {
-  const { colors } = useTheme();
+  const { colors, modeId } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { session } = useAuth();
@@ -118,7 +118,7 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
       <Pressable style={styles.backdrop} onPress={() => markSeen(userId, id)} accessibilityRole="button">
         <View style={[styles.ring, ring]} pointerEvents="none" />
         <View style={[styles.bubble, bubblePosition, { maxWidth: screenWidth - spacing.lg * 2 }]}>
-          <Image source={KOBAN} style={styles.koban} resizeMode="contain" />
+          <Koban size={40} pose="tip" mood="happy" surface={modeId} style={styles.koban} />
           <View style={styles.bubbleBody}>
             <Text style={styles.text}>{text}</Text>
             <Text style={styles.hint}>Tap anywhere to continue</Text>
@@ -154,8 +154,7 @@ function makeStyles(colors) {
       padding: spacing.lg,
     },
     koban: {
-      width: 52,
-      height: 52,
+      alignSelf: 'flex-end',
     },
     bubbleBody: {
       flex: 1,

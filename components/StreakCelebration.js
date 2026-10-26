@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { View, StyleSheet, Modal, Image } from 'react-native';
+import { View, StyleSheet, Modal } from 'react-native';
+import Koban from './koban/Koban';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
 import { addDays, endOfDay, format } from 'date-fns';
@@ -11,9 +12,7 @@ import { useAuth } from '../lib/AuthContext';
 import { enqueue, PRIORITY } from '../lib/momentQueue';
 import { track } from '../lib/track';
 import { pickRecap, recapCta } from '../lib/koban';
-import { STREAK_BADGE_ART } from '../lib/trophies';
 
-const KOBAN_STREAK = require('../assets/mascot/streak.png');
 // Static palette (theme/tokens) a permanently dark celebration screen.
 import { colors, fontFamily, fontSize, spacing } from '../theme/tokens';
 
@@ -71,10 +70,16 @@ export function StreakCelebrationMoment({ payload, onDone }) {
         {/* Content centers in the space above the button, which sits in its
             own footer pinned to the bottom edge. */}
         <View style={styles.content}>
-          {/* The illustrated badge for a milestone day; day 1 has no badge, so
-              it gets the Koban streak mascot. */}
+          {/* Koban: jumping for joy (in his scarf) on a milestone, waving on
+              the day a streak starts. The screen is always dark. */}
           <Animated.View entering={ZoomIn.duration(400)} style={styles.badgeWrap}>
-            <Image source={STREAK_BADGE_ART[current] ?? KOBAN_STREAK} style={styles.badgeArt} resizeMode="contain" />
+            <Koban
+              size={136}
+              pose={isMilestone ? 'jump' : 'hello'}
+              mood={isMilestone ? 'joy' : 'happy'}
+              scarf={isMilestone}
+              surface="dark"
+            />
           </Animated.View>
 
           <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={styles.title}>
@@ -125,10 +130,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
-  },
-  badgeArt: {
-    width: 200,
-    height: 200,
   },
   // Dialed back from fontSize.hero (30) per direct feedback — the varied
   // recap titles run longer than a rank name ("Streak holds at day 30" etc.),
