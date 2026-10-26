@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Path, Ellipse, Circle, G, Defs, ClipPath } from 'react-native-svg';
 import Animated, {
@@ -12,7 +12,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { VIEWBOX, PALETTE, SHAPES, ARMS, STRIPES, WHISKERS, EYES, WIDTHS, JOINTS } from './art';
+import { VIEWBOX, PALETTE, SHAPES, ARMS, WIDTHS, JOINTS } from './art';
+import { MOODS, FaceFeatures, OpenEyes } from './faces';
 
 // Koban, FLO's ginger tabby (37-design-system-and-koban.md). One component for
 // every placement, so he's the same character everywhere. The drawing itself
@@ -20,7 +21,8 @@ import { VIEWBOX, PALETTE, SHAPES, ARMS, STRIPES, WHISKERS, EYES, WIDTHS, JOINTS
 // illustrations); this file only stacks and moves it.
 //
 //   size     width in dp (height follows the art's aspect ratio)
-//   mood     expression — only 'neutral' so far (ticket 09 adds the rest)
+//   mood     expression: neutral, happy, joy, wink, surprised, curious,
+//            focus, content, worried, sleepy (./faces.js)
 //   pose     body — only 'idle' so far (ticket 10 adds the movement library)
 //   loop     false = a still Koban
 //   scarf    the optional lime zigzag scarf
@@ -31,7 +33,6 @@ import { VIEWBOX, PALETTE, SHAPES, ARMS, STRIPES, WHISKERS, EYES, WIDTHS, JOINTS
 // stays on the UI thread. Reduced motion (or loop={false}) makes him still.
 // Placement rule: character moments only, never on a money figure.
 
-const MOODS = ['neutral'];
 const POSES = ['idle'];
 const EASE = Easing.bezier(0.45, 0, 0.55, 1);
 
@@ -48,6 +49,7 @@ export default function Koban({
   if (__DEV__ && (!MOODS.includes(mood) || !POSES.includes(pose))) {
     console.warn(`Koban: mood "${mood}" / pose "${pose}" isn't drawn yet; showing neutral idle.`);
   }
+  const shownMood = MOODS.includes(mood) ? mood : 'neutral';
   const width = size;
   const height = (size * VIEWBOX.h) / VIEWBOX.w;
   const scale = size / VIEWBOX.w;
@@ -63,6 +65,18 @@ export default function Koban({
   const blink = useSharedValue(1);
   const earL = useSharedValue(0);
   const earR = useSharedValue(0);
+
+  // Crossfade between moods (~200 ms). Reduced motion swaps instantly.
+  const [faces, setFaces] = useState({ current: shownMood, previous: null });
+  const faceFade = useSharedValue(1);
+  useEffect(() => {
+    if (shownMood === faces.current) return;
+    setFaces({ current: shownMood, previous: faces.current });
+    faceFade.value = 0;
+    faceFade.value = reduceMotion ? 1 : withTiming(1, { duration: 200, easing: EASE });
+  }, [shownMood]);
+  const currentFaceStyle = useAnimatedStyle(() => ({ opacity: faceFade.value }));
+  const previousFaceStyle = useAnimatedStyle(() => ({ opacity: 1 - faceFade.value }));
 
   useEffect(() => {
     const all = [breath, head, tail, blink, earL, earR];
@@ -187,37 +201,18 @@ export default function Koban({
               turning with the outer ears. */}
           {layer(<Path d={SHAPES.innerEarL} fill={PALETTE.innerEar} />, earLStyle, JOINTS.earL)}
           {layer(<Path d={SHAPES.innerEarR} fill={PALETTE.innerEar} />, earRStyle, JOINTS.earR)}
-          {layer(
-            <>
-              <Path d={SHAPES.muzzle} fill={PALETTE.cream} />
-              {STRIPES.map((s) => (
-                <Path key={s.d} d={s.d} stroke={PALETTE.stripe} strokeWidth={s.w} strokeLinecap="round" fill="none" />
-              ))}
-              <Ellipse cx={99} cy={152} rx={11} ry={6.5} fill={PALETTE.blush} />
-              <Ellipse cx={201} cy={152} rx={11} ry={6.5} fill={PALETTE.blush} />
-              <Path d={SHAPES.nose} fill={PALETTE.nose} />
-              <G stroke={PALETTE.whisker} strokeWidth={1.6} strokeLinecap="round" fill="none">
-                {WHISKERS.map((d) => (
-                  <Path key={d} d={d} />
-                ))}
-              </G>
-            </>
-          )}
-          {layer(
-            <>
-              {EYES.xs.map((x) => (
-                <G key={x}>
-                  <Ellipse cx={x} cy={EYES.y} rx={18} ry={21} fill={PALETTE.eyeWhite} />
-                  <Ellipse cx={x + 1} cy={EYES.y + 1} rx={13} ry={15} fill={PALETTE.iris} />
-                  <Ellipse cx={x + 1} cy={EYES.y + 2} rx={8.5} ry={10.5} fill={PALETTE.pupil} />
-                  <Circle cx={x + 6} cy={EYES.y - 6} r={4.6} fill="#FFFFFF" />
-                  <Circle cx={x - 4} cy={EYES.y + 9} r={2} fill="#FFFFFF" />
-                </G>
-              ))}
-            </>,
-            eyesStyle,
-            JOINTS.eyes
-          )}
+          {/* The face: the one leaving fades out while the new one fades in,
+              so a mood change eases rather than snaps. Only open eyes blink. */}
+          {faces.previous && faces.previous !== faces.current ? (
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, previousFaceStyle]}>
+              {layer(<FaceFeatures mood={faces.previous} />)}
+              {layer(<OpenEyes mood={faces.previous} />, eyesStyle, JOINTS.eyes)}
+            </Animated.View>
+          ) : null}
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, currentFaceStyle]}>
+            {layer(<FaceFeatures mood={faces.current} />)}
+            {layer(<OpenEyes mood={faces.current} />, eyesStyle, JOINTS.eyes)}
+          </Animated.View>
         </Animated.View>
       </Animated.View>
     </View>
