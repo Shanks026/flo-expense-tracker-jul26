@@ -10,6 +10,7 @@ import { claimSpin } from '../lib/rewardsMutations';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { getTheme } from '../lib/cardThemes';
 import { lighten } from '../lib/color';
+// Static palette (theme/tokens) a permanently dark screen (economy, flagged off).
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 
 // 20-milestone-spin-wheel.md Phase 1 — replaces components/MilestoneChest.js.

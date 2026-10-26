@@ -6,6 +6,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react-native';
 import Card from '../components/Card';
 import IconTile from '../components/IconTile';
 import CategoryIcon from '../components/CategoryIcon';
+// Static palette (theme/tokens) only for the white plus on the always-dark add button.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';

@@ -1,4 +1,5 @@
 import { SvgXml } from 'react-native-svg';
+// Static palette (theme/tokens) the default colour only; callers pass the theme ink.
 import { colors } from '../theme/tokens';
 
 // The bare zigzag "flow line" mark, no lime badge / no wordmark — for

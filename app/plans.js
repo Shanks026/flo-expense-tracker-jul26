@@ -11,6 +11,7 @@ import Pill from '../components/Pill';
 import Button from '../components/Button';
 import Skeleton from '../components/Skeleton';
 import FadeIn from '../components/FadeIn';
+// Static palette (theme/tokens) only for text on the dark plan card.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import usePlans from '../hooks/usePlans';

@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FileText, ChevronRight } from 'lucide-react-native';
 import Card from './Card';
+// Static palette (theme/tokens) only for the dark card.
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useReportDue from '../hooks/useReportDue';

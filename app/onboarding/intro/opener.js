@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
 import OnboardingMascot from '../../../components/OnboardingMascot';
 import { useToast } from '../../../components/Toast';
-import { colors, fontFamily, fontSize, spacing } from '../../../theme/tokens';
+import { fontFamily, fontSize, spacing } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
 import { useAuth } from '../../../lib/AuthContext';
 import { setIntroSeen } from '../../../lib/onboardingDraft';
 import { track, trackStepViewed } from '../../../lib/track';
@@ -23,6 +24,8 @@ const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
 // through wait in the queue; the first sign-in copies it to a new account's
 // profile (lib/track.js).
 export default function Opener() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { showToast } = useToast();
   const { signInWithGoogle } = useAuth();
@@ -90,9 +93,7 @@ export default function Opener() {
         <Switch
           value={consent}
           onValueChange={setConsent}
-          // Pinned to the static default palette like the rest of this
-          // pre-auth screen (see OnboardingScreen), which is the theme a
-          // signed-out user sees.
+          // Themed like the rest of onboarding (System by default, spec 37).
           trackColor={{ false: colors.mutedLight, true: colors.brand }}
           thumbColor={colors.surface}
           accessibilityLabel="Share anonymous usage to help improve FLO"
@@ -102,7 +103,8 @@ export default function Opener() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   // `alignSelf: 'stretch'` overrides OnboardingScreen's hero box (which
   // shrink-wraps to content via `alignItems: 'flex-start'`) so this group
   // centres against the FULL screen width, not just against its own children.
@@ -145,4 +147,5 @@ const styles = StyleSheet.create({
   linkBold: {
     fontFamily: fontFamily.extrabold,
   },
-});
+  });
+}

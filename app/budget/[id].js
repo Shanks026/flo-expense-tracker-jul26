@@ -10,6 +10,7 @@ import ProgressBar from '../../components/ProgressBar';
 import AmountText from '../../components/AmountText';
 import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
+// Static palette (theme/tokens) only for text on the dark summary card.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import useBudgetDetail from '../../hooks/useBudgetDetail';

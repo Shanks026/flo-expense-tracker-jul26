@@ -11,6 +11,7 @@ import Pill from '../components/Pill';
 import CategoryIcon from '../components/CategoryIcon';
 import Skeleton from '../components/Skeleton';
 import FadeIn from '../components/FadeIn';
+// Static palette (theme/tokens) only for white text on the always-dark pay button.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useBills, { billStatus } from '../hooks/useBills';

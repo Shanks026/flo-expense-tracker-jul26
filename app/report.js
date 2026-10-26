@@ -14,6 +14,7 @@ import DonutChart from '../components/DonutChart';
 import CategoryBreakdownAccordion from '../components/CategoryBreakdownAccordion';
 import ReportPeriodPicker from '../components/ReportPeriodPicker';
 import { useToast } from '../components/Toast';
+// Static palette (theme/tokens) only for the dark headline card and danger/warn, which are the same in both modes.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useAnalyticsData from '../hooks/useAnalyticsData';

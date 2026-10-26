@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -19,6 +18,7 @@ import Button from '../components/Button';
 import ArrowMark from '../components/ArrowMark';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { resolveColors, DEFAULT_ACCENT_ID } from '../theme/themes';
+import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import { trackStepViewed } from '../lib/track';
 
@@ -37,13 +37,11 @@ export default function SignIn() {
   // flash). A fixed palette means sign-in never re-themes; the account's
   // theme lands on Home, where it belongs. (The shared <Button> still uses
   // the active accent for its fill — a single element, brief, acceptable.)
-  // Since spec 37 the fixed palette follows the phone's own light/dark
-  // setting (System is everyone's default), still independent of the account.
-  const systemScheme = useColorScheme();
-  const colors = useMemo(
-    () => resolveColors(DEFAULT_ACCENT_ID, systemScheme === 'dark' ? 'dark' : 'light'),
-    [systemScheme]
-  );
+  // Since spec 37 the accent is fixed, so only the mode can differ: sign-in
+  // follows the active Appearance (System by default) like onboarding and
+  // the status bar, and keeps the fixed accent.
+  const { modeId } = useTheme();
+  const colors = useMemo(() => resolveColors(DEFAULT_ACCENT_ID, modeId), [modeId]);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const params = useLocalSearchParams();
@@ -136,7 +134,7 @@ export default function SignIn() {
           <View style={styles.spacerTop} />
 
           <View style={styles.brandRow}>
-            <ArrowMark size={52} />
+            <ArrowMark size={52} color={colors.ink} />
           </View>
 
           <View style={{ height: 20 }} />

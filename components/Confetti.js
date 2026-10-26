@@ -8,6 +8,7 @@ import Animated, {
   interpolate,
   Easing,
 } from 'react-native-reanimated';
+// Static palette (theme/tokens) brand and celebration fills, the same in both modes.
 import { colors, radii } from '../theme/tokens';
 import { CATEGORY_COLORS } from './CategoryIcon';
 

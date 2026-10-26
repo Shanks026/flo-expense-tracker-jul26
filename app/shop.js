@@ -5,7 +5,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronLeft, CircleDollarSign, Check, Lock, TrendingUp, TrendingDown } from 'lucide-react-native';
 import CardThemeSurface from '../components/CardThemeSurface';
 import AmountText from '../components/AmountText';
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';

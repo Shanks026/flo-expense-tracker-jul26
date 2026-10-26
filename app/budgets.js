@@ -11,6 +11,7 @@ import Pill from '../components/Pill';
 import CategoryIcon from '../components/CategoryIcon';
 import Skeleton from '../components/Skeleton';
 import FadeIn from '../components/FadeIn';
+// Static palette (theme/tokens) only for danger/warn, which are the same in both modes.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useBudgets, { budgetStatus } from '../hooks/useBudgets';

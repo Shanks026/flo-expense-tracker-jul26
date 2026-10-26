@@ -10,6 +10,7 @@ import Pill from '../../components/Pill';
 import CategoryIcon from '../../components/CategoryIcon';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
+// Static palette (theme/tokens) only for text on the dark summary card.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import useTransactions from '../../hooks/useTransactions';

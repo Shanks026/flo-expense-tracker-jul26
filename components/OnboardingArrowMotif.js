@@ -1,5 +1,6 @@
 import { View, useWindowDimensions } from 'react-native';
 import { SvgXml } from 'react-native-svg';
+// Static palette on purpose: a faint lime fill reads the same in both modes.
 import { colors } from '../theme/tokens';
 
 // Where the motif's box CENTRE sits, as a fraction of screen height — measured

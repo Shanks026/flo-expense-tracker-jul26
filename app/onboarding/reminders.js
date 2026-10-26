@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
-import { colors, radii } from '../../theme/tokens';
+import { radii } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../../lib/AuthContext';
 import { useOnboarding } from '../../lib/onboarding';
 import useProfile from '../../hooks/useProfile';
@@ -24,6 +25,8 @@ import { trackStepViewed } from '../../lib/track';
 // server doesn't count a nudge the user never agreed to. Bill reminders keep
 // their column default; without a token nothing is delivered anyway.
 export default function OnboardingReminders() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   // Set by the first-expense step after a save, for the "Logged." opener.
   const { logged } = useLocalSearchParams();
@@ -79,7 +82,8 @@ export default function OnboardingReminders() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   heroTile: {
     width: 66,
     height: 66,
@@ -88,4 +92,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+  });
+}

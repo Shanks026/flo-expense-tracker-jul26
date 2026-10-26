@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Receipt } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
-import { colors, radii } from '../../theme/tokens';
+import { radii } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import { trackStepViewed } from '../../lib/track';
 
 const REMINDER_ASK = '/onboarding/reminders';
@@ -18,6 +19,8 @@ const REMINDER_ASK = '/onboarding/reminders';
 // The buttons here only show if the sheet is closed without leaving (it never
 // is in the normal flow, since closing moves on): one reopens it, one skips.
 export default function FirstExpense() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { openAdd } = useAddTransactionSheet();
   const leftRef = useRef(false);
@@ -58,7 +61,8 @@ export default function FirstExpense() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   heroTile: {
     width: 66,
     height: 66,
@@ -67,4 +71,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+  });
+}

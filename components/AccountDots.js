@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, interpolateColor } from 'react-native-reanimated';
+// Static palette (theme/tokens) only for the dots on the dark hero card.
 import { colors as staticColors } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 

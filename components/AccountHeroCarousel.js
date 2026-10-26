@@ -13,6 +13,7 @@ import { useAddAccountSheet } from './AddAccountSheet';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import useEntitlement from '../hooks/useEntitlement';
 import { FREE_LIMITS } from '../lib/pro';
+// Static palette (theme/tokens) only for text on the dark hero cards.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { formatMoney } from '../lib/currency';

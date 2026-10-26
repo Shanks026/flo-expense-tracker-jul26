@@ -13,6 +13,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
 import { claimRank } from '../lib/rewardsMutations';
 import { getTheme } from '../lib/cardThemes';
+// Static palette (theme/tokens) a permanently dark screen (economy, flagged off).
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { setMomentBlocker as setMomentActive, useOtherMomentActive } from '../lib/momentQueue';
 

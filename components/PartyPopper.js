@@ -1,4 +1,5 @@
 import Svg, { Path, Circle } from 'react-native-svg';
+// Static palette (theme/tokens) drawn for a light surface (currently unused).
 import { colors } from '../theme/tokens';
 import { CATEGORY_COLORS } from './CategoryIcon';
 

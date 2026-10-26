@@ -13,6 +13,7 @@ import Button from '../../../components/Button';
 import CategoryIcon from '../../../components/CategoryIcon';
 import Switch from '../../../components/Switch';
 import DonutChart from '../../../components/DonutChart';
+// Static palette (theme/tokens) only for text on the dark summary card.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { usePlan } from '../../../hooks/usePlans';

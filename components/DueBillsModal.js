@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
 import { CalendarClock } from 'lucide-react-native';
 import { endOfDay, format } from 'date-fns';
+// Static palette (theme/tokens) only for white text on the always-dark pay button.
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';

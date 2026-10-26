@@ -4,6 +4,7 @@ import { BottomSheetModal, BottomSheetFlatList, BottomSheetBackdrop } from '@gor
 import { useRouter } from 'expo-router';
 import { X, PiggyBank } from 'lucide-react-native';
 import { format } from 'date-fns';
+// Static palette (theme/tokens) a dark sheet (economy, flagged off).
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';

@@ -14,6 +14,7 @@ import { pickRecap, recapCta } from '../lib/koban';
 import { STREAK_BADGE_ART } from '../lib/trophies';
 
 const KOBAN_STREAK = require('../assets/mascot/streak.png');
+// Static palette (theme/tokens) a permanently dark celebration screen.
 import { colors, fontFamily, fontSize, spacing } from '../theme/tokens';
 
 // Streak celebrations as moment-queue moments (34-streak-only.md): the day a

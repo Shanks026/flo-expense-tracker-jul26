@@ -3,14 +3,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from './Button';
 import OnboardingReveal from './OnboardingReveal';
 import OnboardingArrowMotif from './OnboardingArrowMotif';
+// Static palette (theme/tokens) only for the lime `brand` screens and the lime
+// primary button, which read the same in both modes; `light` reads the theme.
 import { colors, spacing, radii, fontFamily, fontSize } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 // The v2 onboarding scaffold. Two background modes, chosen per screen to make
-// the flow "cut" like an edited video (see 12-personal-onboarding.md). No dark/
-// black background anywhere in onboarding — a user's explicit call — so this
-// is deliberately two modes, not three:
+// the flow "cut" like an edited video (see 12-personal-onboarding.md):
 //
-//   light — the workhorse (bg canvas, ink text). Emphasis words go `colors.income`
+//   light — the workhorse (the theme's bg canvas and ink text). Since spec 37
+//           it follows Appearance like the rest of the app, System by
+//           default, so on a dark phone onboarding is dark too (the person's
+//           call, 2026-10-26; it reverses the earlier "no dark background in
+//           onboarding" rule). Emphasis words go `colors.income`
 //           (deep lime) — raw `colors.brand` fails contrast on white, a rule
 //           codified in theme/tokens.js. The thin progress bar lives here.
 //   brand — full lime fill, ink text. Primary button is `dark` (a lime button on
@@ -26,8 +31,9 @@ import { colors, spacing, radii, fontFamily, fontSize } from '../theme/tokens';
 // primary button's own solid background already carries the "this is the
 // main action" hierarchy — the secondary text itself doesn't need to be
 // muted on top of that to read as secondary.
+const lightPalette = (theme) => ({ bg: theme.bg, title: theme.ink, subtitle: theme.muted, eyebrow: theme.income, primary: 'primary', secondary: theme.ink, track: theme.completedTrack, fill: theme.brand });
+// `brand` is a lime fill with ink text, the same in both modes.
 const PALETTES = {
-  light: { bg: colors.bg, title: colors.ink, subtitle: colors.muted, eyebrow: colors.income, primary: 'primary', secondary: colors.ink, track: colors.completedTrack, fill: colors.brand },
   brand: { bg: colors.brand, title: colors.ink, subtitle: colors.ink, eyebrow: colors.ink, primary: 'dark', secondary: colors.ink, track: colors.ink, fill: colors.ink },
 };
 
@@ -82,7 +88,8 @@ export default function OnboardingScreen({
   footerNote, // a node (e.g. the opener's "Sign in" escape hatch)
   children,
 }) {
-  const p = PALETTES[bg] ?? PALETTES.light;
+  const { colors: theme } = useTheme();
+  const p = bg === 'brand' ? PALETTES.brand : lightPalette(theme);
   const showBar = typeof progress === 'number';
   // The arrow motif calls for a top/bottom SPLIT — the vector owns one half,
   // the text sits toward the other. But "toward" is not "flush against the

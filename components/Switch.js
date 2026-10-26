@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Pressable, Animated, StyleSheet, Platform } from 'react-native';
+// Static palette (theme/tokens) only for the white thumb, the same in both modes.
 import { colors as staticColors } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 

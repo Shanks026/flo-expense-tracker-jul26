@@ -17,6 +17,14 @@ Spec: .claude/features/37-design-system-and-koban.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- **Onboarding now follows Appearance (System by default).** That was the person's call on 2026-10-26: people couldn't get dark mode, and it reverses the old "no dark background in onboarding" rule. `OnboardingScreen`'s `light` palette reads the theme; the lime `brand` screens stay lime with ink in both modes. The opener, the reminder and first-expense steps moved to `makeStyles(colors)`. The mascot placeholder reads the theme. Sign-in follows the active Appearance too, and its logo mark takes the theme ink.
+- **Real dark-mode bugs fixed:** `StreakFlame` (the streak screen calendar and legend) painted pale light-mode no-spend and empty cells on dark; it now reads the theme, and only its `dark` (celebration) cells keep the static ones. `ProBadge`'s overlay ring now matches the theme background.
+- **Everything else is deliberate and now says so.** Every remaining static import has a "Static palette (theme/tokens) …" note naming why: a permanently dark surface (`Card dark` / `emphasisBg` text, the Pro screen, celebrations), white on an always-dark button, the Switch thumb, lime fills, or danger/warn, which are mode-independent. All of ticket 02's 34 `mutedOnDark*` uses were confirmed to be on dark surfaces. Two unused static imports were removed (shop, plan history).
+- Open (emulator checks paused): a dark-mode pass over every main screen, sheet and onboarding step, and light mode unchanged.

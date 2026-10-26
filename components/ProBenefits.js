@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Layers, Target, Calendar, FileText, Users } from 'lucide-react-native';
+// Static palette (theme/tokens) only for the `dark` prop.
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { PRO_BENEFITS } from '../lib/pro';

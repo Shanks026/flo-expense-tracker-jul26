@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Text, StyleSheet, AccessibilityInfo } from 'react-native';
+// Static palette (theme/tokens) only for the `dark` prop (amounts on a permanently dark card).
 import { colors as staticColors, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { formatAmountNumber, currencySymbol } from '../lib/currency';

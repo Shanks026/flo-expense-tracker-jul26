@@ -8,6 +8,7 @@ import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
 import Switch from '../components/Switch';
 import Skeleton from '../components/Skeleton';
+// Static palette (theme/tokens) only for text on the dark profile card and the danger button.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';

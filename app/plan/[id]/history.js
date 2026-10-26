@@ -11,7 +11,7 @@ import CategoryIcon from '../../../components/CategoryIcon';
 import AmountText from '../../../components/AmountText';
 import Pill from '../../../components/Pill';
 import Button from '../../../components/Button';
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
+import { fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { formatMoney } from '../../../lib/currency';
 import { usePlan } from '../../../hooks/usePlans';

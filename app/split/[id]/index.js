@@ -25,6 +25,7 @@ import Pill from '../../../components/Pill';
 import Button from '../../../components/Button';
 import Skeleton from '../../../components/Skeleton';
 import { memberInitial } from '../../../components/SplitMemberChip';
+// Static palette (theme/tokens) only for text on the dark hero card.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import useSplit from '../../../hooks/useSplit';

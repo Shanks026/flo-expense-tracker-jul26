@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import { View, Text, Image, StyleSheet, AccessibilityInfo } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { Star, Snowflake } from 'lucide-react-native';
+// Static palette (theme/tokens) a dark overlay (economy, flagged off).
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { FLAGS } from '../lib/flags';

@@ -1,4 +1,5 @@
 import { Pressable, Text, StyleSheet, ActivityIndicator } from 'react-native';
+// Static palette (theme/tokens) only for the always-dark `dark` variant.
 import { colors as staticColors, radii, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 

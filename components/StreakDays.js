@@ -1,7 +1,11 @@
 import { View, Image, StyleSheet } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { Flame, Check } from 'lucide-react-native';
+// The static palette only for `dark` cells (a permanently dark surface, e.g.
+// StreakCelebration) and mode-independent fills; mode-following cells read the
+// theme (37-design-system-and-koban.md).
 import { colors, radii } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const KOBAN_STREAK_FLAME_LOCKED = require('../assets/general/streak-locked.png');
 const KOBAN_FREEZE = require('../assets/general/freeze.png');
@@ -45,6 +49,11 @@ const STAGGER_MS = 60;
 // visual languages for the same idea — which is exactly how the original plain
 // squares ended up meaning nothing.
 export function StreakFlame({ type, size = 34, dark = false, dimmed = false }) {
+  const { colors: theme } = useTheme();
+  // No-spend day: a muted income-green wash, deliberately NOT the vivid
+  // streak orange (covered ≠ logged, and the calendar must say so at a glance).
+  const nospendBg = dark ? colors.incomeBg : theme.incomeBg;
+  const nospendFg = dark ? colors.income : theme.income;
   const isLogged = type === 'logged';
   const isNospend = type === 'nospend';
   const isFrozen = type === 'frozen';
@@ -54,10 +63,10 @@ export function StreakFlame({ type, size = 34, dark = false, dimmed = false }) {
     : isFrozen
       ? styles.cellFrozen
       : isNospend
-        ? styles.cellNospend
+        ? { backgroundColor: nospendBg }
         : dark
           ? styles.cellEmptyDark
-          : styles.cellEmpty;
+          : { backgroundColor: theme.chipBg };
 
   // Only the default/unused case still uses the illustrated flame — its
   // fixed orange/yellow palette can't be retinted at runtime the way the
@@ -88,7 +97,7 @@ export function StreakFlame({ type, size = 34, dark = false, dimmed = false }) {
         // small size than the illustrated flame was.
         <Check size={size * 0.5} color="#FFFFFF" strokeWidth={3.4} />
       ) : isNospend ? (
-        <Flame size={size * 0.5} color={colors.income} fill={colors.income} strokeWidth={2.4} />
+        <Flame size={size * 0.5} color={nospendFg} fill={nospendFg} strokeWidth={2.4} />
       ) : (
         <Image source={KOBAN_STREAK_FLAME_LOCKED} style={{ width: iconFrame, height: iconFrame }} resizeMode="contain" />
       )}
@@ -146,19 +155,11 @@ const styles = StyleSheet.create({
   cellLit: {
     backgroundColor: colors.streakFill,
   },
-  // No-spend day — a muted income-green wash, deliberately NOT the vivid
-  // streak orange: covered ≠ logged, and the calendar must say so at a glance.
-  cellNospend: {
-    backgroundColor: colors.incomeBg,
-  },
   // Frozen day — pale ice wash, same iceBlue/iceBlueBg pairing Home's freeze
   // chip already uses. A third distinct look, never mistaken for logged or
   // no-spend.
   cellFrozen: {
     backgroundColor: colors.iceBlueBg,
-  },
-  cellEmpty: {
-    backgroundColor: colors.chipBg,
   },
   cellEmptyDark: {
     backgroundColor: 'rgba(255,255,255,0.08)',
