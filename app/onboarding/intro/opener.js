@@ -7,7 +7,7 @@ import { useToast } from '../../../components/Toast';
 import { colors, fontFamily, fontSize, spacing } from '../../../theme/tokens';
 import { useAuth } from '../../../lib/AuthContext';
 import { setIntroSeen } from '../../../lib/onboardingDraft';
-import { track } from '../../../lib/track';
+import { track, trackStepViewed } from '../../../lib/track';
 import useAnalyticsConsent from '../../../hooks/useAnalyticsConsent';
 
 const KOBAN_WAVE = require('../../../assets/mascot/hey_screen.png');
@@ -48,6 +48,7 @@ export default function Opener() {
   // RootNavigator marks the intro seen, and OnboardingGate routes the user.
   async function handleGoogle() {
     setGoogleLoading(true);
+    trackStepViewed('auth');
     try {
       await signInWithGoogle();
     } catch (err) {

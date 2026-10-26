@@ -19,6 +19,24 @@ Events from before sign-in follow spec 33's rule: they're queued, then sent with
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-26: Built.
+  - **Step events:** `trackStepViewed(step)` in `lib/track.js` records `onboarding_step_viewed` once per app run.
+    - It's called for `auth` (the opener's Continue with Google tap, and sign-in in sign-up mode), `first_expense` (the step's mount) and `reminder_ask` (its mount).
+    - While a just-signed-in account's consent is still loading, steps wait and go through at the end of `loadTrackingConsent`, under that account's own choice.
+  - **Sign-up event:** `signup_completed {method}` is reported from AuthContext:
+    - email: `signUp` returned a session (nothing is recorded while email confirmation is pending);
+    - google: the user's `last_sign_in_at` is within 2 minutes of `created_at`.
+
+    It's recorded once the new account's consent is known, through the same path.
+  - **Before sign-in:** the opener's `auth` step goes into the queue held on the phone, and the first sign-in claims or drops it (spec 33's rule).
+  - **Names:** they match the `analytics.onboarding_funnel` view: opener → auth → first_expense → reminder_ask.
+- Code review, both left:
+  - Steps are deduplicated per run, not per account, so a second sign-up in the same run has no step rows.
+  - A Google re-sign-in within 2 minutes of creating the account could record a second `signup_completed`. The `signups` view takes the first, so counts aren't affected.
+- Open emulator checks (paused): the acceptance lines, read back through the Supabase MCP after a Google and an email sign-up, with consent on and off.

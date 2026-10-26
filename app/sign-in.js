@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import ArrowMark from '../components/ArrowMark';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { resolveColors, DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { useAuth } from '../lib/AuthContext';
+import { trackStepViewed } from '../lib/track';
 
 // Sign-in, and sign-up behind the opener's "Other options" (?mode=signup,
 // 35-onboarding-v3.md). Sign-up leads with Google; email sign-up asks for
@@ -52,6 +53,11 @@ export default function SignIn() {
   const busy = loading || googleLoading;
 
   const isSignUp = mode === 'signup';
+
+  // The funnel's auth step (35-onboarding-v3.md): sign-up mode only.
+  useEffect(() => {
+    if (isSignUp) trackStepViewed('auth');
+  }, [isSignUp]);
   const canSubmit = email && password;
 
   async function handleSubmit() {

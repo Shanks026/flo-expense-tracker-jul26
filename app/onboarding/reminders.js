@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Bell } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { useOnboarding } from '../../lib/onboarding';
 import useProfile from '../../hooks/useProfile';
 import { requestPermission, setNotificationEnabled } from '../../lib/notifications';
 import { registerPushToken } from '../../lib/pushToken';
+import { trackStepViewed } from '../../lib/track';
 
 // The reminder ask (35-onboarding-v3.md): the last onboarding step. Both
 // answers finish onboarding — finish() writes onboarded_at and the gate takes
@@ -29,6 +30,10 @@ export default function OnboardingReminders() {
   const { updateProfile } = useProfile();
   const { finish, working: finishing } = useOnboarding();
   const [asking, setAsking] = useState(false);
+
+  useEffect(() => {
+    trackStepViewed('reminder_ask');
+  }, []);
 
   async function finishWithReminders(on) {
     await updateProfile({ reminders_enabled: on }, { silent: true });

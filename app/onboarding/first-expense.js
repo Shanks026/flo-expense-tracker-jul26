@@ -5,6 +5,7 @@ import { Receipt } from 'lucide-react-native';
 import OnboardingScreen from '../../components/OnboardingScreen';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { colors, radii } from '../../theme/tokens';
+import { trackStepViewed } from '../../lib/track';
 
 const REMINDER_ASK = '/onboarding/reminders';
 
@@ -34,6 +35,7 @@ export default function FirstExpense() {
   // A beat after mount, so the screen's own fade-in settles before the sheet
   // slides up over it.
   useEffect(() => {
+    trackStepViewed('first_expense');
     const timer = setTimeout(openSheet, 350);
     return () => clearTimeout(timer);
   }, []);
