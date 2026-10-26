@@ -21,6 +21,14 @@ Evening push suppression that reads the mark is spec 39, not this ticket.
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- New `lib/streakMarks.js` → `markNoSpend(localDate)`: an idempotent upsert into `streak_marks` (`ignoreDuplicates` on `user_id,kind,day`), returning `isNew`.
+- `TodayCard`'s "No-spend day" confirm now calls it instead of `claimNoSpend`, runs `notifyChanged()`, and tracks `no_spend_marked` only on a new mark. The XP reward burst is gone. `claimNoSpend` stays in `lib/rewardsMutations.js` for the flagged-off economy but has no caller.
+- Checked via the MCP as the test user in a rolled-back transaction: the first insert writes 1 row, the second writes 0.
+- Open (emulator checks paused): the tap → the streak includes today → the calendar shows no-spend; no `reward_events` row; the event lands when consent is on.

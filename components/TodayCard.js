@@ -10,9 +10,9 @@ import { useTheme } from '../theme/ThemeContext';
 import useStreak from '../hooks/useStreak';
 import useDayState from '../hooks/useDayState';
 import useProfile from '../hooks/useProfile';
-import { claimNoSpend } from '../lib/rewardsMutations';
+import { markNoSpend } from '../lib/streakMarks';
+import { track } from '../lib/track';
 import { useDataRefresh } from '../lib/DataRefreshContext';
-import { useRewardBurst } from './RewardBurst';
 import { todayCardCopy } from '../lib/koban';
 
 // Local "HH:MM:SS"/"HH:MM" (Postgres `time` columns come back this shape,
@@ -46,18 +46,17 @@ export default function TodayCard() {
   const { state, loading: stateLoading } = useDayState();
   const { profile, loading: profileLoading } = useProfile();
   const { notifyChanged } = useDataRefresh();
-  const { showRewardBurst } = useRewardBurst();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [declaring, setDeclaring] = useState(false);
 
   async function declareNoSpend() {
     setDeclaring(true);
-    const { error, isNewClaim, xp: earnedXp } = await claimNoSpend(format(new Date(), 'yyyy-MM-dd'));
+    const { error, isNew } = await markNoSpend(format(new Date(), 'yyyy-MM-dd'));
     setDeclaring(false);
     setConfirmOpen(false);
     if (error) return;
     notifyChanged();
-    if (isNewClaim) showRewardBurst({ xp: earnedXp });
+    if (isNew) track('no_spend_marked');
   }
 
   if (streakLoading || stateLoading || profileLoading) return null;
