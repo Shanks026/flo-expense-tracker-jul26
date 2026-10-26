@@ -55,7 +55,17 @@ Read this before anything else. The ticket files are the source of truth: each h
 | 04 full `expense_logged` event | Code ✓, **staged, not committed** | Commit (person to OK), then emulator check |
 
 ### Spec 34: streak only (`.scratch/streak-only/`)
-Ticketed 2026-10-26 into 7 tickets (01 `streak_marks` + reader → 02 no-spend mark, 03 automatic freezes, 07 streak screen → 04 economy flag off → 05 moment queue → 06 streak moments on the queue). None built yet; 01 is next and needs a Supabase migration (ask first).
+| Ticket | State | What's left |
+|---|---|---|
+| 01 `streak_marks` + reader, milestones 7/30/100/365 | Code ✓ (`49ed576`), table checked via MCP | Emulator check |
+| 02 no-spend writes a mark | Code ✓ (`c207d54`) | Emulator check |
+| 03 automatic freezes | Code ✓ (`b2c9729`) | Emulator check; confirm frozen days count toward earning |
+| 07 simpler streak screen | Code ✓ (`22ab98f`) | Emulator check |
+| 04 economy flagged off | Code ✓ (`41ea0d7`) | Emulator check; decide whether accent/appearance stay reachable (Personalize is hidden) |
+| 05 moment queue + bills-due | Code ✓ (`3f52991`) | Emulator check |
+| 06 streak moments on the queue | Code ✓ (`ba9c4f0`) | Emulator check |
+
+The person plans to wipe every Supabase user (including chrisaustin2001) and start fresh; they'll run `delete from auth.users;` themselves. The test accounts go with it, so the next emulator check needs a fresh one.
 
 ### Not started
 Specs 37 (design system + Koban), 38 (Home, Insights, More) and 39 (nudge + weekly recap) are spec'd but not ticketed.

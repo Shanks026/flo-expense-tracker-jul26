@@ -106,3 +106,19 @@ The streak reader **also reads legacy `reward_events` freeze rows and no-spend r
 - **The main personal account's data must not change.** No migration touches `reward_events` or the economy tables.
 - Legacy freeze rows are read, not converted.
 - If analytics later show weak D7 with the streak alone, pieces of the economy can return by flipping a flag. That's the trigger recorded on the map.
+
+## As built (2026-10-26)
+
+Code for tickets 01–07 (`.scratch/streak-only/`) is in. Emulator checks are pending, because they're paused.
+
+- **Database:** one migration, `streak_marks`: `user_id` (`DEFAULT auth.uid()`, cascade to `auth.users`), `day date`, `kind` (`no_spend` | `freeze_earned` | `freeze_used`), `created_at`. `UNIQUE (user_id, kind, day)`, RLS on, one owner-only policy for `authenticated`, and grants for select, insert and delete. Checked via the MCP: duplicates are rejected, cross-user inserts are blocked, other users see nothing.
+- **Streak rule:** `lib/streak.js`. `MILESTONES = [7, 30, 100, 365]`; the old ladder is kept as `ECONOMY_MILESTONES` for the flagged-off rewards and trophies. Pure `planFreezes` holds the earn/spend rule (`MAX_FREEZES = 2`, `FREEZE_EARN_RUN = 7`):
+  - a gap is covered only when the freezes held cover all of it;
+  - earning counts 7 covered days from the run's start or its last earn mark, and frozen days count as covered.
+- **Reads:** `hooks/useStreak.js` reads `streak_marks` and the legacy `reward_events` no-spend and freeze rows, and exposes `freezesHeld` and `freezePlan`. It returns no plan if any coverage read failed.
+- **Writes:** `lib/streakMarks.js` has `markNoSpend` (the TodayCard button) and `applyFreezePlan`. `components/StreakFreezeSync.js` replaces `FreezePrompt`.
+- **Economy flag:** `FLAGS.economy = false` in `lib/flags.js`. All 11 writers in `lib/rewardsMutations.js` and `lib/cardThemeMutations.js` are no-ops while it's off. Its UI is hidden or redirected, which includes the Personalize screen, and with it the accent and Light/Dark switches until spec 37.
+- **Moment queue:** `lib/momentQueue.js` + `components/MomentHost.js` (+ `MomentQueueSync` in `app/_layout.js`). Kinds: `bills-due` (actionable), `streak` (celebration), `toast` (ambient). `lib/moments.js` is deleted.
+- **Streak screen:** `app/streak.js` shows the count, freezes `n/2`, the next milestone, and the calendar with a legend.
+- **Analytics:** `no_spend_marked`, `freeze_used` (one per covered day) and `streak_milestone { days }`.
+- **Superseded:** the "personal account must not change" constraint above. On 2026-10-26 the person chose to wipe every account and start fresh.
