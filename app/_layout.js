@@ -54,6 +54,7 @@ import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../l
 import { getIntroSeen, setIntroSeen as persistIntroSeen } from '../lib/onboardingDraft';
 import { FIRST_STEP_ROUTE, isStepRoute } from '../lib/onboarding';
 import { flushEvents, loadTrackingConsent, startTrackingSession, track } from '../lib/track';
+import { FLAGS } from '../lib/flags';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -489,8 +490,8 @@ function RootNavigator() {
                                     <DueBillsModal />
                                     <StreakCelebration />
                                     <StreakFreezeSync />
-                                    <RankUpCelebration />
-                                    <TrophyToast />
+                                    {FLAGS.economy && <RankUpCelebration />}
+                                    {FLAGS.economy && <TrophyToast />}
                                     <RecoveryHomeRedirect />
                                     {/* contentStyle matches the active theme's screen bg —
                                         without it, React Navigation's native-stack default

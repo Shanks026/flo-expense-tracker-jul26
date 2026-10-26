@@ -16,6 +16,7 @@ import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { pickRecap, recapEyebrow, recapCta } from '../lib/koban';
 import { claimMilestone } from '../lib/rewardsMutations';
+import { FLAGS } from '../lib/flags';
 import { spinWheelFor, MILESTONE_REWARDS } from '../lib/rewards';
 import { STREAK_BADGE_ART } from '../lib/trophies';
 
@@ -97,7 +98,7 @@ export default function StreakCelebration() {
         ...pickRecap({ streak: current, isNewStreak, isMilestone }),
         eyebrow: recapEyebrow({ streak: current, isNewStreak }),
         cta: recapCta(),
-        reward: isMilestone && MILESTONE_REWARDS[current] ? MILESTONE_REWARDS[current] : null,
+        reward: FLAGS.economy && isMilestone && MILESTONE_REWARDS[current] ? MILESTONE_REWARDS[current] : null,
       };
       setWheelDay(null);
       setVisible(true);
@@ -164,7 +165,8 @@ export default function StreakCelebration() {
         // required it since 30/50 were both milestones; Phase 2 added day 1,
         // which is a NEW STREAK, never a MILESTONES entry — see SPIN_WHEELS'
         // own comment in lib/rewards.js for why day 1 stays off that list).
-        setWheelDay(spinWheelFor(current) ? current : null);
+        // No spin wheel while the economy is flagged off (lib/flags.js).
+        setWheelDay(FLAGS.economy && spinWheelFor(current) ? current : null);
         setVisible(true);
       });
   }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting, onboarded, otherMoment]);

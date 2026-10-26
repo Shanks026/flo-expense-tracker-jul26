@@ -20,6 +20,17 @@ Spec: .claude/features/34-streak-only.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- `lib/flags.js` → `economy: false`, the same in every build.
+- **Writes:** all 11 economy writers (`lib/rewardsMutations.js` ×9: daily log, no-spend, buy freeze, use freeze, milestone, spin, trophy, welcome bundle, rank; `lib/cardThemeMutations.js` ×2: buy and equip theme) return a no-op result first thing when the flag is off. That stops new `reward_events` rows at the source whoever calls them (the Add sheet's daily claim included). The pending login reward is never stored or burst.
+- **UI:** the Home coins/freezes/level chip and the Trophy and Shop buttons are hidden; the account card uses the default theme instead of the equipped one; `/shop`, `/trophies` and `/personalize` redirect to Home; `RankUpCelebration` and `TrophyToast` aren't mounted; `showRewardBurst` does nothing; the Settings Personalize row is hidden; `StreakCelebration` shows no milestone reward and chains no spin wheel. The rewards history sheet only opened from the hidden Home chip.
+- Code and data untouched: economy reads (`useRewards`, `useTrophies`, `useCardThemes`) still run, and flipping the flag on restores everything.
+- Baseline for the "no new rows" check, via the MCP: `reward_events` has 176 rows, the latest at 2026-10-21 03:39 UTC. After the rebuild, any row newer than that is a leak (or a fresh account after the planned wipe should have 0).
+- **Side effect to decide on:** Personalize also held the accent colour and the Light/Dark appearance switch, so those are unreachable until spec 37 adds System/Light/Dark. Say if they should stay reachable now (for example, a Personalize that hides only card themes).
+- Open (emulator checks paused): no economy UI anywhere, deep links redirect, and no new `reward_events` rows after logging, marking no-spend and opening the app.

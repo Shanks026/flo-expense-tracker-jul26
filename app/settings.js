@@ -21,6 +21,7 @@ import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
 import ProBadge from '../components/ProBadge';
+import { FLAGS } from '../lib/flags';
 import { useTheme } from '../theme/ThemeContext';
 import {
   getNotificationSettings,
@@ -488,7 +489,7 @@ export default function Settings() {
             )}
           />
 
-          <Pressable style={[styles.row, styles.rowBorder]} onPress={() => router.push('/manage-categories')}>
+          <Pressable style={[styles.row, FLAGS.economy && styles.rowBorder]} onPress={() => router.push('/manage-categories')}>
             <View style={styles.rowIcon}>
               <Grid2x2 size={20} color={colors.ink} strokeWidth={2} />
             </View>
@@ -501,13 +502,16 @@ export default function Settings() {
               before), now live together in the Personalize hub with a single
               preview and an explicit Equip step, instead of two rows that
               each applied instantly. */}
-          <Pressable style={styles.row} onPress={() => router.push('/personalize')}>
-            <View style={styles.rowIcon}>
-              <Palette size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Personalize</Text>
-            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-          </Pressable>
+          {/* Personalize is economy (lib/flags.js). */}
+          {FLAGS.economy && (
+            <Pressable style={styles.row} onPress={() => router.push('/personalize')}>
+              <View style={styles.rowIcon}>
+                <Palette size={20} color={colors.ink} strokeWidth={2} />
+              </View>
+              <Text style={styles.rowTitle}>Personalize</Text>
+              <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
+            </Pressable>
+          )}
         </Card>
 
         <Text style={styles.sectionLabel}>Notifications</Text>

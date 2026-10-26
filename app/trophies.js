@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { Redirect, useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
@@ -50,6 +50,7 @@ const KOBAN_STREAK_LOCKED = require('../assets/general/streak-locked.png');
 import { RANKS, RANK_BADGE_ART, RANK_BADGE_ART_LOCKED } from '../lib/rewards';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
+import { FLAGS } from '../lib/flags';
 
 // String keys in lib/trophies.js map to these — kept local to this screen
 // rather than CategoryIcon.js, which is specifically the category icon
@@ -99,7 +100,13 @@ function claimAmountLabel(reward) {
 // here is derived live from existing streak/transaction/plan data (via
 // useTrophies → lib/trophies.js); nothing is stored except which trophies
 // have already been "seen" (clears the Menu sheet's unseen dot).
+// Economy flagged off (lib/flags.js): a deep link here lands on Home.
 export default function TrophiesScreen() {
+  if (!FLAGS.economy) return <Redirect href="/" />;
+  return <TrophiesScreenInner />;
+}
+
+function TrophiesScreenInner() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();

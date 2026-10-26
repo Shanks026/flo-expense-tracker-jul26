@@ -45,6 +45,7 @@ import useCardThemes from '../../hooks/useCardThemes';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { useRewardBurst } from '../../components/RewardBurst';
 import { takePendingLoginReward } from '../../lib/pendingLoginReward';
+import { FLAGS } from '../../lib/flags';
 
 const KOBAN_COIN = require('../../assets/general/coin.png');
 const KOBAN_FREEZE = require('../../assets/general/freeze.png');
@@ -191,7 +192,8 @@ export default function Home() {
                 "this is your rank/level" meaning, so no text label is needed.
                 Whole chip opens Rewards history; the fuller Rank/Level/XP card
                 stays one tap away via the Menu (avatar). */}
-            {chipsLoading ? (
+            {/* The coins / freezes / level chip is economy (lib/flags.js). */}
+            {!FLAGS.economy ? null : chipsLoading ? (
               <Skeleton width={150} height={44} radius={14} />
             ) : (
               <FadeIn>
@@ -242,19 +244,24 @@ export default function Home() {
                 </Pressable>
               </FadeIn>
             )}
-            {/* Trophy Room — moved out of the Menu sheet into the header (per
-                direct feedback), beside the bell, carrying its own unseen-dot
-                the same way the bell does its alert dot. */}
-            <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/trophies')}>
-              <Trophy size={20} color={colors.ink} strokeWidth={2} />
-              {unclaimedTrophies > 0 && <View style={styles.bellDot} />}
-            </Pressable>
-            {/* Shop — moved out of the Menu sheet into the header (2026-07-26),
-                grouped with the Trophy button since both are gamification
-                destinations. */}
-            <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/shop')}>
-              <ShoppingBag size={20} color={colors.ink} strokeWidth={2} />
-            </Pressable>
+            {/* Trophy Room and Shop are economy destinations (lib/flags.js). */}
+            {FLAGS.economy && (
+              <>
+                {/* Trophy Room — moved out of the Menu sheet into the header (per
+                    direct feedback), beside the bell, carrying its own unseen-dot
+                    the same way the bell does its alert dot. */}
+                <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/trophies')}>
+                  <Trophy size={20} color={colors.ink} strokeWidth={2} />
+                  {unclaimedTrophies > 0 && <View style={styles.bellDot} />}
+                </Pressable>
+                {/* Shop — moved out of the Menu sheet into the header (2026-07-26),
+                    grouped with the Trophy button since both are gamification
+                    destinations. */}
+                <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/shop')}>
+                  <ShoppingBag size={20} color={colors.ink} strokeWidth={2} />
+                </Pressable>
+              </>
+            )}
             <Pressable style={styles.headerIconButton} hitSlop={10} onPress={openAlerts}>
               <Bell size={20} color={colors.ink} strokeWidth={2} />
               {alertCount > 0 && <View style={styles.bellDot} />}
@@ -291,7 +298,7 @@ export default function Home() {
           onOpenSwitcher={openAccountSwitcher}
           summaries={summaries}
           currency={currency}
-          cardTheme={equippedTheme}
+          cardTheme={FLAGS.economy ? equippedTheme : null}
           loading={heroLoading}
         />
 

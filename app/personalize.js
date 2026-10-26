@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Check, Lock } from 'lucide-react-native';
 import Button from '../components/Button';
@@ -18,6 +18,7 @@ import useCardThemes from '../hooks/useCardThemes';
 import { CARD_THEMES, getTheme } from '../lib/cardThemes';
 import { ACCENT_LIST, DEFAULT_ACCENT_ID, accentSupportsMode, accentModeLabel, resolveColors } from '../theme/themes';
 import { equipTheme } from '../lib/cardThemeMutations';
+import { FLAGS } from '../lib/flags';
 
 // Personalize hub — 23-personalize-hub.md Phase 1. Draft-then-commit, like an
 // OS wallpaper/theme picker: Appearance, Accent color, and Card design are all
@@ -28,7 +29,13 @@ import { equipTheme } from '../lib/cardThemeMutations';
 // the primary place to switch card designs — the Shop stays the place you
 // ACQUIRE cards (coins, prices, buying), this hub is where you EQUIP what you
 // already own plus set the two free preferences, together, with one preview.
+// Economy flagged off (lib/flags.js): a deep link here lands on Home.
 export default function Personalize() {
+  if (!FLAGS.economy) return <Redirect href="/" />;
+  return <PersonalizeScreen />;
+}
+
+function PersonalizeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { accentId, modeId, setAccent, setMode, colors } = useTheme();

@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } fr
 import { Star, Snowflake } from 'lucide-react-native';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
+import { FLAGS } from '../lib/flags';
 
 const KOBAN_COIN = require('../assets/general/coin.png');
 
@@ -26,6 +27,8 @@ export function RewardBurstProvider({ children }) {
   // existing caller (AddTransactionSheet, TodayCard) that never passes it
   // renders identically to before.
   const showRewardBurst = useCallback(({ coins = 0, xp = 0, freezes = 0 } = {}) => {
+    // Economy flagged off (lib/flags.js): no bursts at all.
+    if (!FLAGS.economy) return;
     if (!coins && !xp && !freezes) return;
     setBurst({ id: Date.now(), coins, xp, freezes });
   }, []);

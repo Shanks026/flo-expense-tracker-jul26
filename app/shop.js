@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Redirect, useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, CircleDollarSign, Check, Lock, TrendingUp, TrendingDown } from 'lucide-react-native';
 import CardThemeSurface from '../components/CardThemeSurface';
@@ -70,7 +70,13 @@ function unlockCaption(theme) {
   return null;
 }
 
+// Economy flagged off (lib/flags.js): a deep link here lands on Home.
 export default function Shop() {
+  if (!FLAGS.economy) return <Redirect href="/" />;
+  return <ShopScreen />;
+}
+
+function ShopScreen() {
   const router = useRouter();
   // Optional deep link into the General tab (RewardsHistorySheet's coin Buy
   // button, 25-rewards-hub-sheet.md) — every other entry point into Shop
