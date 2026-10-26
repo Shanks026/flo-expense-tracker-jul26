@@ -25,6 +25,7 @@ import {
   Clock,
   Minus,
   Plus,
+  Cat,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
@@ -782,6 +783,13 @@ export default function Settings() {
             onSwitchChange={handleToggleAnalytics}
           />
         </RowGroup>
+
+        {/* Dev-only: the Koban gallery (37-design-system-and-koban.md). */}
+        {__DEV__ && (
+          <RowGroup title="Developer">
+            <Row icon={Cat} title="Koban gallery" onPress={() => router.push('/dev/koban')} />
+          </RowGroup>
+        )}
 
         <RowGroup>
           <Row

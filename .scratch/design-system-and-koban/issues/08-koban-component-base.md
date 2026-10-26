@@ -23,6 +23,22 @@ Spec: .claude/features/37-design-system-and-koban.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- `components/koban/art.js` holds the whole drawing as data: the round-5 style A shapes, palette, idle arm centre-lines, stripes, whiskers, eyes, limb widths and the joint each part turns around. It is marked as placeholder art, so the person's illustrations replace this one file.
+- `components/koban/Koban.js` takes `size`, `mood`, `pose`, `loop`, `scarf`, `surface` and an optional `accessibilityLabel` (decorative and hidden from TalkBack without one). Each moving part is its own Svg layer in an `Animated.View`, transformed around its joint (`transformOrigin`), so all motion is transform-only on the UI thread:
+  - breathing (scales from the feet);
+  - a slow head tilt;
+  - a tail sway;
+  - a blink about every 4.5 s;
+  - an ear twitch on each ear at different intervals, with the inner ears moving with them.
+- `useReducedMotion()` or `loop={false}` stops everything and resets to a neutral still. Only `neutral` / `idle` exist so far; anything else logs a dev warning and falls back.
+- Creases work as in the prototype: the arms are drawn again in the crease colour, clipped to the torso and head, with a fur disc over each shoulder. **One change from the prototype:** the lime scarf is drawn over the shoulders (on top of the arms), because in the prototype order the arms and crease discs hid almost all of it.
+- Dev gallery `app/dev/koban.js` (native header "Koban gallery") shows 48/96/160 dp on light and dark, with Motion and Scarf switches. It redirects Home when `__DEV__` is false, and the only way in is a dev-only "Developer → Koban gallery" row in Settings.
+- **Checked:** the same layers from `art.js` rendered to a static SVG and viewed in the browser on light and dark, with and without the scarf. They match the round-5 drawing (that check is how the scarf problem was found). Motion is checked on the emulator only.
+- Open (emulator checks paused): the gallery on the device, smooth idle motion, still with reduced motion, the scarf toggle, and that the gallery is unreachable in a release build.

@@ -548,6 +548,7 @@ function RootNavigator() {
                                     >
                                       <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
                                       <Stack.Screen name="streak" options={{ headerShown: true, title: 'Streak' }} />
+                                      <Stack.Screen name="dev/koban" options={{ headerShown: true, title: 'Koban gallery' }} />
                                     </Stack>
                                   </AlertsSheetProvider>
                                 </MenuSheetProvider>
