@@ -29,7 +29,7 @@ Spec: .claude/features/38-home-insights-more.md
 
 ## Comments
 
-**2026-10-26 (Claude):** Built in `56119d0`.
+**2026-10-26 (Claude):** Built in `96980a5`.
 - **Tabs:**
   - `app/(tabs)/analytics.js` is now `insights.js`, titled Insights;
   - the new `app/(tabs)/more.js` is the More tab;

@@ -148,3 +148,45 @@ The hero gets an internal **skin slot** for post-launch seasonal skins.
 
 - This depends on spec 37's components and native headers, and uses spec 34's streak and spec 39's recap data.
 - Finish feature 31's on-device settling checks as part of verifying the splits core.
+
+## As built (2026-10-26)
+
+Code for tickets 01–09 (`.scratch/home-insights-more/`) is in, `1fbd606`..`607b8b4`. Emulator checks are pending, because they're paused. Ticket 10 waits on spec 39.
+
+- **Flags (01, 02):** `lib/flags.js` has `plans`, `splitInvites` and `currencyPicker`, all `false`.
+  - **Plans:** the screens redirect home. The Menu entry, plan alerts, row badges, the Analytics/Report sections and the split sheet's plan link are hidden.
+  - **Split invites:** the invite/revoke rows, `/join/[code]` (redirects home) and `PendingInviteHandler` are hidden. A split's Share (text/PDF) and Export CSV stay; they're exports, not invites.
+  - **Currency picker:** hidden. New accounts and bills seed INR.
+- **Budget warnings (04):** spec 36 had already stopped the toast and the bell already listed budgets. A budget alert now opens `/budget/<id>`.
+- **Tabs and More (03):**
+  - `app/(tabs)/analytics.js` → `insights.js`; the new `more.js` is the More tab.
+  - `TabBar` is Home · Transactions · + · Insights · More, labelled and ≥48 dp.
+  - `MenuSheet` is deleted.
+  - `feature_opened` fires on Budgets, Bills and Splits mount and on each Insights focus.
+- **Accounts (05):** the new `app/accounts.js` (native header) can switch, edit, add, and Transfer from an account when there are 2+. The Add sheet takes a `fromAccountId` payload, and its transfer links are gone.
+- **Home (06, 08):**
+  - **Header:** switcher (2+ accounts) or month · streak · bell. The economy chips, the greeting, `AccountHeroCarousel` and `AccountDots` are gone.
+  - **Hero:** `components/HomeHero.js` shows reset-period spend labelled from `profiles.reset_period`, and "left of budget" from an open overall budget.
+    - Skin slot: `skin` prop → `resolveHeroSkin` (only `plain` today).
+    - The figure sits on an `emphasisBg` plate.
+  - **Today strip:** `components/TodayStrip.js` replaces `TodayCard`, all day: a Koban mood, + Log, and No spend today with a confirm.
+  - **7-day chart:** fixed at 7 days. Its card opens `/insights?period=week&at=…`, and an empty week shows text.
+  - **Recent transactions:** 5 rows titled by note, falling back to the category; subtitle category · date.
+  - **Bills:** last, only when due.
+  - **Axis:** `ChartAxis` ticks are whole rupees.
+- **Insights (07):**
+  - `components/InsightsPeriodControl.js` (Week Mon–Sun / Month / Custom) replaces `AnalyticsFilterBar`.
+  - One scroll: summary, trend, where it went, budget progress, biggest transaction.
+  - Account chips (All + each) carry the all-accounts currency guard. Each budget counts only its own account.
+  - CSV export of the scope. Custom, other accounts and CSV are Pro (open with `billing` off).
+  - **Retired:** the Report screen, `ReportReadyCard`, `ReportPeriodPicker`, `useReportDue`, `lib/reports.js`, `AnalyticsSegmentTabs`, the report bell alert and Settings' Reports section.
+  - `app/report.js` is a redirect to Insights.
+- **Settings (09):**
+  - Account (sign-in methods), Appearance, Notifications, Preferences (summary period), Transaction Detection (auto-detect builds), Data & export, About (version), Developer (`__DEV__`), Log out last.
+  - Data & export holds the new "Export all transactions" CSV (`fetchAllTransactions` pages past 1,000 rows), analytics consent and Delete Account.
+  - Manage Categories moved to More.
+- **Open:**
+  - **Report push still running.** `send-push`'s `sendReportReady` still pushes "Your weekly report is ready" (`data.route: '/report'`) to every profile with `report_cadence` not `off`; sign-ups default to weekly. There's no in-app control to stop it any more. Spec 39's recap push should replace it, or it gets switched off.
+  - **Privacy policy URL.** The row is hidden until `PRIVACY_POLICY_URL` in `lib/about.js` is set; no hosted policy exists yet.
+  - **Merchant titles.** No merchant is stored (spec 40), so only a note titles a Home row.
+  - **Review cleanups skipped:** plans still fetched while flagged off; Insights always fetches all accounts; the account free-limit gate is duplicated in `accounts.js` and `AccountSwitcherSheet`; dead `info`/`report` styling in `AlertsSheet`; `fetchAllTransactions` is a read living in `lib/`.

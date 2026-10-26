@@ -13,7 +13,7 @@ Read this before anything else. The ticket files are the source of truth: each h
 ### Working preferences the person set this session
 - **Emulator checks are paused.** Don't drive the emulator unless the person asks. Verify through the Supabase MCP and code review instead, list any open emulator checks in the ticket, and leave `Verified` unticked.
 - **Don't wait for the green signal.** Tick `Code implementation` (and `Verified` when true) yourself, tell the person in one line that a ticket is ready for green, and move on to the next ticket. The tracer mod refuses any Claude edit that ticks `Green signal` or sets `Status: resolved`. Don't bypass that guard.
-- Still ask before every commit, push and Supabase migration (Step 6).
+- Still ask before every commit, push and Supabase migration (Step 6). Exception: when the person runs `/implement`, that skill's own instruction is to commit to the current branch, and the person accepted that for spec 38. Pushes and migrations still need a yes.
 
 ### Spec 32: safe closed-test build (`.scratch/safe-closed-test-build/`)
 | Ticket | State | What's left |
@@ -84,8 +84,36 @@ The person plans to wipe every Supabase user (including chrisaustin2001) and sta
 
 Koban's art is a placeholder; the person will replace `components/koban/{art,faces,poses}.js` with animated illustrations.
 
-### Not started
-Specs 38 (Home, Insights, More) and 39 (nudge + weekly recap) are spec'd but not ticketed.
+### Spec 38: Home, Insights and More (`.scratch/home-insights-more/`)
+Built in one session with `/to-tickets` then `/implement`. That skill commits to the current branch, so these commits went to `master` without a per-commit ask. All are local, none pushed. The spec's "As built" section has the details.
+
+| Ticket | State | What's left |
+|---|---|---|
+| 01 Plans flagged off | Code ✓ (`1fbd606`) | Emulator check; flag-on restores Plans |
+| 02 split invites + currency picker flagged off | Code ✓ (`1fbd606`) | Emulator: feature 31's settling checklist; a new account is INR (MCP) |
+| 04 budget warnings in the bell | Code ✓ (`1fbd606`) | Emulator check |
+| 03 five tabs + More | Code ✓ (`96980a5`) | Emulator check; `feature_opened` rows land (MCP, consent on) |
+| 05 Accounts screen + transfers | Code ✓ (`e057ebd`) | Emulator: 1 vs 2 accounts; both transfer legs (MCP) |
+| 06 Home header + hero skin slot | Code ✓ (`eb800ba`) | Emulator: 1 vs 2 accounts, budget line, contrast in both modes |
+| 07 Insights with Reports folded in | Code ✓ (`42b2a0b`, fix `607b8b4`) | Emulator: three modes, Week from Home, export |
+| 08 Home body | Code ✓ (`87cf227`, fix `607b8b4`) | Emulator: order in empty and populated accounts, No spend mark (MCP), chart tap |
+| 09 Settings regrouped | Code ✓ (`4d4a768`) | Emulator: section order, release build hides Developer, export |
+| 10 recap card + summary | Not started | Blocked by spec 39's recap data |
+
+**Code review:** run over `feb4454..HEAD`. Three bugs were fixed in `607b8b4`. Five cleanups were skipped; they're listed in the spec's "As built" section.
+
+**Open decisions for the person:**
+- **The report push.** `send-push` still sends "Your weekly report is ready" to every profile with reports on (new sign-ups default to weekly), and Settings no longer has a control to stop it. `/report` redirects to Insights. Replace it with spec 39's recap push, or switch it off sooner.
+- **The privacy policy URL.** The About row is hidden until `lib/about.js` → `PRIVACY_POLICY_URL` is set.
+
+### Next step
+Ticket spec 39 (nudge + weekly recap). It replaces the report push, settles the three notification toggles, and unblocks spec 38 ticket 10:
+
+```
+/mattpocock-skills:to-tickets .claude/features/39-nudge-and-weekly-recap.md
+```
+
+Then `/mattpocock-skills:implement` on those tickets. Once spec 39's recap data exists, build spec 38 ticket 10. After that come spec 40 (share-to-FLO import with merchant memory, which also gives Home rows merchant titles), 41 (Pro with Play Billing) and 42 (forgot password, blocked on a domain).
 
 Live Supabase now has:
 - `events` (insert-only RLS, consent-gated);
@@ -104,6 +132,10 @@ Details are in `00-index.md` (schema and migrations) and the spec's "As built" n
   - Fix: `adb reverse tcp:8082 tcp:8082` with `debug_http_host` set to `localhost:8082` in the app's shared prefs. This is already set on the emulator, and the tunnel survives the emulator's wifi being off.
 - **adb:** calls can hang for minutes. Run long emulator sequences in the background and wait on a marker line.
 - **Test account:** the emulator is signed in as `testtwo@gmail.com`, consent on, with one offline `app_open` still queued.
+- **Agent shell quirks:**
+  - The Bash tool fails on a heredoc whose body contains an apostrophe ("unexpected EOF while looking for matching `''"). Write such files with the Write tool instead.
+  - There's no `python` on this machine; use `node` for scripted edits.
+- **Cheap checks without the emulator:** `npx expo export --platform android --output-dir <scratch dir>` bundles the whole app and catches unresolved imports and syntax errors in about a minute. It is not a substitute for the emulator check.
 
 ---
 
