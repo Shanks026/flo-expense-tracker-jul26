@@ -14,13 +14,29 @@ Their step lists, the pre-auth answer draft and their helpers go with them, alon
 
 **Status:** ready-for-agent
 
-- [ ] None of the listed routes exist, and nothing in the app imports or navigates to them
+- [x] None of the listed routes exist, and nothing in the app imports or navigates to them
 - [ ] A fresh sign-up with Google and with email still runs opener → sign-in → reminder ask → Home
-- [ ] The app bundles with no missing-module errors
-- [ ] No database column or table is dropped
+- [x] The app bundles with no missing-module errors
+- [x] No database column or table is dropped
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-26: Built.
+  - **Deleted, 20 routes:** 9 intro questions, 7 setup screens, done, the welcome bundle, the onboarding expense screen and the tour route.
+  - **Deleted, everything only they used:** `OnboardingChoice`, `TourScreen`, the dev-only `OnboardingDevBack` (and its mount in the root layout), `assets/tour/`, and 14 mascot images nothing references.
+  - **Cut down:**
+    - `lib/onboarding.js` is now just the step list, `FIRST_STEP_ROUTE`, `isStepRoute` and `useOnboarding().finish()`.
+    - `lib/onboardingDraft.js` is just the introSeen flag; the answer draft and its helpers are gone.
+  - **Updated:** two stale comments, in Settings and OnboardingMascot.
+- **Checks:**
+  - A grep finds no import of, or navigation to, any deleted route or symbol.
+  - An esbuild bundle of every file under `app/` resolves every import (images stubbed, packages external).
+  - No database change was made.
+- Code review: `lib/categoryBank.js` is no longer imported. I kept it on purpose, because its header says the `handle_new_user` seed copies its names, icons and colours. A later cleanup could move it into the docs.
+- Open emulator check (paused): fresh Google and email sign-up still run opener → sign-in → reminder ask → Home.

@@ -392,8 +392,8 @@ export default function Settings() {
   // App-wide display currency. Writes BOTH the ACTIVE account's currency —
   // which is what every screen actually displays via useCurrency() →
   // activeAccount.currency — AND profiles.currency (the default seeded into
-  // future new accounts), so the two agree. Mirrors onboarding/currency.js's
-  // own dual write exactly. Previously this wrote ONLY profiles.currency,
+  // future new accounts), so the two agree. (The old onboarding currency
+  // screen did the same dual write.) Previously this wrote ONLY profiles.currency,
   // which nothing on screen reads, so the change never appeared anywhere —
   // the reported bug. Currency here is purely a display symbol (no FX
   // conversion), so re-labeling an existing account's amounts is intended.

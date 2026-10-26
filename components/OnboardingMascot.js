@@ -1,12 +1,10 @@
 import { View, Image, StyleSheet } from 'react-native';
 import { colors, radii } from '../theme/tokens';
 
-// Shared hero-slot artwork for the intro's Koban screens (assets/mascot/).
+// Hero-slot artwork for the opener's Koban (assets/mascot/).
 // Renders the real illustration where one exists; else a gray rounded
-// placeholder so every intro screen already reads as "art goes here" ahead of
-// the remaining mascot drops (same idea as TourScreen's icon+"Preview"
-// fallback for the tour cards, just without the icon — these screens don't
-// have a per-question icon to fall back to).
+// placeholder so a screen without art still reads as "art goes here" ahead of
+// spec 37's Koban component.
 //
 // `alignSelf: 'stretch'` overrides OnboardingScreen's hero box (which
 // shrink-wraps to content via `alignItems: 'flex-start'`), so this always
