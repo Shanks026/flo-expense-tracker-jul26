@@ -6,7 +6,7 @@
 
 ---
 
-## Where things stand (2026-10-19, end of session)
+## Where things stand (updated 2026-10-26)
 
 Read this before anything else. The ticket files are the source of truth: each has a `## Comments` log of what was checked and what's open.
 
@@ -33,7 +33,32 @@ Read this before anything else. The ticket files are the source of truth: each h
 | 01 consent-gated pipeline + `app_open` | Code ✓ Verified ✓ (`4a888c1`, `e3adf68`) | Green signal (person) |
 | 04 dashboard views + 13-month retention | Code ✓ Verified ✓ via MCP (`e59b948`) | Green signal (person) |
 | 02 offline queue | Code ✓ (`54065cb`) | Emulator: consent-off-while-queued, background-only flush, 500 limit, offline cold start using the cached consent |
-| 03 opener opt-in + pre-sign-in queue | Not started, next | Blocked by 02. Switch goes on today's opener (`app/onboarding/intro/opener.js`); spec 35 carries it over |
+| 03 opener opt-in + pre-sign-in queue | Code ✓ (`bd40923`) | Emulator check |
+
+### Spec 35: onboarding v3 (`.scratch/onboarding-v3/`)
+| Ticket | State | What's left |
+|---|---|---|
+| 01 sign-up defaults | Code ✓ Verified ✓ (`0de90ee`) | Green signal (person) |
+| 02 reminder ask finishes onboarding | Code ✓ (`88df5ad`) | Emulator check |
+| 03 opener + Google-first sign-up | Code ✓ (`7dd0da4`) | Emulator check |
+| 04 delete old onboarding | Code ✓ (`a647699`) | Emulator check |
+| 05 first expense in the Add sheet | Code ✓ (`0392ea2`) | Emulator check |
+| 06 coach marks | Code ✓ (`4791cc1`) | Emulator check |
+| 07 funnel events | Code ✓ (`09ff619`) | Emulator check |
+
+### Spec 36: Add sheet 3-tap (`.scratch/add-sheet-3-tap/`)
+| Ticket | State | What's left |
+|---|---|---|
+| 01 smart default category + 4×2 grid | Code ✓ (`21bd07c`) | Emulator check |
+| 02 slim layout | Code ✓ (`f5413f3`) | Emulator check |
+| 03 quiet save with Undo | Code ✓ (`1dffcc5`) | Emulator check; needs a rebuild for `expo-haptics` |
+| 04 full `expense_logged` event | Code ✓, **staged, not committed** | Commit (person to OK), then emulator check |
+
+### Spec 34: streak only (`.scratch/streak-only/`)
+Ticketed 2026-10-26 into 7 tickets (01 `streak_marks` + reader → 02 no-spend mark, 03 automatic freezes, 07 streak screen → 04 economy flag off → 05 moment queue → 06 streak moments on the queue). None built yet; 01 is next and needs a Supabase migration (ask first).
+
+### Not started
+Specs 37 (design system + Koban), 38 (Home, Insights, More) and 39 (nudge + weekly recap) are spec'd but not ticketed.
 
 Live Supabase now has:
 - `events` (insert-only RLS, consent-gated);
