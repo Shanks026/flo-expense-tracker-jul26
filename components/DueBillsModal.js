@@ -10,6 +10,7 @@ import { useAccount } from '../lib/AccountContext';
 import useBills from '../hooks/useBills';
 import { usePayBillSheet } from './PayBillSheet';
 import { formatMoney } from '../lib/currency';
+import { setMomentActive } from '../lib/moments';
 
 const STORAGE_KEY = 'flo.dueBills.lastShown';
 
@@ -25,6 +26,9 @@ export default function DueBillsModal() {
   const { openPayBill } = usePayBillSheet();
 
   const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    setMomentActive('due-bills', visible);
+  }, [visible]);
   const checkedRef = useRef(false);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');

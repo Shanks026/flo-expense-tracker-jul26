@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, List, ChartColumn, Menu as MenuIcon, Plus } from 'lucide-react-native';
@@ -6,6 +6,7 @@ import { radii, fontFamily } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAddTransactionSheet } from './AddTransactionSheet';
 import { useMenuSheet } from './MenuSheet';
+import CoachMark from './CoachMark';
 
 const ICONS = { index: Home, transactions: List, analytics: ChartColumn };
 const LABELS = { index: 'Home', transactions: 'Transactions', analytics: 'Analytics' };
@@ -28,6 +29,7 @@ export default function TabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const { openAdd } = useAddTransactionSheet();
   const { openMenu } = useMenuSheet();
+  const addButtonRef = useRef(null);
 
   function renderItem(route, index) {
     const isFocused = state.index === index;
@@ -67,7 +69,7 @@ export default function TabBar({ state, navigation }) {
        devices (and zero-inset screens) each keep the correct clearance. */
     <View style={[styles.bar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
       {firstHalf.map((route, i) => renderItem(route, i))}
-      <Pressable style={styles.addButton} onPress={() => openAdd()}>
+      <Pressable ref={addButtonRef} style={styles.addButton} onPress={() => openAdd()}>
         {/* The button itself stays the theme's accent color (colors.brand)
             regardless of theme; the icon uses colors.brandText (computed
             per-accent via WCAG contrast) rather than a color that inverts
@@ -81,6 +83,14 @@ export default function TabBar({ state, navigation }) {
           Menu
         </Text>
       </Pressable>
+      {/* First Home after onboarding (35-onboarding-v3.md). Lives here, next
+          to the button it points at; shown only while Home is the open tab. */}
+      <CoachMark
+        id="add"
+        targetRef={addButtonRef}
+        text="Tap + to log what you spend. It takes a few seconds."
+        active={state.routes[state.index]?.name === 'index'}
+      />
     </View>
   );
 }

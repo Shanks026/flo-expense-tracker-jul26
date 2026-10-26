@@ -10,6 +10,7 @@ import Confetti from './Confetti';
 import StreakDays from './StreakDays';
 import useStreak from '../hooks/useStreak';
 import useProfile from '../hooks/useProfile';
+import { setMomentActive } from '../lib/moments';
 import { useRewardBurst } from './RewardBurst';
 import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -66,6 +67,10 @@ export default function StreakCelebration() {
   const [wheelDay, setWheelDay] = useState(null);
   const [wheelVisible, setWheelVisible] = useState(false);
   const contentRef = useRef(null);
+
+  useEffect(() => {
+    setMomentActive('streak', visible || wheelVisible);
+  }, [visible, wheelVisible]);
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const userId = session?.user?.id ?? null;

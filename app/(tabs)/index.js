@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag, Users } from 'lucide-react-native';
@@ -15,6 +15,7 @@ import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import AccountHeroCarousel from '../../components/AccountHeroCarousel';
 import TodayCard from '../../components/TodayCard';
+import CoachMark from '../../components/CoachMark';
 import useStreak from '../../hooks/useStreak';
 import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -78,6 +79,7 @@ export default function Home() {
   const { bills, loading: billsLoading } = useBills();
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
+  const streakChipRef = useRef(null);
   const currency = useCurrency();
   const { coins, freezes, level, xp, loading: rewardsLoading } = useRewards();
   const { current: rank } = rankFromXp(xp);
@@ -224,7 +226,7 @@ export default function Home() {
               <Skeleton width={58} height={44} radius={14} />
             ) : (
               <FadeIn>
-                <Pressable style={styles.streakChip} onPress={() => router.push('/streak')}>
+                <Pressable ref={streakChipRef} style={styles.streakChip} onPress={() => router.push('/streak')}>
                   {/* Fire orange, not brand lime — see theme/tokens.js. Also the
                       one warm accent in this header that must NOT be confused with
                       the bell's red alert dot beside it, which is why it's a true
@@ -435,6 +437,15 @@ export default function Home() {
           </FadeIn>
         )}
       </ScrollView>
+      {/* After the first log (35-onboarding-v3.md), once the + mark is done:
+          a lit streak means something has been logged. */}
+      <CoachMark
+        id="streak"
+        after="add"
+        targetRef={streakChipRef}
+        text="That's day one. Log every day to keep your streak going."
+        active={streakLit && !streakChipLoading}
+      />
     </Screen>
   );
 }

@@ -6,6 +6,7 @@ import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '..
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
 import useFreezeRecovery from '../hooks/useFreezeRecovery';
+import { setMomentActive } from '../lib/moments';
 
 const KOBAN_FREEZE = require('../assets/general/freeze.png');
 // Freeze illustration fills ~87.6% of its own square canvas — corrected so
@@ -35,6 +36,9 @@ export default function FreezePrompt() {
   const { missedDates, freezes, loading, coverCount, isPartial, using, useFreeze } = useFreezeRecovery();
 
   const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    setMomentActive('freeze', visible);
+  }, [visible]);
   const checkedRef = useRef(false);
 
   const userId = session?.user?.id ?? null;

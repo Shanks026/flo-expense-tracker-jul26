@@ -14,6 +14,7 @@ import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
 import { claimRank } from '../lib/rewardsMutations';
 import { getTheme } from '../lib/cardThemes';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { setMomentActive } from '../lib/moments';
 
 // A root-mounted celebration for crossing a Rank threshold
 // (18-gamification-ritual-and-ledger.md Phase 5). Full-screen, pinned-dark
@@ -43,6 +44,9 @@ export default function RankUpCelebration() {
   const { isBursting } = useRewardBurst();
   const { notifyChanged } = useDataRefresh();
   const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    setMomentActive('rankup', visible);
+  }, [visible]);
   const contentRef = useRef(null);
   // Tracks which rank.id this component has already resolved a check for, so
   // the effect below doesn't re-run on every XP tick within the SAME rank —
