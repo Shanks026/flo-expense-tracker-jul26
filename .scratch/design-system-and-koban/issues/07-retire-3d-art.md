@@ -17,6 +17,15 @@ Spec: .claude/features/37-design-system-and-koban.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- The Home streak chip and the streak screen hero use the lucide `Flame`, filled streak orange when lit and an outlined muted grey when not. The glossy `streak.png` / `streak-locked.png` and their fill-ratio maths are gone from both.
+- `StreakFlame` (the 7-day row and the streak calendar): an empty day is an outlined grey `Flame` (a translucent white on the always-dark celebration), and a frozen day is a lucide `Snowflake` on the ice wash instead of the freeze-medallion PNG. Logged (white check on orange) and no-spend (green flame) are unchanged, so all four states stay distinct.
+- The coin, freeze and chest images now appear only on economy surfaces (the hidden Home chip, Shop, rewards sheets, spin wheel), and the files stay in the repo. `StreakFlameIcon.js` was already unused.
+- Not in scope here: the streak *badge* art on the celebration screen; ticket 11 replaces that with Koban.
+- Open (emulator checks paused): the chip, hero, row and calendar lit/unlit/frozen in light and dark.

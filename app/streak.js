@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Snowflake, Flag } from 'lucide-react-native';
+import { Snowflake, Flag, Flame } from 'lucide-react-native';
 import {
   format,
   startOfMonth,
@@ -21,13 +21,9 @@ import { streakHeadline } from '../lib/koban';
 import { MILESTONES, MAX_FREEZES } from '../lib/streak';
 
 const KOBAN_STREAK = require('../assets/mascot/streak.png');
-const KOBAN_STREAK_FLAME = require('../assets/general/streak.png');
 import { fontFamily, fontSize, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
-// Same fill-ratio correction as StreakDays.js/StreakFlameIcon.js for this
-// same flame asset.
-const HERO_FLAME_FILL_RATIO = 0.825;
 
 // Hero mascot geometry — the cat is a POSTER on the card's right edge: large,
 // anchored to the top, and deliberately CROPPED by the card's bottom edge
@@ -97,7 +93,7 @@ export default function StreakScreen() {
         <Card style={styles.hero}>
           <View style={styles.heroText}>
             <View style={styles.heroCountRow}>
-              <Image source={KOBAN_STREAK_FLAME} style={styles.heroFlameIcon} resizeMode="contain" />
+              <Flame size={36} color={lit ? colors.streak : colors.mutedLight} fill={lit ? colors.streak : 'transparent'} strokeWidth={2.2} />
               <Text style={[styles.count, !lit && styles.countEmpty]}>{current}</Text>
             </View>
             {/* "day streak" regardless of count: "days streak" is not English. */}
@@ -233,10 +229,6 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  heroFlameIcon: {
-    width: 40 / HERO_FLAME_FILL_RATIO,
-    height: 40 / HERO_FLAME_FILL_RATIO,
   },
   // See the HERO_CAT_* geometry block at the top of this file — top-anchored
   // and oversized on purpose so the card's bottom edge slices through the cat,

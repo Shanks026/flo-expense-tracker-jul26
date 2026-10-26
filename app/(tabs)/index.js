@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag, Users } from 'lucide-react-native';
+import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag, Users, Flame } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -50,11 +50,6 @@ import { FLAGS } from '../../lib/flags';
 
 const KOBAN_COIN = require('../../assets/general/coin.png');
 const KOBAN_FREEZE = require('../../assets/general/freeze.png');
-const KOBAN_STREAK_FLAME = require('../../assets/general/streak.png');
-const KOBAN_STREAK_FLAME_LOCKED = require('../../assets/general/streak-locked.png');
-// Same fill-ratio correction as StreakFlameIcon.js/StreakDays.js — the source
-// flame only fills ~82.5% of its own square canvas height.
-const STREAK_FLAME_FILL_RATIO = 0.825;
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
@@ -234,10 +229,11 @@ export default function Home() {
                       one warm accent in this header that must NOT be confused with
                       the bell's red alert dot beside it, which is why it's a true
                       orange rather than a red. */}
-                  <Image
-                    source={streakLit ? KOBAN_STREAK_FLAME : KOBAN_STREAK_FLAME_LOCKED}
-                    style={styles.streakFlameIcon}
-                    resizeMode="contain"
+                  <Flame
+                    size={20}
+                    color={streakLit ? colors.streak : colors.mutedLight}
+                    fill={streakLit ? colors.streak : 'transparent'}
+                    strokeWidth={2.2}
                   />
                   <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>
                     {streakCurrent}
@@ -598,10 +594,6 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: 4,
     height: 44,
-  },
-  streakFlameIcon: {
-    width: 17 / STREAK_FLAME_FILL_RATIO,
-    height: 17 / STREAK_FLAME_FILL_RATIO,
   },
   streakCount: {
     fontFamily: fontFamily.extrabold,
