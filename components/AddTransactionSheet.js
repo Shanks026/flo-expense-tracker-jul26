@@ -1,9 +1,15 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import {
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetBackdrop,
+  BottomSheetFooter,
+  BottomSheetTextInput,
+} from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, Trash2, ChevronDown, ChevronUp, MoreHorizontal, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, subDays } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
@@ -16,8 +22,6 @@ import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import useCategoryUsage from '../hooks/useCategoryUsage';
 import { rankCategories, defaultCategoryId, gridCategories, GRID_SIZE } from '../lib/categoryDefaults';
-import usePlans from '../hooks/usePlans';
-import useCollectingPlan from '../hooks/useCollectingPlan';
 import useSplits from '../hooks/useSplits';
 import { createEntryFromTransaction } from '../lib/splits';
 import { budgetToastForSave, planToastForSave } from '../lib/alerts';
@@ -105,8 +109,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const { showRewardBurst } = useRewardBurst();
   const { expenseCategories, incomeCategories } = useCategories();
   const { expenseHistory, incomeHistory } = useCategoryUsage();
-  const { activePlans } = usePlans();
-  const { plan: collectingPlan } = useCollectingPlan();
   // Only OPEN splits are offered — a closed split is frozen by definition
   // (31-split-expenses.md Decision 7), so adding to it would be a surprise.
   const { openSplits } = useSplits();
@@ -120,7 +122,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(null);
   const [planId, setPlanId] = useState(null);
-  const [planPickerOpen, setPlanPickerOpen] = useState(false);
   // Offered on NEW expenses only, never on an edit. An edit can't tell whether
   // it already produced a split entry, so allowing it there would quietly
   // create a second one every time the transaction was touched.
@@ -161,6 +162,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // The smart default and the grid's order (36-add-sheet-3-tap.md), from the
   // user's own recent logs. `showAllCategories` is the More tile's expansion.
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const rankedCategories = useMemo(
     () => rankCategories(categories, type === 'income' ? incomeHistory : expenseHistory, type),
     [categories, type, incomeHistory, expenseHistory]
@@ -170,7 +172,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     const history = nextType === 'income' ? incomeHistory : expenseHistory;
     return defaultCategoryId(list, history, nextType);
   }
-  const selectedPlan = activePlans.find((p) => p.id === planId);
   const selectedSplit = openSplits.find((s) => s.id === splitId);
   // Falls back to activeAccount only for the brief window before `open()`'s
   // setAccountId has run (or if accounts hasn't loaded yet) — once open,
@@ -184,13 +185,25 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // they open Transfer, by design.
   const hasSecondAccount = accounts.length >= 2;
 
+  // The collapsed Details row's one-line summary of what's inside it.
+  const detailsSummary = [
+    formatDateLabel(date),
+    note.trim() || null,
+    !editingId && hasSecondAccount ? selectedAccount?.name : null,
+    selectedSplit ? `Split: ${selectedSplit.name}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  // Save stays disabled until there's an amount above zero.
+  const canSave = Number(amount) > 0;
+
   useImperativeHandle(ref, () => ({
     open(payload) {
       sourceRef.current = payload?.source ?? 'manual';
       onDoneRef.current = payload?.onDone ?? null;
       savedRef.current = false;
       setError(null);
-      setPlanPickerOpen(false);
+      setDetailsOpen(false);
       // Never sticky: a split chosen for one expense must not silently apply to
       // the next one logged from the same sheet.
       setSplitId(null);
@@ -250,7 +263,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setEditingId(null);
         setEditingTransferId(null);
         setType(prefillType);
-        setAmount(payload?.amount ? String(Math.round(payload.amount)) : '');
+        // Paise are kept now that the keypad has a decimal point.
+        setAmount(payload?.amount ? String(payload.amount) : '');
         // An explicit categoryId wins; otherwise the smart default.
         setCategoryId(payload?.categoryId ?? (prefillType === 'transfer' ? null : defaultCategoryFor(prefillType)));
         // Defaults to the active account, same as before — now changeable
@@ -259,15 +273,12 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         // Transfer From/To seed: From = the account you're in, To = unset.
         setFromAccountId(activeAccountId);
         setToAccountId(null);
-        // An explicit plan_id in the payload (Plan Detail's "Add Expense")
-        // always wins. Otherwise a new entry defaults into the active account's
-        // collecting plan, if one is armed — the whole point of Phase 2. This is
-        // the `else` branch (a brand-new entry): editing an existing transaction
-        // takes the `payload?.id` branch above and its plan is NEVER touched here.
-        // The plan lands in the visible "Add to Plan" field, so it can be seen
-        // and cleared before saving — not a hidden default.
-        setPlanId(payload?.plan_id ?? collectingPlan?.id ?? null);
-        setDate(new Date());
+        // Plans are flagged off (36-add-sheet-3-tap.md), so the sheet no longer
+        // shows a Plan control or defaults into a collecting plan. An explicit
+        // plan_id from the opener (Plan Detail's "Add Expense") still lands,
+        // and an edit keeps its plan (the branch above).
+        setPlanId(payload?.plan_id ?? null);
+        setDate(payload?.date ? new Date(payload.date) : new Date());
         setNote(payload?.note ?? '');
       }
       modalRef.current?.present();
@@ -526,6 +537,17 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     []
   );
 
+  // Save, pinned to the bottom of the sheet: with the sheet's keyboard
+  // handling below, that keeps it just above the keyboard, so saving never
+  // means dismissing the keyboard first (36-add-sheet-3-tap.md).
+  const renderFooter = (props) => (
+    <BottomSheetFooter {...props}>
+      <View style={styles.footer}>
+        <Button title="Save" onPress={handleSave} loading={saving} disabled={!canSave} />
+      </View>
+    </BottomSheetFooter>
+  );
+
   return (
     <BottomSheetModal
       ref={modalRef}
@@ -533,6 +555,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       onDismiss={handleDismiss}
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
+      keyboardBehavior="interactive"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
+      footerComponent={renderFooter}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
@@ -555,155 +581,124 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           </View>
         </View>
 
-        {selectedAccount && type !== 'transfer' && (
-          <>
-            <Pressable
-              style={styles.accountRow}
-              disabled={!!editingId || accounts.length < 2}
-              onPress={() => setAccountPickerOpen((v) => !v)}
-            >
-              <View style={[styles.accountDot, { backgroundColor: selectedAccount.color }]} />
-              <Text style={styles.accountText}>
-                Adding to <Text style={styles.accountName}>{selectedAccount.name}</Text>
-              </Text>
-              {/* Editing never changes an entry's account (see handleSave),
-                  and there's nothing to pick among with only one account —
-                  the chevron only appears when this row is actually
-                  interactive. */}
-              {!editingId && accounts.length >= 2 && (
-                <ChevronDown size={14} color={colors.mutedDarker} strokeWidth={2.4} />
-              )}
-            </Pressable>
-            {accountPickerOpen && (
-              <View style={styles.planPicker}>
-                {accounts.map((a) => (
-                  <Pressable
-                    key={a.id}
-                    style={[styles.planOption, accountId === a.id && styles.planOptionSelected]}
-                    onPress={() => {
-                      setAccountId(a.id);
-                      setAccountPickerOpen(false);
-                    }}
-                  >
-                    <Text
-                      style={[styles.planOptionText, accountId === a.id && styles.planOptionTextSelected]}
-                      numberOfLines={1}
-                    >
-                      {a.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </>
-        )}
-
-        <View style={styles.segmentWrap}>
-          <Pressable
-            style={[styles.segment, type === 'expense' && styles.segmentActive]}
-            onPress={() => handleTypeChange('expense')}
-          >
-            <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segment, type === 'income' && styles.segmentActive]}
-            onPress={() => handleTypeChange('income')}
-          >
-            <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segment, type === 'transfer' && styles.segmentActive]}
-            onPress={() => handleTypeChange('transfer')}
-          >
-            <Text style={[styles.segmentText, type === 'transfer' && styles.segmentTextActive]}>Transfer</Text>
-          </Pressable>
-        </View>
-
+        {/* 36-add-sheet-3-tap.md: amount first, focused on open, with a
+            decimal keypad (paise allowed); Save lives in the footer, pinned
+            above the keyboard. */}
         <View style={styles.amountWrap}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
             <Text style={styles.amountCurrency}>{currencySymbol(selectedAccount?.currency)}</Text>
-            <TextInput
+            <BottomSheetTextInput
               ref={amountInputRef}
               value={amount}
               onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
               placeholder="0"
               placeholderTextColor={colors.mutedLight}
-              keyboardType="number-pad"
+              keyboardType="decimal-pad"
               style={styles.amountInput}
             />
           </View>
         </View>
 
         {type === 'transfer' ? (
-          hasSecondAccount ? (
-            <>
-              <AccountField
-                styles={styles}
-                label="From"
-                value={fromAccountId}
-                exclude={toAccountId}
-                accounts={accounts}
-                open={fromPickerOpen}
-                onToggle={() => {
-                  setFromPickerOpen((v) => !v);
-                  setToPickerOpen(false);
-                }}
-                onSelect={(id) => {
-                  setFromAccountId(id);
-                  setFromPickerOpen(false);
-                }}
-              />
-              <View style={styles.swapRow}>
-                <Pressable style={styles.swapButton} onPress={handleSwapAccounts} hitSlop={8}>
-                  <ArrowLeftRight size={16} color={colors.ink} strokeWidth={2.4} />
+          <>
+            {/* Transfer left the type toggle; until spec 38 gives it a home in
+                Accounts it's reached from Details, and this goes back. */}
+            {!editingId && (
+              <Pressable style={styles.linkRow} onPress={() => handleTypeChange('expense')} hitSlop={8}>
+                <Text style={styles.linkText}>Back to expense</Text>
+              </Pressable>
+            )}
+            {hasSecondAccount ? (
+              <>
+                <AccountField
+                  styles={styles}
+                  label="From"
+                  value={fromAccountId}
+                  exclude={toAccountId}
+                  accounts={accounts}
+                  open={fromPickerOpen}
+                  onToggle={() => {
+                    setFromPickerOpen((v) => !v);
+                    setToPickerOpen(false);
+                  }}
+                  onSelect={(id) => {
+                    setFromAccountId(id);
+                    setFromPickerOpen(false);
+                  }}
+                />
+                <View style={styles.swapRow}>
+                  <Pressable style={styles.swapButton} onPress={handleSwapAccounts} hitSlop={8}>
+                    <ArrowLeftRight size={16} color={colors.ink} strokeWidth={2.4} />
+                  </Pressable>
+                </View>
+                <AccountField
+                  styles={styles}
+                  label="To"
+                  value={toAccountId}
+                  exclude={fromAccountId}
+                  accounts={accounts}
+                  open={toPickerOpen}
+                  onToggle={() => {
+                    setToPickerOpen((v) => !v);
+                    setFromPickerOpen(false);
+                  }}
+                  onSelect={(id) => {
+                    setToAccountId(id);
+                    setToPickerOpen(false);
+                  }}
+                />
+                <Pressable style={styles.transferDate} onPress={() => setShowDatePicker(true)}>
+                  <Text style={styles.fieldLabel}>Date</Text>
+                  <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
+                </Pressable>
+                <View style={styles.noteRow}>
+                  <Text style={styles.fieldLabel}>Note</Text>
+                  <BottomSheetTextInput
+                    value={note}
+                    onChangeText={setNote}
+                    placeholder="Add a note…"
+                    placeholderTextColor={colors.mutedLight}
+                    style={styles.noteInput}
+                  />
+                </View>
+              </>
+            ) : (
+              // < 2 accounts: only reachable when editing an old transfer whose
+              // other account is gone, since the Details link needs 2+.
+              <View style={styles.transferEmptyCard}>
+                <View style={styles.transferEmptyIcon}>
+                  <Wallet size={22} color={colors.brand} strokeWidth={2} />
+                </View>
+                <Text style={styles.transferEmptyTitle}>Add a second account</Text>
+                <Text style={styles.transferEmptyBody}>
+                  Transfers move money between two of your own accounts.{' '}
+                  {hasPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}
+                </Text>
+                <Pressable style={styles.transferEmptyButton} onPress={handleAddAccountForTransfer}>
+                  {!hasPro && <Crown size={15} color={colors.ink} strokeWidth={2.4} />}
+                  <Text style={styles.transferEmptyButtonText}>{hasPro ? 'Add an account' : 'Upgrade to Pro'}</Text>
                 </Pressable>
               </View>
-              <AccountField
-                styles={styles}
-                label="To"
-                value={toAccountId}
-                exclude={fromAccountId}
-                accounts={accounts}
-                open={toPickerOpen}
-                onToggle={() => {
-                  setToPickerOpen((v) => !v);
-                  setFromPickerOpen(false);
-                }}
-                onSelect={(id) => {
-                  setToAccountId(id);
-                  setToPickerOpen(false);
-                }}
-              />
-              <Pressable style={styles.transferDate} onPress={() => setShowDatePicker(true)}>
-                <Text style={styles.fieldLabel}>Date</Text>
-                <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
-              </Pressable>
-            </>
-          ) : (
-            // < 2 accounts — a transfer is structurally impossible, so instead
-            // of showing From/To fields with nothing to pick, prompt for the
-            // one thing that actually unblocks it. hasPro gates WHICH sheet:
-            // free → upsell (a 2nd account is a Pro feature, FREE_LIMITS.accounts
-            // = 1), Pro → straight to Add Account.
-            <View style={styles.transferEmptyCard}>
-              <View style={styles.transferEmptyIcon}>
-                <Wallet size={22} color={colors.brand} strokeWidth={2} />
-              </View>
-              <Text style={styles.transferEmptyTitle}>Add a second account</Text>
-              <Text style={styles.transferEmptyBody}>
-                Transfers move money between two of your own accounts.{' '}
-                {hasPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}
-              </Text>
-              <Pressable style={styles.transferEmptyButton} onPress={handleAddAccountForTransfer}>
-                {!hasPro && <Crown size={15} color={colors.ink} strokeWidth={2.4} />}
-                <Text style={styles.transferEmptyButtonText}>{hasPro ? 'Add an account' : 'Upgrade to Pro'}</Text>
-              </Pressable>
-            </View>
-          )
+            )}
+          </>
         ) : (
           <>
-            <Text style={styles.sectionLabel}>CATEGORY</Text>
+            <View style={styles.segmentWrap}>
+              <Pressable
+                style={[styles.segment, type === 'expense' && styles.segmentActive]}
+                onPress={() => handleTypeChange('expense')}
+              >
+                <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.segment, type === 'income' && styles.segmentActive]}
+                onPress={() => handleTypeChange('income')}
+              >
+                <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
+              </Pressable>
+            </View>
+
             {/* Top 8 as a 4×2 grid plus More (36-add-sheet-3-tap.md); More
                 expands every category of this type in place, and picking one
                 there collapses back with it swapped into the grid. */}
@@ -744,122 +739,157 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               )}
             </View>
 
-            <View style={styles.dateAndPlanRow}>
-              <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
-                <Text style={styles.fieldLabel}>Date</Text>
-                <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
-              </Pressable>
-              {/* Only when there's actually a plan to pick. A picker whose only
-                  option is "None" is pure noise — and it's noise every brand-new
-                  user meets first, since nobody has a plan on day one. With it
-                  gone, Date's flex:1 fills the row on its own. Same rule as the
-                  Split picker below and as the Transfer tab's own <2-accounts
-                  case. */}
-              {activePlans.length > 0 && (
-                <Pressable style={[styles.dateRow, { flex: 1 }]} onPress={() => setPlanPickerOpen((v) => !v)}>
-                  <View style={styles.planRowInner}>
-                    <View>
-                      <Text style={styles.fieldLabel}>Add to Plan</Text>
-                      <Text style={[styles.fieldValue, selectedPlan && styles.fieldValuePlan]} numberOfLines={1}>
-                        {selectedPlan?.name ?? 'None'}
-                      </Text>
-                    </View>
-                    <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-                  </View>
-                </Pressable>
-              )}
-            </View>
-            {planPickerOpen && (
-              <View style={styles.planPicker}>
-                <Pressable
-                  style={[styles.planOption, planId === null && styles.planOptionSelected]}
-                  onPress={() => {
-                    setPlanId(null);
-                    setPlanPickerOpen(false);
-                  }}
-                >
-                  <Text style={[styles.planOptionText, planId === null && styles.planOptionTextSelected]}>None</Text>
-                </Pressable>
-                {activePlans.map((p) => (
-                  <Pressable
-                    key={p.id}
-                    style={[styles.planOption, planId === p.id && styles.planOptionSelected]}
-                    onPress={() => {
-                      setPlanId(p.id);
-                      setPlanPickerOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.planOptionText, planId === p.id && styles.planOptionTextSelected]} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                  </Pressable>
-                ))}
+            {/* Everything else, collapsed into one row: date, note, and the
+                account / split / transfer controls only when they apply. */}
+            <Pressable style={styles.detailsRow} onPress={() => setDetailsOpen((v) => !v)}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Details</Text>
+                <Text style={styles.fieldValue} numberOfLines={1}>
+                  {detailsSummary}
+                </Text>
               </View>
-            )}
+              {detailsOpen ? (
+                <ChevronUp size={16} color={colors.muted} strokeWidth={2.4} />
+              ) : (
+                <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+              )}
+            </Pressable>
 
-            {/* "Add to Split" (31-split-expenses.md Phase 2) — log the expense
-                once and have it show up in the split too, instead of typing it
-                in both places.
-
-                Expenses only, and new ones only. A split ENTRY is a shared
-                cost; money coming back to you is a settlement, which belongs in
-                SettleUpSheet where it can be matched to who paid you. And on an
-                edit there's no way to know whether an entry was already
-                created, so offering it would duplicate. */}
-            {type === 'expense' && !editingId && openSplits.length > 0 && (
-              <>
-                <Pressable style={styles.dateRow} onPress={() => setSplitPickerOpen((v) => !v)}>
-                  <View style={styles.planRowInner}>
-                    <View>
-                      <Text style={styles.fieldLabel}>Add to Split</Text>
-                      <Text
-                        style={[styles.fieldValue, selectedSplit && styles.fieldValuePlan]}
-                        numberOfLines={1}
-                      >
-                        {selectedSplit?.name ?? 'None'}
-                      </Text>
-                    </View>
-                    <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-                  </View>
-                </Pressable>
-                {splitPickerOpen && (
-                  <View style={styles.planPicker}>
+            {detailsOpen && (
+              <View style={styles.detailsBody}>
+                <View style={styles.dateChipRow}>
+                  {[
+                    { key: 'today', label: 'Today', active: isToday(date), onPress: () => setDate(new Date()) },
+                    { key: 'yesterday', label: 'Yesterday', active: isYesterday(date), onPress: () => setDate(subDays(new Date(), 1)) },
+                    {
+                      key: 'pick',
+                      label: isToday(date) || isYesterday(date) ? 'Pick a date' : formatDateLabel(date),
+                      active: !isToday(date) && !isYesterday(date),
+                      onPress: () => setShowDatePicker(true),
+                    },
+                  ].map((chip) => (
                     <Pressable
-                      style={[styles.planOption, splitId === null && styles.planOptionSelected]}
-                      onPress={() => {
-                        setSplitId(null);
-                        setSplitPickerOpen(false);
-                      }}
+                      key={chip.key}
+                      style={[styles.dateChip, chip.active && styles.dateChipActive]}
+                      onPress={chip.onPress}
                     >
-                      <Text style={[styles.planOptionText, splitId === null && styles.planOptionTextSelected]}>
-                        None
-                      </Text>
+                      <Text style={[styles.dateChipText, chip.active && styles.dateChipTextActive]}>{chip.label}</Text>
                     </Pressable>
-                    {openSplits.map((s) => (
-                      <Pressable
-                        key={s.id}
-                        style={[styles.planOption, splitId === s.id && styles.planOptionSelected]}
-                        onPress={() => {
-                          setSplitId(s.id);
-                          setSplitPickerOpen(false);
-                        }}
-                      >
-                        <Text
-                          style={[styles.planOptionText, splitId === s.id && styles.planOptionTextSelected]}
-                          numberOfLines={1}
+                  ))}
+                </View>
+
+                <View style={styles.noteRow}>
+                  <Text style={styles.fieldLabel}>Note</Text>
+                  <BottomSheetTextInput
+                    value={note}
+                    onChangeText={setNote}
+                    placeholder="Add a note…"
+                    placeholderTextColor={colors.mutedLight}
+                    style={styles.noteInput}
+                  />
+                </View>
+
+                {/* Only with 2+ accounts, and never on an edit (editing never
+                    changes an entry's account; see handleSave). */}
+                {!editingId && hasSecondAccount && selectedAccount && (
+                  <>
+                    <Pressable style={styles.dateRow} onPress={() => setAccountPickerOpen((v) => !v)}>
+                      <View style={styles.planRowInner}>
+                        <View>
+                          <Text style={styles.fieldLabel}>Account</Text>
+                          <Text style={[styles.fieldValue, styles.fieldValuePlan]} numberOfLines={1}>
+                            {selectedAccount.name}
+                          </Text>
+                        </View>
+                        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+                      </View>
+                    </Pressable>
+                    {accountPickerOpen && (
+                      <View style={styles.planPicker}>
+                        {accounts.map((a) => (
+                          <Pressable
+                            key={a.id}
+                            style={[styles.planOption, accountId === a.id && styles.planOptionSelected]}
+                            onPress={() => {
+                              setAccountId(a.id);
+                              setAccountPickerOpen(false);
+                            }}
+                          >
+                            <Text
+                              style={[styles.planOptionText, accountId === a.id && styles.planOptionTextSelected]}
+                              numberOfLines={1}
+                            >
+                              {a.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {/* "Add to Split" (31-split-expenses.md Phase 2) — log the
+                    expense once and have it show up in the split too. Expenses
+                    only, new ones only (an edit can't tell whether an entry
+                    already exists), and only once there's an open split. */}
+                {type === 'expense' && !editingId && openSplits.length > 0 && (
+                  <>
+                    <Pressable style={styles.dateRow} onPress={() => setSplitPickerOpen((v) => !v)}>
+                      <View style={styles.planRowInner}>
+                        <View>
+                          <Text style={styles.fieldLabel}>Add to Split</Text>
+                          <Text style={[styles.fieldValue, selectedSplit && styles.fieldValuePlan]} numberOfLines={1}>
+                            {selectedSplit?.name ?? 'None'}
+                          </Text>
+                        </View>
+                        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+                      </View>
+                    </Pressable>
+                    {splitPickerOpen && (
+                      <View style={styles.planPicker}>
+                        <Pressable
+                          style={[styles.planOption, splitId === null && styles.planOptionSelected]}
+                          onPress={() => {
+                            setSplitId(null);
+                            setSplitPickerOpen(false);
+                          }}
                         >
-                          {s.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
+                          <Text style={[styles.planOptionText, splitId === null && styles.planOptionTextSelected]}>None</Text>
+                        </Pressable>
+                        {openSplits.map((s) => (
+                          <Pressable
+                            key={s.id}
+                            style={[styles.planOption, splitId === s.id && styles.planOptionSelected]}
+                            onPress={() => {
+                              setSplitId(s.id);
+                              setSplitPickerOpen(false);
+                            }}
+                          >
+                            <Text
+                              style={[styles.planOptionText, splitId === s.id && styles.planOptionTextSelected]}
+                              numberOfLines={1}
+                            >
+                              {s.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                    {selectedSplit && (
+                      <Text style={styles.splitHint}>
+                        Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
+                      </Text>
+                    )}
+                  </>
                 )}
-                {selectedSplit && (
-                  <Text style={styles.splitHint}>
-                    Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
-                  </Text>
+
+                {!editingId && hasSecondAccount && (
+                  <Pressable style={styles.linkRow} onPress={() => handleTypeChange('transfer')} hitSlop={8}>
+                    <ArrowLeftRight size={14} color={colors.ink} strokeWidth={2.4} />
+                    <Text style={styles.linkText}>Transfer between accounts</Text>
+                  </Pressable>
                 )}
-              </>
+              </View>
             )}
           </>
         )}
@@ -876,20 +906,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           />
         )}
 
-        <View style={styles.noteRow}>
-          <Text style={styles.fieldLabel}>Note</Text>
-          <TextInput
-            value={note}
-            onChangeText={setNote}
-            placeholder="Add a note…"
-            placeholderTextColor={colors.mutedLight}
-            style={styles.noteInput}
-          />
-        </View>
-
         {error && <Text style={styles.errorText}>{error}</Text>}
 
-        <Button title="Save" onPress={handleSave} loading={saving} style={{ marginTop: spacing.md }} />
         {editingId && (
           <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
             <Trash2 size={16} color={colors.danger} strokeWidth={2} />
@@ -905,7 +923,8 @@ function makeStyles(colors) {
   return StyleSheet.create({
   sheet: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
+    // Clears the pinned Save footer.
+    paddingBottom: 96,
   },
   headerRow: {
     flexDirection: 'row',
@@ -931,31 +950,6 @@ function makeStyles(colors) {
     backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  accountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    backgroundColor: colors.chipBg,
-    borderRadius: radii.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    marginBottom: spacing.lg,
-  },
-  accountDot: {
-    width: 7,
-    height: 7,
-    borderRadius: radii.pill,
-  },
-  accountText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedDarker,
-  },
-  accountName: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.ink,
   },
   segmentWrap: {
     flexDirection: 'row',
@@ -1011,13 +1005,6 @@ function makeStyles(colors) {
     minWidth: 80,
     textAlign: 'center',
   },
-  sectionLabel: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
   chipGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1052,11 +1039,6 @@ function makeStyles(colors) {
   chipLabelInactive: {
     fontFamily: fontFamily.semibold,
     color: colors.muted,
-  },
-  dateAndPlanRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
   },
   dateRow: {
     backgroundColor: colors.surface,
@@ -1223,6 +1205,64 @@ function makeStyles(colors) {
     color: colors.ink,
     marginTop: 1,
     padding: 0,
+  },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.bg,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+  },
+  detailsBody: {
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  dateChipRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  dateChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dateChipActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  dateChipText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: colors.ink,
+  },
+  dateChipTextActive: {
+    color: colors.surface,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.sm,
+  },
+  linkText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: colors.ink,
+    textDecorationLine: 'underline',
   },
   errorText: {
     fontFamily: fontFamily.semibold,
