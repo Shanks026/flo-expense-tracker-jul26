@@ -14,7 +14,7 @@ import { RANKS, RANK_BADGE_ART, RANK_FLAVOR, rankFromXp } from '../lib/rewards';
 import { claimRank } from '../lib/rewardsMutations';
 import { getTheme } from '../lib/cardThemes';
 import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import { setMomentActive } from '../lib/moments';
+import { setMomentActive, useOtherMomentActive } from '../lib/moments';
 
 // A root-mounted celebration for crossing a Rank threshold
 // (18-gamification-ritual-and-ledger.md Phase 5). Full-screen, pinned-dark
@@ -42,6 +42,8 @@ export default function RankUpCelebration() {
   const { xp, loading } = useRewards();
   const { profile, loading: profileLoading, updateProfile } = useProfile();
   const { isBursting } = useRewardBurst();
+  // Waits for the Add sheet (and any other moment) to close first.
+  const otherMoment = useOtherMomentActive('rankup');
   const { notifyChanged } = useDataRefresh();
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -82,7 +84,7 @@ export default function RankUpCelebration() {
     // the burst (FINDINGS-rank-ladder-rollout.md Finding 2). checkedRankRef
     // is deliberately NOT set yet — leaving it unset means this effect just
     // re-evaluates once isBursting flips false, instead of the two racing.
-    if (isBursting) return;
+    if (isBursting || otherMoment) return;
     checkedRankRef.current = rank.id;
 
     const lastSeenId = profile.highest_rank_seen;
@@ -144,7 +146,7 @@ export default function RankUpCelebration() {
     // checkedRankRef guard above is what actually controls re-entry, not
     // this dependency list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, userId, loading, profileLoading, profile, rank.id, isBursting]);
+  }, [session, userId, loading, profileLoading, profile, rank.id, isBursting, otherMoment]);
 
   if (!visible || !contentRef.current) return null;
 

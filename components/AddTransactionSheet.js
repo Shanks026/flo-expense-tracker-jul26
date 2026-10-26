@@ -14,7 +14,7 @@ import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
-import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
+import { currencySymbol, formatMoney, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -24,11 +24,11 @@ import useCategoryUsage from '../hooks/useCategoryUsage';
 import { rankCategories, defaultCategoryId, gridCategories, GRID_SIZE } from '../lib/categoryDefaults';
 import useSplits from '../hooks/useSplits';
 import { createEntryFromTransaction } from '../lib/splits';
-import { budgetToastForSave, planToastForSave } from '../lib/alerts';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
 import { claimDailyLog } from '../lib/rewardsMutations';
 import { track } from '../lib/track';
-import { useRewardBurst } from './RewardBurst';
+import { setMomentActive } from '../lib/moments';
+import * as Haptics from 'expo-haptics';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
@@ -102,11 +102,19 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const amountInputRef = useRef(null);
-  const handleSheetChange = useSheetBackHandler(modalRef);
+  const handleBackChange = useSheetBackHandler(modalRef);
+  // The open sheet counts as a moment, so celebrations and coach marks wait
+  // until it closes instead of interrupting entry (36-add-sheet-3-tap.md).
+  const handleSheetChange = useCallback(
+    (index) => {
+      handleBackChange(index);
+      setMomentActive('add-sheet', index >= 0);
+    },
+    [handleBackChange]
+  );
   const { notifyChanged } = useDataRefresh();
   const { activeAccountId, activeAccount, accounts } = useAccount();
   const { showToast } = useToast();
-  const { showRewardBurst } = useRewardBurst();
   const { expenseCategories, incomeCategories } = useCategories();
   const { expenseHistory, incomeHistory } = useCategoryUsage();
   // Only OPEN splits are offered — a closed split is frozen by definition
@@ -441,31 +449,16 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       return;
     }
 
-    // Gamification (18-gamification-ritual-and-ledger.md Phase 2) — the daily
-    // coin+XP earn, claimed once per LOCAL day regardless of how many
-    // transactions get logged today (an idempotent upsert on reward_events;
-    // see lib/rewardsMutations.js). Only on a genuine NEW entry, never an
-    // edit — editing an old transaction isn't "showing up today". Uses
-    // `new Date()` (today, real device clock), not the `date` field state,
-    // which may be backdated — same created_at-not-occurred_at discipline
-    // lib/streak.js's own streak already follows, for the same reason: a
-    // backfilled past-dated entry still counts as logging TODAY. Never fails
-    // the save if the claim errors — the transaction itself already
-    // succeeded by this point.
-    const inOnboarding = sourceRef.current === 'onboarding';
+    // The daily coin+XP claim (18-gamification-ritual-and-ledger.md Phase 2)
+    // still records — once per LOCAL day, on a genuine new entry, using
+    // today's clock rather than the possibly backdated `date` — but silently:
+    // no reward burst after a save any more (36-add-sheet-3-tap.md). It never
+    // fails the save; the transaction already succeeded by this point.
     if (isNewEntry) {
       savedRef.current = true;
       if (type === 'expense') track('expense_logged', { source: sourceRef.current });
-      const { error: rewardError, isNewClaim, coins: earnedCoins, xp: earnedXp } = await claimDailyLog(
-        format(new Date(), 'yyyy-MM-dd')
-      );
+      const { error: rewardError } = await claimDailyLog(format(new Date(), 'yyyy-MM-dd'));
       if (rewardError) console.error('claimDailyLog failed:', rewardError.message);
-      // Only the FIRST log of the day is a genuine new claim (the daily coin/
-      // XP earn is flat per day, not per transaction) — the celebration is
-      // for that moment, not for every subsequent transaction logged the same
-      // day, which would cheapen it into background noise. Never during
-      // onboarding (35-onboarding-v3.md); the claim itself still lands.
-      else if (isNewClaim && !inOnboarding) showRewardBurst({ coins: earnedCoins, xp: earnedXp });
     }
 
     // "Add to Split" (31-split-expenses.md Phase 2) — the "log it once, not
@@ -474,7 +467,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     // editable from the split afterwards. A failure here is reported on its own
     // rather than implying the transaction didn't save, because it did.
     let splitError = null;
-    if (!editingId && splitId && newTransactionId) {
+    const addedToSplit = !editingId && splitId && newTransactionId;
+    if (addedToSplit) {
       ({ error: splitError } = await createEntryFromTransaction({
         splitId,
         transaction: {
@@ -489,18 +483,41 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
     notifyChanged();
     modalRef.current?.dismiss();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
     if (splitError) {
       showToast({ message: `Transaction saved, but the split entry didn't: ${splitError.message}`, variant: 'error' });
-    } else {
-      showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' });
+      return;
+    }
+    if (editingId) {
+      showToast({ message: 'Transaction updated', variant: 'success' });
+      return;
     }
 
-    if (!editingId && type === 'expense' && !inOnboarding) {
-      const budgetMsg = await budgetToastForSave({ categoryId, accountId: targetAccountId });
-      const planMsg = planId ? await planToastForSave({ planId }) : null;
-      if (budgetMsg) showToast({ message: budgetMsg, variant: 'warn' });
-      if (planMsg) showToast({ message: planMsg, variant: 'warn' });
+    // "Logged ₹250 · Food", with Undo for 5 s. Budget and plan warnings no
+    // longer toast here; an over-budget category shows in the bell's alerts.
+    // A save that also made a split entry gets no Undo: the entry is shared
+    // and would outlive the deleted transaction (its FK is SET NULL).
+    const categoryName = categories.find((c) => c.id === categoryId)?.name;
+    const message = `Logged ${formatMoney(numericAmount, selectedAccount?.currency)}${categoryName ? ` · ${categoryName}` : ''}`;
+    if (addedToSplit) {
+      showToast({ message, variant: 'success' });
+      return;
     }
+    showToast({
+      message,
+      variant: 'success',
+      actionLabel: 'Undo',
+      duration: 5000,
+      onAction: async () => {
+        const { error: undoError } = await supabase.from('transactions').delete().eq('id', newTransactionId);
+        if (undoError) {
+          showToast({ message: undoError.message, variant: 'error' });
+          return;
+        }
+        notifyChanged();
+      },
+    });
   }
 
   async function handleDelete() {

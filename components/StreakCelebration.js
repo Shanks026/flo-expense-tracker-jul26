@@ -10,7 +10,7 @@ import Confetti from './Confetti';
 import StreakDays from './StreakDays';
 import useStreak from '../hooks/useStreak';
 import useProfile from '../hooks/useProfile';
-import { setMomentActive } from '../lib/moments';
+import { setMomentActive, useOtherMomentActive } from '../lib/moments';
 import { useRewardBurst } from './RewardBurst';
 import { useAuth } from '../lib/AuthContext';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -76,6 +76,8 @@ export default function StreakCelebration() {
   const userId = session?.user?.id ?? null;
   const { profile } = useProfile();
   const onboarded = !!profile?.onboarded_at;
+  // Waits for the Add sheet (and any other moment) to close first.
+  const otherMoment = useOtherMomentActive('streak');
 
   // The gate. It used to fire on the first transaction of EVERY day — a
   // full-screen takeover on an ordinary Tuesday, which trains the user to
@@ -108,6 +110,7 @@ export default function StreakCelebration() {
     // Home, where this effect re-runs. The AsyncStorage "already celebrated
     // today" key below is what stops it re-showing.
     if (!onboarded) return;
+    if (otherMoment) return;
     if (!worthCelebrating) return;
     // Ordering fix (18-gamification-ritual-and-ledger.md Phase 3, found on-
     // device): this is a full-screen Modal, which renders in its own native
@@ -164,7 +167,7 @@ export default function StreakCelebration() {
         setWheelDay(spinWheelFor(current) ? current : null);
         setVisible(true);
       });
-  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting, onboarded]);
+  }, [session, userId, loading, loggedToday, worthCelebrating, todayStr, isBursting, onboarded, otherMoment]);
 
   // Dismissing the celebration hands off to the spin wheel (day 30/50 only,
   // wheelDay is null otherwise) instead of just closing — two sequential
