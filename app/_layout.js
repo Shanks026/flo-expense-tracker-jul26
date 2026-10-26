@@ -53,6 +53,7 @@ import { useNotificationSync } from '../lib/notifications';
 import { usePushTokenSync } from '../lib/pushToken';
 import { isDetectionEnabled, hasNotificationAccess, drainDetections } from '../lib/detect';
 import { getIntroSeen, setIntroSeen as persistIntroSeen } from '../lib/onboardingDraft';
+import { FIRST_STEP_ROUTE, isStepRoute } from '../lib/onboarding';
 import { flushEvents, loadTrackingConsent, startTrackingSession, track } from '../lib/track';
 
 SplashScreen.preventAutoHideAsync();
@@ -175,14 +176,7 @@ function OnboardingGate() {
 
     const inOnboarding = segments[0] === 'onboarding';
     const onSignIn = segments[0] === 'sign-in';
-    // The tour's "Make it yours" card (28-onboarding-welcome-bundle.md Phase 2)
-    // deep-links to the REAL Personalize / Manage-Categories screens, which
-    // live OUTSIDE /onboarding. Without allowing them, this gate would see a
-    // not-yet-onboarded user on a non-onboarding route and yank them back to
-    // /onboarding/account, breaking the detour (and losing tour progress).
-    // Backing out of either returns to the tour card (an /onboarding route),
-    // where the normal rule resumes.
-    const onTourDetour = segments[0] === 'personalize' || segments[0] === 'manage-categories';
+    const onStep = isStepRoute(`/${segments.join('/')}`);
 
     // This gate — not RootNavigator — owns where an authenticated user lands.
     // RootNavigator only knows about `session`, so if it sent signed-in users
@@ -191,10 +185,10 @@ function OnboardingGate() {
     // right destination, once the profile that determines it has actually
     // loaded, is the only way to avoid that flash.
     if (!onboardedAt) {
-      // Post-auth resume point is Act 2's first step — a signed-in user is
-      // already past the pre-auth intro (12-personal-onboarding.md). The tour
-      // detour routes (Personalize / Manage-Categories) are allowed through.
-      if (!inOnboarding && !onTourDetour) router.replace('/onboarding/account');
+      // Anywhere but a current post-auth step goes to the first one
+      // (35-onboarding-v3.md) — including a screen from an older version of
+      // the flow, so a user stuck partway through it restarts in the new one.
+      if (!onStep) router.replace(FIRST_STEP_ROUTE);
     } else if (inOnboarding || onSignIn) {
       router.replace('/');
     }
