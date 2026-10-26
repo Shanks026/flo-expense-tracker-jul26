@@ -31,7 +31,9 @@ import { SettleUpSheetProvider } from '../components/SettleUpSheet';
 import PendingInviteHandler from '../components/PendingInviteHandler';
 import { AddBillSheetProvider } from '../components/AddBillSheet';
 import { PayBillSheetProvider } from '../components/PayBillSheet';
-import DueBillsModal from '../components/DueBillsModal';
+import DueBillsSource from '../components/DueBillsModal';
+import MomentHost from '../components/MomentHost';
+import { loadMomentsFor, setMomentBlocker, startMomentSession } from '../lib/momentQueue';
 import StreakCelebration from '../components/StreakCelebration';
 import StreakFreezeSync from '../components/StreakFreezeSync';
 import RankUpCelebration from '../components/RankUpCelebration';
@@ -297,6 +299,7 @@ function AnalyticsSync() {
   useEffect(() => {
     let cancelled = false;
     startTrackingSession();
+    startMomentSession();
     loadTrackingConsent(userId).then(() => {
       if (cancelled || !coldStartPending.current) return;
       coldStartPending.current = false;
@@ -321,12 +324,38 @@ function AnalyticsSync() {
       if (away < NEW_OPEN_AFTER_MS) return;
       const uid = userIdRef.current;
       startTrackingSession();
+      startMomentSession();
       loadTrackingConsent(uid).then(() => {
         if (userIdRef.current === uid) track('app_open');
       });
     });
     return () => sub.remove();
   }, []);
+
+  return null;
+}
+
+// Feeds the moment queue (lib/momentQueue.js) what it can't see itself: whose
+// saved queue to load, and whether onboarding is on screen — no moment shows
+// during onboarding (34-streak-only.md). A Stack sibling because it needs
+// useProfile and the route segments. Sessions are started alongside the
+// tracking session in AnalyticsSync.
+function MomentQueueSync() {
+  const { session } = useAuth();
+  const { profile, loading } = useProfile();
+  const segments = useSegments();
+  const userId = session?.user?.id ?? null;
+
+  useEffect(() => {
+    loadMomentsFor(userId);
+  }, [userId]);
+
+  // Held while the profile is unknown too, so nothing slips in before the
+  // onboarding check can run.
+  const onboarding = !!session && (loading || !profile?.onboarded_at || segments[0] === 'onboarding');
+  useEffect(() => {
+    setMomentBlocker('onboarding', onboarding);
+  }, [onboarding]);
 
   return null;
 }
@@ -487,7 +516,9 @@ function RootNavigator() {
                                     <NotificationSync />
                                     <PushTokenSync />
                                     <DetectedTransactionHandler />
-                                    <DueBillsModal />
+                                    <MomentQueueSync />
+                                    <DueBillsSource />
+                                    <MomentHost />
                                     <StreakCelebration />
                                     <StreakFreezeSync />
                                     {FLAGS.economy && <RankUpCelebration />}

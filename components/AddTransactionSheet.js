@@ -27,7 +27,7 @@ import { createEntryFromTransaction } from '../lib/splits';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
 import { claimDailyLog } from '../lib/rewardsMutations';
 import { track } from '../lib/track';
-import { setMomentActive } from '../lib/moments';
+import { setMomentBlocker } from '../lib/momentQueue';
 import * as Haptics from 'expo-haptics';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
@@ -103,12 +103,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const modalRef = useRef(null);
   const amountInputRef = useRef(null);
   const handleBackChange = useSheetBackHandler(modalRef);
-  // The open sheet counts as a moment, so celebrations and coach marks wait
-  // until it closes instead of interrupting entry (36-add-sheet-3-tap.md).
+  // The open sheet blocks the moment queue, so celebrations and coach marks
+  // wait until it closes instead of interrupting entry (36-add-sheet-3-tap.md,
+  // 34-streak-only.md).
   const handleSheetChange = useCallback(
     (index) => {
       handleBackChange(index);
-      setMomentActive('add-sheet', index >= 0);
+      setMomentBlocker('add-sheet', index >= 0);
     },
     [handleBackChange]
   );

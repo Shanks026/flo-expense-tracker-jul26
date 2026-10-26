@@ -6,7 +6,7 @@ import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
 import { useRewardBurst } from './RewardBurst';
-import { useAnyMomentActive } from '../lib/moments';
+import { useAnyMomentActive } from '../lib/momentQueue';
 
 const KOBAN = require('../assets/mascot/hey_screen.png');
 

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarClock } from 'lucide-react-native';
-import { format } from 'date-fns';
+import { endOfDay, format } from 'date-fns';
 import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
@@ -10,54 +9,63 @@ import { useAccount } from '../lib/AccountContext';
 import useBills from '../hooks/useBills';
 import { usePayBillSheet } from './PayBillSheet';
 import { formatMoney } from '../lib/currency';
-import { setMomentActive } from '../lib/moments';
+import { enqueue, PRIORITY } from '../lib/momentQueue';
 
-const STORAGE_KEY = 'flo.dueBills.lastShown';
-
-// Sibling of <Stack> in app/_layout.js (same reasoning as ShareIntentHandler):
-// needs useBills/usePayBillSheet/account context, which RootNavigator itself
-// can't consume since it defines those providers.
-export default function DueBillsModal() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+// The bills-due moment (34-streak-only.md): actionable, so it wins over a
+// streak celebration in the moment queue (lib/momentQueue.js).
+//
+// Two parts. DueBillsSource (default export) is the headless sibling of
+// <Stack> in app/_layout.js that enqueues the moment once a day while bills
+// are due — the queue's remembered ids replace the old
+// 'flo.dueBills.lastShown' key. DueBillsMoment is what components/MomentHost.js
+// renders when the moment's turn comes; it reads the bills live, so a moment
+// that waited still lists what's due now.
+export default function DueBillsSource() {
   const { session } = useAuth();
   const { activeAccountId } = useAccount();
   const { bills, loading } = useBills();
-  const { openPayBill } = usePayBillSheet();
 
-  const [visible, setVisible] = useState(false);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const hasDue = bills.some((b) => b.is_active && b.next_due_date <= todayStr);
+
   useEffect(() => {
-    setMomentActive('due-bills', visible);
-  }, [visible]);
-  const checkedRef = useRef(false);
+    if (!session || !activeAccountId || loading || !hasDue) return;
+    enqueue({
+      id: `bills-due:${todayStr}`,
+      kind: 'bills-due',
+      priority: PRIORITY.actionable,
+      // Today's reminder only: tomorrow enqueues its own.
+      expiresAt: endOfDay(new Date()).getTime(),
+    });
+  }, [session, activeAccountId, loading, hasDue, todayStr]);
+
+  return null;
+}
+
+export function DueBillsMoment({ onDone }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { bills, loading } = useBills();
+  const { openPayBill } = usePayBillSheet();
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const dueBills = bills.filter((b) => b.is_active && b.next_due_date <= todayStr);
 
+  // Paid or deleted while the moment waited: nothing to show, and it
+  // shouldn't use up the session's takeover.
   useEffect(() => {
-    if (!session || !activeAccountId || loading || checkedRef.current) return;
-    checkedRef.current = true;
-
-    if (dueBills.length === 0) return;
-
-    AsyncStorage.getItem(STORAGE_KEY)
-      .catch(() => null)
-      .then((lastShown) => {
-        if (lastShown === todayStr) return;
-        AsyncStorage.setItem(STORAGE_KEY, todayStr).catch(() => {});
-        setVisible(true);
-      });
-  }, [session, activeAccountId, loading]);
+    if (!loading && dueBills.length === 0) onDone({ skipped: true });
+  }, [loading, dueBills.length]);
 
   function handleMarkPaid(bill) {
-    setVisible(false);
+    onDone();
     openPayBill(bill);
   }
 
   if (dueBills.length === 0) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
+    <Modal visible transparent animationType="fade" onRequestClose={() => onDone()}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.icon}>
@@ -82,7 +90,7 @@ export default function DueBillsModal() {
             ))}
           </ScrollView>
 
-          <Pressable style={styles.later} onPress={() => setVisible(false)}>
+          <Pressable style={styles.later} onPress={() => onDone()}>
             <Text style={styles.laterText}>Later</Text>
           </Pressable>
         </View>
