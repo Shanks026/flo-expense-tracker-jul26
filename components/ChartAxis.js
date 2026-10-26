@@ -23,6 +23,7 @@ export const AXIS_WIDTH = 28;
 // the chart height. These keep every label round while holding worst-case fill
 // at ~78%.
 const NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+const WHOLE_STEPS = [1, 2, 3, 4, 5, 6, 8, 10];
 
 // Rounds the axis ceiling up so the labels land on readable numbers (200, 500,
 // 2.5k) instead of whatever the tallest bar happens to be (₹1,847). Bars must
@@ -31,6 +32,9 @@ const NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 export function niceAxisMax(rawMax, intervals = AXIS_INTERVALS) {
   if (!rawMax || rawMax <= 0) return intervals;
   const rawStep = rawMax / intervals;
+  // Ticks are whole rupees (38-home-insights-more.md): below a step of 10,
+  // only whole-number steps, so a small week never shows ₹1.5 or ₹4.5.
+  if (rawStep <= 10) return (WHOLE_STEPS.find((step) => rawStep <= step) ?? 10) * intervals;
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const normalized = rawStep / magnitude;
   const niceNormalized = NICE_STEPS.find((step) => normalized <= step) ?? 10;

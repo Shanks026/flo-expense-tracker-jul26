@@ -34,6 +34,31 @@ ReportReadyCard is removed. The recap card slots in after the chart in 10.
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- **Home order:** header, hero, Today strip, 7-day chart, recent transactions, upcoming bills.
+- **Today strip** (new `components/TodayStrip.js`, replacing `TodayCard`):
+  - a 44px Koban whose mood follows the day (happy when logged, content when no-spend, neutral when open);
+  - "Logged today" / "No spend today" with a check, or "Nothing logged yet today";
+  - **+ Log** opens the Add sheet;
+  - **No spend today** (with the same confirm dialog) shows only while the day is open, and writes the spec 34 mark.
+  - Shown all day, not only after the evening reminder time.
+  - `TodayCard.js` and `lib/koban.js`'s `todayCardCopy` are deleted.
+- **7-day chart:**
+  - fixed at `7d` with no range tabs;
+  - the whole card opens `/insights?period=week`;
+  - an all-zero week shows "Log a few days to see your week".
+  - Axis ticks are whole rupees everywhere: `niceAxisMax` uses whole-number steps below 10, so no ₹1.5 or ₹4.5.
+- **Recent transactions:**
+  - 5 rows;
+  - title is the note, falling back to the category. There's no merchant column, and a parsed share import doesn't save the merchant anywhere yet (spec 40's territory), so only a note can title a row today;
+  - subtitle is category · date;
+  - the signed amount is unchanged.
+- **Upcoming bills** moved below recent transactions and still renders nothing when none are overdue or due soon.
+- ReportReadyCard left in 07.
+- Open (emulator checks paused): order in an empty and a populated account, the No spend mark (MCP), the chart empty state and its tap, a note-titled row, the bills section's appearance, light and dark.

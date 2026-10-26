@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, Receipt, ArrowLeftRight, Users, Flame, ChevronDown } from 'lucide-react-native';
@@ -13,7 +13,7 @@ import Pill from '../../components/Pill';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
 import HomeHero from '../../components/HomeHero';
-import TodayCard from '../../components/TodayCard';
+import TodayStrip from '../../components/TodayStrip';
 import CoachMark from '../../components/CoachMark';
 import useStreak from '../../hooks/useStreak';
 // Static palette (theme/tokens) only for danger/warn, which are the same in both modes.
@@ -45,6 +45,7 @@ const UPCOMING_BILL_STYLES = {
   due_soon: { iconTone: 'warn', amountColor: staticColors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
 };
 const MAX_UPCOMING_BILLS = 4;
+const RECENT_COUNT = 5;
 
 // The overall budget (no category) the hero reports against: one whose window
 // is still open, a monthly one first since the hero speaks in months.
@@ -58,9 +59,8 @@ export default function Home() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const router = useRouter();
-  const { transactions, loading: transactionsLoading } = useTransactions({ limit: 4 });
-  const [trendRange, setTrendRange] = useState('7d');
-  const { data: trendData, loading: trendLoading } = useSpendingTrend(trendRange);
+  const { transactions, loading: transactionsLoading } = useTransactions({ limit: RECENT_COUNT });
+  const { data: trendData, loading: trendLoading } = useSpendingTrend('7d');
   const { profile } = useProfile();
   const { openAdd } = useAddTransactionSheet();
   const { activeAccount, accounts, loading: accountsLoading } = useAccount();
@@ -99,6 +99,13 @@ export default function Home() {
   const upcomingBills = bills
     .filter((b) => b.is_active && ['overdue', 'due_soon'].includes(billStatus(b.next_due_date)))
     .slice(0, MAX_UPCOMING_BILLS);
+
+  // A brand-new account gets words, not empty axes.
+  const weekIsEmpty = trendData.every((d) => !d.expense && !d.income);
+
+  function openWeekInsights() {
+    router.navigate({ pathname: '/insights', params: { period: 'week', at: String(Date.now()) } });
+  }
 
   return (
     <Screen padded={false}>
@@ -175,25 +182,103 @@ export default function Home() {
           loading={heroLoading}
         />
 
-        {/* Close-the-day ritual (18-gamification-ritual-and-ledger.md Phase 3) */}
-        <TodayCard />
+        <TodayStrip />
 
-        <Card style={styles.chartCard}>
-          {trendLoading ? (
-            <Skeleton height={140} radius={radii.card} />
-          ) : (
-            <FadeIn>
-              <IncomeExpenseChart
-                data={trendData}
-                range={trendRange}
-                onRangeChange={setTrendRange}
-                defaultVisible={{ expense: true, income: false }}
-                currency={currency}
-              />
-            </FadeIn>
-          )}
-        </Card>
+        {/* This week at a glance: 7 days, no range toggle. The whole card
+            opens Insights on Week. */}
+        <Pressable onPress={openWeekInsights} accessibilityRole="button" accessibilityLabel="This week. Open Insights">
+          <Card>
+            {trendLoading ? (
+              <Skeleton height={140} radius={radii.card} />
+            ) : weekIsEmpty ? (
+              <Text style={styles.emptyText}>Log a few days to see your week</Text>
+            ) : (
+              <FadeIn>
+                <IncomeExpenseChart
+                  data={trendData}
+                  range="7d"
+                  defaultVisible={{ expense: true, income: false }}
+                  currency={currency}
+                />
+              </FadeIn>
+            )}
+          </Card>
+        </Pressable>
 
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Pressable onPress={() => router.push('/transactions')}>
+            <Text style={styles.sectionAction}>See all</Text>
+          </Pressable>
+        </View>
+
+        {transactionsLoading ? (
+          <Card style={styles.listCard}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={[styles.row, i < 2 && styles.rowBorder]}>
+                <Skeleton width={42} height={42} radius={radii.iconTile} />
+                <View style={styles.rowMid}>
+                  <Skeleton width="55%" height={15} radius={6} style={{ marginBottom: 6 }} />
+                  <Skeleton width="35%" height={11} radius={6} />
+                </View>
+              </View>
+            ))}
+          </Card>
+        ) : transactions.length === 0 ? (
+          <FadeIn>
+            <Card>
+              <Text style={styles.emptyText}>No transactions yet. Tap + to add one.</Text>
+            </Card>
+          </FadeIn>
+        ) : (
+          <FadeIn>
+            <Card style={styles.listCard}>
+              {transactions.map((tx, idx) => {
+                const transfer = isTransfer(tx);
+                // Same substitution transfers already get — a settlement has no
+                // category, and without this it fell through to "Expense".
+                const settlement = isSettlement(tx);
+                const categoryName = tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense');
+                // Titled by what it was (its note), falling back to the category.
+                const note = tx.note?.trim();
+                return (
+                  <Pressable
+                    key={tx.id}
+                    style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
+                    onPress={() => openAdd(tx)}
+                  >
+                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
+                      {transfer ? (
+                        <ArrowLeftRight size={20} color={colors.mutedDarker} strokeWidth={2} />
+                      ) : settlement ? (
+                        <Users size={20} color={colors.mutedDarker} strokeWidth={2} />
+                      ) : (
+                        <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
+                      )}
+                    </IconTile>
+                    <View style={styles.rowMid}>
+                      <View style={styles.rowTitleWrap}>
+                        <Text style={styles.rowTitle} numberOfLines={1}>
+                          {transfer ? transferLabel(tx, accounts) : settlement ? settlementLabel(tx) : note || categoryName}
+                        </Text>
+                        {FLAGS.plans && !transfer && !settlement && tx.plan?.name && (
+                          <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
+                        )}
+                      </View>
+                      <Text style={styles.rowSub} numberOfLines={1}>
+                        {transfer ? 'Transfer' : settlement ? 'Settled up' : categoryName} ·{' '}
+                        {format(new Date(tx.occurred_at), 'd MMM')}
+                      </Text>
+                    </View>
+                    <AmountText value={tx.amount} type={tx.type} signed currency={currency} />
+                  </Pressable>
+                );
+              })}
+            </Card>
+          </FadeIn>
+        )}
+
+        {/* Only what's due: nothing at all when no bill is overdue or due soon. */}
         {!billsLoading && upcomingBills.length > 0 && (
           <FadeIn>
             <View style={styles.sectionHeaderRow}>
@@ -230,84 +315,6 @@ export default function Home() {
                       </Text>
                       <Pill label={s.pill.label} tone={s.pill.tone} />
                     </View>
-                  </Pressable>
-                );
-              })}
-            </Card>
-          </FadeIn>
-        )}
-
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <Pressable onPress={() => router.push('/transactions')}>
-            <Text style={styles.sectionAction}>See all</Text>
-          </Pressable>
-        </View>
-
-        {transactionsLoading ? (
-          <Card style={styles.listCard}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={[styles.row, i < 2 && styles.rowBorder]}>
-                <Skeleton width={42} height={42} radius={radii.iconTile} />
-                <View style={styles.rowMid}>
-                  <Skeleton width="55%" height={15} radius={6} style={{ marginBottom: 6 }} />
-                  <Skeleton width="35%" height={11} radius={6} />
-                </View>
-              </View>
-            ))}
-          </Card>
-        ) : transactions.length === 0 ? (
-          <FadeIn>
-            <Card>
-              <Text style={styles.emptyText}>No transactions yet. Tap + to add one.</Text>
-            </Card>
-          </FadeIn>
-        ) : (
-          <FadeIn>
-            <Card style={styles.listCard}>
-              {transactions.map((tx, idx) => {
-                const transfer = isTransfer(tx);
-                // Same substitution transfers already get — a settlement has no
-                // category, and without this it fell through to "Expense".
-                const settlement = isSettlement(tx);
-                return (
-                  <Pressable
-                    key={tx.id}
-                    style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
-                    onPress={() => openAdd(tx)}
-                  >
-                    <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
-                      {transfer ? (
-                        <ArrowLeftRight size={20} color={colors.mutedDarker} strokeWidth={2} />
-                      ) : settlement ? (
-                        <Users size={20} color={colors.mutedDarker} strokeWidth={2} />
-                      ) : (
-                        <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
-                      )}
-                    </IconTile>
-                    <View style={styles.rowMid}>
-                      <View style={styles.rowTitleWrap}>
-                        <Text style={styles.rowTitle}>
-                          {transfer
-                            ? transferLabel(tx, accounts)
-                            : settlement
-                              ? settlementLabel(tx)
-                              : tx.category?.name ?? 'Uncategorized'}
-                        </Text>
-                        {FLAGS.plans && !transfer && !settlement && tx.plan?.name && (
-                          <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
-                        )}
-                      </View>
-                      <Text style={styles.rowSub}>
-                        {format(new Date(tx.occurred_at), 'd MMM')} ·{' '}
-                        {transfer
-                          ? 'Transfer'
-                          : settlement
-                            ? 'Settled up'
-                            : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
-                      </Text>
-                    </View>
-                    <AmountText value={tx.amount} type={tx.type} signed currency={currency} />
                   </Pressable>
                 );
               })}
@@ -399,9 +406,6 @@ function makeStyles(colors) {
     borderWidth: 2,
     borderColor: colors.bg,
   },
-  chartCard: {
-    marginTop: spacing.lg,
-  },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -442,6 +446,7 @@ function makeStyles(colors) {
   },
   rowMid: {
     flex: 1,
+    minWidth: 0,
   },
   rowTitleWrap: {
     flexDirection: 'row',
@@ -452,6 +457,7 @@ function makeStyles(colors) {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.lg,
     color: colors.ink,
+    flexShrink: 1,
   },
   planPill: {
     paddingHorizontal: 8,
