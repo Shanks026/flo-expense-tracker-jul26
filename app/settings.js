@@ -73,6 +73,7 @@ import { getReportSettings, setReportSettings, DEFAULT_REPORT_SETTINGS } from '.
 import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
 import { RESET_PERIOD_OPTIONS } from '../lib/periods';
 import AppearanceToggle from '../components/AppearanceToggle';
+import { destructiveHaptic } from '../lib/haptics';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 
@@ -316,7 +317,14 @@ export default function Settings() {
       })
       .join('\n\n───\n\n');
     Alert.alert(`Last ${entries.length} seen`, body, [
-      { text: 'Clear', style: 'destructive', onPress: clearDetectionDebugLog },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          destructiveHaptic();
+          clearDetectionDebugLog();
+        },
+      },
       { text: 'Close', style: 'cancel' },
     ]);
   }
@@ -453,6 +461,7 @@ export default function Settings() {
   }
 
   async function handleDelete() {
+    destructiveHaptic();
     setDeleting(true);
     setDeleteError(null);
     try {

@@ -16,6 +16,7 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import Switch from './Switch';
 import useCurrency from '../hooks/useCurrency';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddPlanSheetContext = createContext(null);
 
@@ -136,6 +137,7 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
 
   async function handleDelete() {
     if (!editingId) return;
+    destructiveHaptic();
     setSaving(true);
     const { error: deleteError } = await supabase.from('plans').delete().eq('id', editingId);
     setSaving(false);

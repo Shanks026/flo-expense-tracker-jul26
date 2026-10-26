@@ -14,6 +14,7 @@ import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useProfile from '../hooks/useProfile';
 import { DEFAULT_CURRENCY } from '../lib/currency';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddAccountSheetContext = createContext(null);
 
@@ -160,7 +161,14 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   function confirmDelete() {
     Alert.alert('Delete account', `Delete "${name}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: handleDelete },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          destructiveHaptic();
+          handleDelete();
+        },
+      },
     ]);
   }
 

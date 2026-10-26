@@ -19,6 +19,7 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import useCurrency from '../hooks/useCurrency';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddBudgetSheetContext = createContext(null);
 
@@ -174,6 +175,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
 
   async function handleDelete() {
     if (!editingId) return;
+    destructiveHaptic();
     setSaving(true);
     const { error: deleteError } = await supabase.from('budgets').delete().eq('id', editingId);
     setSaving(false);

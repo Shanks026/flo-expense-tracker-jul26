@@ -17,6 +17,7 @@ import useSplitPeople from '../hooks/useSplitPeople';
 import usePlans from '../hooks/usePlans';
 import { createSplit, updateSplit, deleteSplit } from '../lib/splits';
 import { useAddSplitPersonSheet } from './AddSplitPersonSheet';
+import { destructiveHaptic } from '../lib/haptics';
 
 // A small curated set rather than the whole CATEGORY_ICON_KEYS bank — a split is
 // an event ("the Mysore trip", "flat rent"), so the useful icons are the
@@ -143,6 +144,7 @@ const AddSplitSheet = forwardRef(function AddSplitSheet(_props, ref) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            destructiveHaptic();
             setSaving(true);
             const { error: deleteError } = await deleteSplit(editingId);
             setSaving(false);

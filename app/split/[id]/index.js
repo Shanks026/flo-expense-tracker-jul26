@@ -54,6 +54,7 @@ import { useAddSplitSheet } from '../../../components/AddSplitSheet';
 import { useAddSplitEntrySheet } from '../../../components/AddSplitEntrySheet';
 import { useAddSplitPersonSheet } from '../../../components/AddSplitPersonSheet';
 import { useSettleUpSheet } from '../../../components/SettleUpSheet';
+import { destructiveHaptic } from '../../../lib/haptics';
 
 export default function SplitDetail() {
   const { colors } = useTheme();
@@ -323,6 +324,7 @@ export default function SplitDetail() {
           text: 'Turn off',
           style: 'destructive',
           onPress: async () => {
+            destructiveHaptic();
             const { error } = await revokeInvites(split.id);
             if (error) return showToast({ message: error.message, variant: 'error' });
             notifyChanged();
@@ -386,6 +388,7 @@ export default function SplitDetail() {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
+          destructiveHaptic();
           const { error } = await removeMember(member.id);
           if (error) {
             // removeMember turns the RESTRICT violation into a sentence — they

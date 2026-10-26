@@ -14,6 +14,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import useCategories from '../hooks/useCategories';
 import { useAddCategorySheet } from '../components/AddCategorySheet';
 import { useToast } from '../components/Toast';
+import { destructiveHaptic } from '../lib/haptics';
 
 export default function ManageCategories() {
   const { colors } = useTheme();
@@ -52,7 +53,14 @@ export default function ManageCategories() {
   function confirmDelete(category) {
     Alert.alert('Delete category', `Delete "${category.name}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => handleDelete(category) },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          destructiveHaptic();
+          handleDelete(category);
+        },
+      },
     ]);
   }
 

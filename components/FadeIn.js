@@ -1,24 +1,24 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { motion } from '../theme/tokens';
 
-// A gentle, ONE-TIME cross-fade for content that just finished loading —
-// mount this in place of a Skeleton once real data arrives, and it fades in
-// (240ms, small 6px rise, no bounce/spring) rather than popping in instantly.
-//
-// Deliberately restrained compared to onboarding's OnboardingReveal: this is
-// the main app, seen dozens of times a day, not a first-run flourish — quick
-// and quiet, not playful. Animate-first, snap-on-reduce (same fix already
-// applied to OnboardingReveal/CountUp after the reflection-screen lag bug):
-// starts fading immediately on mount rather than waiting on the async
-// reduce-motion check, and only snaps to the final frame if that check later
-// resolves true.
-export default function FadeIn({ style, children }) {
+// Content no longer fades in on every load (37-design-system-and-koban.md):
+// once data is ready it simply appears, which reads as faster. FadeIn stays as
+// the one wrapper for the rare first-time moment that should ease in — pass
+// `animate` for that. Without it this is a plain View, so the many load-time
+// call sites keep their layout and just stop animating.
+export default function FadeIn({ style, children, animate = false }) {
+  if (!animate) return <View style={style}>{children}</View>;
+  return <AnimatedFadeIn style={style}>{children}</AnimatedFadeIn>;
+}
+
+function AnimatedFadeIn({ style, children }) {
   const p = useSharedValue(0);
   const [reduce, setReduce] = useState(false);
 
   useEffect(() => {
-    p.value = withTiming(1, { duration: 240 });
+    p.value = withTiming(1, { duration: motion.base });
   }, []);
 
   useEffect(() => {

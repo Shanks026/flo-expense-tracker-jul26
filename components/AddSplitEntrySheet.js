@@ -17,6 +17,7 @@ import useCurrency from '../hooks/useCurrency';
 import useCategories from '../hooks/useCategories';
 import { saveEntry, deleteEntry, logEntryFromPocket, linkEntryToTransaction } from '../lib/splits';
 import { resolveEqualShares, sharesBalance } from '../lib/splitMath';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddSplitEntrySheetContext = createContext(null);
 
@@ -273,6 +274,7 @@ const AddSplitEntrySheet = forwardRef(function AddSplitEntrySheet(_props, ref) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            destructiveHaptic();
             setSaving(true);
             const { error: deleteError } = await deleteEntry(editingId, { hasSettlements: ctx.hasSettlements });
             setSaving(false);

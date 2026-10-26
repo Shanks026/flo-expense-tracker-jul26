@@ -17,6 +17,7 @@ import useCategories from '../hooks/useCategories';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useProfile from '../hooks/useProfile';
 import CurrencyPicker from './CurrencyPicker';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddBillSheetContext = createContext(null);
 
@@ -149,6 +150,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
 
   async function handleDelete() {
     if (!editingId) return;
+    destructiveHaptic();
     setSaving(true);
     const { error: deleteError } = await supabase.from('bills').delete().eq('id', editingId);
     setSaving(false);

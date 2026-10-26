@@ -10,6 +10,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import { addPerson, updatePerson, deletePerson } from '../lib/splits';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddSplitPersonSheetContext = createContext(null);
 
@@ -94,6 +95,7 @@ const AddSplitPersonSheet = forwardRef(function AddSplitPersonSheet(_props, ref)
 
   async function handleDelete() {
     if (!editingId) return;
+    destructiveHaptic();
     setSaving(true);
     const { error: deleteError } = await deletePerson(editingId);
     setSaving(false);

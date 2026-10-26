@@ -33,6 +33,7 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import { useAddAccountSheet } from './AddAccountSheet';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -544,6 +545,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   }
 
   async function handleDelete() {
+    if (editingId || editingTransferId) destructiveHaptic();
     setSaving(true);
     // A transfer is two rows — delete the whole pair by transfer_id, never one leg.
     const { error: deleteError } = editingTransferId
