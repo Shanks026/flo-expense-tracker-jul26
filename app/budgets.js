@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
+import { track } from '../lib/track';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Wallet } from 'lucide-react-native';
 import Card from '../components/Card';
@@ -27,6 +28,10 @@ import useCurrency from '../hooks/useCurrency';
 
 export default function Budgets() {
   const { colors } = useTheme();
+  // Which secondary features earn their place (38-home-insights-more.md).
+  useEffect(() => {
+    track('feature_opened', { feature: 'budgets' });
+  }, []);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { refreshing, onRefresh } = usePullToRefresh();
   // Healthy uses the active theme's accent (not the income green) — same

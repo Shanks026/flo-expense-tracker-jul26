@@ -1,34 +1,24 @@
 import { useMemo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, List, ChartColumn, Menu as MenuIcon, Plus } from 'lucide-react-native';
-import { radii, fontFamily } from '../theme/tokens';
+import { Home, List, ChartColumn, Ellipsis, Plus } from 'lucide-react-native';
+import { radii, fontFamily, hitTarget } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAddTransactionSheet } from './AddTransactionSheet';
-import { useMenuSheet } from './MenuSheet';
 import CoachMark from './CoachMark';
 
-const ICONS = { index: Home, transactions: List, analytics: ChartColumn };
-const LABELS = { index: 'Home', transactions: 'Transactions', analytics: 'Analytics' };
+const ICONS = { index: Home, transactions: List, insights: ChartColumn, more: Ellipsis };
+const LABELS = { index: 'Home', transactions: 'Transactions', insights: 'Insights', more: 'More' };
 
-// Plans' old tab slot is now a "Menu" action button (2026-07-14) — the menu
-// was otherwise only reachable via Home's header, which meant walking all the
-// way back to the Home tab just to reach Plans/Budgets/Reports/Settings.
-// Like the ⊕ button, Menu is an action (opens a sheet), not a navigable
-// route, so it isn't part of `state.routes` and is appended after it rather
-// than rendered via renderItem.
-//
-// Budgets swapped out for Analytics here (2026-07-18) — Analytics is the
-// more-frequently-used screen, so it took the tab slot; Budgets moved to a
-// pushed screen reached from the Menu sheet, alongside Plans (see
-// MenuSheet.js), so the two sit consistently rather than one being a tab and
-// the other buried in a sheet.
+// Home · Transactions · (+) · Insights · More (38-home-insights-more.md).
+// The centre + is an action (opens the Add sheet), not a route, so it isn't
+// part of `state.routes`; it's rendered between the two halves. The old Menu
+// action and its sheet are gone: More is a real tab screen now.
 export default function TabBar({ state, navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { openAdd } = useAddTransactionSheet();
-  const { openMenu } = useMenuSheet();
   const addButtonRef = useRef(null);
 
   function renderItem(route, index) {
@@ -44,7 +34,14 @@ export default function TabBar({ state, navigation }) {
     }
 
     return (
-      <Pressable key={route.key} onPress={onPress} style={styles.item}>
+      <Pressable
+        key={route.key}
+        onPress={onPress}
+        style={styles.item}
+        accessibilityRole="tab"
+        accessibilityLabel={LABELS[route.name]}
+        accessibilityState={{ selected: isFocused }}
+      >
         <Icon size={24} color={color} strokeWidth={isFocused ? 2.2 : 2} />
         <Text
           style={[styles.label, { color, fontFamily: isFocused ? fontFamily.extrabold : fontFamily.semibold }]}
@@ -69,7 +66,13 @@ export default function TabBar({ state, navigation }) {
        devices (and zero-inset screens) each keep the correct clearance. */
     <View style={[styles.bar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
       {firstHalf.map((route, i) => renderItem(route, i))}
-      <Pressable ref={addButtonRef} style={styles.addButton} onPress={() => openAdd()}>
+      <Pressable
+        ref={addButtonRef}
+        style={styles.addButton}
+        onPress={() => openAdd()}
+        accessibilityRole="button"
+        accessibilityLabel="Add a transaction"
+      >
         {/* The button itself stays the theme's accent color (colors.brand)
             regardless of theme; the icon uses colors.brandText (computed
             per-accent via WCAG contrast) rather than a color that inverts
@@ -77,12 +80,6 @@ export default function TabBar({ state, navigation }) {
         <Plus size={28} color={colors.brandText} strokeWidth={2.6} />
       </Pressable>
       {secondHalf.map((route, i) => renderItem(route, i + 2))}
-      <Pressable style={styles.item} onPress={openMenu}>
-        <MenuIcon size={24} color={colors.mutedLight} strokeWidth={2} />
-        <Text style={[styles.label, { color: colors.mutedLight, fontFamily: fontFamily.semibold }]} numberOfLines={1}>
-          Menu
-        </Text>
-      </Pressable>
       {/* First Home after onboarding (35-onboarding-v3.md). Lives here, next
           to the button it points at; shown only while Home is the open tab. */}
       <CoachMark
@@ -111,6 +108,7 @@ function makeStyles(colors) {
       alignItems: 'center',
       gap: 5,
       width: 72,
+      minHeight: hitTarget,
     },
     label: {
       fontSize: 10,

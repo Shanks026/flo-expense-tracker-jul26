@@ -24,6 +24,20 @@ Spec: .claude/features/38-home-insights-more.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built in `1fbd606`.
+- **`splitInvites: false`:**
+  - the split screen's "Invite people" and "Turn off the invite link" rows are hidden;
+  - `/join/[code]` redirects to Home without parking the code;
+  - `PendingInviteHandler` isn't mounted.
+- **Kept on purpose:** the split's Share (as text or PDF) and Export CSV. They're exports of the summary, not invites.
+- **`currencyPicker: false`:**
+  - the picker is hidden in Settings, the account sheet and the bill sheet;
+  - new accounts and bills seed INR instead of `profiles.currency`;
+  - existing accounts and bills keep their stored currency.
+- Open (emulator checks paused): feature 31's on-device settling checklist; a new account's `currency = 'INR'` via MCP after creating one on device; a non-INR account still shows its own currency.

@@ -43,7 +43,6 @@ import { AddCategorySheetProvider } from '../components/AddCategorySheet';
 import { RewardsHistorySheetProvider } from '../components/RewardsHistorySheet';
 import { AddAccountSheetProvider } from '../components/AddAccountSheet';
 import { AccountSwitcherSheetProvider } from '../components/AccountSwitcherSheet';
-import { MenuSheetProvider } from '../components/MenuSheet';
 import { AlertsSheetProvider } from '../components/AlertsSheet';
 import { ProUpsellSheetProvider } from '../components/ProUpsellSheet';
 import AppErrorBoundary, { RecoveryHomeRedirect } from '../components/AppErrorBoundary';
@@ -505,7 +504,6 @@ function RootNavigator() {
                             <EditProfileSheetProvider>
                               <AddCategorySheetProvider>
                                 <RewardsHistorySheetProvider>
-                                <MenuSheetProvider>
                                   <AlertsSheetProvider>
                                     <OnboardingGate />
                                     <ThemeProfileSync />
@@ -551,7 +549,6 @@ function RootNavigator() {
                                       <Stack.Screen name="dev/koban" options={{ headerShown: true, title: 'Koban gallery' }} />
                                     </Stack>
                                   </AlertsSheetProvider>
-                                </MenuSheetProvider>
                                 </RewardsHistorySheetProvider>
                               </AddCategorySheetProvider>
                             </EditProfileSheetProvider>

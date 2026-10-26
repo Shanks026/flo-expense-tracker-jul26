@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { track } from '../lib/track';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Check } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
@@ -27,6 +28,10 @@ import useCurrency from '../hooks/useCurrency';
 // destinations go in the menu, not a 6th tab).
 export default function Splits() {
   const { colors } = useTheme();
+  // Which secondary features earn their place (38-home-insights-more.md).
+  useEffect(() => {
+    track('feature_opened', { feature: 'splits' });
+  }, []);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();

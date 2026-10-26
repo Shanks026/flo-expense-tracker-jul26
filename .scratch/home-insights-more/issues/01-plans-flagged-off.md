@@ -21,6 +21,15 @@ Transactions linked to a plan render like any other, with no plan badge. No plan
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built in `1fbd606`.
+- `FLAGS.plans = false` in `lib/flags.js`.
+- `/plans`, `/plan/[id]` and `/plan/[id]/history` redirect to Home, using the same wrapper pattern as the Shop.
+- Hidden: the Menu entry, plan alerts in the bell, plan pills on Home and Transactions rows, the Analytics Plans segment, the Report Plans section, and the split sheet's plan link.
+- The Add sheet already had no plan control or collecting default (spec 36). Nothing writes or deletes plan data.
+- Open (emulator checks paused): no Plans anywhere on device, and flipping the flag back on restores Plans. The plan-data check is moot after the 2026-10-26 fresh-start wipe.

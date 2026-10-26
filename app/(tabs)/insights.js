@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { TrendingUp, TrendingDown, Download } from 'lucide-react-native';
 import { startOfMonth, endOfMonth, subDays, differenceInCalendarDays, isAfter, format } from 'date-fns';
@@ -28,6 +29,7 @@ import { useAccount } from '../../lib/AccountContext';
 import { buildTransactionsCsv, shareCsv } from '../../lib/export';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
+import { track } from '../../lib/track';
 import {
   computeTrend,
   computeDelta,
@@ -70,8 +72,14 @@ function DeltaBadge({ delta, goodDirection = 'up' }) {
   );
 }
 
-export default function Analytics() {
+export default function Insights() {
   const { colors } = useTheme();
+  // A tab stays mounted, so count each visit, not the first mount.
+  useFocusEffect(
+    useCallback(() => {
+      track('feature_opened', { feature: 'insights' });
+    }, [])
+  );
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { refreshing, onRefresh } = usePullToRefresh();
   // Healthy uses the active theme's accent, not the income green — matches
@@ -183,7 +191,7 @@ export default function Analytics() {
     <Screen padded={false}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Analytics</Text>
+          <Text style={styles.headerTitle}>Insights</Text>
           {activeAccount && <Text style={styles.headerSubtitle}>{activeAccount.name}</Text>}
         </View>
         <Pressable style={styles.exportButton} onPress={handleExport} disabled={exporting}>

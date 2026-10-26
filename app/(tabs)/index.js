@@ -29,7 +29,6 @@ import useBills, { billStatus } from '../../hooks/useBills';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
-import { useMenuSheet } from '../../components/MenuSheet';
 import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
@@ -67,7 +66,6 @@ export default function Home() {
   const { data: trendData, loading: trendLoading } = useSpendingTrend(trendRange);
   const { avatarUrl } = useProfile();
   const { openAdd } = useAddTransactionSheet();
-  const { openMenu } = useMenuSheet();
   const { activeAccount, accounts, setActiveAccount, loading: accountsLoading } = useAccount();
   const { summaries, loading: summariesLoading } = useAllAccountSummaries();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
