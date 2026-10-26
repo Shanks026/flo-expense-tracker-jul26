@@ -67,7 +67,11 @@ function ShareIntentHandler() {
   useEffect(() => {
     if (!sharedText || !session) return;
     const parsed = parseTransactionSms(sharedText);
-    openAdd(parsed ? { amount: parsed.amount, type: parsed.type } : { note: sharedText });
+    openAdd(
+      parsed
+        ? { amount: parsed.amount, type: parsed.type, source: 'share' }
+        : { note: sharedText, source: 'share' }
+    );
     clearSharedText();
   }, [sharedText, session]);
 

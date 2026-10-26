@@ -163,6 +163,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // expense (35-onboarding-v3.md) moves on from there. Refs, not state: they
   // only matter at save and dismiss time.
   const sourceRef = useRef('manual');
+  // For the rest of `expense_logged` (36-add-sheet-3-tap.md): when this open
+  // began, for seconds_to_save, and which category the sheet chose by itself,
+  // for category_was_prefilled.
+  const openedAtRef = useRef(0);
+  const prefilledCategoryRef = useRef(null);
   const onDoneRef = useRef(null);
   const savedRef = useRef(false);
 
@@ -208,6 +213,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   useImperativeHandle(ref, () => ({
     open(payload) {
       sourceRef.current = payload?.source ?? 'manual';
+      openedAtRef.current = Date.now();
+      prefilledCategoryRef.current = null;
       onDoneRef.current = payload?.onDone ?? null;
       savedRef.current = false;
       setError(null);
@@ -274,7 +281,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         // Paise are kept now that the keypad has a decimal point.
         setAmount(payload?.amount ? String(payload.amount) : '');
         // An explicit categoryId wins; otherwise the smart default.
-        setCategoryId(payload?.categoryId ?? (prefillType === 'transfer' ? null : defaultCategoryFor(prefillType)));
+        const initialCategory = payload?.categoryId ?? (prefillType === 'transfer' ? null : defaultCategoryFor(prefillType));
+        prefilledCategoryRef.current = initialCategory;
+        setCategoryId(initialCategory);
         // Defaults to the active account, same as before — now changeable
         // via the inline dropdown before saving, instead of fixed.
         setAccountId(activeAccountId);
@@ -319,7 +328,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // they arrive. Only a blank new entry; never an edit or a transfer.
   useEffect(() => {
     if (categoryId || editingId || type === 'transfer' || !categories.length) return;
-    setCategoryId(defaultCategoryFor(type));
+    const initialCategory = defaultCategoryFor(type);
+    prefilledCategoryRef.current = initialCategory;
+    setCategoryId(initialCategory);
   }, [categoryId, editingId, type, categories.length]);
 
   function handleTypeChange(nextType) {
@@ -327,7 +338,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     setType(nextType);
     setShowAllCategories(false);
     if (nextType === 'transfer') return; // transfers have no category
-    setCategoryId(defaultCategoryFor(nextType));
+    const initialCategory = defaultCategoryFor(nextType);
+    prefilledCategoryRef.current = initialCategory;
+    setCategoryId(initialCategory);
   }
 
   // Transfer's empty state (< 2 accounts) — same hasPro gate shape as
@@ -395,6 +408,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
   async function handleSave() {
     if (type === 'transfer') return handleSaveTransfer();
+    // Timed at the tap, so the insert's round trip doesn't count.
+    const secondsToSave = Math.round((Date.now() - openedAtRef.current) / 1000);
     const numericAmount = Number(amount);
     if (!numericAmount || numericAmount <= 0) {
       setError('Enter an amount');
@@ -456,7 +471,14 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     // fails the save; the transaction already succeeded by this point.
     if (isNewEntry) {
       savedRef.current = true;
-      if (type === 'expense') track('expense_logged', { source: sourceRef.current });
+      // Never the amount (33-product-analytics.md).
+      if (type === 'expense') {
+        track('expense_logged', {
+          source: sourceRef.current,
+          category_was_prefilled: !!categoryId && categoryId === prefilledCategoryRef.current,
+          seconds_to_save: secondsToSave,
+        });
+      }
       const { error: rewardError } = await claimDailyLog(format(new Date(), 'yyyy-MM-dd'));
       if (rewardError) console.error('claimDailyLog failed:', rewardError.message);
     }
