@@ -23,6 +23,24 @@ Spec: .claude/features/38-home-insights-more.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built in `56119d0`.
+- **Tabs:**
+  - `app/(tabs)/analytics.js` is now `insights.js`, titled Insights;
+  - the new `app/(tabs)/more.js` is the More tab;
+  - `TabBar` renders Home, Transactions, the + (opens the Add sheet), Insights and More;
+  - each tab is an accessible `tab` with its label and `selected` state, at least 48dp tall;
+  - the + is a labelled button.
+- **Menu removed:** `components/MenuSheet.js`, its provider and Home's leftover hook are deleted.
+- **More** is three `RowGroup`s:
+  - Money: Budgets, Bills, Splits;
+  - Set up: Accounts, Categories;
+  - Pro (only with `billing` on) and Settings.
+  - Accounts opened the switcher sheet here; 05 points it at `/accounts`.
+- **Events:** `feature_opened` fires on mount of Budgets, Bills and Splits, and on every focus of the Insights tab. It is consent-gated like every event.
+- Open (emulator checks paused): tab order and the + on device, TalkBack labels, light and dark, and `feature_opened` rows landing in `events` with consent on.

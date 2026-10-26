@@ -289,8 +289,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         // Defaults to the active account, same as before — now changeable
         // via the inline dropdown before saving, instead of fixed.
         setAccountId(activeAccountId);
-        // Transfer From/To seed: From = the account you're in, To = unset.
-        setFromAccountId(activeAccountId);
+        // Transfer From/To seed: From = the account the transfer was started
+        // from (Accounts screen), else the account you're in; To = unset.
+        setFromAccountId(payload?.fromAccountId ?? activeAccountId);
         setToAccountId(null);
         // Plans are flagged off (36-add-sheet-3-tap.md), so the sheet no longer
         // shows a Plan control or defaults into a collecting plan. An explicit
@@ -644,13 +645,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
 
         {type === 'transfer' ? (
           <>
-            {/* Transfer left the type toggle; until spec 38 gives it a home in
-                Accounts it's reached from Details, and this goes back. */}
-            {!editingId && (
-              <Pressable style={styles.linkRow} onPress={() => handleTypeChange('expense')} hitSlop={8}>
-                <Text style={styles.linkText}>Back to expense</Text>
-              </Pressable>
-            )}
+            {/* Transfers are started from an account's actions on the
+                Accounts screen (38-home-insights-more.md), never from here. */}
             {hasSecondAccount ? (
               <>
                 <AccountField
@@ -923,13 +919,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                       </Text>
                     )}
                   </>
-                )}
-
-                {!editingId && hasSecondAccount && (
-                  <Pressable style={styles.linkRow} onPress={() => handleTypeChange('transfer')} hitSlop={8}>
-                    <ArrowLeftRight size={14} color={colors.ink} strokeWidth={2.4} />
-                    <Text style={styles.linkText}>Transfer between accounts</Text>
-                  </Pressable>
                 )}
               </View>
             )}
@@ -1292,19 +1281,6 @@ function makeStyles(colors) {
   },
   dateChipTextActive: {
     color: colors.surface,
-  },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.sm,
-  },
-  linkText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.ink,
-    textDecorationLine: 'underline',
   },
   errorText: {
     fontFamily: fontFamily.semibold,

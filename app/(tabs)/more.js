@@ -7,7 +7,6 @@ import Row, { RowGroup } from '../../components/Row';
 import { fontFamily, fontSize, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { FLAGS } from '../../lib/flags';
-import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 
 // The More tab (38-home-insights-more.md): the secondary features, one tap
 // from anywhere, so Home stays about this month. Replaces the old Menu sheet.
@@ -15,7 +14,6 @@ export default function More() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const { openAccountSwitcher } = useAccountSwitcherSheet();
 
   return (
     <Screen>
@@ -30,7 +28,7 @@ export default function More() {
         </RowGroup>
 
         <RowGroup title="Set up">
-          <Row icon={Landmark} title="Accounts" onPress={openAccountSwitcher} />
+          <Row icon={Landmark} title="Accounts" onPress={() => router.push('/accounts')} />
           <Row icon={Grid2x2} title="Categories" onPress={() => router.push('/manage-categories')} />
         </RowGroup>
 

@@ -21,6 +21,19 @@ With 2+ accounts, each account's actions include **Transfer**, which moves money
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- **New `app/accounts.js`** (native header "Accounts"), reached from More → Accounts. It lists each account with its colour, name and in-hand balance; the active one carries a check.
+- **Actions:**
+  - tap an account to make it active;
+  - **Edit** opens the account sheet;
+  - **Transfer** appears only with 2+ accounts and opens the Add sheet as a transfer, with From set to that account (new `fromAccountId` payload);
+  - **New account** keeps the Free-limit gate (open while `billing` is off).
+- **Add sheet:** the "Transfer between accounts" and "Back to expense" links are gone, so the sheet can't become a transfer by itself. Tapping an existing transfer still opens it as a transfer to edit.
+- The account switcher sheet stays for Home's header (06).
+- Open (emulator checks paused): one account shows no Transfer; with two, a transfer writes both legs (MCP); editing an existing transfer still works; light and dark.
