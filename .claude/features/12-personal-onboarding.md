@@ -1032,6 +1032,8 @@ app/onboarding/
 
 ### Post-Phase-3 Polish Round (2026-07-14) — no dark background anywhere, font sizes matched to the design mock
 
+> **Superseded 2026-10-26 (spec 37):** onboarding now follows Appearance (System by default), so it is dark on a dark phone. The person asked for it because people couldn't get dark mode. Only the lime `brand` screens stay lime in both modes.
+
 User feedback after reviewing the built flow, checked against
 `claude-design/FLO Expense Tracker Design/FLO App.dc.html` directly:
 
