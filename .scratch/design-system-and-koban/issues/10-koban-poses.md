@@ -20,6 +20,19 @@ Spec: .claude/features/37-design-system-and-koban.md
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- New `components/koban/poses.js` (placeholder art) defines 12 poses as data: which arm shapes each uses, a duration, a suggested mood, and keyframe channels (`body`, `head`, `armL`, `armR`, `legL`, `legR`, `tail`, `bubble`), each with its own joint origin and an optional phase offset. Keyframes are translateY / rotate / scaleX / scaleY.
+  - The seven moves are ported from the prototype's CSS keyframes: hello, jump, walk, hmm, shrug, dance, niceOne.
+  - The four prop poses are new: report (glasses + a sheet held in both paws), notepad (a lime pad + pencil writing), magnifier, and tip (a raised finger beside the head).
+  - The file also draws the extras: wave paw pads, the thumb, the props, the confetti overlay and the ? bubble.
+- `Koban.js` was rewritten around one pose clock (UI thread, linear 0 → 1 per cycle). Each channel interpolates its keyframes into transforms around its joint, and the idle life (breathing, head tilt, tail sway, blink, ear twitches) keeps running underneath. Arms are their own layers over the head (so a paw can reach the chin, as in the prototype), each with its clipped crease.
+- **API change from ticket 08:** a new `animated` prop (false = completely still, showing the pose's `still` key frame); `loop={false}` now plays the pose once and settles into idle, as this ticket asks. Reduced motion still makes him still. An unknown pose falls back to idle, with a dev warning. Any pose works with any mood.
+- The gallery gained Loop and Pose controls (choosing a pose also picks its suggested mood) and an "Every pose" grid. It renders about 50 Kobans, which is fine for a dev screen.
+- **Checked:** every pose was rendered from the real `art.js` / `faces.js` / `poses.js` (Babel → static SVG, same layer order, channels applied at two clock times) on light and dark. Two fixes came out of it: the report sheet was hidden under the arms (now drawn over them, with the paws on top and the arms held still), and the tip finger vanished over the head (the hand moved out beside the head). The other ten matched the intent.
+- Open (emulator checks paused): smoothness of each loop on the device, play-once-then-idle, still with reduced motion.

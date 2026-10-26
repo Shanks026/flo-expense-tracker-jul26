@@ -48,13 +48,7 @@ export const SHAPES = {
   scarfTail: 'M166 198 L173 226 L161 224 L158 201 Z',
 };
 
-// Arm centre-lines per pose. `idle` is the resting pair.
-export const ARMS = {
-  idle: {
-    left: { d: 'M128 196 Q116 216 119 242', end: [119, 242] },
-    right: { d: 'M172 196 Q184 216 181 242', end: [181, 242] },
-  },
-};
+// Arm shapes per pose live in ./poses.js.
 
 export const STRIPES = [
   { d: 'M150 60 L150 78', w: 5.5 },
