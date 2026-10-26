@@ -5,8 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   CircleDollarSign,
-  Grid2x2,
   Palette,
+  KeyRound,
+  Download,
+  Info,
+  ShieldCheck,
+  LogOut,
   SunMedium,
   SunMoon,
   Sunrise,
@@ -43,6 +47,9 @@ import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
 import ProBadge from '../components/ProBadge';
+import { useProUpsellSheet } from '../components/ProUpsellSheet';
+import { fetchAllTransactions, buildTransactionsCsv, shareCsv } from '../lib/export';
+import { APP_VERSION, PRIVACY_POLICY_URL } from '../lib/about';
 import { FLAGS } from '../lib/flags';
 import { useTheme } from '../theme/ThemeContext';
 import {
@@ -98,16 +105,46 @@ function timeOnTodayFromString(timeStr, fallbackHour, fallbackMinute) {
 
 export default function Settings() {
   const router = useRouter();
-  const { session, deleteAccount } = useAuth();
+  const { session, deleteAccount, signOut } = useAuth();
   const { profile, avatarUrl, updateProfile, loading: profileLoading } = useProfile();
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, accounts } = useAccount();
   const { notifyChanged } = useDataRefresh();
   const currency = useCurrency();
   const { openEditProfile } = useEditProfileSheet();
   const { colors, modePreference, setModePreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { isPro } = useEntitlement();
+  const { isPro, hasPro } = useEntitlement();
+  const { openProUpsell } = useProUpsellSheet();
   const { showToast } = useToast();
+  const [exportingAll, setExportingAll] = useState(false);
+
+  // How this account signs in, from Supabase's identity providers.
+  const PROVIDER_LABEL = { email: 'Email', google: 'Google' };
+  const signInMethods =
+    (session?.user?.app_metadata?.providers ?? [session?.user?.app_metadata?.provider])
+      .filter(Boolean)
+      .map((p) => PROVIDER_LABEL[p] ?? p)
+      .join(', ') || 'Email';
+
+  // Every transaction in every account, as one CSV. Pro, like Insights' CSV
+  // (open while the billing flag is off).
+  async function handleExportAll() {
+    if (!hasPro) {
+      openProUpsell('CSV export is a Pro feature');
+      return;
+    }
+    setExportingAll(true);
+    try {
+      const { transactions, error } = await fetchAllTransactions();
+      if (error) throw error;
+      const result = await shareCsv(`flo-transactions-${format(new Date(), 'yyyy-MM-dd')}.csv`, buildTransactionsCsv(transactions, accounts));
+      if (result.unsupported) showToast({ message: 'Sharing is not available on this device', variant: 'error' });
+    } catch (err) {
+      showToast({ message: 'Export failed', variant: 'error' });
+    } finally {
+      setExportingAll(false);
+    }
+  }
 
   // Applied on the device first, so the switch is instant, then saved to the
   // profile `silent` (no app-wide refetch). A failed save keeps the local
@@ -471,31 +508,11 @@ export default function Settings() {
           </Card>
         </Pressable>
 
-        <RowGroup title="General">
-          {/* value is the EFFECTIVE display currency (useCurrency →
-              activeAccount.currency), matching what the app actually shows,
-              not profiles.currency (which only seeds new accounts). Hidden
-              while the currency picker is flagged off (lib/flags.js). */}
-          {FLAGS.currencyPicker && (
-            <CurrencyPicker
-              value={currency}
-              onChange={handleCurrencyChange}
-              variant="dialog"
-              renderTrigger={(selected, toggle) => (
-                <Row
-                  icon={CircleDollarSign}
-                  title="Currency"
-                  hint="Shown across the app"
-                  value={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
-                  onPress={toggle}
-                  chevron={false}
-                />
-              )}
-            />
-          )}
-          <Row icon={Grid2x2} title="Manage Categories" onPress={() => router.push('/manage-categories')} />
-          {/* Personalize is economy (lib/flags.js). */}
-          {FLAGS.economy && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}
+        {/* Sections in a fixed order (38-home-insights-more.md): Account,
+            Appearance, Notifications, Preferences, Data & export, About, then
+            Log out on its own at the bottom. */}
+        <RowGroup title="Account">
+          <Row icon={KeyRound} title="Signed in with" value={signInMethods} />
         </RowGroup>
 
         {/* Appearance: System follows the phone's light/dark setting and is the
@@ -505,6 +522,8 @@ export default function Settings() {
           <Row icon={SunMoon} title="Theme">
             <AppearanceToggle value={modePreference} onChange={handleAppearanceChange} />
           </Row>
+          {/* Personalize is economy (lib/flags.js). */}
+          {FLAGS.economy && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}
         </RowGroup>
 
         <RowGroup title="Notifications">
@@ -567,32 +586,6 @@ export default function Settings() {
               />
             </Row>
           )}
-          {/* Dev-only: the push registration status + "Send test" link
-              (32-safe-closed-test-build.md — no debug UI for testers). */}
-          {__DEV__ && notifEnabled && (
-            <Row
-              icon={Send}
-              title="Push notifications"
-              hint={
-                pushStatus.checking
-                  ? 'Checking…'
-                  : pushStatus.unsupported
-                    ? 'Needs a development build, not Expo Go.'
-                    : pushStatus.registered
-                      ? 'This device is registered.'
-                      : 'Not registered yet — reopen the app, or check your connection.'
-              }
-              right={
-                <Button
-                  variant="secondary"
-                  title={sendingTestPush ? 'Sending…' : 'Send test'}
-                  onPress={handleSendTestPush}
-                  disabled={sendingTestPush || !pushStatus.registered}
-                  style={styles.inlineButton}
-                />
-              }
-            />
-          )}
         </RowGroup>
         {timePickerField && (
           <DateTimePicker
@@ -607,10 +600,10 @@ export default function Settings() {
           />
         )}
 
-        <RowGroup title="Summary Period">
-          <Row icon={CircleDollarSign} title="Income & Expenses reset">
+        <RowGroup title="Preferences">
+          <Row icon={CircleDollarSign} title="Summary period" hint="When Home's spent and received totals reset">
             <SegmentedChoice
-              accessibilityLabel="Income and expenses reset"
+              accessibilityLabel="Summary period"
               options={RESET_PERIOD_OPTIONS}
               value={resetPeriod}
               onChange={handleResetPeriodChange}
@@ -622,6 +615,27 @@ export default function Settings() {
               title="Starts from"
               value={format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
               onPress={() => setShowResetDatePicker(true)}
+            />
+          )}
+          {/* value is the EFFECTIVE display currency (useCurrency →
+              activeAccount.currency), matching what the app actually shows,
+              not profiles.currency (which only seeds new accounts). Hidden
+              while the currency picker is flagged off (lib/flags.js). */}
+          {FLAGS.currencyPicker && (
+            <CurrencyPicker
+              value={currency}
+              onChange={handleCurrencyChange}
+              variant="dialog"
+              renderTrigger={(selected, toggle) => (
+                <Row
+                  icon={CircleDollarSign}
+                  title="Currency"
+                  hint="Shown across the app"
+                  value={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
+                  onPress={toggle}
+                  chevron={false}
+                />
+              )}
             />
           )}
         </RowGroup>
@@ -670,22 +684,20 @@ export default function Settings() {
 
         <RowGroup title="Data & export">
           <Row
+            icon={Download}
+            title="Export all transactions"
+            hint="A CSV of every account"
+            onPress={handleExportAll}
+            right={exportingAll ? <ActivityIndicator size="small" color={colors.ink} /> : !hasPro ? <ProBadge variant="pill" /> : null}
+            disabled={exportingAll}
+          />
+          <Row
             icon={ChartColumn}
             title="Share anonymous usage"
             hint="Helps improve FLO. Only which features you use, never amounts, notes or names."
             switchValue={analyticsConsent}
             onSwitchChange={handleToggleAnalytics}
           />
-        </RowGroup>
-
-        {/* Dev-only: the Koban gallery (37-design-system-and-koban.md). */}
-        {__DEV__ && (
-          <RowGroup title="Developer">
-            <Row icon={Cat} title="Koban gallery" onPress={() => router.push('/dev/koban')} />
-          </RowGroup>
-        )}
-
-        <RowGroup>
           <Row
             icon={Trash2}
             title="Delete Account"
@@ -698,7 +710,48 @@ export default function Settings() {
           />
         </RowGroup>
 
-        <Text style={styles.version}>FLO v1.0.0</Text>
+        <RowGroup title="About">
+          <Row icon={Info} title="Version" value={APP_VERSION} />
+          {PRIVACY_POLICY_URL && (
+            <Row icon={ShieldCheck} title="Privacy policy" onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} />
+          )}
+        </RowGroup>
+
+        {/* Developer rows render in development builds only
+            (32-safe-closed-test-build.md — no debug UI for testers). */}
+        {__DEV__ && (
+          <RowGroup title="Developer">
+            <Row icon={Cat} title="Koban gallery" onPress={() => router.push('/dev/koban')} />
+            {notifEnabled && (
+              <Row
+                icon={Send}
+                title="Push notifications"
+                hint={
+                  pushStatus.checking
+                    ? 'Checking…'
+                    : pushStatus.unsupported
+                      ? 'Needs a development build, not Expo Go.'
+                      : pushStatus.registered
+                        ? 'This device is registered.'
+                        : 'Not registered yet — reopen the app, or check your connection.'
+                }
+                right={
+                  <Button
+                    variant="secondary"
+                    title={sendingTestPush ? 'Sending…' : 'Send test'}
+                    onPress={handleSendTestPush}
+                    disabled={sendingTestPush || !pushStatus.registered}
+                    style={styles.inlineButton}
+                  />
+                }
+              />
+            )}
+          </RowGroup>
+        )}
+
+        <RowGroup>
+          <Row icon={LogOut} title="Log out" chevron={false} onPress={signOut} />
+        </RowGroup>
       </ScrollView>
 
       <Modal
@@ -889,13 +942,6 @@ function makeStyles(colors) {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.md,
     color: colors.muted,
-  },
-  version: {
-    fontFamily: fontFamily.semibold,
-    fontSize: type.caption,
-    color: colors.mutedLight,
-    textAlign: 'center',
-    marginTop: spacing.xl,
   },
   });
 }
