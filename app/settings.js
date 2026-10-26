@@ -46,6 +46,7 @@ import {
 import { getReportSettings, setReportSettings, DEFAULT_REPORT_SETTINGS } from '../lib/reports';
 import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
 import { RESET_PERIOD_OPTIONS } from '../lib/periods';
+import AppearanceToggle from '../components/AppearanceToggle';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 
@@ -100,10 +101,20 @@ export default function Settings() {
   const { notifyChanged } = useDataRefresh();
   const currency = useCurrency();
   const { openEditProfile } = useEditProfileSheet();
-  const { colors } = useTheme();
+  const { colors, modePreference, setModePreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPro } = useEntitlement();
   const { showToast } = useToast();
+
+  // Applied on the device first, so the switch is instant, then saved to the
+  // profile `silent` (no app-wide refetch). A failed save keeps the local
+  // choice and says so.
+  async function handleAppearanceChange(pref) {
+    if (pref === modePreference) return;
+    setModePreference(pref);
+    const { error } = await updateProfile({ theme_mode: pref }, { silent: true });
+    if (error) showToast({ message: error.message, variant: 'error' });
+  }
   const { consent: analyticsConsent, setConsent: setAnalyticsConsent } = useAnalyticsConsent();
 
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -513,6 +524,12 @@ export default function Settings() {
             </Pressable>
           )}
         </Card>
+
+        {/* Appearance (37-design-system-and-koban.md): System follows the
+            phone's light/dark setting and is the default. Applied straight
+            away and saved to the profile so it follows the account. */}
+        <Text style={styles.sectionLabel}>Appearance</Text>
+        <AppearanceToggle value={modePreference} onChange={handleAppearanceChange} style={styles.appearanceToggle} />
 
         <Text style={styles.sectionLabel}>Notifications</Text>
         <Card style={styles.rowsCard}>
@@ -1022,6 +1039,9 @@ function makeStyles(colors) {
   },
   pushTestLinkDisabled: {
     color: colors.mutedMid,
+  },
+  appearanceToggle: {
+    marginBottom: spacing.xs,
   },
   sectionLabel: {
     fontFamily: fontFamily.bold,

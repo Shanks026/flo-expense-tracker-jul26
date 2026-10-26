@@ -15,8 +15,7 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
-import { ThemeProvider, useTheme } from '../theme/ThemeContext';
-import { DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
+import { ThemeProvider, useTheme, MODE_PREFERENCES, DEFAULT_MODE_PREFERENCE } from '../theme/ThemeContext';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider, useAccount } from '../lib/AccountContext';
 import { ToastProvider, useToast } from '../components/Toast';
@@ -363,7 +362,7 @@ function MomentQueueSync() {
 function ThemeProfileSync() {
   const { session } = useAuth();
   const { profile } = useProfile();
-  const { accentId, modeId, setAccent, setMode } = useTheme();
+  const { modePreference, setModePreference } = useTheme();
   const userId = session?.user?.id ?? null;
   const prevUserIdRef = useRef(userId);
 
@@ -379,18 +378,18 @@ function ThemeProfileSync() {
       // screens are now pinned to the default palette themselves
       // (app/sign-in.js), so leaving the active theme on the outgoing
       // account's colors until that screen unmounts is invisible.
-      if (userId) {
-        setAccent(DEFAULT_ACCENT_ID);
-        setMode(DEFAULT_MODE_ID);
-      }
+      if (userId) setModePreference(DEFAULT_MODE_PREFERENCE);
     }
-  }, [userId, setAccent, setMode]);
+  }, [userId, setModePreference]);
 
   useEffect(() => {
-    if (profile?.theme_accent && profile.theme_accent !== accentId) setAccent(profile.theme_accent);
-    if (profile?.theme_mode && profile.theme_mode !== modeId) setMode(profile.theme_mode);
+    // Mode only (spec 37): the accent is fixed to lime, so a stored
+    // theme_accent (and equipped_card_theme) is ignored, not cleared.
+    if (MODE_PREFERENCES.includes(profile?.theme_mode) && profile.theme_mode !== modePreference) {
+      setModePreference(profile.theme_mode);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, setAccent, setMode]);
+  }, [profile, setModePreference]);
 
   return null;
 }

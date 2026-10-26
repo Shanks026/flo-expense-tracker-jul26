@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Sun, Moon } from 'lucide-react-native';
+import { Smartphone, Sun, Moon } from 'lucide-react-native';
 import { spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
-import { MODE_LIST } from '../theme/themes';
-
-const MODE_ICONS = { light: Sun, dark: Moon };
+// Appearance: System / Light / Dark (37-design-system-and-koban.md). System
+// follows the phone's setting and is the default.
+const OPTIONS = [
+  { id: 'system', name: 'System', Icon: Smartphone },
+  { id: 'light', name: 'Light', Icon: Sun },
+  { id: 'dark', name: 'Dark', Icon: Moon },
+];
 
 // Just a light/dark toggle — unlike ColorPicker, two options don't need a
 // dialog. A compact inline segmented control (same shape as Settings' own
@@ -19,18 +23,20 @@ export default function AppearanceToggle({ value, onChange, style }) {
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   return (
-    <View style={[s.wrap, style]}>
-      {MODE_LIST.map((mode) => {
-        const isSelected = mode.id === value;
-        const Icon = MODE_ICONS[mode.id];
+    <View style={[s.wrap, style]} accessibilityRole="radiogroup">
+      {OPTIONS.map(({ id, name, Icon }) => {
+        const isSelected = id === value;
         return (
           <Pressable
-            key={mode.id}
+            key={id}
             style={[s.segment, isSelected && s.segmentActive]}
-            onPress={() => onChange(mode.id)}
+            onPress={() => onChange(id)}
+            accessibilityRole="radio"
+            accessibilityLabel={`${name} appearance`}
+            accessibilityState={{ selected: isSelected }}
           >
-            {Icon && <Icon size={13} color={isSelected ? colors.surface : colors.muted} strokeWidth={2.4} />}
-            <Text style={[s.segmentText, isSelected && s.segmentTextActive]}>{mode.name}</Text>
+            <Icon size={13} color={isSelected ? colors.surface : colors.muted} strokeWidth={2.4} />
+            <Text style={[s.segmentText, isSelected && s.segmentTextActive]}>{name}</Text>
           </Pressable>
         );
       })}
@@ -47,6 +53,9 @@ function makeStyles(colors) {
       padding: 3,
     },
     segment: {
+      flex: 1,
+      justifyContent: 'center',
+      minHeight: 40,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,

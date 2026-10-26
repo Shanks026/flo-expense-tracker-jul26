@@ -38,7 +38,7 @@ export default function Personalize() {
 function PersonalizeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { accentId, modeId, setAccent, setMode, colors } = useTheme();
+  const { accentId, modeId, setModePreference, colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const { updateProfile } = useProfile();
@@ -95,18 +95,11 @@ function PersonalizeScreen() {
     // write, `silent` so it doesn't bump useDataRefresh's version and flicker
     // every data hook in the app) — moved here since Equip is now the one
     // moment these fields actually change, not every tap.
-    if (draftAccent !== accentId) {
-      setAccent(draftAccent);
-      const { error } = await updateProfile({ theme_accent: draftAccent }, { silent: true });
-      if (error) {
-        setEquipping(false);
-        showToast({ message: error.message, variant: 'error' });
-        return;
-      }
-    }
+    // The accent is fixed to lime since spec 37, so a picked accent is only
+    // previewed here, never applied or saved.
 
     if (draftMode !== modeId) {
-      setMode(draftMode);
+      setModePreference(draftMode);
       const { error } = await updateProfile({ theme_mode: draftMode }, { silent: true });
       if (error) {
         setEquipping(false);
