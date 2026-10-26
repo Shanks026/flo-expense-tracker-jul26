@@ -124,3 +124,22 @@ He appears **only in character moments**.
 
 - The user may ask for another round on Koban's drawing later. That would change only the art inside the component, not its API or placements.
 - Native-header adoption is gradual. Any screen a spec touches moves to it.
+
+## As built (2026-10-26)
+
+Code for tickets 01–11 (`.scratch/design-system-and-koban/`) is in. Emulator checks are pending, because they're paused.
+
+- **Appearance (01):** `theme/ThemeContext.js` stores a mode preference (`system` | `light` | `dark`, System by default) and resolves it with `useColorScheme()`. The accent is fixed to lime. Settings → Appearance holds the three-way switch, `app.json` is `automatic`, and the profile sync is mode-only. One migration: `profiles.theme_mode` defaults to `'system'`.
+- **Colour (02, 03):** light-mode muted text reaches 4.6–6.7:1, dark `mutedLight` 5.6:1, and income 5.2:1. `brandStrong` replaces lime as text. `mutedOnDark*` keep the old greys for permanently dark surfaces. Signed amounts carry a TalkBack label. Every remaining static-palette import is documented.
+  - **Superseded:** onboarding and sign-in now follow Appearance too (the person's call; it reverses "no dark onboarding").
+  - **Open follow-up:** danger, warn and streak orange are still below 4.5:1 as light-mode text.
+- **Scale and components (04):** `type` / `radius` / `hitTarget` / `shadow` / `motion` tokens sit alongside the old ones. New components: `IconButton` (48 dp, label required), `BackButton`, `Row` + `RowGroup` (grouped lists; a switch row is one accessible switch), and `SegmentedChoice`. `Button` gained a `secondary` text variant. Settings is rebuilt on these.
+- **Native headers (05):** the root Stack themes native headers, off by default; Settings, Streak and the dev Koban gallery turn them on.
+- **Feedback (06):** `FadeIn` no longer animates unless `animate` is passed. `lib/haptics.js` → `destructiveHaptic()` fires at every destructive confirm.
+- **Art (07):** the streak chip, hero and calendar use the lucide `Flame` / `Snowflake`. The 3D PNGs remain only on economy surfaces.
+- **Koban (08–11):** `components/koban/` = `Koban.js` (layers and motion) plus three placeholder-art files: `art.js` (the body), `faces.js` (10 moods) and `poses.js` (12 poses as keyframe channels).
+  - Props: `size`, `mood`, `pose`, `loop` (false = play once, then idle), `animated` (false = still), `scarf`, `surface`. Reduced motion makes him still.
+  - The dev gallery is at `/dev/koban` (Settings → Developer, dev builds only).
+  - Placed in the onboarding opener, coach marks, the streak hero and the streak celebration. No empty state had a mascot to replace.
+  - The person plans their own **animated** illustrations to replace the art files.
+

@@ -67,8 +67,25 @@ Read this before anything else. The ticket files are the source of truth: each h
 
 The person plans to wipe every Supabase user (including chrisaustin2001) and start fresh; they'll run `delete from auth.users;` themselves. The test accounts go with it, so the next emulator check needs a fresh one.
 
+### Spec 37: design system and Koban (`.scratch/design-system-and-koban/`)
+| Ticket | State | What's left |
+|---|---|---|
+| 01 Appearance System/Light/Dark | Code ✓ (`e2404b2`), migration applied | Native rebuild, then emulator check |
+| 02 accessible colour tokens | Code ✓ (`509b490`) | Emulator check; follow-up for danger/warn/streak text contrast |
+| 03 no static light colours (onboarding follows the theme too) | Code ✓ (`6f55d1d`) | Dark-mode emulator pass |
+| 04 shared components + Settings | Code ✓ (`07b5668`) | TalkBack / large font / 48 dp check |
+| 05 native headers | Code ✓ (`67f80a5`) | Emulator check |
+| 06 calm feedback | Code ✓ (`95e8502`) | Emulator check |
+| 07 retire 3D art | Code ✓ (`421584a`) | Emulator check |
+| 08 Koban component | Code ✓ (`cf0faf9`) | Gallery on the device |
+| 09 Koban moods | Code ✓ (`573b27b`) | Gallery on the device |
+| 10 Koban poses | Code ✓ (`59fda09`) | Gallery on the device |
+| 11 Koban placements | Code ✓ (`9f2387c`) | Each placement on the device |
+
+Koban's art is a placeholder; the person will replace `components/koban/{art,faces,poses}.js` with animated illustrations.
+
 ### Not started
-Specs 37 (design system + Koban), 38 (Home, Insights, More) and 39 (nudge + weekly recap) are spec'd but not ticketed.
+Specs 38 (Home, Insights, More) and 39 (nudge + weekly recap) are spec'd but not ticketed.
 
 Live Supabase now has:
 - `events` (insert-only RLS, consent-gated);
