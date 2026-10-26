@@ -33,7 +33,7 @@ import { AddBillSheetProvider } from '../components/AddBillSheet';
 import { PayBillSheetProvider } from '../components/PayBillSheet';
 import DueBillsModal from '../components/DueBillsModal';
 import StreakCelebration from '../components/StreakCelebration';
-import FreezePrompt from '../components/FreezePrompt';
+import StreakFreezeSync from '../components/StreakFreezeSync';
 import RankUpCelebration from '../components/RankUpCelebration';
 import TrophyToast from '../components/TrophyToast';
 import { EditProfileSheetProvider } from '../components/EditProfileSheet';
@@ -488,7 +488,7 @@ function RootNavigator() {
                                     <DetectedTransactionHandler />
                                     <DueBillsModal />
                                     <StreakCelebration />
-                                    <FreezePrompt />
+                                    <StreakFreezeSync />
                                     <RankUpCelebration />
                                     <TrophyToast />
                                     <RecoveryHomeRedirect />

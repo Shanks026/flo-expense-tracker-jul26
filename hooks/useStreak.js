@@ -3,7 +3,7 @@ import { format, subDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
-import { computeStreak } from '../lib/streak';
+import { computeStreak, dayKey, planFreezes, MAX_FREEZES } from '../lib/streak';
 import useLoadedFor from './useLoadedFor';
 
 // How far back to fetch. A streak longer than this reads as capped — an
@@ -11,7 +11,9 @@ import useLoadedFor from './useLoadedFor';
 // payload small; 90 days is more than enough for any streak worth showing.
 const WINDOW_DAYS = 90;
 
-const EMPTY = computeStreak([], new Map(), new Date());
+const NO_PLAN = { toUse: [], toEarn: [] };
+const empty = () => ({ ...computeStreak([], new Map(), new Date()), freezesHeld: 0, freezePlan: NO_PLAN });
+const EMPTY = empty();
 
 // Plain, non-hook fetch — used by the hook below. Previously also used by
 // lib/notifications.js's rescheduleAll() (a plain async function, not a
@@ -21,7 +23,7 @@ const EMPTY = computeStreak([], new Map(), new Date());
 // function regardless: fetching fresh rather than accepting a possibly-stale
 // passed-in streak is still the right shape for any future non-hook caller.
 export async function fetchStreak(userId) {
-  if (!userId) return computeStreak([], new Map(), new Date());
+  if (!userId) return empty();
 
   // created_at, NOT occurred_at — see lib/streak.js's comment. occurred_at is
   // user-editable, so backfilling receipts would fabricate a streak.
@@ -49,10 +51,12 @@ export async function fetchStreak(userId) {
     // The streak's own store (34-streak-only.md). New no-spend and freeze
     // days land here; the two reward_events reads above stay so legacy
     // history, written before the economy was flagged off, still counts.
-    supabase.from('streak_marks').select('day, kind').in('kind', ['no_spend', 'freeze_used']).gte('day', since),
+    // Freeze marks are read all-time (there are only a few a week): the
+    // freezes held are every earned mark minus every used one.
+    supabase.from('streak_marks').select('day, kind').or(`kind.neq.no_spend,day.gte.${since}`),
   ]);
 
-  if (txnResult.error) return computeStreak([], new Map(), new Date());
+  if (txnResult.error) return empty();
 
   // Map, not a Set — lib/streak.js's history needs to know WHICH kind of
   // coverage a date has, not just that it's covered. Insertion order is the
@@ -68,9 +72,27 @@ export async function fetchStreak(userId) {
   if (!frozenResult.error) {
     for (const row of frozenResult.data ?? []) coveredDates.set(row.ref, 'frozen');
   }
-  for (const row of marks) if (row.kind === 'freeze_used') coveredDates.set(row.day, 'frozen');
+  for (const row of marks) if (row.kind === 'freeze_used' && row.day >= since) coveredDates.set(row.day, 'frozen');
 
-  return computeStreak(txnResult.data ?? [], coveredDates, new Date());
+  const now = new Date();
+  const streak = computeStreak(txnResult.data ?? [], coveredDates, now);
+
+  // Automatic freezes (34-streak-only.md). Legacy reward_events freezes count
+  // as already used: only streak_marks hold freezes.
+  const earnedKeys = new Set(marks.filter((m) => m.kind === 'freeze_earned').map((m) => m.day));
+  const usedCount = marks.filter((m) => m.kind === 'freeze_used').length;
+  const freezesHeld = Math.min(MAX_FREEZES, Math.max(0, earnedKeys.size - usedCount));
+
+  // Plan only from a complete picture: a failed coverage read would make a
+  // covered day look missed and spend a freeze on it.
+  let freezePlan = NO_PLAN;
+  if (!marksResult.error && !noSpendResult.error && !frozenResult.error) {
+    const coveredKeys = new Set(coveredDates.keys());
+    for (const row of txnResult.data ?? []) coveredKeys.add(dayKey(new Date(row.created_at)));
+    freezePlan = planFreezes({ coveredKeys, earnedKeys, held: freezesHeld, now });
+  }
+
+  return { ...streak, freezesHeld, freezePlan };
 }
 
 // A streak is a habit, not a ledger view — so this is GLOBAL, deliberately not
