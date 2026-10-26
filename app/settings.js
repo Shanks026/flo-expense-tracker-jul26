@@ -3,13 +3,39 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ChevronLeft, ChevronRight, CircleDollarSign, Grid2x2, Palette, SunMedium, Bell, FileText, Receipt, Landmark, BatteryWarning, Trash2, TriangleAlert, Send, ChartColumn } from 'lucide-react-native';
+import {
+  CircleDollarSign,
+  Grid2x2,
+  Palette,
+  SunMedium,
+  SunMoon,
+  Sunrise,
+  Moon,
+  Bell,
+  FileText,
+  Receipt,
+  Landmark,
+  BatteryWarning,
+  Trash2,
+  TriangleAlert,
+  Send,
+  ChartColumn,
+  CalendarClock,
+  CalendarDays,
+  Clock,
+  Minus,
+  Plus,
+} from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
-import Switch from '../components/Switch';
+import Button from '../components/Button';
+import BackButton from '../components/BackButton';
+import IconButton from '../components/IconButton';
+import Row, { RowGroup } from '../components/Row';
+import SegmentedChoice from '../components/SegmentedChoice';
 import Skeleton from '../components/Skeleton';
 // Static palette (theme/tokens) only for text on the dark profile card and the danger button.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii, type } from '../theme/tokens';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { useAccount } from '../lib/AccountContext';
@@ -443,14 +469,24 @@ export default function Settings() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <BackButton />
+        <Text style={styles.headerTitle} accessibilityRole="header">
+          Settings
+        </Text>
       </View>
 
+      {/* Flat grouped lists built from the shared Row/RowGroup
+          (37-design-system-and-koban.md): 48dp+ targets, a role and label on
+          every control, pressed feedback. The profile card stays the one
+          emphasis surface. */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Pressable onPress={openEditProfile}>
+        <Pressable
+          onPress={openEditProfile}
+          accessibilityRole="button"
+          accessibilityLabel={`${fullName || 'Add your name'}, ${session?.user?.email ?? ''}`}
+          accessibilityHint="Edit your profile"
+          style={({ pressed }) => pressed && styles.pressedDim}
+        >
           <Card dark style={styles.profileCard}>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
@@ -473,7 +509,7 @@ export default function Settings() {
           </Card>
         </Pressable>
 
-        <Card style={styles.rowsCard}>
+        <RowGroup title="General">
           {/* value is the EFFECTIVE display currency (useCurrency →
               activeAccount.currency), matching what the app actually shows,
               not profiles.currency (which only seeds new accounts). */}
@@ -482,176 +518,117 @@ export default function Settings() {
             onChange={handleCurrencyChange}
             variant="dialog"
             renderTrigger={(selected, toggle) => (
-              <Pressable style={[styles.row, styles.rowBorder]} onPress={toggle}>
-                <View style={styles.rowIcon}>
-                  <CircleDollarSign size={20} color={colors.ink} strokeWidth={2} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>Currency</Text>
-                  <Text style={styles.rowHint}>Shown across the app</Text>
-                </View>
-                {profileLoading ? (
-                  <Skeleton width={54} height={16} radius={6} />
-                ) : (
-                  <Text style={styles.rowValue}>
-                    {selected.symbol} {selected.code}
-                  </Text>
-                )}
-              </Pressable>
+              <Row
+                icon={CircleDollarSign}
+                title="Currency"
+                hint="Shown across the app"
+                value={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
+                onPress={toggle}
+                chevron={false}
+              />
             )}
           />
-
-          <Pressable style={[styles.row, FLAGS.economy && styles.rowBorder]} onPress={() => router.push('/manage-categories')}>
-            <View style={styles.rowIcon}>
-              <Grid2x2 size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Manage Categories</Text>
-            <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-          </Pressable>
-
-          {/* Primary Color + Appearance collapsed into one row
-              (23-personalize-hub.md) — both, plus the card design (Shop-only
-              before), now live together in the Personalize hub with a single
-              preview and an explicit Equip step, instead of two rows that
-              each applied instantly. */}
+          <Row icon={Grid2x2} title="Manage Categories" onPress={() => router.push('/manage-categories')} />
           {/* Personalize is economy (lib/flags.js). */}
-          {FLAGS.economy && (
-            <Pressable style={styles.row} onPress={() => router.push('/personalize')}>
-              <View style={styles.rowIcon}>
-                <Palette size={20} color={colors.ink} strokeWidth={2} />
-              </View>
-              <Text style={styles.rowTitle}>Personalize</Text>
-              <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-            </Pressable>
-          )}
-        </Card>
+          {FLAGS.economy && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}
+        </RowGroup>
 
-        {/* Appearance (37-design-system-and-koban.md): System follows the
-            phone's light/dark setting and is the default. Applied straight
-            away and saved to the profile so it follows the account. */}
-        <Text style={styles.sectionLabel}>Appearance</Text>
-        <AppearanceToggle value={modePreference} onChange={handleAppearanceChange} style={styles.appearanceToggle} />
+        {/* Appearance: System follows the phone's light/dark setting and is the
+            default. Applied straight away and saved to the profile so it
+            follows the account. */}
+        <RowGroup title="Appearance">
+          <Row icon={SunMoon} title="Theme">
+            <AppearanceToggle value={modePreference} onChange={handleAppearanceChange} />
+          </Row>
+        </RowGroup>
 
-        <Text style={styles.sectionLabel}>Notifications</Text>
-        <Card style={styles.rowsCard}>
-          <View style={[styles.row, styles.rowBorder]}>
-            <View style={styles.rowIcon}>
-              <Bell size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Notifications</Text>
-            <Switch value={notifEnabled} onValueChange={handleToggleNotifications} />
-          </View>
-
+        <RowGroup title="Notifications">
+          <Row icon={Bell} title="Notifications" switchValue={notifEnabled} onSwitchChange={handleToggleNotifications} />
           {permissionBlocked && (
-            <Pressable style={[styles.row, styles.rowBorder]} onPress={() => Linking.openSettings()}>
-              <Text style={styles.permissionHint}>Notifications are blocked. Tap to open system settings.</Text>
-            </Pressable>
-          )}
-
-          <Pressable style={[styles.row, styles.rowBorder]} onPress={handleOpenBatterySettings}>
-            <View style={styles.rowIcon}>
-              <BatteryWarning size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>Battery settings</Text>
-              <Text style={styles.rowHint}>
-                Reminders may be delayed or dropped by your phone's battery manager. Set FLO to
-                "Don't optimize" here — on Vivo/iQOO also check Settings → Battery → High
-                background power consumption, and Settings → Apps → Autostart.
-              </Text>
-            </View>
-          </Pressable>
-
-          <View style={[styles.row, styles.rowBorder, !notifEnabled && styles.rowDisabled]}>
-            <View style={styles.rowIcon}>
-              <SunMedium size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Daily Reminders</Text>
-            <Switch
-              value={profile?.reminders_enabled ?? true}
-              onValueChange={handleToggleDailyReminders}
-              disabled={!notifEnabled}
+            <Row
+              title="Notifications are blocked"
+              hint="Tap to open system settings."
+              tone="danger"
+              onPress={() => Linking.openSettings()}
             />
-          </View>
+          )}
+          <Row
+            icon={BatteryWarning}
+            title="Battery settings"
+            hint={'Reminders may be delayed or dropped by your phone\'s battery manager. Set FLO to "Don\'t optimize" here — on Vivo/iQOO also check Settings → Battery → High background power consumption, and Settings → Apps → Autostart.'}
+            onPress={handleOpenBatterySettings}
+          />
+          <Row
+            icon={SunMedium}
+            title="Daily Reminders"
+            switchValue={profile?.reminders_enabled ?? true}
+            onSwitchChange={handleToggleDailyReminders}
+            disabled={!notifEnabled}
+          />
           {notifEnabled && (profile?.reminders_enabled ?? true) && (
-            <>
-              <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setTimePickerField('morning')}>
-                <Text style={styles.subRowLabel}>Morning</Text>
-                <Text style={styles.subRowValue}>
-                  {format(timeOnTodayFromString(profile?.morning_reminder_time, 8, 0), 'h:mm a')}
-                </Text>
-              </Pressable>
-              <Pressable style={[styles.subRow, styles.rowBorder]} onPress={() => setTimePickerField('evening')}>
-                <Text style={styles.subRowLabel}>Evening</Text>
-                <Text style={styles.subRowValue}>
-                  {format(timeOnTodayFromString(profile?.evening_reminder_time, 21, 0), 'h:mm a')}
-                </Text>
-              </Pressable>
-            </>
+            <Row
+              icon={Sunrise}
+              title="Morning"
+              value={format(timeOnTodayFromString(profile?.morning_reminder_time, 8, 0), 'h:mm a')}
+              onPress={() => setTimePickerField('morning')}
+            />
           )}
-
-          {/* Bottom borders here only when the dev-only push row follows —
-              otherwise these are the card's last rows. */}
-          <View
-            style={[
-              styles.row,
-              (__DEV__ && notifEnabled) || (notifEnabled && billReminders.enabled) ? styles.rowBorder : null,
-              !notifEnabled && styles.rowDisabled,
-            ]}
-          >
-            <View style={styles.rowIcon}>
-              <Receipt size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowTitle}>Bill Reminders</Text>
-            <Switch value={billReminders.enabled} onValueChange={handleToggleBillReminders} disabled={!notifEnabled} />
-          </View>
+          {notifEnabled && (profile?.reminders_enabled ?? true) && (
+            <Row
+              icon={Moon}
+              title="Evening"
+              value={format(timeOnTodayFromString(profile?.evening_reminder_time, 21, 0), 'h:mm a')}
+              onPress={() => setTimePickerField('evening')}
+            />
+          )}
+          <Row
+            icon={Receipt}
+            title="Bill Reminders"
+            switchValue={billReminders.enabled}
+            onSwitchChange={handleToggleBillReminders}
+            disabled={!notifEnabled}
+          />
           {notifEnabled && billReminders.enabled && (
-            <View style={[styles.subRow, __DEV__ && styles.rowBorder]}>
-              <Text style={styles.subRowLabel}>Remind me</Text>
-              <View style={styles.daysBeforeGroup}>
-                {DAYS_BEFORE_OPTIONS.map((days) => {
-                  const selected = billReminders.daysBefore === days;
-                  return (
-                    <Pressable
-                      key={days}
-                      style={[styles.dayChip, selected && styles.dayChipSelected]}
-                      onPress={() => handleDaysBeforeChange(days)}
-                    >
-                      <Text style={[styles.dayChipText, selected && styles.dayChipTextSelected]}>{days}d before</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
+            <Row icon={CalendarClock} title="Remind me">
+              <SegmentedChoice
+                accessibilityLabel="Remind me before a bill is due"
+                options={DAYS_BEFORE_OPTIONS.map((d) => ({
+                  value: d,
+                  label: `${d}d before`,
+                  accessibilityLabel: `${d} ${d === 1 ? 'day' : 'days'} before`,
+                }))}
+                value={billReminders.daysBefore}
+                onChange={handleDaysBeforeChange}
+              />
+            </Row>
           )}
-
           {/* Dev-only: the push registration status + "Send test" link
               (32-safe-closed-test-build.md — no debug UI for testers). */}
           {__DEV__ && notifEnabled && (
-            <View style={styles.row}>
-              <View style={styles.rowIcon}>
-                <Send size={20} color={colors.ink} strokeWidth={2} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>Push notifications</Text>
-                <Text style={styles.rowHint}>
-                  {pushStatus.checking
-                    ? 'Checking…'
-                    : pushStatus.unsupported
-                      ? 'Needs a development build, not Expo Go.'
-                      : pushStatus.registered
-                        ? 'This device is registered.'
-                        : 'Not registered yet — reopen the app, or check your connection.'}
-                </Text>
-              </View>
-              <Pressable onPress={handleSendTestPush} disabled={sendingTestPush || !pushStatus.registered} hitSlop={8}>
-                <Text style={[styles.pushTestLink, (sendingTestPush || !pushStatus.registered) && styles.pushTestLinkDisabled]}>
-                  {sendingTestPush ? 'Sending…' : 'Send test'}
-                </Text>
-              </Pressable>
-            </View>
+            <Row
+              icon={Send}
+              title="Push notifications"
+              hint={
+                pushStatus.checking
+                  ? 'Checking…'
+                  : pushStatus.unsupported
+                    ? 'Needs a development build, not Expo Go.'
+                    : pushStatus.registered
+                      ? 'This device is registered.'
+                      : 'Not registered yet — reopen the app, or check your connection.'
+              }
+              right={
+                <Button
+                  variant="secondary"
+                  title={sendingTestPush ? 'Sending…' : 'Send test'}
+                  onPress={handleSendTestPush}
+                  disabled={sendingTestPush || !pushStatus.registered}
+                  style={styles.inlineButton}
+                />
+              }
+            />
           )}
-        </Card>
+        </RowGroup>
         {timePickerField && (
           <DateTimePicker
             value={
@@ -665,71 +642,61 @@ export default function Settings() {
           />
         )}
 
-        <Text style={styles.sectionLabel}>Reports</Text>
-        <Card style={styles.rowsCard}>
-          <View style={[styles.reportCadenceBlock, reportSettings.cadence !== 'off' && styles.rowBorder]}>
-            <View style={styles.reportCadenceTop}>
-              <View style={styles.rowIcon}>
-                <FileText size={20} color={colors.ink} strokeWidth={2} />
-              </View>
-              <Text style={styles.rowTitle}>Cadence</Text>
-            </View>
-            <View style={styles.reportSegmentWrap}>
-              {CADENCE_OPTIONS.map((c) => (
-                <Pressable
-                  key={c.value}
-                  style={[styles.reportSegment, reportSettings.cadence === c.value && styles.reportSegmentActive]}
-                  onPress={() => persistReportSettings({ cadence: c.value })}
-                >
-                  <Text style={[styles.reportSegmentText, reportSettings.cadence === c.value && styles.reportSegmentTextActive]}>
-                    {c.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
+        <RowGroup title="Reports">
+          <Row icon={FileText} title="Cadence">
+            <SegmentedChoice
+              accessibilityLabel="Report cadence"
+              options={CADENCE_OPTIONS}
+              value={reportSettings.cadence}
+              onChange={(cadence) => persistReportSettings({ cadence })}
+            />
+          </Row>
           {reportSettings.cadence === 'weekly' && (
-            <View style={[styles.reportDayBlock, styles.rowBorder]}>
-              <Text style={styles.subRowLabel}>Day</Text>
-              <View style={styles.weekdayRow}>
-                {WEEKDAY_CHIPS.map((d) => (
-                  <Pressable
-                    key={d.value}
-                    style={[styles.weekdayChip, reportSettings.weekday === d.value && styles.weekdayChipActive]}
-                    onPress={() => persistReportSettings({ weekday: d.value })}
-                  >
-                    <Text style={[styles.weekdayChipText, reportSettings.weekday === d.value && styles.weekdayChipTextActive]}>
-                      {d.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+            <Row icon={CalendarDays} title="Day">
+              <SegmentedChoice
+                accessibilityLabel="Report day"
+                options={WEEKDAY_CHIPS}
+                value={reportSettings.weekday}
+                onChange={(weekday) => persistReportSettings({ weekday })}
+              />
+            </Row>
           )}
-
           {reportSettings.cadence === 'monthly' && (
-            <View style={[styles.subRow, styles.rowBorder]}>
-              <Text style={styles.subRowLabel}>Day of month</Text>
-              <View style={styles.dayStepper}>
-                <Pressable onPress={() => persistReportSettings({ dayOfMonth: Math.max(1, reportSettings.dayOfMonth - 1) })}>
-                  <ChevronLeft size={16} color={colors.ink} strokeWidth={2.4} />
-                </Pressable>
-                <Text style={styles.dayStepperValue}>{reportSettings.dayOfMonth}</Text>
-                <Pressable onPress={() => persistReportSettings({ dayOfMonth: Math.min(31, reportSettings.dayOfMonth + 1) })}>
-                  <ChevronRight size={16} color={colors.ink} strokeWidth={2.4} />
-                </Pressable>
-              </View>
-            </View>
+            <Row
+              icon={CalendarDays}
+              title="Day of month"
+              right={
+                <View style={styles.dayStepper}>
+                  <IconButton
+                    icon={Minus}
+                    size={18}
+                    accessibilityLabel="Earlier day of month"
+                    disabled={reportSettings.dayOfMonth <= 1}
+                    onPress={() => persistReportSettings({ dayOfMonth: Math.max(1, reportSettings.dayOfMonth - 1) })}
+                  />
+                  <Text style={styles.dayStepperValue} accessibilityLabel={`Day ${reportSettings.dayOfMonth}`}>
+                    {reportSettings.dayOfMonth}
+                  </Text>
+                  <IconButton
+                    icon={Plus}
+                    size={18}
+                    accessibilityLabel="Later day of month"
+                    disabled={reportSettings.dayOfMonth >= 31}
+                    onPress={() => persistReportSettings({ dayOfMonth: Math.min(31, reportSettings.dayOfMonth + 1) })}
+                  />
+                </View>
+              }
+            />
           )}
-
           {reportSettings.cadence !== 'off' && (
-            <Pressable style={styles.subRow} onPress={() => setShowReportTimePicker(true)}>
-              <Text style={styles.subRowLabel}>At</Text>
-              <Text style={styles.subRowValue}>{format(timeOnToday(reportSettings.hour, reportSettings.minute), 'h:mm a')}</Text>
-            </Pressable>
+            <Row
+              icon={Clock}
+              title="At"
+              value={format(timeOnToday(reportSettings.hour, reportSettings.minute), 'h:mm a')}
+              onPress={() => setShowReportTimePicker(true)}
+            />
           )}
-        </Card>
+        </RowGroup>
 
         {showReportTimePicker && (
           <DateTimePicker
@@ -744,39 +711,24 @@ export default function Settings() {
           />
         )}
 
-        <Text style={styles.sectionLabel}>Summary Period</Text>
-        <Card style={styles.rowsCard}>
-          <View style={[styles.reportCadenceBlock, resetPeriod === 'custom' && styles.rowBorder]}>
-            <View style={styles.reportCadenceTop}>
-              <View style={styles.rowIcon}>
-                <CircleDollarSign size={20} color={colors.ink} strokeWidth={2} />
-              </View>
-              <Text style={styles.rowTitle}>Income & Expenses reset</Text>
-            </View>
-            <View style={styles.reportSegmentWrap}>
-              {RESET_PERIOD_OPTIONS.map((opt) => (
-                <Pressable
-                  key={opt.value}
-                  style={[styles.reportSegment, resetPeriod === opt.value && styles.reportSegmentActive]}
-                  onPress={() => handleResetPeriodChange(opt.value)}
-                >
-                  <Text style={[styles.reportSegmentText, resetPeriod === opt.value && styles.reportSegmentTextActive]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
+        <RowGroup title="Summary Period">
+          <Row icon={CircleDollarSign} title="Income & Expenses reset">
+            <SegmentedChoice
+              accessibilityLabel="Income and expenses reset"
+              options={RESET_PERIOD_OPTIONS}
+              value={resetPeriod}
+              onChange={handleResetPeriodChange}
+            />
+          </Row>
           {resetPeriod === 'custom' && (
-            <Pressable style={styles.subRow} onPress={() => setShowResetDatePicker(true)}>
-              <Text style={styles.subRowLabel}>Starts from</Text>
-              <Text style={styles.subRowValue}>
-                {format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
-              </Text>
-            </Pressable>
+            <Row
+              icon={CalendarDays}
+              title="Starts from"
+              value={format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
+              onPress={() => setShowResetDatePicker(true)}
+            />
           )}
-        </Card>
+        </RowGroup>
 
         {showResetDatePicker && (
           <DateTimePicker
@@ -788,78 +740,60 @@ export default function Settings() {
           />
         )}
 
-        {isAutoDetectVariant() && (
-          <>
-            <Text style={styles.sectionLabel}>Transaction Detection</Text>
-            <Card style={styles.rowsCard}>
-              {!isDetectSupported() ? (
-                <View style={styles.row}>
-                  <Text style={styles.permissionHint}>Android only, and needs a development build (not Expo Go).</Text>
-                </View>
-              ) : (
-                <>
-                  <Pressable style={[styles.row, styles.rowBorder]} onPress={openNotificationAccessSettings}>
-                    <View style={styles.rowIcon}>
-                      <Landmark size={20} color={colors.ink} strokeWidth={2} />
-                    </View>
-                    <Text style={styles.rowTitle}>Notification access</Text>
-                    <Text style={styles.rowValue}>{detectAccess ? 'Granted' : 'Tap to grant'}</Text>
-                  </Pressable>
+        {isAutoDetectVariant() &&
+          (!isDetectSupported() ? (
+            <RowGroup title="Transaction Detection">
+              <Row title="Not available" hint="Android only, and needs a development build (not Expo Go)." />
+            </RowGroup>
+          ) : (
+            <RowGroup
+              title="Transaction Detection"
+              footer={
+                detectEnabled
+                  ? `Watches ${Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit alerts, so FLO can prompt you to log them. Reads only these apps' notifications — nothing else on the device.`
+                  : null
+              }
+            >
+              <Row
+                icon={Landmark}
+                title="Notification access"
+                value={detectAccess ? 'Granted' : 'Tap to grant'}
+                onPress={openNotificationAccessSettings}
+              />
+              <Row
+                icon={Bell}
+                title="Enable detection"
+                switchValue={detectEnabled}
+                onSwitchChange={handleToggleDetect}
+                disabled={!detectAccess}
+              />
+              {/* Dev-only: the detection debug log. */}
+              {__DEV__ && detectEnabled && <Row icon={Receipt} title="What FLO has seen" onPress={handleShowDetectionLog} />}
+            </RowGroup>
+          ))}
 
-                  <View style={[styles.row, detectEnabled && styles.rowBorder, !detectAccess && styles.rowDisabled]}>
-                    <View style={styles.rowIcon}>
-                      <Bell size={20} color={colors.ink} strokeWidth={2} />
-                    </View>
-                    <Text style={styles.rowTitle}>Enable detection</Text>
-                    <Switch value={detectEnabled} onValueChange={handleToggleDetect} disabled={!detectAccess} />
-                  </View>
+        <RowGroup title="Data & export">
+          <Row
+            icon={ChartColumn}
+            title="Share anonymous usage"
+            hint="Helps improve FLO. Only which features you use, never amounts, notes or names."
+            switchValue={analyticsConsent}
+            onSwitchChange={handleToggleAnalytics}
+          />
+        </RowGroup>
 
-                  {/* Dev-only: the detection debug log. */}
-                  {__DEV__ && detectEnabled && (
-                    <Pressable style={[styles.row, styles.rowBorder]} onPress={handleShowDetectionLog}>
-                      <View style={styles.rowIcon}>
-                        <Receipt size={20} color={colors.ink} strokeWidth={2} />
-                      </View>
-                      <Text style={styles.rowTitle}>What FLO has seen</Text>
-                      <ChevronRight size={18} color={colors.chevron} strokeWidth={2.4} />
-                    </Pressable>
-                  )}
-
-                  {detectEnabled && (
-                    <View style={styles.watchedAppsRow}>
-                      <Text style={styles.watchedAppsText}>
-                        Watches {Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit
-                        alerts, so FLO can prompt you to log them. Reads only these apps'
-                        notifications — nothing else on the device.
-                      </Text>
-                    </View>
-                  )}
-                </>
-              )}
-            </Card>
-          </>
-        )}
-
-        <Text style={styles.sectionLabel}>Data & export</Text>
-        <Card style={styles.rowsCard}>
-          <View style={styles.row}>
-            <View style={styles.rowIcon}>
-              <ChartColumn size={20} color={colors.ink} strokeWidth={2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>Share anonymous usage</Text>
-              <Text style={styles.rowHint}>
-                Helps improve FLO. Only which features you use, never amounts, notes or names.
-              </Text>
-            </View>
-            <Switch value={analyticsConsent} onValueChange={handleToggleAnalytics} />
-          </View>
-        </Card>
-
-        <Pressable style={styles.deleteButton} onPress={() => { setDeleteError(null); setConfirmVisible(true); }}>
-          <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
-          <Text style={styles.deleteText}>Delete Account</Text>
-        </Pressable>
+        <RowGroup>
+          <Row
+            icon={Trash2}
+            title="Delete Account"
+            tone="danger"
+            chevron={false}
+            onPress={() => {
+              setDeleteError(null);
+              setConfirmVisible(true);
+            }}
+          />
+        </RowGroup>
 
         <Text style={styles.version}>FLO v1.0.0</Text>
       </ScrollView>
@@ -886,6 +820,9 @@ export default function Settings() {
 
             <Pressable
               style={[styles.modalDelete, deleting && styles.modalDeleteDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Delete everything"
+              accessibilityState={{ disabled: deleting, busy: deleting }}
               onPress={handleDelete}
               disabled={deleting}
             >
@@ -897,6 +834,7 @@ export default function Settings() {
             </Pressable>
             <Pressable
               style={styles.modalCancel}
+              accessibilityRole="button"
               onPress={() => setConfirmVisible(false)}
               disabled={deleting}
             >
@@ -911,6 +849,14 @@ export default function Settings() {
 
 function makeStyles(colors) {
   return StyleSheet.create({
+  pressedDim: {
+    opacity: 0.85,
+  },
+  // The dev-only "Send test" text button, sized to sit inside a Row.
+  inlineButton: {
+    height: 40,
+    paddingHorizontal: spacing.md,
+  },
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -918,30 +864,21 @@ function makeStyles(colors) {
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
+    gap: spacing.xs,
+    // The back button's 48dp target carries its own padding.
+    paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerTitle: {
     fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
+    fontSize: type.title,
     letterSpacing: -0.3,
     color: colors.ink,
   },
   scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 60,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sectionLg,
   },
   profileCard: {
     flexDirection: 'row',
@@ -990,231 +927,16 @@ function makeStyles(colors) {
     color: staticColors.mutedOnDark,
     marginTop: 2,
   },
-  rowsCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 17,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.iconTileBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowTitle: {
-    flex: 1,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  rowHint: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  rowValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
-  rowDisabled: {
-    opacity: 0.45,
-  },
-  pushTestLink: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.sm,
-    color: colors.brandStrong,
-  },
-  pushTestLinkDisabled: {
-    color: colors.mutedMid,
-  },
-  appearanceToggle: {
-    marginBottom: spacing.xs,
-  },
-  sectionLabel: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-    marginLeft: spacing.xs,
-  },
-  permissionHint: {
-    flex: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.dangerStrong,
-    paddingVertical: spacing.sm,
-  },
-  subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingLeft: 52,
-  },
-  subRowLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.mutedDarker,
-  },
-  subRowValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-  },
-  reportCadenceBlock: {
-    paddingVertical: spacing.md,
-  },
-  reportCadenceTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  reportSegmentWrap: {
-    flexDirection: 'row',
-    backgroundColor: colors.chipBg,
-    borderRadius: 14,
-    padding: 4,
-  },
-  reportSegment: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 11,
-  },
-  reportSegmentActive: {
-    backgroundColor: colors.ink,
-  },
-  reportSegmentText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-  },
-  reportSegmentTextActive: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.surface,
-  },
-  reportDayBlock: {
-    paddingVertical: spacing.md,
-    paddingLeft: 52,
-    gap: spacing.sm,
-  },
-  // flexShrink lets this take only the width subRow's space-between layout
-  // actually leaves after the "Day" label (rather than overflowing past
-  // it), and flexWrap lets the 7 fixed-width chips reflow onto a second
-  // line once that constrained width can't fit them all on one — at 320
-  // and even 375px, 7×36px chips plus gaps genuinely don't fit on one
-  // line next to the label, and without this they were rendering off the
-  // right edge, unwrapped and untappable.
-  weekdayRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    flexShrink: 1,
-    justifyContent: 'flex-end',
-    gap: 6,
-  },
-  weekdayChip: {
-    width: 36,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  weekdayChipActive: {
-    backgroundColor: colors.ink,
-  },
-  weekdayChipText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.xs,
-    color: colors.mutedDarker,
-  },
-  weekdayChipTextActive: {
-    color: colors.surface,
-  },
   dayStepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
   },
   dayStepperValue: {
     fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
+    fontSize: type.bodyLg,
     color: colors.ink,
     minWidth: 20,
     textAlign: 'center',
-  },
-  watchedAppsRow: {
-    paddingLeft: 52,
-    paddingRight: spacing.xs,
-    paddingVertical: spacing.md,
-  },
-  watchedAppsText: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    lineHeight: 18,
-  },
-  // Same fix as weekdayRow above — content-width chips with no
-  // flexShrink/flexWrap were overflowing subRow's available width on
-  // narrow-to-mid screens once paired with the "Remind me" label.
-  daysBeforeGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    flexShrink: 1,
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-  },
-  dayChip: {
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
-    backgroundColor: colors.iconTileBg,
-  },
-  dayChipSelected: {
-    backgroundColor: colors.ink,
-  },
-  dayChipText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.mutedDarker,
-  },
-  dayChipTextSelected: {
-    color: colors.surface,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-    height: 56,
-    borderRadius: radii.buttonSm + 4,
-    borderWidth: 1.5,
-    borderColor: colors.dangerBorder,
-    backgroundColor: colors.surface,
-    marginTop: spacing.lg,
-  },
-  deleteText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    color: colors.danger,
   },
   modalOverlay: {
     flex: 1,
@@ -1291,7 +1013,7 @@ function makeStyles(colors) {
   },
   version: {
     fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
+    fontSize: type.caption,
     color: colors.mutedLight,
     textAlign: 'center',
     marginTop: spacing.xl,

@@ -31,8 +31,11 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
   // should stay the loud primary brand color — the two need visually
   // distinct weights, per direct feedback that a lone bright button for
   // every action in these modals "looks odd."
+  // `secondary` (spec 37) is a text button: no fill, no border, theme ink.
+  // Primary stays the lime fill — lime is only ever a fill.
   const VARIANTS = {
     primary: { bg: colors.brand, text: colors.brandText },
+    secondary: { bg: 'transparent', text: colors.ink },
     dark: { bg: staticColors.ink, text: staticColors.surface },
     outline: { bg: colors.surface, text: colors.ink, border: colors.border },
     danger: { bg: colors.surface, text: colors.danger, border: colors.dangerBorder },
@@ -44,6 +47,9 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       style={({ pressed }) => [
         styles.base,
         {
@@ -52,6 +58,7 @@ export default function Button({ title, onPress, variant = 'primary', disabled, 
           borderColor: v.border,
           opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
         },
+        variant === 'secondary' && pressed && !disabled && { backgroundColor: colors.chipBg, opacity: 1 },
         style,
       ]}
     >

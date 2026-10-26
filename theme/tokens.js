@@ -109,6 +109,9 @@ export const spacing = {
   lg: 16,
   xl: 20,
   xxl: 24,
+  // Gaps between sections (37-design-system-and-koban.md).
+  section: 32,
+  sectionLg: 48,
 };
 
 export const fontWeight = {
@@ -144,5 +147,44 @@ export const fontSize = {
   amountXl: 56,
 };
 
-const tokens = { colors, radii, spacing, fontWeight, fontFamily, fontSize };
+// --- Spec 37 scale ("Ledger, not game") --------------------------------------
+// Added alongside the older tokens above, not instead of them: screens move
+// to these as each spec touches them (37-design-system-and-koban.md).
+
+// The type ramp: six sizes, used with three Manrope weights (semibold, bold,
+// extrabold). Body text is never below `body` (14).
+export const type = {
+  caption: 12,
+  body: 14,
+  bodyLg: 16,
+  title: 20,
+  headline: 28,
+  display: 40,
+};
+
+// Three corner radii plus full.
+export const radius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  full: 999,
+};
+
+// The smallest tap target, in dp, for anything a user can press.
+export const hitTarget = 48;
+
+// Elevation, so components stop hand-rolling shadows.
+export const shadow = {
+  sm: { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  md: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+};
+
+// Motion durations in ms. Entrance animation is for first-time moments only.
+export const motion = {
+  fast: 150,
+  base: 250,
+  slow: 400,
+};
+
+const tokens = { colors, radii, spacing, fontWeight, fontFamily, fontSize, type, radius, hitTarget, shadow, motion };
 export default tokens;
