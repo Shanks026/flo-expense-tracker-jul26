@@ -52,8 +52,10 @@ export default function TodayStrip() {
           <View style={styles.textWrap}>
             <View style={styles.titleRow}>
               {covered && <CircleCheck size={18} color={colors.brandStrong} strokeWidth={2.4} />}
+              {/* Blank while the day's state loads, rather than briefly
+                  claiming nothing is logged. */}
               <Text style={styles.title} accessibilityRole="header">
-                {copy.title}
+                {loading ? '' : copy.title}
               </Text>
             </View>
           </View>

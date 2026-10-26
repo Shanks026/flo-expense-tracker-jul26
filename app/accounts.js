@@ -63,7 +63,7 @@ export default function Accounts() {
                 style={styles.accountMain}
                 onPress={() => handleSelect(account)}
                 accessibilityRole="button"
-                accessibilityLabel={`${account.name}, ${formatMoney(balance, account.currency)} in hand${active ? ', active' : ''}`}
+                accessibilityLabel={`${account.name}, ${balance < 0 ? 'minus ' : ''}${formatMoney(Math.abs(balance), account.currency)} in hand${active ? ', active' : ''}`}
                 accessibilityState={{ selected: active }}
               >
                 <View style={[styles.dot, { backgroundColor: account.color }]} />
@@ -71,7 +71,10 @@ export default function Accounts() {
                   <Text style={styles.accountName} numberOfLines={1}>
                     {account.name}
                   </Text>
-                  <Text style={styles.accountBalance}>{formatMoney(balance, account.currency)} in hand</Text>
+                  <Text style={styles.accountBalance}>
+                    {balance < 0 ? '−' : ''}
+                    {formatMoney(Math.abs(balance), account.currency)} in hand
+                  </Text>
                 </View>
                 {active && <Check size={18} color={colors.ink} strokeWidth={2.6} />}
               </Pressable>

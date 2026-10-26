@@ -239,7 +239,12 @@ export default function Insights() {
   );
 
   const budgetRows = scopedBudgets
-    .map((budget) => ({ budget, periods: computeBudgetPeriods(budget, scopedCurrent, from, to) }))
+    // A budget belongs to one account, so only that account's spending counts
+    // toward it, even in the all-accounts view.
+    .map((budget) => ({
+      budget,
+      periods: computeBudgetPeriods(budget, scopedCurrent.filter((tx) => tx.account_id === budget.account_id), from, to),
+    }))
     .filter((r) => r.periods.length > 0);
 
   return (
