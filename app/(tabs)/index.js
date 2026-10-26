@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
+import { useState, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Receipt, ArrowLeftRight, Trophy, ShoppingBag, Users, Flame } from 'lucide-react-native';
+import { Bell, Receipt, ArrowLeftRight, Users, Flame, ChevronDown } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -13,12 +13,12 @@ import Pill from '../../components/Pill';
 import ReportReadyCard from '../../components/ReportReadyCard';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
-import AccountHeroCarousel from '../../components/AccountHeroCarousel';
+import HomeHero from '../../components/HomeHero';
 import TodayCard from '../../components/TodayCard';
 import CoachMark from '../../components/CoachMark';
 import useStreak from '../../hooks/useStreak';
 // Static palette (theme/tokens) only for danger/warn, which are the same in both modes.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
+import { colors as staticColors, fontFamily, fontSize, spacing, radii, hitTarget } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useAuth } from '../../lib/AuthContext';
 import useAllAccountSummaries from '../../hooks/useAllAccountSummaries';
@@ -26,6 +26,7 @@ import useTransactions from '../../hooks/useTransactions';
 import useSpendingTrend from '../../hooks/useSpendingTrend';
 import useProfile from '../../hooks/useProfile';
 import useBills, { billStatus } from '../../hooks/useBills';
+import useBudgets from '../../hooks/useBudgets';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
@@ -33,28 +34,25 @@ import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
 import { isSettlement, settlementLabel } from '../../lib/settlements';
+import { isBudgetEnded } from '../../lib/budgets';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
-import { getGreeting } from '../../lib/greetings';
-import useRewards from '../../hooks/useRewards';
-import useTrophies from '../../hooks/useTrophies';
-import { rankFromXp, RANK_BADGE_ART } from '../../lib/rewards';
-import { useRewardsHistorySheet } from '../../components/RewardsHistorySheet';
-import useCardThemes from '../../hooks/useCardThemes';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
-import { useRewardBurst } from '../../components/RewardBurst';
-import { takePendingLoginReward } from '../../lib/pendingLoginReward';
 import { FLAGS } from '../../lib/flags';
-
-const KOBAN_COIN = require('../../assets/general/coin.png');
-const KOBAN_FREEZE = require('../../assets/general/freeze.png');
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
   due_soon: { iconTone: 'warn', amountColor: staticColors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
 };
 const MAX_UPCOMING_BILLS = 4;
+
+// The overall budget (no category) the hero reports against: one whose window
+// is still open, a monthly one first since the hero speaks in months.
+function heroBudget(budgets) {
+  const open = budgets.filter((b) => !b.category_id && !isBudgetEnded(b));
+  return open.find((b) => b.period_type === 'calendar_month') ?? open[0] ?? null;
+}
 
 export default function Home() {
   const { colors, hydrated: themeHydrated } = useTheme();
@@ -64,10 +62,11 @@ export default function Home() {
   const { transactions, loading: transactionsLoading } = useTransactions({ limit: 4 });
   const [trendRange, setTrendRange] = useState('7d');
   const { data: trendData, loading: trendLoading } = useSpendingTrend(trendRange);
-  const { avatarUrl } = useProfile();
+  const { profile } = useProfile();
   const { openAdd } = useAddTransactionSheet();
-  const { activeAccount, accounts, setActiveAccount, loading: accountsLoading } = useAccount();
+  const { activeAccount, accounts, loading: accountsLoading } = useAccount();
   const { summaries, loading: summariesLoading } = useAllAccountSummaries();
+  const { budgets, loading: budgetsLoading } = useBudgets();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
   const { count: alertCount } = useAlerts();
@@ -76,88 +75,28 @@ export default function Home() {
   const { current: streakCurrent, loading: streakLoading } = useStreak();
   const streakChipRef = useRef(null);
   const currency = useCurrency();
-  const { coins, freezes, level, xp, loading: rewardsLoading } = useRewards();
-  const { current: rank } = rankFromXp(xp);
-  // The dot means "there's a reward waiting to be collected", not "there's
-  // something new to look at" — so it tracks UNCLAIMED rewards and survives
-  // opening the Trophy Room, clearing only once the reward is actually
-  // claimed. (unseenCount, the old source, cleared on mere viewing.)
-  const { unclaimedCount: unclaimedTrophies } = useTrophies();
-  const { openRewardsHistory } = useRewardsHistorySheet();
-  const { equippedTheme } = useCardThemes();
-  const { showRewardBurst } = useRewardBurst();
   const { refreshing, onRefresh } = usePullToRefresh();
-
-  // Surfaces the day-login coins/XP reward when it was earned somewhere
-  // that isn't AddTransactionSheet (onboarding's balance.js/expense.js, which
-  // insert transactions directly and persist the claim instead of bursting
-  // it immediately — see lib/pendingLoginReward.js). One-shot: the take
-  // call clears the flag as it reads it, so this is a no-op on every mount
-  // after the first that finds one. Deliberately NOT gated on anything else
-  // finishing first (the streak celebration/spin wheel this same first
-  // transaction already triggers are independent, root-mounted, and handle
-  // their own RewardBurst-vs-celebration sequencing already).
-  useEffect(() => {
-    const userId = session?.user?.id;
-    if (!userId) return;
-    takePendingLoginReward(userId).then((reward) => {
-      if (reward) showRewardBurst(reward);
-    });
-  }, [session?.user?.id, showRewardBurst]);
 
   // Signing out while Home is the focused screen sets `session` to null on
   // this same render pass — RootNavigator's redirect to /sign-in is a
   // separate effect that only fires afterward, so there's always at least
-  // one render of Home with no session before it unmounts. Every data hook
-  // above already resets to a safe empty default on session→null, but the
-  // greeting below reads session.user directly and had nothing to fall back
-  // to — getGreeting(name: undefined) stringifies straight into the title
-  // ("Tuesday, undefined"), which is the bug this was reported as. Bailing
-  // out here, all hooks already called, skips deriving from a session that's
-  // mid-teardown instead of papering over it with a fallback name.
+  // one render of Home with no session before it unmounts. Bail out, all
+  // hooks already called, rather than derive from a session mid-teardown.
   if (!session) return null;
 
   // Lit only when there IS a streak. The muted flame on a zero streak is not a
   // failure state — it's the invitation.
   const streakLit = streakCurrent > 0;
-
-  // Every header chip (item stats, level, streak) and the hero carousel
-  // share this same "still loading" gate — folding in !themeHydrated too, not
-  // just each hook's own loading flag, so none of them paint a beat in the
-  // wrong (default, pre-reconciliation) theme colors right before flipping to
-  // the account's real ones. Chips render a Skeleton while true, then a
-  // one-time FadeIn once false — the same pairing everywhere, rather than the
-  // streak chip being the only one with an entrance animation and the others
-  // just popping in with default zero values.
-  const chipsLoading = rewardsLoading || !themeHydrated;
+  // Every loading gate folds in !themeHydrated too, so nothing paints a beat
+  // in the default theme right before flipping to the account's real one.
   const streakChipLoading = streakLoading || !themeHydrated;
-  // Folds summariesLoading in too: the hero card now shows ONE card-shaped
-  // skeleton rather than per-element skeletons inside a real card, so its
-  // numbers being in flight is the same "not ready" state as its accounts
-  // being in flight — one gate, one skeleton.
-  const heroLoading = accountsLoading || summariesLoading || !themeHydrated;
-
-  // Email sign-up no longer asks for a name (35-onboarding-v3.md), so fall
-  // back to the part of the email before the @, not the whole address.
-  const firstName =
-    session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email?.split('@')[0];
-  const initial = firstName?.[0]?.toUpperCase() ?? '?';
-  // Recomputed on every render rather than cached in state — this is a
-  // pure function of the current time, and Home re-renders often enough
-  // (focus, data refetches) that it never gets stuck showing a stale
-  // time-of-day bucket for long. No need for a live-updating clock.
-  const { title: greetingTitle, subtitle: greetingSubtitle } = getGreeting(new Date(), firstName);
+  const heroLoading = accountsLoading || summariesLoading || budgetsLoading || !themeHydrated;
+  const multipleAccounts = accounts.length > 1;
 
   // Global (not account-scoped, per useBills) — overdue/due-soon only, the
-  // same billStatus() threshold the Bills tab and DueBillsModal already use,
-  // not a new window invented for this section. No free dismiss: a row only
-  // leaves this list when the underlying bill is actually paid or skipped
-  // (openPayBill → notifyChanged() → useBills refetches), the same
-  // computed-feed pattern the bell/AlertsSheet already uses app-wide — see
-  // 05-koban-engagement.md's "reward the logging, never the numbers" note for
-  // the same reasoning applied to a different surface. Renders nothing at all
-  // when empty; unlike Recent Transactions, "no bills due" isn't worth
-  // permanent scroll space.
+  // same billStatus() threshold the Bills tab and DueBillsModal already use.
+  // No free dismiss: a row only leaves this list when the bill is actually
+  // paid or skipped. Renders nothing at all when empty.
   const upcomingBills = bills
     .filter((b) => b.is_active && ['overdue', 'due_soon'].includes(billStatus(b.next_due_date)))
     .slice(0, MAX_UPCOMING_BILLS);
@@ -170,130 +109,70 @@ export default function Home() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandStrong} colors={[colors.brandStrong]} />}
       >
+        {/* The calm header (38-home-insights-more.md): which account, or the
+            month when there's only one, then the streak and the bell. */}
         <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            {/* Item stats — coins + freezes, "your stuff". Level moved back
-                out to its own chip (18-gamification-ritual-and-ledger.md
-                Phase 5) — a bare "⭐ 10" folded in here read as unclear (icon
-                alone doesn't say what the number IS, unlike coins/freeze/
-                streak, whose icon already carries the meaning), and adding a
-                "LVL" label to disambiguate needed more room than fit as a
-                third entry in this chip. */}
-            {/* One chip, three counters — coins, freeze, and level (folded in
-                per direct feedback, no longer its own pill). Level shows the
-                user's current rank badge (the same RANK_BADGE_ART the Trophy
-                Room / Menu use) + a bare level number — the badge carries the
-                "this is your rank/level" meaning, so no text label is needed.
-                Whole chip opens Rewards history; the fuller Rank/Level/XP card
-                stays one tap away via the Menu (avatar). */}
-            {/* The coins / freezes / level chip is economy (lib/flags.js). */}
-            {!FLAGS.economy ? null : chipsLoading ? (
-              <Skeleton width={150} height={44} radius={14} />
-            ) : (
-              <FadeIn>
-                <Pressable style={styles.itemStats} onPress={openRewardsHistory}>
-                  <View style={styles.itemStatEntry}>
-                    <Image source={KOBAN_COIN} style={styles.coinIcon} resizeMode="contain" />
-                    <Text style={styles.itemStatText}>{coins.toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.itemStatEntry}>
-                    <Image source={KOBAN_FREEZE} style={styles.freezeIcon} resizeMode="contain" />
-                    <Text style={styles.itemStatText}>{freezes}</Text>
-                  </View>
-                  <View style={styles.itemStatEntry}>
-                    <Image source={RANK_BADGE_ART[rank.id]} style={styles.levelRankBadge} resizeMode="contain" />
-                    <Text style={styles.itemStatText}>{level}</Text>
-                  </View>
-                </Pressable>
-              </FadeIn>
-            )}
-          </View>
+          {multipleAccounts ? (
+            <Pressable
+              style={styles.switcher}
+              onPress={openAccountSwitcher}
+              accessibilityRole="button"
+              accessibilityLabel={`${activeAccount?.name ?? 'Account'}, switch account`}
+            >
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {activeAccount?.name}
+              </Text>
+              <ChevronDown size={20} color={colors.ink} strokeWidth={2.4} />
+            </Pressable>
+          ) : (
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {format(new Date(), 'MMMM')}
+            </Text>
+          )}
           <View style={styles.headerRight}>
-            {/* Duolingo's model: the streak lives in the header, always visible,
-                and it is a DOOR — it opens /streak, where the calendar and the
-                history live. Unlit when today hasn't been logged: that muted
-                flame IS the nudge, and it costs no words.
-                Same Skeleton-while-loading/FadeIn-once-ready pairing as the
-                item-stats and level chips beside it — this was previously the
-                ONLY header chip with an entrance animation (and even then, no
-                skeleton — just absent, shifting headerRight's layout once it
-                popped in). Now all three match. */}
+            {/* The streak is a DOOR — it opens /streak, where the calendar and
+                freezes live. Unlit when nothing is logged yet: that muted
+                flame IS the nudge, and it costs no words. */}
             {streakChipLoading ? (
-              <Skeleton width={58} height={44} radius={14} />
+              <Skeleton width={58} height={hitTarget} radius={14} />
             ) : (
               <FadeIn>
-                <Pressable ref={streakChipRef} style={styles.streakChip} onPress={() => router.push('/streak')}>
-                  {/* Fire orange, not brand lime — see theme/tokens.js. Also the
-                      one warm accent in this header that must NOT be confused with
-                      the bell's red alert dot beside it, which is why it's a true
-                      orange rather than a red. */}
+                <Pressable
+                  ref={streakChipRef}
+                  style={styles.streakChip}
+                  onPress={() => router.push('/streak')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${streakCurrent} day streak`}
+                >
+                  {/* Fire orange, not brand lime, so it never reads as the
+                      bell's red alert dot beside it. */}
                   <Flame
                     size={20}
                     color={streakLit ? colors.streak : colors.mutedLight}
                     fill={streakLit ? colors.streak : 'transparent'}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>
-                    {streakCurrent}
-                  </Text>
+                  <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>{streakCurrent}</Text>
                 </Pressable>
               </FadeIn>
             )}
-            {/* Trophy Room and Shop are economy destinations (lib/flags.js). */}
-            {FLAGS.economy && (
-              <>
-                {/* Trophy Room — moved out of the Menu sheet into the header (per
-                    direct feedback), beside the bell, carrying its own unseen-dot
-                    the same way the bell does its alert dot. */}
-                <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/trophies')}>
-                  <Trophy size={20} color={colors.ink} strokeWidth={2} />
-                  {unclaimedTrophies > 0 && <View style={styles.bellDot} />}
-                </Pressable>
-                {/* Shop — moved out of the Menu sheet into the header (2026-07-26),
-                    grouped with the Trophy button since both are gamification
-                    destinations. */}
-                <Pressable style={styles.headerIconButton} hitSlop={10} onPress={() => router.push('/shop')}>
-                  <ShoppingBag size={20} color={colors.ink} strokeWidth={2} />
-                </Pressable>
-              </>
-            )}
-            <Pressable style={styles.headerIconButton} hitSlop={10} onPress={openAlerts}>
+            <Pressable
+              style={styles.headerIconButton}
+              onPress={openAlerts}
+              accessibilityRole="button"
+              accessibilityLabel={alertCount > 0 ? `Alerts, ${alertCount} new` : 'Alerts'}
+            >
               <Bell size={20} color={colors.ink} strokeWidth={2} />
               {alertCount > 0 && <View style={styles.bellDot} />}
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.welcomeRow}>
-          {/* Avatar hidden for now — just the greeting. The Menu is still
-              reachable from the tab bar's Menu action, so nothing is stranded
-              by this. Styles (avatarWrap/avatar/avatarImage/avatarText) and
-              the useProfile()/Image imports are intentionally left in place
-              for an easy restore.
-          <Pressable onPress={openMenu} style={styles.avatarWrap}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initial}</Text>
-              </View>
-            )}
-          </Pressable>
-          */}
-          <View style={styles.welcomeTextGroup}>
-            <Text style={styles.welcomeTitle}>{greetingTitle}</Text>
-            <Text style={styles.welcomeSubtitle}>{greetingSubtitle}</Text>
-          </View>
-        </View>
-
-        <AccountHeroCarousel
-          accounts={accounts}
-          activeAccountId={activeAccount?.id ?? null}
-          onSwitchAccount={setActiveAccount}
-          onOpenSwitcher={openAccountSwitcher}
-          summaries={summaries}
+        <HomeHero
+          spent={summaries[activeAccount?.id]?.period_expense ?? 0}
+          budget={heroBudget(budgets)}
           currency={currency}
-          cardTheme={FLAGS.economy ? equippedTheme : null}
+          resetPeriod={profile?.reset_period}
           loading={heroLoading}
         />
 
@@ -463,135 +342,35 @@ function makeStyles(colors) {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // lg rather than xl since the avatar came out of welcomeRow below: the row
-    // is the same height either way, but a circular avatar filled that band
-    // visually where two lines of left-aligned text don't, so the old gap
-    // started reading as a hole.
+    gap: spacing.md,
     marginBottom: spacing.lg,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  // "Your stuff" — coins + freeze + level. No chip background/border and no
-  // dividers anymore (both removed per direct feedback); spacing alone groups
-  // the three counters. spacing.lg — the dividers-gone gap:10 read as crowded,
-  // but headerRight's spacing.xl was too loose for this tighter cluster, so it
-  // sits one step under it (per direct feedback).
-  itemStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    gap: spacing.lg,
-  },
-  itemStatEntry: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  // The illustrated coin only fills ~69.3% of its own 1024x1024 source canvas
-  // (measured via its alpha bounding box — it has a soft glow halo baked in,
-  // unlike the mascot art's ~60-80% fill), so the frame has to be sized UP
-  // from the 16px this is standing in for (16 / 0.693 ≈ 23), not set to 16
-  // directly, or the coin renders visibly smaller than its freeze/rank-badge
-  // siblings in this same row despite the frame numbers looking equal.
-  coinIcon: {
-    width: 23,
-    height: 23,
-  },
-  // Frame corrected for the freeze illustration's ~87.6% canvas fill (same
-  // FREEZE_FILL_RATIO measurement used everywhere else this art appears).
-  freezeIcon: {
-    width: 16 / 0.876,
-    height: 16 / 0.876,
-  },
-  // includeFontPadding/textAlignVertical — Android adds extra vertical
-  // padding to Text by default (the same font-metrics quirk fixed elsewhere
-  // in this app, e.g. AddTransactionSheet's amount input); without this, the
-  // text sits low enough against the adjacent icon/coin image that
-  // `alignItems: 'center'` on the row reads as if it were flex-end.
-  itemStatText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    letterSpacing: -0.2,
-    color: colors.ink,
-    textAlignVertical: 'center',
-    includeFontPadding: false,
-  },
-  // The current rank badge shown in place of the old Star, inside the shared
-  // item-stats chip's level entry (per direct feedback). A touch larger than
-  // the 16px sibling icons since illustrated art reads smaller than a flat
-  // glyph at the same box.
-  levelRankBadge: {
-    width: 20,
-    height: 20,
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImage: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-  },
-  // Sits on the theme-accent avatar bg (colors.brand) — colors.brandText
-  // picks legible dark/light text per-accent (theme/themes.js).
-  avatarText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.brandText,
-  },
-  // Greeting only — the avatar that used to lead this row is commented out in
-  // the JSX above (its Menu tap-target is redundant with TabBar's own Menu
-  // button). The row keeps its flexDirection/gap so restoring the avatar is
-  // just an uncomment. Subtitle is lib/greetings.js's real day/time-varied
-  // voice copy — the Money Level metric that once lived beneath it moved to
-  // the Menu sheet (18-gamification-ritual-and-ledger.md), so this stays
-  // exactly what it looks like: the greeting, nothing else.
-  welcomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  welcomeTextGroup: {
-    flexShrink: 1,
-  },
-  welcomeTitle: {
+  headerTitle: {
     fontFamily: fontFamily.extrabold,
     fontSize: fontSize.heading,
     letterSpacing: -0.2,
     color: colors.ink,
+    flexShrink: 1,
   },
-  welcomeSubtitle: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-    marginTop: 2,
+  switcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: hitTarget,
+    flexShrink: 1,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    // sm(8)→lg(16)→xl(20) (per direct feedback, in two passes) — this
-    // cluster reads better looser than itemStats does.
-    gap: spacing.xl,
+    gap: spacing.sm,
   },
-  // Chip background/border removed (per direct feedback) — same bare
-  // treatment as itemStats now.
   streakChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
-    height: 44,
+    minWidth: hitTarget,
+    height: hitTarget,
   },
   streakCount: {
     fontFamily: fontFamily.extrabold,
@@ -604,36 +383,22 @@ function makeStyles(colors) {
   streakCountEmpty: {
     color: colors.mutedLight,
   },
-  // Shared by the trophy + bell header buttons. Bare, content-sized (no
-  // fixed width/background/border, per direct feedback) — same shape
-  // discipline as streakChip now, so headerRight's own `gap` is the ONLY
-  // thing determining spacing between streak/trophy/bell. The old fixed
-  // 44-wide centered box added invisible padding around the 20px icon that
-  // streakChip's intrinsic sizing didn't have, which is what made the
-  // streak↔trophy gap look different from the trophy↔bell gap. `hitSlop`
-  // on the Pressables (not this box) is what keeps the tap target
-  // comfortable now that the visual box shrank to the icon's own size.
   headerIconButton: {
-    height: 44,
+    width: hitTarget,
+    height: hitTarget,
+    alignItems: 'center',
     justifyContent: 'center',
   },
+  // Sits at the bell icon's top-right corner inside the 48dp box.
   bellDot: {
     position: 'absolute',
-    top: 9,
-    // Retuned for headerIconButton's new content-sized (~20px) width — the
-    // old right:9 assumed a 44-wide centered box; same "sits at the icon's
-    // top-right corner" relationship, just recomputed for the narrower box.
-    right: -2,
+    top: 11,
+    right: 11,
     width: 11,
     height: 11,
     borderRadius: radii.pill,
     backgroundColor: colors.rose,
-    // The ring's color needs to MATCH WHATEVER IS BEHIND IT — it used to be
-    // colors.surface because both header buttons sat on a colors.surface
-    // chip; now that those chips are gone (bare icons, per direct feedback),
-    // the real backdrop is the screen itself, so this is colors.bg, not
-    // colors.surface (they differ — #F6F7F3 vs #FFFFFF in Brand light).
-    // Getting this wrong shows a faint mismatched-color halo around the dot.
+    // The ring matches the screen behind it (colors.bg), so no halo shows.
     borderWidth: 2,
     borderColor: colors.bg,
   },

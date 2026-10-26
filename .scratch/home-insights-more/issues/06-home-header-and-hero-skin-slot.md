@@ -30,6 +30,26 @@ The hero renders through a `skin` prop that defaults to the plain emphasis surfa
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-10-26 (Claude):** Built.
+- **Header:**
+  - with 2+ accounts, the active account's name and a chevron open the account switcher;
+  - with one account, the month name;
+  - then the streak chip (opens `/streak`) and the bell;
+  - all are labelled, 48dp targets.
+- **Removed from Home:**
+  - the greeting row;
+  - the coins/freezes/level chip, Trophy and Shop;
+  - the pending login-reward burst;
+  - the card-theme hookup.
+  - `AccountHeroCarousel` and `AccountDots` had no other users and are deleted.
+- **New `components/HomeHero.js`:**
+  - shows the active account's spend for the reset period (`period_expense`), labelled from `profiles.reset_period` ("Spent this month" by default);
+  - adds "₹X left of budget" (or "over budget") only when an overall, still-open budget exists, monthly first.
+- **Skin slot:** `skin` prop resolved through `resolveHeroSkin`, with only `plain` today. The figure always sits on an `emphasisBg` plate with white text.
+- Open (emulator checks paused): one vs two accounts, the budget line appearing and disappearing, light and dark.
