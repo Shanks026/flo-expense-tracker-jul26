@@ -140,7 +140,10 @@ export default function Home() {
   // being in flight — one gate, one skeleton.
   const heroLoading = accountsLoading || summariesLoading || !themeHydrated;
 
-  const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email;
+  // Email sign-up no longer asks for a name (35-onboarding-v3.md), so fall
+  // back to the part of the email before the @, not the whole address.
+  const firstName =
+    session?.user?.user_metadata?.full_name?.split(' ')[0] || session?.user?.email?.split('@')[0];
   const initial = firstName?.[0]?.toUpperCase() ?? '?';
   // Recomputed on every render rather than cached in state — this is a
   // pure function of the current time, and Home re-renders often enough

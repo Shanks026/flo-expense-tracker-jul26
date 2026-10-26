@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,21 +12,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import Button from '../components/Button';
 import ArrowMark from '../components/ArrowMark';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { resolveColors, DEFAULT_ACCENT_ID, DEFAULT_MODE_ID } from '../theme/themes';
 import { useAuth } from '../lib/AuthContext';
-import { getDraft, clearDraft } from '../lib/onboardingDraft';
 
-// The hinge (12-personal-onboarding.md screen 13): the pre-auth intro already
-// asked for a name (screen 4), so a user arriving here with a drafted name
-// should not be asked again — that would read as the app not having listened.
-// Arriving from the intro's reflection screen passes ?mode=signup so this
-// opens straight into sign-up, framed as "save your progress" rather than
-// re-asking "create account" cold.
+// Sign-in, and sign-up behind the opener's "Other options" (?mode=signup,
+// 35-onboarding-v3.md). Sign-up leads with Google; email sign-up asks for
+// email and password only — no name, since the intro no longer asks for one
+// and nothing needs it to set the account up.
 export default function SignIn() {
   // Pinned to the fixed default brand palette, NOT the active theme
   // (useTheme). This is a pre-auth screen: the moment sign-in succeeds,
@@ -43,9 +40,6 @@ export default function SignIn() {
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const params = useLocalSearchParams();
   const [mode, setMode] = useState(params.mode === 'signup' ? 'signup' : 'signin');
-  const [draftName, setDraftName] = useState(null);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -57,25 +51,15 @@ export default function SignIn() {
   // versa) could kick off two concurrent auth attempts racing each other.
   const busy = loading || googleLoading;
 
-  useEffect(() => {
-    getDraft().then((d) => {
-      if (d.name) setDraftName(d.name);
-    });
-  }, []);
-
   const isSignUp = mode === 'signup';
-  const canSubmit = isSignUp
-    ? email && password && (draftName || (firstName.trim() && lastName.trim()))
-    : email && password;
+  const canSubmit = email && password;
 
   async function handleSubmit() {
     setError(null);
     setLoading(true);
     try {
       if (isSignUp) {
-        const fullName = draftName || `${firstName.trim()} ${lastName.trim()}`.trim();
-        await signUp(email.trim(), password, fullName);
-        await discardStaleDraftIfBypassed();
+        await signUp(email.trim(), password);
       } else {
         await signIn(email.trim(), password);
       }
@@ -83,27 +67,6 @@ export default function SignIn() {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  }
-
-  // The pre-auth draft (lib/onboardingDraft.js) is device-scoped, not
-  // user-scoped, and only ever cleared by finish() — so it happily survives an
-  // ABANDONED signup (account deleted, or the app just closed mid-intro).
-  // `?mode=signup` is passed to THIS screen only by reflection.js's legitimate
-  // intro→signup handoff (grep-verified: no other caller sets it) — every
-  // other arrival at sign-up here (RootNavigator's plain `/sign-in` redirect,
-  // once `introSeen` is already true, with its own "Sign Up" toggle) bypassed
-  // the intro entirely. For that bypass case, whatever's in the draft belongs
-  // to a DIFFERENT, unrelated attempt — left uncleared, it silently leaks into
-  // this new account: `budget.js` (Act 2) would create a budget from a leak
-  // category this user never actually chose. Clearing here, right after a
-  // successful signup, closes that gap without touching the legitimate path
-  // (mode === 'signup'), which still needs the draft intact for account.js's
-  // durable-answer flush. Found live — reported as "the created-budget screen
-  // shows even though a budget wasn't created".
-  async function discardStaleDraftIfBypassed() {
-    if (params.mode !== 'signup') {
-      await clearDraft();
     }
   }
 
@@ -116,16 +79,42 @@ export default function SignIn() {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
-      // Same bypass gap as email signup above — a NEW Google account also
-      // never passes through the intro's leak.js, so a stale draft from an
-      // unrelated attempt must not leak into it either.
-      await discardStaleDraftIfBypassed();
     } catch (err) {
       setError(err.message);
     } finally {
       setGoogleLoading(false);
     }
   }
+
+  const divider = (
+    <View style={styles.dividerRow}>
+      <View style={styles.dividerLine} />
+      <Text style={styles.dividerText}>or</Text>
+      <View style={styles.dividerLine} />
+    </View>
+  );
+
+  // Sign-up leads with it (above the email form); sign-in keeps email first.
+  const googleButton = (
+    <Pressable
+      onPress={handleGoogleSignIn}
+      disabled={busy}
+      style={({ pressed }) => [
+        styles.googleButton,
+        busy && styles.googleButtonDisabled,
+        pressed && !busy && styles.googleButtonPressed,
+      ]}
+    >
+      {googleLoading ? (
+        <ActivityIndicator color={colors.ink} />
+      ) : (
+        <>
+          <GoogleIcon />
+          <Text style={styles.googleText}>Continue with Google</Text>
+        </>
+      )}
+    </Pressable>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -138,66 +127,15 @@ export default function SignIn() {
           </View>
 
           <View style={{ height: 20 }} />
-          <Text style={styles.title}>
-            {isSignUp
-              ? draftName
-                ? `Save your progress, ${draftName}.`
-                : 'Create account'
-              : 'Welcome back'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isSignUp && draftName
-              ? 'Everything you just told us gets set up on the other side.'
-              : 'Know where your money flows.'}
-          </Text>
+          <Text style={styles.title}>{isSignUp ? 'Create account' : 'Welcome back'}</Text>
+          <Text style={styles.subtitle}>Know where your money flows.</Text>
 
           <View style={{ height: 40 }} />
 
-          {isSignUp && draftName && (
+          {isSignUp && (
             <>
-              <View style={styles.draftNameRow}>
-                <User size={18} color={colors.mutedMid} strokeWidth={2} />
-                <Text style={styles.draftNameText}>
-                  Signing up as <Text style={styles.draftNameValue}>{draftName}</Text>
-                </Text>
-              </View>
-              <View style={{ height: 16 }} />
-            </>
-          )}
-
-          {isSignUp && !draftName && (
-            <>
-              <View style={styles.nameRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>First name</Text>
-                  <View style={styles.inputRow}>
-                    <User size={18} color={colors.mutedMid} strokeWidth={2} />
-                    <TextInput
-                      value={firstName}
-                      onChangeText={setFirstName}
-                      placeholder="Jacob"
-                      placeholderTextColor={colors.mutedLight}
-                      autoCapitalize="words"
-                      style={styles.input}
-                    />
-                  </View>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Last name</Text>
-                  <View style={styles.inputRow}>
-                    <User size={18} color={colors.mutedMid} strokeWidth={2} />
-                    <TextInput
-                      value={lastName}
-                      onChangeText={setLastName}
-                      placeholder="Joestar"
-                      placeholderTextColor={colors.mutedLight}
-                      autoCapitalize="words"
-                      style={styles.input}
-                    />
-                  </View>
-                </View>
-              </View>
-              <View style={{ height: 16 }} />
+              {googleButton}
+              {divider}
             </>
           )}
 
@@ -261,30 +199,12 @@ export default function SignIn() {
             style={{ backgroundColor: colors.brand }}
           />
 
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <Pressable
-            onPress={handleGoogleSignIn}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.googleButton,
-              busy && styles.googleButtonDisabled,
-              pressed && !busy && styles.googleButtonPressed,
-            ]}
-          >
-            {googleLoading ? (
-              <ActivityIndicator color={colors.ink} />
-            ) : (
-              <>
-                <GoogleIcon />
-                <Text style={styles.googleText}>Continue with Google</Text>
-              </>
-            )}
-          </Pressable>
+          {!isSignUp && (
+            <>
+              {divider}
+              {googleButton}
+            </>
+          )}
 
           <View style={{ flex: 1 }} />
           <Pressable
@@ -351,28 +271,6 @@ function makeStyles(colors) {
     fontSize: fontSize.base,
     color: colors.mutedDarker,
     marginBottom: spacing.sm,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  draftNameRow: {
-    height: 56,
-    borderRadius: radii.buttonSm,
-    backgroundColor: colors.incomeBg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    gap: 10,
-  },
-  draftNameText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.lg,
-    color: colors.mutedDarker,
-  },
-  draftNameValue: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.income,
   },
   inputRow: {
     height: 56,

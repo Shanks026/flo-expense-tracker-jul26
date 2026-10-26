@@ -30,6 +30,23 @@ The intro question screens are no longer reached. The 2a reminder ask follows si
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-10-26: Built.
+  - **Opener** (`app/onboarding/intro/opener.js`): Koban's hello image, the line "Know where your money goes, a few seconds a day.", and Continue with Google as the main button, which calls `signInWithGoogle` straight from the opener.
+    - "Other options" opens `/sign-in?mode=signup`; "Already have an account? Sign in" opens `/sign-in`.
+    - The analytics switch is unchanged.
+    - Nothing calls `getIntroNext` any more, so the intro question screens can't be reached.
+  - **Sign-in screen:**
+    - Sign-up mode shows Google first, then "or", then email and password.
+    - The name fields and the draft-name path are removed. The stale-draft clearing went with them; nothing reads the draft any more.
+    - Sign-in mode is unchanged.
+  - **After Google succeeds:** the session lands, and OnboardingGate sends a new account to the reminder ask and an onboarded one to Home.
+- Code review:
+  - Fixed: Home's greeting now falls back to the part of the email before the @ when there's no `full_name` (email sign-ups no longer send one).
+  - Left: the opener's Google button has no G logo. Email sign-up still shows nothing if Supabase email confirmation is on; that's unchanged, and the test setup skips the email link.
+- Open emulator checks (paused): every acceptance line, plus the look of the opener and of sign-up mode. Only the parse checks were done.
