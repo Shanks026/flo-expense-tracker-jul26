@@ -173,7 +173,7 @@ export default function PersonalizePreview({ colors, cardTheme, style }) {
             </View>
           </View>
 
-          <CardThemeSurface theme={cardTheme} style={styles.heroShape}>
+          <CardThemeSurface key={cardTheme.id} theme={cardTheme} style={styles.heroShape} animate>
             <View style={styles.heroContent}>
               {/* Name + chevron, no leading colour stroke — the real hero card
                   dropped that stroke, and the whole card is the switcher

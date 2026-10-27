@@ -34,6 +34,10 @@ export default function AmountText({
   // themes. Every other AmountText call site omits this and keeps the
   // original computed tone.
   currencyColor,
+  // Replaces the red for a negative amount, number and ₹ alike — for a hero
+  // card skin whose background the app red doesn't read on (spec 43's
+  // Christmas scene). Omitted everywhere else.
+  negativeColor,
   animate = false,
   animateDuration = 1100,
   // Bumping animateKey replays the count from 0 even when `value` is unchanged
@@ -120,7 +124,9 @@ export default function AmountText({
   const shownValue = animate ? display : value;
 
   const color = isNegative
-    ? dark
+    ? negativeColor
+      ? negativeColor
+      : dark
       ? staticColors.dangerStrong
       : colors.danger
     : {

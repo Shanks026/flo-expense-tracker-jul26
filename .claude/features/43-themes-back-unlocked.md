@@ -114,6 +114,45 @@ No database changes. `profiles.equipped_card_theme` and `profiles.theme_accent` 
 
 ---
 
+## Phase 1b — First illustrated skin: Christmas (sample)
+
+### Goal
+A Christmas scene shows up in Personalize next to the other card designs and can be equipped on Home's account card. It's the first test of illustrated, seasonal skins, drawn from `.scratch/skin-samples/christmas-card.svg`.
+
+### Build
+- **New background type `scene`** in `CardThemeSurface`. It renders a named SVG from `lib/cardScenes.js` with `preserveAspectRatio="xMidYMid slice"`, so the art fills any card size without stretching.
+- **`lib/cardScenes.js`:** the Christmas scene as a static SVG string, generated from the sample. It's the sample's settled frame: no CSS, no falling flakes, no mask. react-native-svg can't run CSS animations.
+- **Catalogue entry** `christmas` (tier `seasonal`), placed right after the free themes.
+  - Colours: `textColor` #FFFFFF, a gold `chipColor` and `negativeColor` #FF8F8F.
+- **Skin red for a negative balance:**
+  - Themes can set `negativeColor`. A negative balance uses it in place of the app red, which is 3.2:1 on this green.
+  - `AmountText` gets an optional `negativeColor` prop, so the ₹ takes it too.
+
+### Constraints carried over from the sample
+- Text stays in the left two-thirds.
+- Worst contrast behind text: white 12.7:1, muted 9.6:1, `#FF8F8F` 5.8:1.
+
+### Animation (added 2026-10-27)
+- **Layers:** `lib/cardScenes.js` holds the scene as ordered layers in one 360×180 space, generated from the sample by `.scratch/skin-samples/gen-card-scenes.js`. There are 4 static layers and 7 moving ones: the star's halo, the star, the stable's glow, three bulb groups, the bells and the twinkling sky. `sceneXml` joins them for the static frame.
+- **`components/AnimatedCardScene.js`** puts each moving layer in an `Animated.View` and drives it with Reanimated: pulse (opacity), scale and swing.
+  - Scale and swing turn about a scene point, mapped through the `xMidYMid slice` fit into the card's pixels (`transformOrigin`).
+  - Snow is 34 animated dots that fade out over Home's text areas with a soft edge, the same idea as the sample's mask.
+- **Timing:** everything finishes within about 5 seconds and rests on the finished frame. With Reduce motion on (Reanimated's `useReducedMotion`) nothing moves and no snow falls.
+- **Where it plays:** Home's card and the Personalize preview (`CardThemeSurface animate`). It plays each time its screen comes into focus (`useFocusEffect`), so it replays on every return to Home, and again when you pick it in the preview. Each play is a fresh ~5 seconds with a new snowfall, never a loop (the person's call, 2026-10-27). The grid tiles stay still.
+- **Checked on the phone:** a mid-animation and a settled screenshot of Home.
+
+### Not in this step
+- **A seasonal availability window.** Gating is Phase 2.
+
+### Checklist
+- [x] `scene` background type renders in Personalize's grid and on Home
+- [x] Christmas is listed and can be equipped
+- [ ] A negative balance on the Christmas card uses #FF8F8F, including the ₹
+- [ ] Other themes are unchanged (no `negativeColor` means the app red)
+- [x] Bundle check and phone check (Home, animated and settled)
+
+---
+
 ## Phase 2 — Gating (recommendations, not scheduled)
 
 The person chose "unlock all for now, gate later". The recommendation from 2026-10-27, recorded for when that happens:

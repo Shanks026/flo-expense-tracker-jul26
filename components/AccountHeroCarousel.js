@@ -233,7 +233,7 @@ export default function AccountHeroCarousel({
                       a plain View — a nested Pressable would only shrink the
                       tap target it already covers. */}
                   <Pressable onPress={onOpenSwitcher}>
-                  <CardThemeSurface theme={theme} style={styles.heroCardShape}>
+                  <CardThemeSurface theme={theme} style={styles.heroCardShape} animate>
                     <View style={styles.heroCardContent}>
                       <View style={styles.heroTopRow}>
                         <View style={styles.accountHeading}>
@@ -260,6 +260,8 @@ export default function AccountHeroCarousel({
                         minimumFontScale={0.35}
                         // The card's text colour only for a positive balance: a negative
                         // one keeps AmountText's red all the way through, not just its ₹.
+                        // A skin can supply its own red where the app red doesn't read (spec 43).
+                        negativeColor={theme.negativeColor}
                         style={[styles.heroBalance, summary.in_hand_balance >= 0 && { color: theme.textColor }]}
                       />
                       <View style={styles.heroStatsRow}>

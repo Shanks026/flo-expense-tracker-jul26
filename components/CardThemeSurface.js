@@ -1,6 +1,8 @@
 import { View, StyleSheet } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { radii } from '../theme/tokens';
+import { CARD_SCENES } from '../lib/cardScenes';
+import AnimatedCardScene from './AnimatedCardScene';
 
 // Renders a card theme's background (solid / linear-gradient / pattern) with
 // `children` layered on top — same children-on-top-of-background shape
@@ -163,7 +165,10 @@ function buildPatternSvg({ kind, line, accent, accent2, accent3, colors, angle }
 // this same container would leave the background overlay short of the
 // card's real edges. Give `children` their own padded wrapper instead (see
 // AccountHeroCarousel's `heroCardContent`).
-export default function CardThemeSurface({ theme, style, children }) {
+// `animate` lets an illustrated scene move once, then settle (the Home card
+// and the Personalize preview). Everywhere else, and for every other theme,
+// it's ignored.
+export default function CardThemeSurface({ theme, style, children, animate = false }) {
   const bg = theme.background;
 
   return (
@@ -173,6 +178,16 @@ export default function CardThemeSurface({ theme, style, children }) {
           <SvgXml xml={buildLinearSvg(bg)} width="100%" height="100%" />
         </View>
       )}
+      {/* An illustrated scene (spec 43, Phase 1b): SVG layers that fill the
+          card without stretching, animated or as one static frame. */}
+      {bg.type === 'scene' && CARD_SCENES[bg.scene] &&
+        (animate ? (
+          <AnimatedCardScene sceneId={bg.scene} />
+        ) : (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <SvgXml xml={CARD_SCENES[bg.scene].sceneXml} width="100%" height="100%" />
+          </View>
+        ))}
       {bg.type === 'pattern' && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <SvgXml xml={buildPatternSvg(bg)} width="100%" height="100%" />
