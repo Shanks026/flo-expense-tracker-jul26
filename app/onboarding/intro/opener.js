@@ -27,7 +27,9 @@ export default function Opener() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { showToast } = useToast();
-  const { signInWithGoogle } = useAuth();
+  // Google sign-in parked 2026-10-27: email only for now. Uncomment this,
+  // handleGoogle and the Google primary below to bring it back.
+  // const { signInWithGoogle } = useAuth();
   const { consent, setConsent } = useAnalyticsConsent();
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -48,17 +50,17 @@ export default function Opener() {
   // A backed-out browser sheet returns normally (AuthContext), so only a real
   // failure shows. On success there's nothing to do here: the session lands,
   // RootNavigator marks the intro seen, and OnboardingGate routes the user.
-  async function handleGoogle() {
-    setGoogleLoading(true);
-    trackStepViewed('auth');
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      showToast({ message: err.message, variant: 'error' });
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
+  // async function handleGoogle() {
+  //   setGoogleLoading(true);
+  //   trackStepViewed('auth');
+  //   try {
+  //     await signInWithGoogle();
+  //   } catch (err) {
+  //     showToast({ message: err.message, variant: 'error' });
+  //   } finally {
+  //     setGoogleLoading(false);
+  //   }
+  // }
 
   async function goToSignIn(mode) {
     await setIntroSeen();
@@ -74,11 +76,14 @@ export default function Opener() {
           <Text style={styles.value}>Know where your money goes, a few seconds a day.</Text>
         </View>
       }
-      primaryLabel="Continue with Google"
-      onPrimary={handleGoogle}
-      primaryLoading={googleLoading}
-      secondaryLabel="Other options"
-      onSecondary={() => goToSignIn('signup')}
+      // Google parked: email sign-up is the main button.
+      // primaryLabel="Continue with Google"
+      // onPrimary={handleGoogle}
+      // primaryLoading={googleLoading}
+      // secondaryLabel="Other options"
+      // onSecondary={() => goToSignIn('signup')}
+      primaryLabel="Create account"
+      onPrimary={() => goToSignIn('signup')}
       footerNote={
         <Pressable style={styles.link} onPress={() => goToSignIn('signin')} disabled={googleLoading}>
           <Text style={styles.linkText}>

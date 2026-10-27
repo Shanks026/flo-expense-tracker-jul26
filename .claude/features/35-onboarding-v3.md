@@ -109,3 +109,9 @@ Then Home, where 1–2 coach marks replace the tour. Everything else is defaulte
 
 - This supersedes the July 2026 deferral ("trim onboarding only after feature 28 ships").
 - Google OAuth's consent screen must be "In production" before the closed test, or unlisted testers can't sign in (closed-test ticket).
+
+## Revised after the first phone check (2026-10-27)
+
+- **Google sign-in is parked.** Email only for now. The Google buttons are commented out in `app/onboarding/intro/opener.js` and `app/sign-in.js`; `signInWithGoogle` stays in AuthContext, so uncommenting brings it back.
+- **The opener's main button is "Create account"**, which opens sign-up mode. "Other options" is gone, and "Already have an account? Sign in" stays.
+- **The analytics switch left the opener.** It's now a one-time ask after the 3rd expense (33-product-analytics.md, same date).

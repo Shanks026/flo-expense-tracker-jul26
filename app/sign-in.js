@@ -143,12 +143,13 @@ export default function SignIn() {
 
           <View style={{ height: 40 }} />
 
+          {/* Google sign-in parked 2026-10-27: email only for now.
           {isSignUp && (
             <>
               {googleButton}
               {divider}
             </>
-          )}
+          )} */}
 
           <Text style={styles.label}>Email</Text>
           <View style={styles.inputRow}>
@@ -210,12 +211,13 @@ export default function SignIn() {
             style={{ backgroundColor: colors.brand }}
           />
 
+          {/* Google sign-in parked 2026-10-27.
           {!isSignUp && (
             <>
               {divider}
               {googleButton}
             </>
-          )}
+          )} */}
 
           <View style={{ flex: 1 }} />
           <Pressable
