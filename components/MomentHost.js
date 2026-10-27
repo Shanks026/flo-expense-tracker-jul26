@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useActiveMoment, finishMoment } from '../lib/momentQueue';
 import { DueBillsMoment } from './DueBillsModal';
 import { StreakCelebrationMoment } from './StreakCelebration';
+import { ShareUsageMoment } from './ShareUsageAsk';
 import { useToast } from './Toast';
 
 // An ambient moment: a toast (payload = showToast's options), shown and
@@ -23,6 +24,7 @@ function ToastMoment({ payload, onDone }) {
 const RENDERERS = {
   'bills-due': DueBillsMoment,
   streak: StreakCelebrationMoment,
+  'share-usage': ShareUsageMoment,
   toast: ToastMoment,
 };
 

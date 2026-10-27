@@ -92,6 +92,8 @@ export default function Opener() {
         </Pressable>
       }
     >
+      {/* Analytics opt-in removed from the opener 2026-10-27: it felt like a
+          hurdle before sign-up. The choice lives in Settings → Data & export.
       <View style={styles.consentRow}>
         <Text style={styles.consentText}>Share anonymous usage to help improve FLO</Text>
         <Switch
@@ -102,7 +104,7 @@ export default function Opener() {
           thumbColor={colors.surface}
           accessibilityLabel="Share anonymous usage to help improve FLO"
         />
-      </View>
+      </View> */}
     </OnboardingScreen>
   );
 }

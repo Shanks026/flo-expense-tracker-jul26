@@ -32,6 +32,7 @@ import PendingInviteHandler from '../components/PendingInviteHandler';
 import { AddBillSheetProvider } from '../components/AddBillSheet';
 import { PayBillSheetProvider } from '../components/PayBillSheet';
 import DueBillsSource from '../components/DueBillsModal';
+import ShareUsageSource from '../components/ShareUsageAsk';
 import MomentHost from '../components/MomentHost';
 import { loadMomentsFor, setMomentBlocker, startMomentSession } from '../lib/momentQueue';
 import StreakCelebrationSource from '../components/StreakCelebration';
@@ -516,6 +517,7 @@ function RootNavigator() {
                                     <DetectedTransactionHandler />
                                     <MomentQueueSync />
                                     <DueBillsSource />
+                                    <ShareUsageSource />
                                     <MomentHost />
                                     <StreakCelebrationSource />
                                     <StreakFreezeSync />

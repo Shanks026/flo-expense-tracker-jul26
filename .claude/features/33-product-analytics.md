@@ -123,3 +123,12 @@ A first-party event pipeline inside Supabase:
 - Opt-in will undercount the funnel. Accept it, and compare consenting cohorts with each other, not with installs.
 - **Play Data safety:** declare "App interactions" as collected, **optional**, purpose Analytics, not shared (App content ticket).
 - Whether an anonymous install id counts as personal data is unresolved. This design avoids the question by sending nothing before consent.
+
+## Revised after the first phone check (2026-10-27)
+
+- **The opt-in left the opener.** On the phone the switch felt like a hurdle before sign-up, so it's commented out in `app/onboarding/intro/opener.js`.
+- **A one-time ask replaces it** (`components/ShareUsageAsk.js`). Once the account has 3 expenses and consent is off, `ShareUsageSource` enqueues a `share-usage` takeover on the moment queue at ambient priority, so bills and celebrations go first. `ShareUsageMoment` shows Koban, "Help improve FLO?", Share usage and Not now.
+  - Either answer is remembered per user in AsyncStorage (`flo.shareUsageAsk.<userId>`), because the queue's capped `doneIds` would eventually drop the id and ask again.
+  - If consent is turned on in Settings while the moment waits, it's skipped.
+- **The Settings switch is unchanged** (Data & export).
+- **Cost:** consent is now always off during onboarding, so `analytics.onboarding_funnel` and the pre-sign-in queue get almost no rows. Usage after the yes is still recorded.
