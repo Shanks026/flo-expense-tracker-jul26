@@ -1,33 +1,29 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { format } from 'date-fns';
-import { Plus, CircleCheck } from 'lucide-react-native';
 import Card from './Card';
 import Button from './Button';
 import Koban from './koban/Koban';
-import { fontFamily, spacing, type, hitTarget } from '../theme/tokens';
+import { useToast } from './Toast';
+import { fontFamily, spacing, type } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useDayState from '../hooks/useDayState';
 import { markNoSpend } from '../lib/streakMarks';
 import { track } from '../lib/track';
 import { useDataRefresh } from '../lib/DataRefreshContext';
-import { useAddTransactionSheet } from './AddTransactionSheet';
 
-const STATE_COPY = {
-  logged: { title: 'Logged today', mood: 'happy' },
-  nospend: { title: 'No spend today', mood: 'content' },
-  open: { title: 'Nothing logged yet today', mood: 'neutral' },
-};
-
-// Today's habit in one strip (38-home-insights-more.md), all day rather than
-// only in the evening: whether today is covered, + Log, and the no-spend mark
-// (34-streak-only.md) while the day is still open. A small Koban keeps it warm.
-export default function TodayStrip() {
+// Home's nudge while today is still open (replaces spec 38's all-day Today
+// strip, on the person's call, 2026-10-27). It shows each day only until
+// something is logged or the day is marked no-spend, then goes away. Logging
+// is the tab bar's +, so this card's one action is the no-spend mark
+// (34-streak-only.md), which has no other home. Hidden while the day's state
+// loads, so it never flashes on a day that's already covered.
+export default function NothingLoggedCard() {
   const { colors, modeId } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { state, loading } = useDayState();
   const { notifyChanged } = useDataRefresh();
-  const { openAdd } = useAddTransactionSheet();
+  const { showToast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [declaring, setDeclaring] = useState(false);
 
@@ -36,48 +32,35 @@ export default function TodayStrip() {
     const { error, isNew } = await markNoSpend(format(new Date(), 'yyyy-MM-dd'));
     setDeclaring(false);
     setConfirmOpen(false);
-    if (error) return;
+    if (error) {
+      showToast({ message: "Couldn't mark today. Try again.", variant: 'error' });
+      return;
+    }
     notifyChanged();
     if (isNew) track('no_spend_marked');
+    showToast({ message: 'No spend today. Your streak is safe.' });
   }
 
-  const copy = STATE_COPY[loading ? 'open' : state] ?? STATE_COPY.open;
-  const covered = !loading && state !== 'open';
+  if (loading || state !== 'open') return null;
 
   return (
     <>
       <Card style={styles.card}>
         <View style={styles.row}>
-          <Koban size={44} mood={copy.mood} surface={modeId} accessibilityLabel="Koban" />
-          <View style={styles.textWrap}>
-            <View style={styles.titleRow}>
-              {covered && <CircleCheck size={18} color={colors.brandStrong} strokeWidth={2.4} />}
-              {/* Blank while the day's state loads, rather than briefly
-                  claiming nothing is logged. */}
-              <Text style={styles.title} accessibilityRole="header">
-                {loading ? '' : copy.title}
-              </Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.actions}>
-          <Pressable
-            style={styles.logButton}
-            onPress={() => openAdd()}
-            accessibilityRole="button"
-            accessibilityLabel="Log a transaction"
-          >
-            <Plus size={18} color={colors.brandText} strokeWidth={2.6} />
-            <Text style={styles.logText}>Log</Text>
-          </Pressable>
-          {!loading && state === 'open' && (
+          <View style={styles.body}>
+            <Text style={styles.title} accessibilityRole="header">
+              Nothing logged yet today
+            </Text>
+            <Text style={styles.subtitle}>Spent nothing? Mark it and your streak keeps going.</Text>
             <Button
               title="No spend today"
               onPress={() => setConfirmOpen(true)}
               variant="outline"
               style={styles.noSpendButton}
             />
-          )}
+          </View>
+          {/* Stands on the card's bottom edge, wondering. */}
+          <Koban size={84} pose="hmm" surface={modeId} style={styles.koban} accessibilityLabel="Koban" />
         </View>
       </Card>
 
@@ -102,48 +85,39 @@ export default function TodayStrip() {
 function makeStyles(colors) {
   return StyleSheet.create({
     card: {
-      marginBottom: spacing.lg,
+      marginBottom: spacing.md,
+      // Koban sits on the bottom edge, so the card's own bottom padding
+      // goes; the text column keeps its breathing room instead.
+      paddingBottom: 0,
     },
     row: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-end',
       gap: spacing.md,
     },
-    textWrap: {
+    body: {
       flex: 1,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
+      paddingBottom: spacing.lg,
     },
     title: {
       fontFamily: fontFamily.extrabold,
       fontSize: type.bodyLg,
       color: colors.ink,
     },
-    actions: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: spacing.md,
-    },
-    logButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.xs,
-      minHeight: hitTarget,
-      paddingHorizontal: spacing.xl,
-      borderRadius: 14,
-      backgroundColor: colors.brand,
-    },
-    logText: {
-      fontFamily: fontFamily.extrabold,
+    subtitle: {
+      fontFamily: fontFamily.semibold,
       fontSize: type.body,
-      color: colors.brandText,
+      lineHeight: 20,
+      color: colors.muted,
+      marginTop: spacing.xs,
     },
     noSpendButton: {
-      flex: 1,
+      alignSelf: 'flex-start',
+      paddingHorizontal: spacing.xl,
+      marginTop: spacing.md,
+    },
+    koban: {
+      marginRight: -spacing.xs,
     },
     overlay: {
       flex: 1,

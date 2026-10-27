@@ -190,3 +190,21 @@ Code for tickets 01–09 (`.scratch/home-insights-more/`) is in, `1fbd606`..`607
   - **Privacy policy URL.** The row is hidden until `PRIVACY_POLICY_URL` in `lib/about.js` is set; no hosted policy exists yet.
   - **Merchant titles.** No merchant is stored (spec 40), so only a note titles a Home row.
   - **Review cleanups skipped:** plans still fetched while flagged off; Insights always fetches all accounts; the account free-limit gate is duplicated in `accounts.js` and `AccountSwitcherSheet`; dead `info`/`report` styling in `AlertsSheet`; `fetchAllTransactions` is a read living in `lib/`.
+
+## Revised after the first phone check (2026-10-27)
+
+The person checked Home on a physical phone (vivo I2220, Android 16) and changed two Home decisions. These supersede the Home parts of "As built" above.
+
+- **Hero:** `AccountHeroCarousel` and `AccountDots` are back (restored from `eb800ba^`), replacing `HomeHero`. The card shows the account name with the switcher, In Hand, and this period's Income and Expenses, and it swipes between accounts, with the "Add another account" slide when there's only one.
+  - Card themes stay off with the economy flag (`cardTheme={null}`). With no card theme, the hero takes `colors.emphasisBg` instead of Ink's fixed `#101010`, so in dark mode it matches every other Home card.
+  - The dots have even space above and below (`spacing.md`), so they no longer sit on the next card's edge.
+  - The header always shows the month, because the card carries the switcher.
+  - **The skin slot went with `HomeHero`.** `CardThemeSurface` already renders a theme behind the card, so the seasonal Store's skins can go through it; the fixed-contrast plate rule still has to be added then.
+- **Today strip → `NothingLoggedCard`:** the all-day strip and its + Log are gone, because the tab bar's + is the one way to log.
+  - The new card shows each day only while today is open (`useDayState` → `open`), and it's hidden while that loads. It goes away once something is logged or the day is marked no-spend.
+  - Its one action is **No spend today**, with the same confirm ("Nothing at all today, including cash?") and a toast after.
+  - Layout: title and one line on the left with the button under them; Koban (84, `hmm` pose) stands on the card's bottom edge on the right.
+- **Fixes found on the same check:**
+  - The Add sheet's Save footer and scroll end add `insets.bottom`, so Save clears a 3-button nav bar under Android's edge-to-edge drawing.
+  - `CoachMark` measures with `measure` (page coordinates), not `measureInWindow`, which on Android takes the status bar off y and put the ring one status bar above the + button. The bubble is placed against the Modal's own measured height.
+  - `modules/flo-notification-listener/android/build.gradle` uses the `expo-module-gradle-plugin` form; the legacy `apply from: ExpoModulesCorePlugin.gradle` fails on Gradle 8.14 (same fix as `scripts/patch-expo-share-intent.js`).

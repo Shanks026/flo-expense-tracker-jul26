@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Receipt, ArrowLeftRight, Users, Flame, ChevronDown } from 'lucide-react-native';
+import { Bell, Receipt, ArrowLeftRight, Users, Flame } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -12,8 +12,8 @@ import IncomeExpenseChart from '../../components/IncomeExpenseChart';
 import Pill from '../../components/Pill';
 import Skeleton from '../../components/Skeleton';
 import FadeIn from '../../components/FadeIn';
-import HomeHero from '../../components/HomeHero';
-import TodayStrip from '../../components/TodayStrip';
+import AccountHeroCarousel from '../../components/AccountHeroCarousel';
+import NothingLoggedCard from '../../components/NothingLoggedCard';
 import CoachMark from '../../components/CoachMark';
 import useStreak from '../../hooks/useStreak';
 // Static palette (theme/tokens) only for danger/warn, which are the same in both modes.
@@ -23,9 +23,7 @@ import { useAuth } from '../../lib/AuthContext';
 import useAllAccountSummaries from '../../hooks/useAllAccountSummaries';
 import useTransactions from '../../hooks/useTransactions';
 import useSpendingTrend from '../../hooks/useSpendingTrend';
-import useProfile from '../../hooks/useProfile';
 import useBills, { billStatus } from '../../hooks/useBills';
-import useBudgets from '../../hooks/useBudgets';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
@@ -33,7 +31,6 @@ import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { isTransfer, transferLabel } from '../../lib/transfers';
 import { isSettlement, settlementLabel } from '../../lib/settlements';
-import { isBudgetEnded } from '../../lib/budgets';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
@@ -47,13 +44,6 @@ const UPCOMING_BILL_STYLES = {
 const MAX_UPCOMING_BILLS = 4;
 const RECENT_COUNT = 5;
 
-// The overall budget (no category) the hero reports against: one whose window
-// is still open, a monthly one first since the hero speaks in months.
-function heroBudget(budgets) {
-  const open = budgets.filter((b) => !b.category_id && !isBudgetEnded(b));
-  return open.find((b) => b.period_type === 'calendar_month') ?? open[0] ?? null;
-}
-
 export default function Home() {
   const { colors, hydrated: themeHydrated } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -61,11 +51,9 @@ export default function Home() {
   const router = useRouter();
   const { transactions, loading: transactionsLoading } = useTransactions({ limit: RECENT_COUNT });
   const { data: trendData, loading: trendLoading } = useSpendingTrend('7d');
-  const { profile } = useProfile();
   const { openAdd } = useAddTransactionSheet();
-  const { activeAccount, accounts, loading: accountsLoading } = useAccount();
+  const { activeAccount, accounts, setActiveAccount, loading: accountsLoading } = useAccount();
   const { summaries, loading: summariesLoading } = useAllAccountSummaries();
-  const { budgets, loading: budgetsLoading } = useBudgets();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
   const { count: alertCount } = useAlerts();
@@ -89,8 +77,7 @@ export default function Home() {
   // Every loading gate folds in !themeHydrated too, so nothing paints a beat
   // in the default theme right before flipping to the account's real one.
   const streakChipLoading = streakLoading || !themeHydrated;
-  const heroLoading = accountsLoading || summariesLoading || budgetsLoading || !themeHydrated;
-  const multipleAccounts = accounts.length > 1;
+  const heroLoading = accountsLoading || summariesLoading || !themeHydrated;
 
   // Global (not account-scoped, per useBills) — overdue/due-soon only, the
   // same billStatus() threshold the Bills tab and DueBillsModal already use.
@@ -115,26 +102,12 @@ export default function Home() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandStrong} colors={[colors.brandStrong]} />}
       >
-        {/* The calm header (38-home-insights-more.md): which account, or the
-            month when there's only one, then the streak and the bell. */}
+        {/* The month, then the streak and the bell. Which account is on the
+            hero card itself, which carries the switcher. */}
         <View style={styles.headerRow}>
-          {multipleAccounts ? (
-            <Pressable
-              style={styles.switcher}
-              onPress={openAccountSwitcher}
-              accessibilityRole="button"
-              accessibilityLabel={`${activeAccount?.name ?? 'Account'}, switch account`}
-            >
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {activeAccount?.name}
-              </Text>
-              <ChevronDown size={20} color={colors.ink} strokeWidth={2.4} />
-            </Pressable>
-          ) : (
-            <Text style={styles.headerTitle} accessibilityRole="header">
-              {format(new Date(), 'MMMM')}
-            </Text>
-          )}
+          <Text style={styles.headerTitle} accessibilityRole="header">
+            {format(new Date(), 'MMMM')}
+          </Text>
           <View style={styles.headerRight}>
             {/* The streak is a DOOR — it opens /streak, where the calendar and
                 freezes live. Unlit when nothing is logged yet: that muted
@@ -174,15 +147,22 @@ export default function Home() {
           </View>
         </View>
 
-        <HomeHero
-          spent={summaries[activeAccount?.id]?.period_expense ?? 0}
-          budget={heroBudget(budgets)}
+        {/* The account card: In hand, with this period's income and expenses,
+            swiping between accounts (restored over spec 38's spend-only hero
+            on the person's call, 2026-10-27). Card themes stay with the
+            economy flag. */}
+        <AccountHeroCarousel
+          accounts={accounts}
+          activeAccountId={activeAccount?.id ?? null}
+          onSwitchAccount={setActiveAccount}
+          onOpenSwitcher={openAccountSwitcher}
+          summaries={summaries}
           currency={currency}
-          resetPeriod={profile?.reset_period}
+          cardTheme={null}
           loading={heroLoading}
         />
 
-        <TodayStrip />
+        <NothingLoggedCard />
 
         {/* This week at a glance: 7 days, no range toggle. The whole card
             opens Insights on Week. */}
@@ -354,13 +334,6 @@ function makeStyles(colors) {
     fontSize: fontSize.heading,
     letterSpacing: -0.2,
     color: colors.ink,
-    flexShrink: 1,
-  },
-  switcher: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: hitTarget,
     flexShrink: 1,
   },
   headerRight: {
