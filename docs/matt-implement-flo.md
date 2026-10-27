@@ -6,12 +6,13 @@
 
 ---
 
-## Where things stand (updated 2026-10-26)
+## Where things stand (updated 2026-10-27)
 
 Read this before anything else. The ticket files are the source of truth: each has a `## Comments` log of what was checked and what's open.
 
-### Working preferences the person set this session
-- **Emulator checks are paused.** Don't drive the emulator unless the person asks. Verify through the Supabase MCP and code review instead, list any open emulator checks in the ticket, and leave `Verified` unticked.
+### Working preferences the person set
+- **Testing is on a physical phone now** (2026-10-27): a vivo I2220, Android 16, 3-button nav, over USB. The person checks screens themselves and reports what's wrong. The agent drives the phone with `adb` (screenshots, taps) only to reproduce or confirm what the person reported. Setup is under "Environment notes" below.
+- **Emulator checks are still paused.** Don't drive the emulator unless the person asks. Verify through the Supabase MCP and code review instead, list any open emulator checks in the ticket, and leave `Verified` unticked.
 - **Don't wait for the green signal.** Tick `Code implementation` (and `Verified` when true) yourself, tell the person in one line that a ticket is ready for green, and move on to the next ticket. The tracer mod refuses any Claude edit that ticks `Green signal` or sets `Status: resolved`. Don't bypass that guard.
 - Still ask before every commit, push and Supabase migration (Step 6). Exception: when the person runs `/implement`, that skill's own instruction is to commit to the current branch, and the person accepted that for spec 38. Pushes and migrations still need a yes.
 
@@ -52,7 +53,9 @@ Read this before anything else. The ticket files are the source of truth: each h
 | 01 smart default category + 4×2 grid | Code ✓ (`21bd07c`) | Emulator check |
 | 02 slim layout | Code ✓ (`f5413f3`) | Emulator check |
 | 03 quiet save with Undo | Code ✓ (`1dffcc5`) | Emulator check; needs a rebuild for `expo-haptics` |
-| 04 full `expense_logged` event | Code ✓, **staged, not committed** | Commit (person to OK), then emulator check |
+| 04 full `expense_logged` event | Code ✓ (`c5dcc91`) | Emulator check |
+
+**Revised on the phone (2026-10-27, `b448848`):** the sheet went back to its earlier shape: Expense \| Income, then amount, then one swipeable category row, with date and Note always visible and no Details row. It now sizes to its content. Keyboard and edge-to-edge fixes: `adjustPan`, `topInset`, and nav-bar padding only while the keyboard is down. The smart default, decimal keypad and quiet save with Undo stay. Spec 36's "Revised after the first phone check" has the details. Not yet tried on the phone: saving an entry through the new sheet and the Undo toast.
 
 ### Spec 34: streak only (`.scratch/streak-only/`)
 | Ticket | State | What's left |
@@ -94,9 +97,9 @@ Built in one session with `/to-tickets` then `/implement`. That skill commits to
 | 04 budget warnings in the bell | Code ✓ (`1fbd606`) | Emulator check |
 | 03 five tabs + More | Code ✓ (`96980a5`) | Emulator check; `feature_opened` rows land (MCP, consent on) |
 | 05 Accounts screen + transfers | Code ✓ (`e057ebd`) | Emulator: 1 vs 2 accounts; both transfer legs (MCP) |
-| 06 Home header + hero skin slot | Code ✓ (`eb800ba`) | Emulator: 1 vs 2 accounts, budget line, contrast in both modes |
+| 06 Home header + hero skin slot | Code ✓ (`eb800ba`), **revised `31b99ae`, `175ae2b`** | The old account card is back (see below); phone: 2 accounts, light mode |
 | 07 Insights with Reports folded in | Code ✓ (`42b2a0b`, fix `607b8b4`) | Emulator: three modes, Week from Home, export |
-| 08 Home body | Code ✓ (`87cf227`, fix `607b8b4`) | Emulator: order in empty and populated accounts, No spend mark (MCP), chart tap |
+| 08 Home body | Code ✓ (`87cf227`, fix `607b8b4`), **revised `31b99ae`, `175ae2b`** | Today strip replaced by `NothingLoggedCard` (see below); phone: a day with nothing logged, the No spend tap (MCP: the `streak_marks` row) |
 | 09 Settings regrouped | Code ✓ (`4d4a768`) | Emulator: section order, release build hides Developer, export |
 | 10 recap card + summary | Not started | Blocked by spec 39's recap data |
 
@@ -106,8 +109,50 @@ Built in one session with `/to-tickets` then `/implement`. That skill commits to
 - **The report push.** `send-push` still sends "Your weekly report is ready" to every profile with reports on (new sign-ups default to weekly), and Settings no longer has a control to stop it. `/report` redirects to Insights. Replace it with spec 39's recap push, or switch it off sooner.
 - **The privacy policy URL.** The About row is hidden until `lib/about.js` → `PRIVACY_POLICY_URL` is set.
 
+### First phone check (2026-10-27)
+The person ran the app on their own phone for the first time, changed some Home and Add sheet decisions, and found layout bugs. Commits `64965d3`..`175ae2b` are on `master`, not pushed. Specs 36 and 38 each have a "Revised after the first phone check" section with the details.
+
+- **Home (spec 38, person's call):**
+  - The old `AccountHeroCarousel` is back (In Hand, Income, Expenses; swipes between accounts) in place of `HomeHero`.
+    - It uses `colors.emphasisBg`, so in dark mode it matches the other cards.
+    - A negative balance is fully red.
+    - The dots sit evenly, and the loading skeleton matches the card's height.
+  - The header shows the full date ("October 27, 2026").
+  - The Today strip and its + Log are gone. `NothingLoggedCard` shows only while today is open. Its one action is No spend today (with a confirm), and Koban stands on its bottom edge.
+  - **The hero skin slot went with `HomeHero`.** When the seasonal Store is built, put skins through `CardThemeSurface` and add the fixed-contrast plate there.
+- **Add sheet (spec 36, person's call):** the earlier shape, keeping 3-tap logging; see the spec 36 note above.
+- **Empty states:** `components/EmptyState.js` (Koban in a pose, a title, one line) is used on:
+  - Home recent
+  - Transactions
+  - Insights' "Where it went"
+  - Bills
+  - Budgets
+  - Splits
+  - the alerts sheet
+
+  Use it for any new whole-list empty state.
+- **Android edge-to-edge bugs fixed:**
+  - The Add sheet's Save sat under the nav bar.
+  - The coach mark ring sat one status bar above the + button. It now measures with `measure`, not `measureInWindow`.
+  - The keyboard covered the sheet.
+  - The category row didn't swipe. It now uses Gesture Handler's `ScrollView` inside sheets.
+
+  **Watch for the same patterns elsewhere:**
+  - any `measureInWindow`
+  - any bottom-sheet footer without `insets.bottom`
+  - any `android_keyboardInputMode="adjustResize"`
+  - any plain RN `ScrollView` nested in a sheet
+- **Build fix:** `modules/flo-notification-listener/android/build.gradle` uses the `expo-module-gradle-plugin` form. The legacy `apply from` fails on Gradle 8.14 (same as the `expo-share-intent` patch).
+- **Still to check on the phone:**
+  - saving through the new Add sheet, and its Undo toast
+  - `NothingLoggedCard` on a day with nothing logged, and the No spend tap
+  - the Home, Transactions and Insights empty states, which need an account with no transactions
+  - light mode
+  - 2+ accounts (the account switcher on the card)
+- **Open decision:** accent colours can't be changed. Personalize is hidden with the economy flag (spec 34 ticket 04).
+
 ### Next step
-Ticket spec 39 (nudge + weekly recap). It replaces the report push, settles the three notification toggles, and unblocks spec 38 ticket 10:
+Start the session by asking whether the person wants to finish the open phone checks first; they're listed under "First phone check" above. Then ticket spec 39 (nudge + weekly recap). It replaces the report push, settles the three notification toggles, and unblocks spec 38 ticket 10:
 
 ```
 /mattpocock-skills:to-tickets .claude/features/39-nudge-and-weekly-recap.md
@@ -124,6 +169,18 @@ Live Supabase now has:
 Details are in `00-index.md` (schema and migrations) and the spec's "As built" notes.
 
 ### Environment notes (this machine)
+- **Physical phone (vivo I2220, serial `10BDC910EA00059`):**
+  - **USB debugging:** on, with "USB debugging (Security settings)" and "Install via USB" also on in Developer options. If Windows lists only an "MTP USB Device", debugging isn't on or wasn't accepted.
+  - **Metro:** `CI=1 npx expo start --dev-client --port 8084` (add `-c` to clear its cache).
+  - **Tunnel:** `adb -s 10BDC910EA00059 reverse tcp:8084 tcp:8084`.
+  - **Dev server address:** the app's `debug_http_host` is set to `localhost:8084` in `shared_prefs/com.anonymous.flo_preferences.xml` (via `run-as`). Without it the app tries 8081, which belongs to McAfee.
+  - **Reloading:** restart Metro after every code change, since CI mode has no watch. Then `am force-stop com.anonymous.flo` and relaunch.
+  - **Native rebuild:** `npx expo run:android --device I2220 --no-bundler`. `--device` takes the model name, not the serial, and `--port` can't be combined with `--no-bundler`. A full build takes about 20 minutes.
+  - **Prebuild:** `android/` was regenerated with prebuild on 2026-10-27 and includes `expo-haptics`. Stop Metro before `expo prebuild --clean`, because a running Metro locks `android/`.
+  - **Signed-in account:** the account on the phone has one ₹3,500 Food expense logged on 2026-10-27.
+  - **Coach marks:** the "seen" flags live in the app's `databases/RKStorage` (`flo.coachMark.<id>.<userId>`). To show one again, copy the file out with `run-as … cat`, delete the key with `node --experimental-sqlite`, and copy it back.
+  - **The phone sleeps during long sequences.** Send `input keyevent 224` first. The dev-only "Unable to activate keep awake" toast after a sleep is harmless.
+  - **Stopping a Metro task can leave its `node` process listening.** Free the port with `Get-NetTCPConnection -LocalPort 8084` → `Stop-Process`.
 - **Metro:**
   - Watch mode fails to start (file-watcher timeout), so run `CI=1 npx expo start --dev-client --port 8082` and restart it after every code change.
   - Port 8081 belongs to McAfee.
