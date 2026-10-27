@@ -1135,8 +1135,6 @@ function makeStyles(colors) {
   transferEmptyCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radii.card,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,

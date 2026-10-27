@@ -435,8 +435,6 @@ function makeStyles(colors) {
     alignItems: 'center',
     gap: spacing.md,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radii.card,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,

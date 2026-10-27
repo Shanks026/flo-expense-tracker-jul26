@@ -292,8 +292,6 @@ function makeStyles(colors) {
     },
     claimRow: {
       backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
       borderRadius: radii.card,
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.lg,

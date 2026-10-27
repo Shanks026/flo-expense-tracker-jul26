@@ -12,8 +12,11 @@ import { useTheme } from '../theme/ThemeContext';
 // emphasisBg that actually stands out against its own bg/surface.
 export default function Card({ children, style, dark = false, variant = 'default' }) {
   const { colors } = useTheme();
+  // Borderless by default (2026-10-27): the surface already stands off the
+  // screen's bg. Only the state variants keep an outline, since it carries
+  // meaning there.
   const borderColor = {
-    default: colors.border,
+    default: 'transparent',
     danger: colors.dangerBorder,
     warn: colors.warnBorder,
     completed: colors.completedBorder,
@@ -23,7 +26,9 @@ export default function Card({ children, style, dark = false, variant = 'default
     <View
       style={[
         styles.card,
-        dark ? { backgroundColor: colors.emphasisBg, borderWidth: 0 } : { backgroundColor: colors.surface, borderColor },
+        dark || variant === 'default'
+          ? { backgroundColor: dark ? colors.emphasisBg : colors.surface, borderWidth: 0 }
+          : { backgroundColor: colors.surface, borderColor },
         variant === 'completed' && !dark && { backgroundColor: colors.completedBg },
         style,
       ]}
