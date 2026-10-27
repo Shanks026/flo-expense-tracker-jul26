@@ -6,7 +6,7 @@
 
 ---
 
-## Where things stand (updated 2026-10-27)
+## Where things stand (updated 2026-10-27, evening)
 
 Read this before anything else. The ticket files are the source of truth: each has a `## Comments` log of what was checked and what's open.
 
@@ -34,7 +34,9 @@ Read this before anything else. The ticket files are the source of truth: each h
 | 01 consent-gated pipeline + `app_open` | Code ✓ Verified ✓ (`4a888c1`, `e3adf68`) | Green signal (person) |
 | 04 dashboard views + 13-month retention | Code ✓ Verified ✓ via MCP (`e59b948`) | Green signal (person) |
 | 02 offline queue | Code ✓ (`54065cb`) | Emulator: consent-off-while-queued, background-only flush, 500 limit, offline cold start using the cached consent |
-| 03 opener opt-in + pre-sign-in queue | Code ✓ (`bd40923`) | Emulator check |
+| 03 opener opt-in + pre-sign-in queue | Code ✓ (`bd40923`), **revised `857fb27`** | The opt-in left the opener (see below); emulator check |
+
+**Revised on the phone (2026-10-27, `857fb27`):** the opener's "Share anonymous usage" switch felt like a hurdle before sign-up. It's now asked once, as a moment on the queue (`components/ShareUsageAsk.js`), after the account's 3rd expense. Settings → Data & export keeps the switch. **Cost:** consent is off during onboarding, so `analytics.onboarding_funnel` and the pre-sign-in queue get almost no rows. Not yet seen on the phone: the popup after the 3rd expense.
 
 ### Spec 35: onboarding v3 (`.scratch/onboarding-v3/`)
 | Ticket | State | What's left |
@@ -45,7 +47,9 @@ Read this before anything else. The ticket files are the source of truth: each h
 | 04 delete old onboarding | Code ✓ (`a647699`) | Emulator check |
 | 05 first expense in the Add sheet | Code ✓ (`0392ea2`) | Emulator check |
 | 06 coach marks | Code ✓ (`4791cc1`) | Emulator check |
-| 07 funnel events | Code ✓ (`09ff619`) | Emulator check |
+| 07 funnel events | Code ✓ (`09ff619`) | Emulator check; mostly empty now that consent is asked later (spec 33 revision) |
+
+**Revised on the phone (2026-10-27, `521d525`):** Google sign-in is parked, so sign-up is email only. The Google buttons are commented out on the opener and the sign-in screen; `signInWithGoogle` stays in AuthContext. The opener's main button is now "Create account". The person walked the onboarding screens on the phone.
 
 ### Spec 36: Add sheet 3-tap (`.scratch/add-sheet-3-tap/`)
 | Ticket | State | What's left |
@@ -64,7 +68,7 @@ Read this before anything else. The ticket files are the source of truth: each h
 | 02 no-spend writes a mark | Code ✓ (`c207d54`) | Emulator check |
 | 03 automatic freezes | Code ✓ (`b2c9729`) | Emulator check; confirm frozen days count toward earning |
 | 07 simpler streak screen | Code ✓ (`22ab98f`) | Emulator check |
-| 04 economy flagged off | Code ✓ (`41ea0d7`) | Emulator check; decide whether accent/appearance stay reachable (Personalize is hidden) |
+| 04 economy flagged off | Code ✓ (`41ea0d7`) | Emulator check. Accents and card themes are reachable again through spec 43 |
 | 05 moment queue + bills-due | Code ✓ (`3f52991`) | Emulator check |
 | 06 streak moments on the queue | Code ✓ (`ba9c4f0`) | Emulator check |
 
@@ -86,6 +90,27 @@ The person plans to wipe every Supabase user (including chrisaustin2001) and sta
 | 11 Koban placements | Code ✓ (`9f2387c`) | Each placement on the device |
 
 Koban's art is a placeholder; the person will replace `components/koban/{art,faces,poses}.js` with animated illustrations.
+
+**Cards are borderless (2026-10-27, `0281740`):** `Card`'s default variant has no border; the danger, warn and completed outlines stay. Four hand-built cards lost the same border.
+
+### Spec 43: themes back, unlocked (`.scratch/themes-back-unlocked/`)
+Built on 2026-10-27 after the person's friends liked the card themes. It partly reverses spec 37.
+
+| Ticket | State | What's left |
+|---|---|---|
+| 01 card themes back, all unlocked | Code ✓ (`6e57964`) | Phone: equip a design, see it on Home, relaunch |
+| 02 accent colours back | Code ✓ (`6e57964`) | Phone: equip an accent, relaunch, sign out and in |
+| Phase 1b Christmas card | Code ✓, checked on the phone (`081a084`) | Nothing |
+
+- **Flags:** `FLAGS.themes` (on) brings back Personalize, all ~50 card designs and every accent, apart from the economy. `FLAGS.themeGating` (off) makes every theme owned. Coins, the Shop and trophies stay off.
+- **Appearance:** Settings keeps System/Light/Dark; Personalize no longer has a mode toggle.
+- **Christmas card:** the first illustrated, animated skin.
+  - It's built from SVG layers in `lib/cardScenes.js`, generated from `.scratch/skin-samples/christmas-card.svg` by `gen-card-scenes.js`.
+  - `components/AnimatedCardScene.js` animates it with Reanimated. Each play is about 5 seconds and replays whenever Home regains focus; nothing moves with Reduce motion.
+  - Themes can set `negativeColor` (Christmas uses `#FF8F8F`).
+  - Rules for any new skin: text stays in the left two-thirds, and the art and anything bright go in the right third.
+- **Gating (Phase 2, not scheduled):** streak-milestone unlocks first, then Pro unlocks everything once Play Billing ships, then paid seasonal skins. No coins.
+- **Known contrast risk:** spec 37 found 13 accents fail 3:1, and that's accepted for now.
 
 ### Spec 38: Home, Insights and More (`.scratch/home-insights-more/`)
 Built in one session with `/to-tickets` then `/implement`. That skill commits to the current branch, so these commits went to `master` without a per-commit ask. All are local, none pushed. The spec's "As built" section has the details.
@@ -149,10 +174,15 @@ The person ran the app on their own phone for the first time, changed some Home 
   - the Home, Transactions and Insights empty states, which need an account with no transactions
   - light mode
   - 2+ accounts (the account switcher on the card)
-- **Open decision:** accent colours can't be changed. Personalize is hidden with the economy flag (spec 34 ticket 04).
+- **Accent colours** are back through Personalize (spec 43), which settles the earlier open decision.
 
 ### Next step
-Start the session by asking whether the person wants to finish the open phone checks first; they're listed under "First phone check" above. Then ticket spec 39 (nudge + weekly recap). It replaces the report push, settles the three notification toggles, and unblocks spec 38 ticket 10:
+Start a new session for spec 39; the person asked for it to be done there. First ask whether they want to finish the open phone checks:
+- the ones under "First phone check" above;
+- the share-usage popup after the 3rd expense (spec 33);
+- equipping a card theme and an accent, then relaunching (spec 43).
+
+Then ticket spec 39 (nudge + weekly recap). It replaces the report push, settles the three notification toggles, and unblocks spec 38 ticket 10:
 
 ```
 /mattpocock-skills:to-tickets .claude/features/39-nudge-and-weekly-recap.md
