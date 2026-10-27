@@ -257,6 +257,7 @@ data model.
 | 40 | `40-share-to-flo-import.md` | **Share-to-FLO import:** the SMS/UPI parser with merchant and date, a `merchant_categories` memory, opens the pre-filled Add sheet, raw text never stored. | 📝 **Spec, ready-for-agent** (v1-reset, 2026-10-18). Not built. |
 | 41 | `41-pro-play-billing.md` | **Pro with Play Billing:** ₹99/mo, ₹399/yr with a 7-day trial, ₹999 lifetime via `expo-iap`; `play-verify` and `play-rtdn` Edge Functions; a `play_purchases` ledger feeding `entitlements`. No RevenueCat. | 📝 **Spec, ready-for-agent** (v1-reset, 2026-10-18). Not built. |
 | 42 | `42-forgot-password-otp.md` | **Forgot password:** a 6-digit email code via Resend custom SMTP. Supersedes 29's plan; blocked on registering a domain. | 📝 **Spec, ready-for-agent** (v1-reset, 2026-10-18). Not built. |
+| 43 | `43-themes-back-unlocked.md` | **Themes back, unlocked:** all ~50 card themes and every accent return through Personalize, behind `FLAGS.themes` and apart from the economy; `FLAGS.themeGating` off means everything is owned. Partly reverses spec 37. Gating recommendations recorded (streak milestones, then Pro, then paid seasonal skins; no coins). | 🚧 **Code built 2026-10-27** (`.scratch/themes-back-unlocked/`, tickets 01–02), not committed. No DB change (`equipped_card_theme`, `theme_accent` reused). Phone check pending. |
 
 **Note (2026-08-26)**: rows for `29-forgot-password.md` and
 `30-summary-reset-period.md` were never added to this table — they exist as

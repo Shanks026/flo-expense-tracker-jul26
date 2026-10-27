@@ -16,6 +16,7 @@ import AccountHeroCarousel from '../../components/AccountHeroCarousel';
 import NothingLoggedCard from '../../components/NothingLoggedCard';
 import CoachMark from '../../components/CoachMark';
 import useStreak from '../../hooks/useStreak';
+import useCardThemes from '../../hooks/useCardThemes';
 // Static palette (theme/tokens) only for danger/warn, which are the same in both modes.
 import { colors as staticColors, fontFamily, fontSize, spacing, radii, hitTarget } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -61,6 +62,10 @@ export default function Home() {
   const { bills, loading: billsLoading } = useBills();
   const { openPayBill } = usePayBillSheet();
   const { current: streakCurrent, loading: streakLoading } = useStreak();
+  // The equipped card design (spec 43). Ink, the default, keeps the plain
+  // emphasis surface so it matches the other cards in dark mode.
+  const { equippedId, equippedTheme } = useCardThemes();
+  const heroCardTheme = FLAGS.themes && equippedId !== 'ink' ? equippedTheme : null;
   const streakChipRef = useRef(null);
   const currency = useCurrency();
   const { refreshing, onRefresh } = usePullToRefresh();
@@ -150,8 +155,8 @@ export default function Home() {
 
         {/* The account card: In hand, with this period's income and expenses,
             swiping between accounts (restored over spec 38's spend-only hero
-            on the person's call, 2026-10-27). Card themes stay with the
-            economy flag. */}
+            on the person's call, 2026-10-27). The card design comes from
+            Personalize (spec 43). */}
         <AccountHeroCarousel
           accounts={accounts}
           activeAccountId={activeAccount?.id ?? null}
@@ -159,7 +164,7 @@ export default function Home() {
           onOpenSwitcher={openAccountSwitcher}
           summaries={summaries}
           currency={currency}
-          cardTheme={null}
+          cardTheme={heroCardTheme}
           loading={heroLoading}
         />
 

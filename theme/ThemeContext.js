@@ -2,9 +2,11 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SystemUI from 'expo-system-ui';
-import { MODES, DEFAULT_ACCENT_ID, resolveColors } from './themes';
+import { ACCENTS, MODES, DEFAULT_ACCENT_ID, resolveColors, accentSupportsMode } from './themes';
+import { FLAGS } from '../lib/flags';
 
 const MODE_STORAGE_KEY = 'flo.themeMode';
+const ACCENT_STORAGE_KEY = 'flo.themeAccent';
 
 // What the user chose in Settings → Appearance (37-design-system-and-koban.md).
 // 'system' follows the phone's light/dark setting live and is the default;
@@ -22,16 +24,16 @@ const ThemeContext = createContext(null);
 // app/_layout.js — the same "sibling of <Stack>" shape ShareIntentHandler/
 // OnboardingGate already use for the identical reason.
 //
-// Still two axes internally (accent × mode, see themes.js) so seasonal hero
-// skins can plug in later, but the accent is fixed to the brand lime: the
-// accent picker is gone and a stored accent is ignored (spec 37). Only the
-// mode is a choice.
+// Two axes: accent × mode (see themes.js). Spec 37 fixed the accent to lime;
+// spec 43 brings the accent back as a choice (Personalize), behind
+// FLAGS.themes. With the flag off it stays fixed to lime.
 //
 // `modePreference` is the choice ('system' | 'light' | 'dark'); `modeId` is
 // what's on screen now ('light' | 'dark'), which every consumer that paints
 // (StatusBar, the navigation bar, resolveColors) keeps reading.
 export function ThemeProvider({ children }) {
   const [modePreference, setModePreferenceState] = useState(DEFAULT_MODE_PREFERENCE);
+  const [storedAccentId, setStoredAccentId] = useState(DEFAULT_ACCENT_ID);
   const [hydrated, setHydrated] = useState(false);
   const systemScheme = useColorScheme();
 
@@ -39,12 +41,14 @@ export function ThemeProvider({ children }) {
   // paint the first frame in the right colors. Same reasoning
   // AccountContext's own AsyncStorage read has for activeAccountId.
   useEffect(() => {
-    AsyncStorage.getItem(MODE_STORAGE_KEY)
-      .catch(() => null)
-      .then((stored) => {
-        if (MODE_PREFERENCES.includes(stored)) setModePreferenceState(stored);
-        setHydrated(true);
-      });
+    Promise.all([
+      AsyncStorage.getItem(MODE_STORAGE_KEY).catch(() => null),
+      AsyncStorage.getItem(ACCENT_STORAGE_KEY).catch(() => null),
+    ]).then(([storedMode, storedAccent]) => {
+      if (MODE_PREFERENCES.includes(storedMode)) setModePreferenceState(storedMode);
+      if (storedAccent && ACCENTS[storedAccent]) setStoredAccentId(storedAccent);
+      setHydrated(true);
+    });
   }, []);
 
   const setModePreference = useCallback((pref) => {
@@ -55,7 +59,15 @@ export function ThemeProvider({ children }) {
 
   const modeId =
     modePreference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : MODES[modePreference] ? modePreference : 'light';
-  const accentId = DEFAULT_ACCENT_ID;
+  const setAccent = useCallback((id) => {
+    if (!ACCENTS[id]) return;
+    setStoredAccentId(id);
+    AsyncStorage.setItem(ACCENT_STORAGE_KEY, id).catch(() => {});
+  }, []);
+
+  // A dark-only accent (Ash, Cream) falls back to lime while the phone is in
+  // light mode, and comes back with dark.
+  const accentId = FLAGS.themes && accentSupportsMode(storedAccentId, modeId) ? storedAccentId : DEFAULT_ACCENT_ID;
 
   // Memoized on modeId specifically — resolveColors() builds a fresh object
   // every call, so without this, ANY re-render of ThemeProvider would hand
@@ -78,8 +90,10 @@ export function ThemeProvider({ children }) {
   // Same reasoning as `colors` above, one level up — React Context compares
   // the value by reference.
   const value = useMemo(
-    () => ({ accentId, modeId, modePreference, setModePreference, colors, hydrated }),
-    [accentId, modeId, modePreference, setModePreference, colors, hydrated]
+    // accentPreference is the stored choice; accentId is what's on screen
+    // (lime while a dark-only accent meets light mode, or the flag is off).
+    () => ({ accentId, accentPreference: storedAccentId, setAccent, modeId, modePreference, setModePreference, colors, hydrated }),
+    [accentId, storedAccentId, setAccent, modeId, modePreference, setModePreference, colors, hydrated]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

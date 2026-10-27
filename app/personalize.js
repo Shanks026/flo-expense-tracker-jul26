@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,7 +6,6 @@ import { ChevronLeft, Check, Lock } from 'lucide-react-native';
 import Button from '../components/Button';
 import CardThemeSurface from '../components/CardThemeSurface';
 import PersonalizePreview from '../components/PersonalizePreview';
-import AppearanceToggle from '../components/AppearanceToggle';
 import { ColorSwatch } from '../components/ColorPicker';
 import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -29,16 +28,16 @@ import { FLAGS } from '../lib/flags';
 // the primary place to switch card designs — the Shop stays the place you
 // ACQUIRE cards (coins, prices, buying), this hub is where you EQUIP what you
 // already own plus set the two free preferences, together, with one preview.
-// Economy flagged off (lib/flags.js): a deep link here lands on Home.
+// Themes flagged off (lib/flags.js, spec 43): a deep link here lands on Home.
 export default function Personalize() {
-  if (!FLAGS.economy) return <Redirect href="/" />;
+  if (!FLAGS.themes) return <Redirect href="/" />;
   return <PersonalizeScreen />;
 }
 
 function PersonalizeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { accentId, modeId, setModePreference, colors } = useTheme();
+  const { accentId, setAccent, modeId, colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const { updateProfile } = useProfile();
@@ -47,7 +46,6 @@ function PersonalizeScreen() {
   const { ownedIds, equippedId, loading: cardsLoading } = useCardThemes();
 
   const [draftAccent, setDraftAccent] = useState(accentId);
-  const [draftMode, setDraftMode] = useState(modeId);
   // Starts null (the equipped card comes from an async DB fetch via
   // useCardThemes, unlike accent/mode which are already-hydrated context
   // values by the time this screen is reachable) — synced once, the first
@@ -60,25 +58,41 @@ function PersonalizeScreen() {
     if (!cardsLoading && draftCard === null) setDraftCard(equippedId);
   }, [cardsLoading, equippedId, draftCard]);
 
-  // Mode-lock rule: if the mode being switched TO doesn't support the
-  // currently-drafted accent (Ash/Cream are dark-only), snap the draft accent
-  // back to the default in the same update — the draft must always be a
-  // legible combination, and the accent row's own lock state (below) always
-  // matches the mode actually shown in the preview.
-  const handleModeChange = useCallback((id) => {
-    setDraftMode(id);
-    setDraftAccent((current) => (accentSupportsMode(current, id) ? current : DEFAULT_ACCENT_ID));
-  }, []);
+  // Mode-lock rule: when the phone's mode changes to one the drafted accent
+  // doesn't support (Ash/Cream are dark-only), the draft snaps back to the
+  // default, so the preview is always a legible combination.
+  useEffect(() => {
+    setDraftAccent((current) => (accentSupportsMode(current, modeId) ? current : DEFAULT_ACCENT_ID));
+  }, [modeId]);
 
-  const previewColors = useMemo(() => resolveColors(draftAccent, draftMode), [draftAccent, draftMode]);
-  const previewCardTheme = useMemo(() => getTheme(draftCard ?? equippedId), [draftCard, equippedId]);
+  const previewColors = useMemo(() => resolveColors(draftAccent, modeId), [draftAccent, modeId]);
+  // Ink previews the way Home shows it: the plain emphasis surface.
+  const previewCardTheme = useMemo(() => {
+    const theme = getTheme(draftCard ?? equippedId);
+    return theme.id === 'ink' ? { ...theme, background: { type: 'solid', color: previewColors.emphasisBg } } : theme;
+  }, [draftCard, equippedId, previewColors.emphasisBg]);
 
   const ownedThemes = useMemo(() => CARD_THEMES.filter((t) => ownedIds.has(t.id)), [ownedIds]);
 
-  const dirty = draftCard !== null && (draftAccent !== accentId || draftMode !== modeId || draftCard !== equippedId);
+  const dirty = draftCard !== null && (draftAccent !== accentId || draftCard !== equippedId);
 
   async function handleEquip() {
     setEquipping(true);
+
+    // The accent first: a local apply (AsyncStorage via setAccent) plus the
+    // durable profile write, `silent` so it doesn't bump useDataRefresh's
+    // version. It has to land before the card's notifyChanged() below, or
+    // ThemeProfileSync's refetch could read the old theme_accent and put it
+    // back (spec 43).
+    if (draftAccent !== accentId) {
+      setAccent(draftAccent);
+      const { error } = await updateProfile({ theme_accent: draftAccent }, { silent: true });
+      if (error) {
+        setEquipping(false);
+        showToast({ message: error.message, variant: 'error' });
+        return;
+      }
+    }
 
     if (draftCard !== equippedId) {
       const { error } = await equipTheme(session?.user?.id, draftCard);
@@ -88,24 +102,6 @@ function PersonalizeScreen() {
         return;
       }
       notifyChanged();
-    }
-
-    // Same dual-write shape Settings used to own directly (AsyncStorage-
-    // backed local apply via setAccent()/setMode(), plus the durable profile
-    // write, `silent` so it doesn't bump useDataRefresh's version and flicker
-    // every data hook in the app) — moved here since Equip is now the one
-    // moment these fields actually change, not every tap.
-    // The accent is fixed to lime since spec 37, so a picked accent is only
-    // previewed here, never applied or saved.
-
-    if (draftMode !== modeId) {
-      setModePreference(draftMode);
-      const { error } = await updateProfile({ theme_mode: draftMode }, { silent: true });
-      if (error) {
-        setEquipping(false);
-        showToast({ message: error.message, variant: 'error' });
-        return;
-      }
     }
 
     setEquipping(false);
@@ -133,13 +129,13 @@ function PersonalizeScreen() {
             normal flow leaves the sections below actual room to scroll. */}
         <PersonalizePreview colors={previewColors} cardTheme={previewCardTheme} style={styles.preview} />
 
-        <Text style={styles.sectionLabel}>Appearance</Text>
-        <AppearanceToggle value={draftMode} onChange={handleModeChange} style={styles.appearanceToggle} />
+        {/* Appearance lives in Settings since spec 37 (System / Light / Dark),
+            so the preview follows the mode on screen. */}
 
         <Text style={styles.sectionLabel}>Accent color</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accentRow}>
           {ACCENT_LIST.map((a) => {
-            const supported = accentSupportsMode(a, draftMode);
+            const supported = accentSupportsMode(a, modeId);
             const isSelected = draftAccent === a.id;
             const lockLabel = accentModeLabel(a);
             return (
@@ -167,9 +163,12 @@ function PersonalizeScreen() {
 
         <View style={styles.cardHeaderRow}>
           <Text style={styles.sectionLabel}>Card design</Text>
-          <Pressable onPress={() => router.push('/shop')}>
-            <Text style={styles.getMoreText}>Get more →</Text>
-          </Pressable>
+          {/* The Shop is economy; with gating off every card is here already. */}
+          {FLAGS.economy && (
+            <Pressable onPress={() => router.push('/shop')}>
+              <Text style={styles.getMoreText}>Get more →</Text>
+            </Pressable>
+          )}
         </View>
         <View style={styles.cardGrid}>
           {ownedThemes.map((t) => {
@@ -253,10 +252,6 @@ function makeStyles(colors) {
       letterSpacing: 0.4,
       marginBottom: spacing.md,
       marginLeft: spacing.xs,
-    },
-    appearanceToggle: {
-      alignSelf: 'flex-start',
-      marginBottom: spacing.xl,
     },
     accentRow: {
       gap: spacing.lg,

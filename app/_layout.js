@@ -16,6 +16,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { ThemeProvider, useTheme, MODE_PREFERENCES, DEFAULT_MODE_PREFERENCE } from '../theme/ThemeContext';
+import { DEFAULT_ACCENT_ID } from '../theme/themes';
 import { fontFamily, type } from '../theme/tokens';
 import { DataRefreshProvider } from '../lib/DataRefreshContext';
 import { AccountProvider, useAccount } from '../lib/AccountContext';
@@ -363,7 +364,7 @@ function MomentQueueSync() {
 function ThemeProfileSync() {
   const { session } = useAuth();
   const { profile } = useProfile();
-  const { modePreference, setModePreference } = useTheme();
+  const { modePreference, setModePreference, accentPreference, setAccent } = useTheme();
   const userId = session?.user?.id ?? null;
   const prevUserIdRef = useRef(userId);
 
@@ -379,18 +380,23 @@ function ThemeProfileSync() {
       // screens are now pinned to the default palette themselves
       // (app/sign-in.js), so leaving the active theme on the outgoing
       // account's colors until that screen unmounts is invisible.
-      if (userId) setModePreference(DEFAULT_MODE_PREFERENCE);
+      if (userId) {
+        setModePreference(DEFAULT_MODE_PREFERENCE);
+        setAccent(DEFAULT_ACCENT_ID);
+      }
     }
-  }, [userId, setModePreference]);
+  }, [userId, setModePreference, setAccent]);
 
   useEffect(() => {
-    // Mode only (spec 37): the accent is fixed to lime, so a stored
-    // theme_accent (and equipped_card_theme) is ignored, not cleared.
     if (MODE_PREFERENCES.includes(profile?.theme_mode) && profile.theme_mode !== modePreference) {
       setModePreference(profile.theme_mode);
     }
+    // The accent is a choice again (spec 43); setAccent ignores unknown ids,
+    // and ThemeContext keeps it on lime while FLAGS.themes is off.
+    // Compared first, like the mode, so a profile refetch doesn't rewrite it.
+    if (profile?.theme_accent && profile.theme_accent !== accentPreference) setAccent(profile.theme_accent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, setModePreference]);
+  }, [profile, setModePreference, setAccent]);
 
   return null;
 }

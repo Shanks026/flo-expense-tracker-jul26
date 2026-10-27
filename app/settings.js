@@ -522,8 +522,8 @@ export default function Settings() {
           <Row icon={SunMoon} title="Theme">
             <AppearanceToggle value={modePreference} onChange={handleAppearanceChange} />
           </Row>
-          {/* Personalize is economy (lib/flags.js). */}
-          {FLAGS.economy && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}
+          {/* Personalize: card themes and accents (lib/flags.js, spec 43). */}
+          {FLAGS.themes && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}
         </RowGroup>
 
         <RowGroup title="Notifications">

@@ -94,7 +94,7 @@ export default function AccountHeroCarousel({
   // Falls back to Ink (today's pre-feature look) if no theme is resolved
   // yet — 19-card-themes.md Phase 1. Ink is the free default so this is
   // never visibly wrong, just a safe placeholder during the first render.
-  // With no card theme (card themes are flagged off with the economy), the
+  // With no card theme (Ink equipped, or FLAGS.themes off), the
   // hero takes the theme's emphasis background, so in dark mode it matches
   // every other card on Home (the person's call, 2026-10-27).
   const theme = cardTheme ?? { ...getTheme('ink'), background: { type: 'solid', color: colors.emphasisBg } };

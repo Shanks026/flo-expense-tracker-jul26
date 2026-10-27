@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
 import { CARD_THEMES, getTheme } from '../lib/cardThemes';
+import { FLAGS } from '../lib/flags';
 
 const FREE_IDS = CARD_THEMES.filter((t) => t.tier === 'free').map((t) => t.id);
+const ALL_IDS = new Set(CARD_THEMES.map((t) => t.id));
 
 // 19-card-themes.md Phase 1. Global (user-scoped), like useRewards/useStreak
 // — card themes belong to the person, not one account. Fetches, in
@@ -27,6 +29,16 @@ export default function useCardThemes() {
       setCoins(0);
       setOwnedIds(new Set(FREE_IDS));
       setEquippedId('ink');
+      setLoading(false);
+      return;
+    }
+    // Gating off (43-themes-back-unlocked.md): every theme is owned and the
+    // coin economy isn't read, only the equipped id.
+    if (!FLAGS.themeGating) {
+      const { data } = await supabase.from('profiles').select('equipped_card_theme').eq('id', userId).maybeSingle();
+      setCoins(0);
+      setOwnedIds(ALL_IDS);
+      setEquippedId(data?.equipped_card_theme ?? 'ink');
       setLoading(false);
       return;
     }
