@@ -25,6 +25,7 @@ import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
 import { formatMoney } from '../lib/currency';
 import useCurrency from '../hooks/useCurrency';
+import EmptyState from '../components/EmptyState';
 
 export default function Budgets() {
   const { colors } = useTheme();
@@ -104,9 +105,12 @@ export default function Budgets() {
           </>
         ) : budgets.length === 0 ? (
           <FadeIn>
-            <Card style={{ marginTop: spacing.lg }}>
-              <Text style={styles.emptyText}>No budgets yet. Tap "New Budget" to set a spending limit.</Text>
-            </Card>
+            <EmptyState
+              pose="tip"
+              title="No budgets yet"
+              body="Tap New Budget to set a spending limit."
+              style={{ marginTop: spacing.lg }}
+            />
           </FadeIn>
         ) : (
           <FadeIn>
@@ -231,12 +235,6 @@ function makeStyles(colors) {
     paddingTop: spacing.lg,
     paddingBottom: 60,
     gap: spacing.md,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
   },
   budgetCard: {
     marginBottom: spacing.md,

@@ -36,6 +36,7 @@ import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { FLAGS } from '../../lib/flags';
+import EmptyState from '../../components/EmptyState';
 
 const UPCOMING_BILL_STYLES = {
   overdue: { iconTone: 'danger', amountColor: staticColors.danger, pill: { label: 'Overdue', tone: 'danger' } },
@@ -106,7 +107,7 @@ export default function Home() {
             hero card itself, which carries the switcher. */}
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle} accessibilityRole="header">
-            {format(new Date(), 'MMMM')}
+            {format(new Date(), 'MMMM d, yyyy')}
           </Text>
           <View style={styles.headerRight}>
             {/* The streak is a DOOR — it opens /streak, where the calendar and
@@ -206,9 +207,7 @@ export default function Home() {
           </Card>
         ) : transactions.length === 0 ? (
           <FadeIn>
-            <Card>
-              <Text style={styles.emptyText}>No transactions yet. Tap + to add one.</Text>
-            </Card>
+            <EmptyState pose="notepad" title="No transactions yet" body="Tap + to log what you spend." />
           </FadeIn>
         ) : (
           <FadeIn>

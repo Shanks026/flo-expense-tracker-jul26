@@ -22,6 +22,7 @@ import { isSettlement, settlementLabel } from '../../lib/settlements';
 import { formatMoney } from '../../lib/currency';
 import useCurrency from '../../hooks/useCurrency';
 import { FLAGS } from '../../lib/flags';
+import EmptyState from '../../components/EmptyState';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -151,9 +152,12 @@ export default function Transactions() {
           </Card>
         ) : groups.length === 0 ? (
           <FadeIn>
-            <Card style={{ marginTop: spacing.lg }}>
-              <Text style={styles.emptyText}>No transactions this month.</Text>
-            </Card>
+            <EmptyState
+              pose="magnifier"
+              title="Nothing this month"
+              body="Tap + to log what you spend, or look at another month."
+              style={{ marginTop: spacing.lg }}
+            />
           </FadeIn>
         ) : (
           <FadeIn>
@@ -339,12 +343,6 @@ function makeStyles(colors) {
     padding: 0,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',

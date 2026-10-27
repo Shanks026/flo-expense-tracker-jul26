@@ -20,6 +20,7 @@ import usePullToRefresh from '../hooks/usePullToRefresh';
 import { useAddBillSheet } from '../components/AddBillSheet';
 import { usePayBillSheet } from '../components/PayBillSheet';
 import { formatMoney } from '../lib/currency';
+import EmptyState from '../components/EmptyState';
 
 const CADENCE_LABELS = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
 
@@ -80,9 +81,12 @@ export default function Bills() {
           </>
         ) : bills.length === 0 ? (
           <FadeIn>
-            <Card style={{ marginTop: spacing.lg }}>
-              <Text style={styles.emptyText}>No bills yet. Tap "New Bill" to add a recurring bill or subscription.</Text>
-            </Card>
+            <EmptyState
+              pose="hmm"
+              title="No bills yet"
+              body="Tap New Bill to add a recurring bill or subscription."
+              style={{ marginTop: spacing.lg }}
+            />
           </FadeIn>
         ) : (
           <FadeIn>
@@ -189,12 +193,6 @@ function makeStyles(colors) {
     paddingTop: spacing.lg,
     paddingBottom: 60,
     gap: spacing.md,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
   },
   billCard: {
     gap: spacing.md,

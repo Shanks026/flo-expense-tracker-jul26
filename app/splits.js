@@ -22,6 +22,7 @@ import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
 import { formatMoney } from '../lib/currency';
 import useCurrency from '../hooks/useCurrency';
+import EmptyState from '../components/EmptyState';
 
 // Pushed from the Menu sheet, same shape as Plans/Bills/Settings — its own back
 // button and SafeAreaView, no tab slot (the skill's navigation rule: new global
@@ -145,13 +146,12 @@ export default function Splits() {
           </>
         ) : openSplits.length === 0 && closedSplits.length === 0 ? (
           <FadeIn>
-            <Card style={{ marginTop: spacing.lg }}>
-              <Text style={styles.emptyTitle}>Split something</Text>
-              <Text style={styles.emptyText}>
-                A trip, a dinner, rent. Add who was there and what each thing cost — FLO works out who
-                owes whom. Nothing touches your ledger until you settle up.
-              </Text>
-            </Card>
+            <EmptyState
+              pose="hello"
+              title="Split something"
+              body="A trip, a dinner, rent. Add who was there and what each thing cost, and FLO works out who owes whom. Nothing touches your ledger until you settle up."
+              style={{ marginTop: spacing.lg }}
+            />
           </FadeIn>
         ) : (
           <FadeIn>
@@ -272,20 +272,6 @@ function makeStyles(colors) {
       marginBottom: spacing.md,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
-    },
-    emptyTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.heading,
-      color: colors.ink,
-      marginBottom: spacing.sm,
-      textAlign: 'center',
-    },
-    emptyText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.muted,
-      textAlign: 'center',
-      lineHeight: 21,
     },
   });
 }

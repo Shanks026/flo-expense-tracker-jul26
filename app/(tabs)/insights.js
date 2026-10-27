@@ -30,6 +30,7 @@ import { useAccount } from '../../lib/AccountContext';
 import { buildTransactionsCsv, shareCsv } from '../../lib/export';
 import { formatMoney } from '../../lib/currency';
 import { track } from '../../lib/track';
+import EmptyState from '../../components/EmptyState';
 import {
   computeTrend,
   computeDelta,
@@ -381,9 +382,12 @@ export default function Insights() {
               </View>
             </View>
             {categoryDeltas.length === 0 ? (
-              <Card style={styles.card}>
-                <Text style={styles.emptyText}>Nothing {categoryType === 'expense' ? 'spent' : 'received'} in this period.</Text>
-              </Card>
+              <EmptyState
+                pose="report"
+                title={`Nothing ${categoryType === 'expense' ? 'spent' : 'received'} in this period`}
+                body="Try another period, or log a few days first."
+                style={styles.card}
+              />
             ) : (
               <>
                 <Card style={styles.card}>
@@ -616,12 +620,6 @@ function makeStyles(colors) {
     fontSize: fontSize.xs,
     color: colors.mutedMid,
     marginTop: 1,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
   },
   typeToggleWrap: {
     flexDirection: 'row',

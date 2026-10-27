@@ -2,11 +2,12 @@ import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createCo
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Receipt, Wallet, Flag, FileText, ChevronRight, CircleCheck } from 'lucide-react-native';
+import { X, Receipt, Wallet, Flag, FileText, ChevronRight } from 'lucide-react-native';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useAlerts from '../hooks/useAlerts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import EmptyState from './EmptyState';
 
 const AlertsSheetContext = createContext(null);
 
@@ -80,12 +81,7 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
         </View>
 
         {alerts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <CircleCheck size={26} color={colors.brandStrong} strokeWidth={2} />
-            </View>
-            <Text style={styles.emptyText}>You're all caught up.</Text>
-          </View>
+          <EmptyState pose="idle" mood="content" title="You're all caught up" body="Bills due and budget warnings show up here." />
         ) : (
           alerts.map((alert) => {
             const Icon = KIND_ICON[alert.kind] ?? Receipt;
@@ -168,24 +164,6 @@ function makeStyles(colors) {
     fontSize: fontSize.sm,
     color: colors.mutedMid,
     marginTop: 1,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.pill,
-    backgroundColor: colors.iconTileBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  emptyText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.mutedMid,
   },
   });
 }
