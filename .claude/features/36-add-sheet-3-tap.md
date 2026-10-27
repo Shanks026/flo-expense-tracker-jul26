@@ -112,3 +112,13 @@ It's computed from the user's own transactions, and it feeds both the default an
 
 - The target median `seconds_to_save` is under 5 s. Watch it after the reset ships.
 - Keep the opener's API backward-compatible so share-import and onboarding plug in without changes elsewhere.
+
+## Revised after the first phone check (2026-10-27)
+
+The person checked the sheet on a physical phone (vivo I2220, Android 16, 3-button nav) and preferred the shape of the sheet before this spec. This keeps the 3-tap speed and changes the layout:
+
+- **Order:** Expense | Income on top, then the amount (still focused on open, decimal keypad), then the categories.
+- **Categories:** one swipeable row of every category, in usage order, replacing the 4×2 grid and its More tile. The category picked for this open (the smart default, a prefill or an edit's own category) leads the row, fixed until the next open or Expense/Income switch, so a tap never reshuffles it. `gridCategories` / `GRID_SIZE` in `lib/categoryDefaults.js` are no longer used by the sheet. The row is Gesture Handler's `ScrollView`: React Native's loses the horizontal swipe to the bottom sheet's gesture on Android.
+- **Details row removed:** the Today / Yesterday / Pick a date chips and the Note field are always visible (Home titles a row by its note). Account (2+ accounts, not on an edit) and Add to Split (open splits, new expenses) still appear only when they apply.
+- **Height:** the sheet sizes to its content (`enableDynamicSizing`, capped at 92% of the window), so Save sits under the fields instead of below an empty gap.
+- **Keyboard:** `android_keyboardInputMode="adjustPan"`. Under Android's edge-to-edge drawing the window no longer resizes for the keyboard, so `adjustResize` left the fields and Save under it. `topInset` keeps the raised sheet clear of the status bar. The footer adds the nav-bar inset only while the keyboard is down, and the scroll end reserves exactly the footer's height (`FOOTER_HEIGHT`).

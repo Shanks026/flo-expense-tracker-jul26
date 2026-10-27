@@ -1,5 +1,8 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Keyboard, useWindowDimensions } from 'react-native';
+// Gesture Handler's ScrollView, not React Native's: inside the bottom sheet,
+// a plain one loses the horizontal swipe to the sheet's own gesture.
+import { ScrollView } from 'react-native-gesture-handler';
 import {
   BottomSheetModal,
   BottomSheetScrollView,
@@ -7,8 +10,9 @@ import {
   BottomSheetFooter,
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { X, Trash2, ChevronDown, ChevronUp, MoreHorizontal, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
+import { X, Trash2, ChevronDown, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
 import { format, isToday, isYesterday, subDays } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
@@ -21,7 +25,7 @@ import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
 import useCategoryUsage from '../hooks/useCategoryUsage';
-import { rankCategories, defaultCategoryId, gridCategories, GRID_SIZE } from '../lib/categoryDefaults';
+import { rankCategories, defaultCategoryId } from '../lib/categoryDefaults';
 import useSplits from '../hooks/useSplits';
 import { createEntryFromTransaction } from '../lib/splits';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
@@ -98,9 +102,28 @@ function AccountField({ label, value, exclude, accounts, open, onToggle, onSelec
   );
 }
 
+// The pinned Save footer's own height: the 56 dp button plus the footer's
+// spacing.sm top and spacing.lg bottom padding (the nav-bar inset is added
+// on top while the keyboard is down).
+const FOOTER_HEIGHT = 56 + spacing.sm + spacing.lg;
+
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  // The sheet runs to the screen edge; Android draws edge-to-edge, so Save
+  // and the scroll end clear the system nav bar by its inset.
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const maxSheetHeight = Math.round(windowHeight * 0.92);
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const modalRef = useRef(null);
   const amountInputRef = useRef(null);
   const handleBackChange = useSheetBackHandler(modalRef);
@@ -174,14 +197,18 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const savedRef = useRef(false);
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
-  // The smart default and the grid's order (36-add-sheet-3-tap.md), from the
-  // user's own recent logs. `showAllCategories` is the More tile's expansion.
-  const [showAllCategories, setShowAllCategories] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // The smart default and the row's order (36-add-sheet-3-tap.md), from the
+  // user's own recent logs. The category picked for this open leads the row,
+  // fixed until the next open or type switch, so a tap never reshuffles it.
+  const [leadCategoryId, setLeadCategoryId] = useState(null);
   const rankedCategories = useMemo(
     () => rankCategories(categories, type === 'income' ? incomeHistory : expenseHistory, type),
     [categories, type, incomeHistory, expenseHistory]
   );
+  const rowCategories = useMemo(() => {
+    const lead = rankedCategories.find((c) => c.id === leadCategoryId);
+    return lead ? [lead, ...rankedCategories.filter((c) => c.id !== lead.id)] : rankedCategories;
+  }, [rankedCategories, leadCategoryId]);
   function defaultCategoryFor(nextType) {
     const list = nextType === 'income' ? incomeCategories : expenseCategories;
     const history = nextType === 'income' ? incomeHistory : expenseHistory;
@@ -200,15 +227,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // they open Transfer, by design.
   const hasSecondAccount = accounts.length >= 2;
 
-  // The collapsed Details row's one-line summary of what's inside it.
-  const detailsSummary = [
-    formatDateLabel(date),
-    note.trim() || null,
-    !editingId && hasSecondAccount ? selectedAccount?.name : null,
-    selectedSplit ? `Split: ${selectedSplit.name}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
   // Save stays disabled until there's an amount above zero.
   const canSave = Number(amount) > 0;
 
@@ -220,7 +238,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       onDoneRef.current = payload?.onDone ?? null;
       savedRef.current = false;
       setError(null);
-      setDetailsOpen(false);
       // Never sticky: a split chosen for one expense must not silently apply to
       // the next one logged from the same sheet.
       setSplitId(null);
@@ -228,7 +245,6 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       setFromPickerOpen(false);
       setToPickerOpen(false);
       setAccountPickerOpen(false);
-      setShowAllCategories(false);
       // Autofocus the amount field ONLY for a genuinely blank entry (the ⊕
       // tab, no payload at all) — that's the one case where typing the amount
       // is obviously the user's next move. Every other path already has an
@@ -268,6 +284,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         setType(tx.type);
         setAmount(String(tx.amount));
         setCategoryId(tx.category_id);
+        setLeadCategoryId(tx.category_id);
         setPlanId(tx.plan_id);
         // The transaction's REAL account — editing never changes it (see
         // handleSave), this is display-only, but must reflect the actual
@@ -286,6 +303,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         const initialCategory = payload?.categoryId ?? (prefillType === 'transfer' ? null : defaultCategoryFor(prefillType));
         prefilledCategoryRef.current = initialCategory;
         setCategoryId(initialCategory);
+        setLeadCategoryId(initialCategory);
         // Defaults to the active account, same as before — now changeable
         // via the inline dropdown before saving, instead of fixed.
         setAccountId(activeAccountId);
@@ -334,16 +352,17 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     const initialCategory = defaultCategoryFor(type);
     prefilledCategoryRef.current = initialCategory;
     setCategoryId(initialCategory);
+    setLeadCategoryId(initialCategory);
   }, [categoryId, editingId, type, categories.length]);
 
   function handleTypeChange(nextType) {
     setError(null);
     setType(nextType);
-    setShowAllCategories(false);
     if (nextType === 'transfer') return; // transfers have no category
     const initialCategory = defaultCategoryFor(nextType);
     prefilledCategoryRef.current = initialCategory;
     setCategoryId(initialCategory);
+    setLeadCategoryId(initialCategory);
   }
 
   // Transfer's empty state (< 2 accounts) — same hasPro gate shape as
@@ -585,7 +604,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // means dismissing the keyboard first (36-add-sheet-3-tap.md).
   const renderFooter = (props) => (
     <BottomSheetFooter {...props}>
-      <View style={styles.footer}>
+      {/* The nav-bar inset only while the keyboard is down; with it up, Save
+          sits right on the keyboard. */}
+      <View style={[styles.footer, { paddingBottom: spacing.lg + (keyboardUp ? 0 : insets.bottom) }]}>
         <Button title="Save" onPress={handleSave} loading={saving} disabled={!canSave} />
       </View>
     </BottomSheetFooter>
@@ -596,17 +617,23 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       ref={modalRef}
       onChange={handleSheetChange}
       onDismiss={handleDismiss}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
+      topInset={insets.top}
+      // Sized to its content, so Save sits under the fields instead of below
+      // an empty gap; capped so a long form still scrolls.
+      enableDynamicSizing
+      maxDynamicContentSize={maxSheetHeight}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
-      android_keyboardInputMode="adjustResize"
+      // adjustPan: the sheet tracks the keyboard itself. Under Android's
+      // edge-to-edge drawing (Android 15+) the window no longer resizes for
+      // the keyboard, so adjustResize left Save and the fields under it.
+      android_keyboardInputMode="adjustPan"
       footerComponent={renderFooter}
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
     >
-      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
+      <BottomSheetScrollView contentContainerStyle={[styles.sheet, { paddingBottom: FOOTER_HEIGHT + spacing.md + (keyboardUp ? 0 : insets.bottom) }]} keyboardShouldPersistTaps="handled">
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>
             {type === 'transfer'
@@ -624,9 +651,27 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           </View>
         </View>
 
-        {/* 36-add-sheet-3-tap.md: amount first, focused on open, with a
-            decimal keypad (paise allowed); Save lives in the footer, pinned
-            above the keyboard. */}
+        {/* Expense | Income on top, then the amount (focused on open, decimal
+            keypad), the way the sheet read before spec 36. Save lives in the
+            footer, pinned above the keyboard. Transfers start from Accounts
+            and have no toggle. */}
+        {type !== 'transfer' && (
+          <View style={styles.segmentWrap}>
+            <Pressable
+              style={[styles.segment, type === 'expense' && styles.segmentActive]}
+              onPress={() => handleTypeChange('expense')}
+            >
+              <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.segment, type === 'income' && styles.segmentActive]}
+              onPress={() => handleTypeChange('income')}
+            >
+              <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.amountWrap}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
@@ -722,36 +767,22 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           </>
         ) : (
           <>
-            <View style={styles.segmentWrap}>
-              <Pressable
-                style={[styles.segment, type === 'expense' && styles.segmentActive]}
-                onPress={() => handleTypeChange('expense')}
-              >
-                <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.segment, type === 'income' && styles.segmentActive]}
-                onPress={() => handleTypeChange('income')}
-              >
-                <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
-              </Pressable>
-            </View>
-
-            {/* Top 8 as a 4×2 grid plus More (36-add-sheet-3-tap.md); More
-                expands every category of this type in place, and picking one
-                there collapses back with it swapped into the grid. */}
-            <View style={styles.chipGrid}>
-              {(showAllCategories ? rankedCategories : gridCategories(rankedCategories, categoryId)).map((cat) => {
+            {/* Every category in one swipeable row (the person's call,
+                2026-10-27, over spec 36's 4×2 grid), in usage order with the
+                pre-selected one first so it's always in view. */}
+            <Text style={styles.sectionLabel}>Category</Text>
+            <ScrollView
+              key={type}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.chipScroll}
+              contentContainerStyle={styles.chipRow}
+            >
+              {rowCategories.map((cat) => {
                 const selected = cat.id === categoryId;
                 return (
-                  <Pressable
-                    key={cat.id}
-                    style={styles.chip}
-                    onPress={() => {
-                      setCategoryId(cat.id);
-                      setShowAllCategories(false);
-                    }}
-                  >
+                  <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
                     <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
                       <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
                     </View>
@@ -761,167 +792,137 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                   </Pressable>
                 );
               })}
-              {rankedCategories.length > GRID_SIZE && (
-                <Pressable style={styles.chip} onPress={() => setShowAllCategories((v) => !v)}>
-                  <View style={styles.chipIcon}>
-                    {showAllCategories ? (
-                      <ChevronUp size={22} color={colors.ink} strokeWidth={2} />
-                    ) : (
-                      <MoreHorizontal size={22} color={colors.ink} strokeWidth={2} />
-                    )}
-                  </View>
-                  <Text style={[styles.chipLabel, styles.chipLabelInactive]} numberOfLines={1}>
-                    {showAllCategories ? 'Less' : 'More'}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
+            </ScrollView>
 
-            {/* Everything else, collapsed into one row: date, note, and the
-                account / split / transfer controls only when they apply. */}
-            <Pressable style={styles.detailsRow} onPress={() => setDetailsOpen((v) => !v)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Details</Text>
-                <Text style={styles.fieldValue} numberOfLines={1}>
-                  {detailsSummary}
-                </Text>
+            {/* Date and note always in view (Home titles a row by its note);
+                account and split only when they apply. */}
+            <View style={styles.detailsBody}>
+              <View style={styles.dateChipRow}>
+                {[
+                  { key: 'today', label: 'Today', active: isToday(date), onPress: () => setDate(new Date()) },
+                  { key: 'yesterday', label: 'Yesterday', active: isYesterday(date), onPress: () => setDate(subDays(new Date(), 1)) },
+                  {
+                    key: 'pick',
+                    label: isToday(date) || isYesterday(date) ? 'Pick a date' : formatDateLabel(date),
+                    active: !isToday(date) && !isYesterday(date),
+                    onPress: () => setShowDatePicker(true),
+                  },
+                ].map((chip) => (
+                  <Pressable
+                    key={chip.key}
+                    style={[styles.dateChip, chip.active && styles.dateChipActive]}
+                    onPress={chip.onPress}
+                  >
+                    <Text style={[styles.dateChipText, chip.active && styles.dateChipTextActive]}>{chip.label}</Text>
+                  </Pressable>
+                ))}
               </View>
-              {detailsOpen ? (
-                <ChevronUp size={16} color={colors.muted} strokeWidth={2.4} />
-              ) : (
-                <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-              )}
-            </Pressable>
 
-            {detailsOpen && (
-              <View style={styles.detailsBody}>
-                <View style={styles.dateChipRow}>
-                  {[
-                    { key: 'today', label: 'Today', active: isToday(date), onPress: () => setDate(new Date()) },
-                    { key: 'yesterday', label: 'Yesterday', active: isYesterday(date), onPress: () => setDate(subDays(new Date(), 1)) },
-                    {
-                      key: 'pick',
-                      label: isToday(date) || isYesterday(date) ? 'Pick a date' : formatDateLabel(date),
-                      active: !isToday(date) && !isYesterday(date),
-                      onPress: () => setShowDatePicker(true),
-                    },
-                  ].map((chip) => (
-                    <Pressable
-                      key={chip.key}
-                      style={[styles.dateChip, chip.active && styles.dateChipActive]}
-                      onPress={chip.onPress}
-                    >
-                      <Text style={[styles.dateChipText, chip.active && styles.dateChipTextActive]}>{chip.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+              <View style={[styles.noteRow, styles.noteRowInGroup]}>
+                <Text style={styles.fieldLabel}>Note</Text>
+                <BottomSheetTextInput
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder="Add a note…"
+                  placeholderTextColor={colors.mutedLight}
+                  style={styles.noteInput}
+                />
+              </View>
 
-                <View style={styles.noteRow}>
-                  <Text style={styles.fieldLabel}>Note</Text>
-                  <BottomSheetTextInput
-                    value={note}
-                    onChangeText={setNote}
-                    placeholder="Add a note…"
-                    placeholderTextColor={colors.mutedLight}
-                    style={styles.noteInput}
-                  />
-                </View>
-
-                {/* Only with 2+ accounts, and never on an edit (editing never
-                    changes an entry's account; see handleSave). */}
-                {!editingId && hasSecondAccount && selectedAccount && (
-                  <>
-                    <Pressable style={styles.dateRow} onPress={() => setAccountPickerOpen((v) => !v)}>
-                      <View style={styles.planRowInner}>
-                        <View>
-                          <Text style={styles.fieldLabel}>Account</Text>
-                          <Text style={[styles.fieldValue, styles.fieldValuePlan]} numberOfLines={1}>
-                            {selectedAccount.name}
-                          </Text>
-                        </View>
-                        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+              {/* Only with 2+ accounts, and never on an edit (editing never
+                  changes an entry's account; see handleSave). */}
+              {!editingId && hasSecondAccount && selectedAccount && (
+                <>
+                  <Pressable style={styles.dateRow} onPress={() => setAccountPickerOpen((v) => !v)}>
+                    <View style={styles.planRowInner}>
+                      <View>
+                        <Text style={styles.fieldLabel}>Account</Text>
+                        <Text style={[styles.fieldValue, styles.fieldValuePlan]} numberOfLines={1}>
+                          {selectedAccount.name}
+                        </Text>
                       </View>
-                    </Pressable>
-                    {accountPickerOpen && (
-                      <View style={styles.planPicker}>
-                        {accounts.map((a) => (
-                          <Pressable
-                            key={a.id}
-                            style={[styles.planOption, accountId === a.id && styles.planOptionSelected]}
-                            onPress={() => {
-                              setAccountId(a.id);
-                              setAccountPickerOpen(false);
-                            }}
-                          >
-                            <Text
-                              style={[styles.planOptionText, accountId === a.id && styles.planOptionTextSelected]}
-                              numberOfLines={1}
-                            >
-                              {a.name}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
-                  </>
-                )}
-
-                {/* "Add to Split" (31-split-expenses.md Phase 2) — log the
-                    expense once and have it show up in the split too. Expenses
-                    only, new ones only (an edit can't tell whether an entry
-                    already exists), and only once there's an open split. */}
-                {type === 'expense' && !editingId && openSplits.length > 0 && (
-                  <>
-                    <Pressable style={styles.dateRow} onPress={() => setSplitPickerOpen((v) => !v)}>
-                      <View style={styles.planRowInner}>
-                        <View>
-                          <Text style={styles.fieldLabel}>Add to Split</Text>
-                          <Text style={[styles.fieldValue, selectedSplit && styles.fieldValuePlan]} numberOfLines={1}>
-                            {selectedSplit?.name ?? 'None'}
-                          </Text>
-                        </View>
-                        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-                      </View>
-                    </Pressable>
-                    {splitPickerOpen && (
-                      <View style={styles.planPicker}>
+                      <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+                    </View>
+                  </Pressable>
+                  {accountPickerOpen && (
+                    <View style={styles.planPicker}>
+                      {accounts.map((a) => (
                         <Pressable
-                          style={[styles.planOption, splitId === null && styles.planOptionSelected]}
+                          key={a.id}
+                          style={[styles.planOption, accountId === a.id && styles.planOptionSelected]}
                           onPress={() => {
-                            setSplitId(null);
+                            setAccountId(a.id);
+                            setAccountPickerOpen(false);
+                          }}
+                        >
+                          <Text
+                            style={[styles.planOptionText, accountId === a.id && styles.planOptionTextSelected]}
+                            numberOfLines={1}
+                          >
+                            {a.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+
+              {/* "Add to Split" (31-split-expenses.md Phase 2) — log the
+                  expense once and have it show up in the split too. Expenses
+                  only, new ones only (an edit can't tell whether an entry
+                  already exists), and only once there's an open split. */}
+              {type === 'expense' && !editingId && openSplits.length > 0 && (
+                <>
+                  <Pressable style={styles.dateRow} onPress={() => setSplitPickerOpen((v) => !v)}>
+                    <View style={styles.planRowInner}>
+                      <View>
+                        <Text style={styles.fieldLabel}>Add to Split</Text>
+                        <Text style={[styles.fieldValue, selectedSplit && styles.fieldValuePlan]} numberOfLines={1}>
+                          {selectedSplit?.name ?? 'None'}
+                        </Text>
+                      </View>
+                      <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
+                    </View>
+                  </Pressable>
+                  {splitPickerOpen && (
+                    <View style={styles.planPicker}>
+                      <Pressable
+                        style={[styles.planOption, splitId === null && styles.planOptionSelected]}
+                        onPress={() => {
+                          setSplitId(null);
+                          setSplitPickerOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.planOptionText, splitId === null && styles.planOptionTextSelected]}>None</Text>
+                      </Pressable>
+                      {openSplits.map((s) => (
+                        <Pressable
+                          key={s.id}
+                          style={[styles.planOption, splitId === s.id && styles.planOptionSelected]}
+                          onPress={() => {
+                            setSplitId(s.id);
                             setSplitPickerOpen(false);
                           }}
                         >
-                          <Text style={[styles.planOptionText, splitId === null && styles.planOptionTextSelected]}>None</Text>
-                        </Pressable>
-                        {openSplits.map((s) => (
-                          <Pressable
-                            key={s.id}
-                            style={[styles.planOption, splitId === s.id && styles.planOptionSelected]}
-                            onPress={() => {
-                              setSplitId(s.id);
-                              setSplitPickerOpen(false);
-                            }}
+                          <Text
+                            style={[styles.planOptionText, splitId === s.id && styles.planOptionTextSelected]}
+                            numberOfLines={1}
                           >
-                            <Text
-                              style={[styles.planOptionText, splitId === s.id && styles.planOptionTextSelected]}
-                              numberOfLines={1}
-                            >
-                              {s.name}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
-                    {selectedSplit && (
-                      <Text style={styles.splitHint}>
-                        Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
-                      </Text>
-                    )}
-                  </>
-                )}
-              </View>
-            )}
+                            {s.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                  {selectedSplit && (
+                    <Text style={styles.splitHint}>
+                      Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
+                    </Text>
+                  )}
+                </>
+              )}
+            </View>
           </>
         )}
         {showDatePicker && (
@@ -987,7 +988,7 @@ function makeStyles(colors) {
     backgroundColor: colors.chipBg,
     borderRadius: 14,
     padding: 4,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   segment: {
     flex: 1,
@@ -1036,16 +1037,27 @@ function makeStyles(colors) {
     minWidth: 80,
     textAlign: 'center',
   },
-  chipGrid: {
+  sectionLabel: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+    color: colors.mutedMid,
+    marginBottom: spacing.sm,
+  },
+  // Bleeds to the sheet's edges so the row scrolls edge to edge; the padding
+  // puts the first chip back in line with everything else.
+  chipScroll: {
+    marginHorizontal: -spacing.xl,
+  },
+  chipRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 14,
+    gap: 14,
+    paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
   },
   chip: {
     alignItems: 'center',
     gap: 6,
-    width: '25%',
+    width: 64,
   },
   chipIcon: {
     width: 52,
@@ -1218,6 +1230,10 @@ function makeStyles(colors) {
     color: colors.ink,
     marginTop: 1,
   },
+  noteRowInGroup: {
+    marginTop: 0,
+    marginBottom: 0,
+  },
   noteRow: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -1243,20 +1259,8 @@ function makeStyles(colors) {
     paddingBottom: spacing.lg,
     backgroundColor: colors.bg,
   },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-  },
   detailsBody: {
     gap: spacing.md,
-    marginTop: spacing.md,
   },
   dateChipRow: {
     flexDirection: 'row',
