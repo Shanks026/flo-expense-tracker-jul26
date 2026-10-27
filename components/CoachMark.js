@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import Koban from './koban/Koban';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -68,7 +68,7 @@ function useSeen(userId, id) {
 export default function CoachMark({ id, targetRef, text, active = true, after = null }) {
   const { colors, modeId } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
   const { profile } = useProfile();
@@ -77,6 +77,11 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
   const seen = useSeen(userId, id);
   const afterSeen = useSeen(userId, after);
   const [rect, setRect] = useState(null);
+  // Where the Modal's root sits, measured the same way as the target, and its
+  // real height (useWindowDimensions on Android leaves out the bars, so it
+  // isn't the Modal's height). The ring and bubble are placed against this.
+  const backdropRef = useRef(null);
+  const [frame, setFrame] = useState(null);
 
   const eligible =
     !!profile?.onboarded_at && new Date(profile.onboarded_at) >= new Date(COACH_MARKS_SINCE);
@@ -88,11 +93,17 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
   useEffect(() => {
     if (!ready) {
       setRect(null);
+      setFrame(null);
       return;
     }
     const timer = setTimeout(() => {
-      targetRef.current?.measureInWindow((x, y, width, height) => {
-        if (width > 0 && height > 0) setRect({ x, y, width, height });
+      // measure, not measureInWindow: on Android measureInWindow takes the
+      // status bar off y even though the app draws edge to edge, which put the
+      // ring a status bar above the + button. page coordinates are relative to
+      // the root view, which starts at the top of the screen here and in the
+      // Modal alike.
+      targetRef.current?.measure((_x, _y, width, height, pageX, pageY) => {
+        if (width > 0 && height > 0) setRect({ x: pageX, y: pageY, width, height });
       });
     }, 500);
     return () => clearTimeout(timer);
@@ -100,30 +111,46 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
 
   if (!ready || !rect) return null;
 
+  function measureFrame(e) {
+    const { height } = e.nativeEvent.layout;
+    backdropRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => setFrame({ x: pageX, y: pageY, height }));
+  }
+
   const pad = 6;
+  const originX = frame?.x ?? 0;
+  const originY = frame?.y ?? 0;
+  const frameHeight = frame?.height ?? 0;
   const ring = {
-    left: rect.x - pad,
-    top: rect.y - pad,
+    left: rect.x - originX - pad,
+    top: rect.y - originY - pad,
     width: rect.width + pad * 2,
     height: rect.height + pad * 2,
   };
   // The bubble sits on whichever side of the target has more room.
-  const below = rect.y + rect.height / 2 < screenHeight / 2;
+  const below = ring.top + ring.height / 2 < frameHeight / 2;
   const bubblePosition = below
     ? { top: ring.top + ring.height + spacing.md }
-    : { bottom: screenHeight - ring.top + spacing.md };
+    : { bottom: frameHeight - ring.top + spacing.md };
 
   return (
-    <Modal visible transparent statusBarTranslucent animationType="fade" onRequestClose={() => markSeen(userId, id)}>
-      <Pressable style={styles.backdrop} onPress={() => markSeen(userId, id)} accessibilityRole="button">
-        <View style={[styles.ring, ring]} pointerEvents="none" />
-        <View style={[styles.bubble, bubblePosition, { maxWidth: screenWidth - spacing.lg * 2 }]}>
-          <Koban size={40} pose="tip" mood="happy" surface={modeId} style={styles.koban} />
-          <View style={styles.bubbleBody}>
-            <Text style={styles.text}>{text}</Text>
-            <Text style={styles.hint}>Tap anywhere to continue</Text>
+    <Modal visible transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => markSeen(userId, id)}>
+      <Pressable
+        ref={backdropRef}
+        style={styles.backdrop}
+        onLayout={measureFrame}
+        onPress={() => markSeen(userId, id)}
+        accessibilityRole="button"
+      >
+        {frame ? <View style={[styles.ring, ring]} pointerEvents="none" /> : null}
+        {frame ? (
+          <View style={[styles.bubble, bubblePosition, { maxWidth: screenWidth - spacing.lg * 2 }]}>
+            <Koban size={40} pose="tip" mood="happy" surface={modeId} style={styles.koban} />
+            <View style={styles.bubbleBody}>
+              <Text style={styles.text}>{text}</Text>
+              <Text style={styles.hint}>Tap anywhere to continue</Text>
+            </View>
           </View>
-        </View>
+        ) : null}
       </Pressable>
     </Modal>
   );
