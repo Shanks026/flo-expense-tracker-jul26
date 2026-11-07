@@ -6,7 +6,7 @@
 
 ---
 
-## Where things stand (updated 2026-10-27, evening)
+## Where things stand (updated 2026-11-03)
 
 Read this before anything else. The ticket files are the source of truth: each has a `## Comments` log of what was checked and what's open.
 
@@ -176,19 +176,37 @@ The person ran the app on their own phone for the first time, changed some Home 
   - 2+ accounts (the account switcher on the card)
 - **Accent colours** are back through Personalize (spec 43), which settles the earlier open decision.
 
+### Spec 39: nudge and weekly recap (`.scratch/nudge-and-weekly-recap/`)
+Ticketed on 2026-11-03 with `/to-tickets`. Nothing is built yet. The person will implement it in a new session.
+
+| Ticket | Blocked by | What it delivers |
+|---|---|---|
+| 01 one evening nudge | — | No morning or report-ready push; no nudge after a no-spend mark; a nudge tap opens the Add sheet; leftover local notifications cleared; `nudge_opened` |
+| 02 Settings: three toggles | — | Daily nudge (with a time), Weekly recap, Bill reminders; new `profiles.weekly_recap_enabled` (migration); bills default to 1 day before |
+| 03 nudge back-off | 01 | Every other day after 3 ignored nudges, none after 7, daily again after a log or no-spend mark |
+| 04 streak in the nudge copy | 01 | Server-side streak count; the copy names it from 2 days up; milestone tier 7/30/100/365 |
+| 05 recap data + recap screen | — | A pure week/month recap module; a recap route with Koban's `report` pose; a temporary Insights entry; `recap_viewed` |
+| 06 weekly recap push | 02, 04, 05 | `weekly_recap` on Monday 09:00 local, claimed once per ISO week; a tap opens the recap screen |
+| 07 on-device check | 01–06 | The spec's device checks plus feature 17's 14 open ones; builds nothing |
+
+- **Ready to start:** 01, 02 and 05.
+- **Settles:** ticket 01 removes the report push (an open decision under spec 38).
+- **Spec 38 ticket 10** (the Home recap card and the Insights summary) waits on spec 39 ticket 05. Its "Blocked by" line still says "spec 39's recap data".
+- **Needs a yes first:** the migration in 02 and every `send-push` deploy (01, 03, 04, 06).
+
 ### Next step
-Start a new session for spec 39; the person asked for it to be done there. First ask whether they want to finish the open phone checks:
+Implement spec 39 in a new session; the person asked for it to be done there. First ask whether they want to finish the open phone checks:
 - the ones under "First phone check" above;
 - the share-usage popup after the 3rd expense (spec 33);
 - equipping a card theme and an accent, then relaunching (spec 43).
 
-Then ticket spec 39 (nudge + weekly recap). It replaces the report push, settles the three notification toggles, and unblocks spec 38 ticket 10:
+Then work spec 39's tickets in order, starting with the frontier (01, 02, 05):
 
 ```
-/mattpocock-skills:to-tickets .claude/features/39-nudge-and-weekly-recap.md
+/mattpocock-skills:implement .scratch/nudge-and-weekly-recap/issues/01-one-evening-nudge.md
 ```
 
-Then `/mattpocock-skills:implement` on those tickets. Once spec 39's recap data exists, build spec 38 ticket 10. After that come spec 40 (share-to-FLO import with merchant memory, which also gives Home rows merchant titles), 41 (Pro with Play Billing) and 42 (forgot password, blocked on a domain).
+Once spec 39 ticket 05 is done, build spec 38 ticket 10. After that come spec 40 (share-to-FLO import with merchant memory, which also gives Home rows merchant titles), 41 (Pro with Play Billing) and 42 (forgot password, blocked on a domain).
 
 Live Supabase now has:
 - `events` (insert-only RLS, consent-gated);
