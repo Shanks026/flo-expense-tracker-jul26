@@ -201,11 +201,16 @@ The person reversed the "no AI" rule. FLO is now **a personal-use app first**, b
 
 **Stage 0: chores to clear before any AI code** (✋ = the person does it, or must say yes first)
 1. ✋ **Commit what's uncommitted:** these docs, `CLAUDE.md`, `AGENTS.md`, spec 44, and the `flo-ticket-tracker/` mod at the repo root. Decide whether the mod belongs in the repo or in `.gitignore`.
-2. ✋ **Fix the Supabase MCP permission.** `execute_sql` was refused on 2026-11-08 ("You do not have permission"). Every RLS check in spec 44 runs through it.
-3. ✋ **Remove the old AI leftovers:**
+2. ✅ **Supabase MCP permission (done 2026-11-08).** The sign-in had expired, and the first re-sign-in approved the wrong organization ("Austin's Org"). It now works for FLO. If it fails again, sign in through `/mcp` and pick FLO's organization.
+3. ◐ **Old AI leftovers.** ✅ `ai-interpret` and `ai-report-summary` were deleted with the CLI on 2026-11-08; only `send-push` remains. ✅ The person removed the `GEMINI_API_KEY` secret (confirmed gone from `secrets list`). Still to do, by the person:
+   - revoke the old Gemini key at Google AI Studio and the old OpenRouter key (the `OPENROUTER_API_KEY` secret from 2026-08-06; setting the new key under the same name replaces the secret).
+
+   Original list:
    - the `ai-interpret` and `ai-report-summary` Edge Functions are still deployed (Dashboard → Edge Functions → delete, or `supabase functions delete <slug>`);
    - delete their secrets, and revoke the old provider (Gemini) keys at the provider.
-4. ✋ **Decide the data wipe.** The plan was to run `delete from auth.users;`. FLO is now personal-use, so either wipe **once, now** and keep your real account from here on, or cancel the wipe. Test accounts stay separate either way.
+4. ✅ **Data wipe (done 2026-11-08).** The person ran `delete from auth.users where email <> 'chrisaustin2001@gmail.com'` in the SQL editor; the MCP's own confirmation auto-declined it twice. 7 accounts went: abishek230102, chrisaustin11109, sachinsachi7395, sachin, flotest, testtwo and testoncemore. Every user table, `storage.objects` and `auth.identities`/`sessions` were checked: 0 rows from other users remain. What's left is the person's real account: 358 transactions, 3 accounts, 3 budgets, 1 split. **There's no test account now**; make a fresh one for emulator checks (CLAUDE.md: random email, skip the email link).
+
+   Original note: The plan was to run `delete from auth.users;`. FLO is now personal-use, so either wipe **once, now** and keep your real account from here on, or cancel the wipe. Test accounts stay separate either way.
 5. ✋ **Set up OpenRouter:**
    - buy credits (UPI);
    - create a key with a **credit limit** for FLO;
@@ -213,6 +218,20 @@ The person reversed the "no AI" rule. FLO is now **a personal-use app first**, b
    - then `supabase secrets set OPENROUTER_API_KEY=… AI_MODEL_QUICK=anthropic/claude-haiku-5.5 AI_MODEL_CHAT=anthropic/claude-haiku-5.5 AI_MODEL_FALLBACK=google/gemini-3.1-flash-lite`.
 
    The agent never handles the key. The `wizard` skill can generate a step-by-step walkthrough for this.
+
+**Stage 0b: cleanup found on 2026-11-08 (before any AI code)**
+- ✅ `node_modules` was missing entirely; reinstalled with `npm ci` (832 packages, expo 54.0.37). `expo export --platform android` bundles all 4,185 modules cleanly.
+- ✅ No AI leftovers in the code (grep for ai-interpret, aiReportSummary, receipt_*, ai_usage, GEMINI, openrouter: nothing).
+- ✅ `supabase/.temp/` (the CLI's linked-project cache) added to `.gitignore`.
+- ✅ The security advisor shows only the accepted WARNs (`pg_net` in public; 5 intentional SECURITY DEFINER RPCs; leaked-password protection off).
+- ✅ **RLS holes fixed (2026-11-08)** by `rls_hardening_ownership_and_splits` (see the `00-index.md` migrations row). It was applied through the CLI because the MCP auto-declines writes. 12 rolled-back checks pass. Original finding:
+  - the `split_members` UPDATE policy lets a member edit their own row (role, `split_id`);
+  - the INSERT/UPDATE policies on `transactions`, `budgets`, `plans` and `bills` check `user_id` but not that `account_id`/`category_id`/`plan_id` are the user's own;
+  - the `split_entry_shares` INSERT only checks that *some* entry exists.
+
+  There's zero exposure with one user, but `ai-assistant` runs as the user and leans on RLS, so fix it in one migration first (SQL in audit §3; show it and get a yes).
+- ✋ **The "weekly report ready" push** still goes out (`send-push`), and nothing in Settings stops it. Either switch it off for the profile now or do spec 39 ticket 01 first.
+- **Tools:** the Supabase MCP and the CLI are both signed in to FLO's org. Use the MCP for SQL and advisors; use the CLI (`npx supabase … --project-ref uergtlcfpwajztqgncim`, `db query --read-only`) for functions and secrets. Writes need the person's yes, and the CLI needs `--yes` after it.
 
 **Stage 1: checks to clear first, because AI fills the Add sheet**
 6. ✋ **Boot the emulator** (`Pixel_API_36`, never booted yet), install a fresh dev build, set `debug_http_host` / `adb reverse`, and make a test account. It's on hold until the person says go.
