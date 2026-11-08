@@ -10,7 +10,7 @@ Spec: .claude/features/32-safe-closed-test-build.md
 
 - [ ] **Artifact:** the lite AAB's merged manifest (via `aapt dump` or bundletool) has no `NotificationListenerService` and no CAMERA permission
 - [ ] **Artifact:** the package id is `app.floexpense.tracker` and the version code is above 2
-- [ ] **Emulator** (Medium_Phone_API_29, fresh install of the lite release build): a new account signs up and goes through onboarding to Home, with no tour
+- [ ] **Emulator** (Pixel_API_36, fresh install of the lite release build): a new account signs up and goes through onboarding to Home, with no tour
 - [ ] Menu, Settings, Shop and every former Pro trigger show no price, Buy button, upsell or dev row, and sign-in has no "Forgot password?" link
 - [ ] 2+ accounts, 3+ budgets and 2+ splits can be created with no wall
 - [ ] A manually invoked push arrives

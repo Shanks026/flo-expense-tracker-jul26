@@ -53,19 +53,40 @@ store-submission strip-list in that doc's Part 1 still applies **if** a store
 build is ever cut with the module present — but the default is that it simply
 isn't shipped.)
 
-> **Superseded 2026-08-10** — this section used to name AI (receipt scan +
-> categorisation) as the cross-platform paid backbone that replaces
-> auto-detect. **There is no AI in FLO and none is planned** (see the standing
-> rule below). Auto-detect is still unshippable; AI is simply no longer the
-> answer to what replaces it. Pro rests on the limits + full reports.
+> **Superseded 2026-08-10, and again 2026-11-08** — this section used to name
+> AI (receipt scan + categorisation) as the cross-platform paid backbone that
+> replaces auto-detect. On 2026-08-10 AI was dropped entirely. On 2026-11-08
+> AI came back as the priority (see the standing rule below), for the author's
+> personal use first. Auto-detect is still unshippable to a store; whether AI
+> becomes part of Pro is decided when the store launch is planned, not now.
 
-**Standing rule — no AI features**: AI has been built and removed **twice** on
-direct instruction — `ai-interpret` (categorisation + receipt scanning,
-2026-07-22) and `ai-report-summary` (report insights, 2026-08-10: *"we dont
-want AI in the app. it doesnt work. plus it very slow"*). Do not propose,
-plan, or build a third. `IDEAS-ai-features.md` and the AI portions of
-`IDEAS-subscription-and-store.md` are **history, not a roadmap** — read them
-only to understand what was already tried.
+**Standing rule — AI is back, as the priority (reversed 2026-11-08 on direct
+instruction).** The old "no AI features" rule is lifted. The person's account
+of why: the two earlier attempts, `ai-interpret` (categorisation + receipt
+scanning, 2026-07-22) and `ai-report-summary` (report insights, 2026-08-10:
+*"we dont want AI in the app. it doesnt work. plus it very slow"*), were
+dropped mainly because they couldn't buy API credits at the time. They now
+can, through **OpenRouter** (UPI top-ups, one API key). FLO is now a
+**personal-use app first**: the goal is quick, accurate results and a much
+better UX for the author, and a store launch comes later. What to build is
+spec 44 (voice and typed quick add, plus a chat that answers questions about
+transactions and accounts and proposes entries such as budgets).
+
+Lessons from the two removals, which are now design rules for spec 44:
+- **Speed:** a local parser handles simple entries ("40 lunch") with no AI
+  call; speech-to-text runs on the device; use a fast model.
+- **Accuracy:** the model never writes to the database. It returns a draft or
+  proposal, the person confirms it, and the existing `lib/*.js` mutation runs
+  (so Pro gates, RLS and `notifyChanged()` all still apply). The model never
+  does arithmetic: totals, balances and breakdowns come from SQL the server
+  runs, and the model only phrases them.
+- **Proof before building more:** phase 1 must pass a test set of real
+  phrasings (target ≥90% correct, p50 under ~1.5 s) before chat is built.
+- **Key handling:** the OpenRouter key lives only in an Edge Function secret,
+  never in the app. No SDK; plain HTTP from Deno.
+
+`IDEAS-ai-features.md` and the AI parts of `IDEAS-subscription-and-store.md`
+are still history: read them for what was tried, not as the plan.
 
 **Standing rule — installing a native-permission build for testing**
 (added 2026-07-12, `06-transaction-auto-detect.md`'s Phase 1 go/no-go round):
@@ -258,6 +279,7 @@ data model.
 | 41 | `41-pro-play-billing.md` | **Pro with Play Billing:** ₹99/mo, ₹399/yr with a 7-day trial, ₹999 lifetime via `expo-iap`; `play-verify` and `play-rtdn` Edge Functions; a `play_purchases` ledger feeding `entitlements`. No RevenueCat. | 📝 **Spec, ready-for-agent** (v1-reset, 2026-10-18). Not built. |
 | 42 | `42-forgot-password-otp.md` | **Forgot password:** a 6-digit email code via Resend custom SMTP. Supersedes 29's plan; blocked on registering a domain. | 📝 **Spec, ready-for-agent** (v1-reset, 2026-10-18). Not built. |
 | 43 | `43-themes-back-unlocked.md` | **Themes back, unlocked:** all ~50 card themes and every accent return through Personalize, behind `FLAGS.themes` and apart from the economy; `FLAGS.themeGating` off means everything is owned. Partly reverses spec 37. Gating recommendations recorded (streak milestones, then Pro, then paid seasonal skins; no coins). | 🚧 **Code built 2026-10-27** (`.scratch/themes-back-unlocked/`, tickets 01–02, `6e57964`). **Phase 1b** (`081a084`): the first illustrated card, Christmas, as SVG layers (`lib/cardScenes.js`) animated by `AnimatedCardScene` (~5 s per play, replays when Home regains focus, nothing moves with Reduce motion), plus a per-theme `negativeColor`. No DB change (`equipped_card_theme`, `theme_accent` reused). Phone: Christmas checked; equip/relaunch for 01–02 pending. |
+| 44 | `44-ai-assistant.md` | **AI assistant (OpenRouter):** typed and voice quick add into the Add sheet (local parser first, model second), and an "Ask FLO" chat with server-side tools for every number and proposals that open pre-filled sheets. The model never writes. Default model `anthropic/claude-haiku-5.5`. | 📝 **Spec** (2026-11-08, after the AI rule was reversed). Not built. Phase 1 is gated on a 40-phrase test. |
 
 **Note (2026-08-26)**: rows for `29-forgot-password.md` and
 `30-summary-reset-period.md` were never added to this table — they exist as

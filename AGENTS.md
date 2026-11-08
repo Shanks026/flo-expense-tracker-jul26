@@ -81,10 +81,11 @@ never data-model changes. See `.claude/features/14-subscription-pro.md`.
 
 - `send-push` — server push, driven by a cron reading `profiles.timezone` for
   local-time scheduling. `TimezoneSync` writes the device's real IANA zone.
-- **No AI Edge Functions. `send-push` is the only one.** Two AI attempts have
-  now been removed on direct instruction — `ai-interpret` (categorisation +
-  receipt scanning, 2026-07-22) and `ai-report-summary` (report insights,
-  2026-08-10). See the standing rule below before proposing a third.
+- **AI goes through one Edge Function** (planned in spec 44, `ai-assistant`).
+  It holds the OpenRouter key as a secret and calls OpenRouter over plain HTTP,
+  with no SDK. The app never holds the key or calls a model directly. Earlier
+  AI functions (`ai-interpret`, `ai-report-summary`) were removed; don't
+  revive their code, build to spec 44.
 
 ## Supabase / schema truth
 
@@ -103,19 +104,25 @@ via the Supabase MCP (`list_tables`, `list_migrations`; project
 
 ## Standing rules (from 00-index.md — do not re-litigate)
 
-- **No AI features. Do not propose or build one.** Removed twice on direct
-  instruction — `ai-interpret` (2026-07-22) and `ai-report-summary`
-  (2026-08-10, "we dont want AI in the app. it doesnt work. plus it very
-  slow"). The `IDEAS-ai-features.md` / `IDEAS-subscription-and-store.md`
-  reasoning that named AI the paid backbone is **superseded**; treat those
-  docs as history, not a plan. Pro's value is the limits + full reports
-  (`lib/pro.js`), not AI.
+- **AI is the current priority (since 2026-11-08), and FLO is personal-use
+  first; a store launch comes later.** The old "no AI" rule is lifted: the two
+  earlier removals were mainly because credits couldn't be bought, and
+  OpenRouter now solves that. Build to spec 44: voice and typed quick add, and
+  a chat over transactions and accounts. Design rules carried from the
+  removals ("it doesnt work. plus it very slow"):
+  - a local parser handles simple entries with no AI call;
+  - speech-to-text runs on the device;
+  - the model only drafts or proposes, the person confirms, and the existing
+    `lib/*.js` mutation writes;
+  - totals and balances come from SQL, never from model arithmetic;
+  - phase 1 must pass a phrasing test set before chat is built.
+  Details are in `00-index.md`. Whether AI becomes part of Pro is decided at
+  launch planning.
 - **Auto-detect is personal-use only, never shippable.** The notification-listener
   path (`modules/flo-notification-listener/`, `lib/detect.js`,
   `DetectedTransactionHandler`) is architecturally impossible on iOS and
   policy-fraught on Play. Do not propose gating, polishing, or store-hardening
-  it. (This previously pointed at AI as the shippable alternative — that's no
-  longer the answer either; see the AI rule above.)
+  it for a store. It stays in the author's personal build.
 - **Native-permission test builds** hit Play Protect + Android "Restricted
   settings" — install over `adb`/`expo run:android`, and enable "Allow
   restricted settings" per install. Details in `00-index.md`.

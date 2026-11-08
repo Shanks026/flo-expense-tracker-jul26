@@ -95,7 +95,7 @@ Everything else ships unchanged and is replaced by later fix builds: the long on
 ## Testing Decisions
 
 - **What makes a good test here:** observable behaviour in the built app and the built artifact, never implementation details. "No price appears anywhere a tester can reach" is the test, not "the flag is read in component X".
-- **Seam 1, the emulator** (Medium_Phone_API_29, test account), on a **lite release build** (`lite-preview` or a local release APK) installed fresh, since the package id changed:
+- **Seam 1, the emulator** (Pixel_API_36, test account), on a **lite release build** (`lite-preview` or a local release APK) installed fresh, since the package id changed:
   - walk sign-up, onboarding through to Home, Menu, Settings, the Shop and every former Pro trigger;
   - confirm no price or Buy button, no upsell, no tour, no "Forgot password?" link, and no dev rows;
   - create 2+ accounts, 3+ budgets and 2+ splits with no wall;

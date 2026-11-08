@@ -194,8 +194,82 @@ Ticketed on 2026-11-03 with `/to-tickets`. Nothing is built yet. The person will
 - **Spec 38 ticket 10** (the Home recap card and the Insights summary) waits on spec 39 ticket 05. Its "Blocked by" line still says "spec 39's recap data".
 - **Needs a yes first:** the migration in 02 and every `send-push` deploy (01, 03, 04, 06).
 
-### Next step
-Implement spec 39 in a new session; the person asked for it to be done there. First ask whether they want to finish the open phone checks:
+### Direction change (2026-11-08): personal use first, AI is the priority
+The person reversed the "no AI" rule. FLO is now **a personal-use app first**, built for quick, accurate results and a much better UX for the author; **the store launch comes later**. The rule changes are recorded in `00-index.md` (standing rule "AI is back") and `AGENTS.md`, and `CLAUDE.md` allows OpenRouter as the one third-party service.
+
+**Roadmap (2026-11-08).** Spec 44 is written: `.claude/features/44-ai-assistant.md`. Work top to bottom.
+
+**Stage 0: chores to clear before any AI code** (✋ = the person does it, or must say yes first)
+1. ✋ **Commit what's uncommitted:** these docs, `CLAUDE.md`, `AGENTS.md`, spec 44, and the `flo-ticket-tracker/` mod at the repo root. Decide whether the mod belongs in the repo or in `.gitignore`.
+2. ✋ **Fix the Supabase MCP permission.** `execute_sql` was refused on 2026-11-08 ("You do not have permission"). Every RLS check in spec 44 runs through it.
+3. ✋ **Remove the old AI leftovers:**
+   - the `ai-interpret` and `ai-report-summary` Edge Functions are still deployed (Dashboard → Edge Functions → delete, or `supabase functions delete <slug>`);
+   - delete their secrets, and revoke the old provider (Gemini) keys at the provider.
+4. ✋ **Decide the data wipe.** The plan was to run `delete from auth.users;`. FLO is now personal-use, so either wipe **once, now** and keep your real account from here on, or cancel the wipe. Test accounts stay separate either way.
+5. ✋ **Set up OpenRouter:**
+   - buy credits (UPI);
+   - create a key with a **credit limit** for FLO;
+   - turn off prompt logging and training in the account's privacy settings;
+   - then `supabase secrets set OPENROUTER_API_KEY=… AI_MODEL_QUICK=anthropic/claude-haiku-5.5 AI_MODEL_CHAT=anthropic/claude-haiku-5.5 AI_MODEL_FALLBACK=google/gemini-3.1-flash-lite`.
+
+   The agent never handles the key. The `wizard` skill can generate a step-by-step walkthrough for this.
+
+**Stage 1: checks to clear first, because AI fills the Add sheet**
+6. ✋ **Boot the emulator** (`Pixel_API_36`, never booted yet), install a fresh dev build, set `debug_http_host` / `adb reverse`, and make a test account. It's on hold until the person says go.
+7. **Add sheet checks** on the phone or emulator: saving through the sheet, the Undo toast, a prefilled open (share-to-FLO text), and the keyboard not covering Save. Spec 44 phase 1 builds on exactly this path, so it has to be solid first.
+   - The other open phone checks can be batched later; they don't block AI: `NothingLoggedCard`, empty states, light mode, 2+ accounts, card theme and accent relaunch, and the share-usage popup.
+
+**Stage 2: build spec 44** (`/to-tickets` on the spec, then `/implement` per ticket)
+8. **Phase 1, typed quick add:** the `ai_usage` migration (yes first), the `ai-assistant` function deploy (yes first), `lib/quickParse.js`, `QuickAddField`, and the `app/dev/ai-eval.js` test set. **Gate:** ≥ 90% correct, p50 ≤ 1.5 s, at least half the phrases answered by the local parser. If it fails, stop and decide before phase 2.
+9. **Phase 2, voice:** a new native dependency (`expo-speech-recognition`; name it to the person first), then prebuild and a native rebuild.
+10. **Phase 3, chat (read only):** the `ai_conversations` / `ai_messages` migration (yes first) and six server-side tools. Every number is checked against Insights.
+11. **Phase 4, chat proposals:** transaction, budget and bill cards that open pre-filled sheets. The model never writes.
+
+**Stage 3: after or alongside spec 44**
+12. **Spec 39** (one evening nudge + weekly recap). It can start once spec 44 phase 1 is green; its tickets are unchanged. Spec 38 ticket 10 still waits on spec 39 ticket 05.
+13. **Spec 40** (share-to-FLO import). Its merchant memory can feed `quickParse`'s synonyms.
+
+**Parked until launch planning:**
+- spec 44 phase 5 (consent, privacy, Pro, caps);
+- spec 32's remaining store-build tickets (05, 07, 08);
+- the 12-tester closed test;
+- the privacy policy URL;
+- spec 41 (Play Billing);
+- spec 42 (forgot password).
+
+Auto-detect stays in the personal build as it is.
+
+**Earlier draft of this list (superseded by the roadmap above):**
+1. **Spec 44: AI assistant (OpenRouter).** Not written yet; next free number. Write it with `/to-spec` (or the flo-feature skill), then `/to-tickets`. Scope:
+   - typed and voice quick add ("40 rupees for lunch today" → a pre-filled Add sheet; on-device speech-to-text, en-IN + Hindi);
+   - a chat that answers questions about transactions, accounts and budgets, with numbers from server-side SQL tools;
+   - write actions (a transaction, a budget, a bill) as confirm cards that call the existing `lib/*.js` mutations.
+
+   The flow:
+   - one Edge Function, `ai-assistant`, holds the key as a secret;
+   - new tables `ai_conversations`, `ai_messages` and `ai_usage`;
+   - the model name is a secret, so it can change without a release;
+   - starting models: a Gemini Flash-class model, with Claude Haiku 5.5 as the fallback for chat tool use. Check current OpenRouter model ids and prices when writing the spec.
+
+   **Phases:**
+   - 0: spec;
+   - 1: function + typed quick add, gated by a test set of about 40 real phrasings (≥90% correct, p50 under ~1.5 s);
+   - 2: voice (new dev build);
+   - 3: chat, read only;
+   - 4: chat write actions;
+   - 5: privacy, consent and Pro (only at launch planning).
+2. **Spec 39** (one evening nudge + weekly recap) after or alongside spec 44 phase 1; its tickets are unchanged. Spec 38 ticket 10 still waits on spec 39 ticket 05.
+3. **Parked until launch planning:**
+   - spec 32's remaining store-build tickets (05 package id, 07 EAS envs, 08 release candidate);
+   - the 12-tester closed test;
+   - the privacy policy URL;
+   - spec 41 (Play Billing);
+   - spec 42 (forgot password).
+
+   Spec 40 (share-to-FLO import) stays useful for personal use, and spec 44's quick-add parser can share its merchant memory.
+4. **Auto-detect** (notification listener) stays in the personal build as it is. It's still never store-hardened.
+
+**Earlier next step (before the direction change):** implement spec 39 in a new session; the person asked for it to be done there. First ask whether they want to finish the open phone checks:
 - the ones under "First phone check" above;
 - the share-usage popup after the 3rd expense (spec 33);
 - equipping a card theme and an accent, then relaunching (spec 43).
@@ -229,6 +303,12 @@ Details are in `00-index.md` (schema and migrations) and the spec's "As built" n
   - **Coach marks:** the "seen" flags live in the app's `databases/RKStorage` (`flo.coachMark.<id>.<userId>`). To show one again, copy the file out with `run-as … cat`, delete the key with `node --experimental-sqlite`, and copy it back.
   - **The phone sleeps during long sequences.** Send `input keyevent 224` first. The dev-only "Unable to activate keep awake" toast after a sleep is harmless.
   - **Stopping a Metro task can leave its `node` process listening.** Free the port with `Get-NetTCPConnection -LocalPort 8084` → `Stop-Process`.
+- **Emulator (recreated 2026-11-08):** the old Medium_Phone_API_29 AVD and its image were gone, so the emulator is now **`Pixel_API_36`**: Android 16 (`system-images/android-36/google_apis/x86_64`), Pixel profile, AVD files on `D:\Android\avd\Pixel_API_36.avd`.
+  - **C: is nearly full** (it hit 0 GB during the first unpack). So the SDK's `system-images` and `.sdk` (the `android` CLI's download cache) are **directory junctions to `D:\Android\system-images` and `D:\Android\sdk-cache`**. Anything large for the SDK should go to D: the same way.
+  - **`android sdk install` downloads through the junction but fails to unpack** ("Failed to extract package archive"). The Android 16 image was unpacked by hand: check the zip in `D:\Android\sdk-cache\arch\<sha1>` against Google's SHA-1 (the filename), then `unzip` it into `D:\Android\system-images\android-36\google_apis\`. The AVD was made with `avdmanager create avd -n Pixel_API_36 -k "system-images;android-36;google_apis;x86_64" -d pixel_7 -p D:\Android\avd\Pixel_API_36.avd`, and then `config.ini` was edited: the `disk.dataPartition.path=<temp>` line dropped, and GPU and keyboard set to yes.
+  - **SDK tools:** `cmdline-tools\latest` was installed the same day. Its `sdkmanager.bat` now wraps the new `android` CLI; `cmd` splits `;` package names, so install with `android.exe sdk install system-images/android-36/google_apis/x86_64`. Set `JAVA_HOME` to `C:\Program Files\Android\Android Studio\jbr` first.
+  - It is a fresh device: no FLO build, no `debug_http_host`, no `adb reverse`, and no signed-in account. Redo those, and the "Allow restricted settings" step, on its first use.
+  - **RAM:** only ~1.3 GB was free at the last check; close apps before starting it.
 - **Metro:**
   - Watch mode fails to start (file-watcher timeout), so run `CI=1 npx expo start --dev-client --port 8082` and restart it after every code change.
   - Port 8081 belongs to McAfee.
@@ -236,7 +316,7 @@ Details are in `00-index.md` (schema and migrations) and the spec's "As built" n
   - Over `10.0.2.2:8082` the download breaks intermittently (`ProtocolException: Expected leading [0-9a-fA-F] character`).
   - Fix: `adb reverse tcp:8082 tcp:8082` with `debug_http_host` set to `localhost:8082` in the app's shared prefs. This is already set on the emulator, and the tunnel survives the emulator's wifi being off.
 - **adb:** calls can hang for minutes. Run long emulator sequences in the background and wait on a marker line.
-- **Test account:** the emulator is signed in as `testtwo@gmail.com`, consent on, with one offline `app_open` still queued.
+- **Test account:** the old API 29 emulator was signed in as `testtwo@gmail.com`; that device is gone, so the new emulator needs a fresh test account.
 - **Agent shell quirks:**
   - The Bash tool fails on a heredoc whose body contains an apostrophe ("unexpected EOF while looking for matching `''"). Write such files with the Write tool instead.
   - There's no `python` on this machine; use `node` for scripted edits.
@@ -362,7 +442,7 @@ Commit the setup output.
 
 ## FLO-specific rules for every step
 
-- **Verification:** there is no test or lint runner. Verify on the **Medium_Phone_API_29** emulator with the test account `flotest@gmail.com`; the user signs in, and the agent never handles passwords. Drive the emulator with `adb` from PowerShell. The installed APK predates these changes, so rebuild (`npx expo run:android`, or a `lite-preview` build) before verifying client changes.
+- **Verification:** there is no test or lint runner. Verify on the **Pixel_API_36** emulator (Android 16) with the test account; the user signs in, and the agent never handles passwords. Drive the emulator with `adb` from PowerShell. The installed APK predates these changes, so rebuild (`npx expo run:android`, or a `lite-preview` build) before verifying client changes.
 - **Schema truth** is the live Supabase project `uergtlcfpwajztqgncim` via the Supabase MCP. Follow the 00-index standing rules: `user_id DEFAULT auth.uid()`, cascade FKs, `security_invoker` on views.
 - **Cut ≠ delete.** For v1, feature-flag gamification, Plans and split invites off and keep the code and data. Delete only after analytics confirm.
 - **Docs:** each finished spec updates its `.claude/features` doc and the `00-index.md` row.
