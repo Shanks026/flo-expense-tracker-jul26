@@ -17,7 +17,7 @@ Read this first in a new session, then `AGENTS.md`, `.claude/features/00-index.m
 - **Docs:**
   - spec 44 is written and indexed;
   - the AI rule is reversed;
-  - testing moves to the **`Pixel_API_36`** emulator (Android 16, AVD on `D:\Android\avd`), made but **never booted**;
+  - testing moves to the **`Pixel_API_36`** emulator (Android 16, AVD on `D:\Android\avd`), **boot-checked 2026-11-08** (boots in ~2 min, adb `emulator-5554`, screencap works; FLO not installed yet);
   - the SDK's `system-images` and `.sdk` folders are junctions to D: because C: is nearly full.
 - **Tracker mod:** `flo-ticket-tracker/` is a copy of the ticket-tracker mod that reads `.scratch` tickets. Load it with `claude --plugin-dir ./flo-ticket-tracker`.
 - **Supabase cleanup:**
