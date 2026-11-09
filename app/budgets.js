@@ -17,7 +17,7 @@ import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '..
 import { useTheme } from '../theme/ThemeContext';
 import useBudgets, { budgetStatus } from '../hooks/useBudgets';
 import usePullToRefresh from '../hooks/usePullToRefresh';
-import { formatPeriodLabel, isBudgetEnded, budgetLimitReached } from '../lib/budgets';
+import { formatPeriodLabel, isBudgetEnded, budgetLimitReached, BUDGET_LIMIT_MESSAGE } from '../lib/budgets';
 import { useAddBudgetSheet } from '../components/AddBudgetSheet';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
@@ -54,7 +54,7 @@ export default function Budgets() {
 
   async function handleNewBudget() {
     if (await budgetLimitReached(hasPro)) {
-      openProUpsell('Free includes 2 budgets');
+      openProUpsell(BUDGET_LIMIT_MESSAGE);
       return;
     }
     openAddBudget();

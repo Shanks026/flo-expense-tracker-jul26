@@ -37,6 +37,7 @@ import {
   isProposalTool,
   runProposal,
   historyNote,
+  stripDraftNotes,
   type Proposal,
 } from './proposals.ts';
 
@@ -781,7 +782,10 @@ export async function handleChat(supabase: SupabaseClient, body: Record<string, 
   const history = ((historyRes.data ?? []) as { role: string; content: string | null; proposal: unknown }[])
     .reverse()
     .filter((m) => m.content)
-    .map((m) => ({ role: m.role, content: m.role === 'assistant' ? m.content + historyNote(m.proposal, ctx) : m.content }));
+    .map((m) => ({
+      role: m.role,
+      content: m.role === 'assistant' ? stripDraftNotes(m.content as string) + historyNote(m.proposal, ctx) : m.content,
+    }));
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt({ today, time, tz, ctx }) },
     ...history,

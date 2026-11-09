@@ -9,7 +9,7 @@ import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
-import { previewPeriodDates, budgetLimitReached } from '../lib/budgets';
+import { previewPeriodDates, budgetLimitReached, BUDGET_LIMIT_MESSAGE } from '../lib/budgets';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -165,8 +165,11 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     // edit). The Budgets screen checks the count before opening a blank
     // sheet; a draft from Ask FLO arrives here without that, so Save checks
     // again. With FLAGS.billing off, hasPro is true and both pass.
+    // Either gate closes this sheet before the upsell opens, so the two
+    // sheets never stack.
     if (!editingId) {
       if (isCustom && !hasPro) {
+        modalRef.current?.dismiss();
         openProUpsell('Custom periods are a Pro feature');
         return;
       }
@@ -175,7 +178,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
       setSaving(false);
       if (overLimit) {
         modalRef.current?.dismiss();
-        openProUpsell('Free includes 2 budgets');
+        openProUpsell(BUDGET_LIMIT_MESSAGE);
         return;
       }
     }

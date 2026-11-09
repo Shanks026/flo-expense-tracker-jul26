@@ -700,3 +700,15 @@ category, date and account all match.
 - The composer's mic sits in the Send button's place while the composer is
   empty, and a spoken question is sent as if typed. Still to check on the
   phone with real speech.
+
+### Phase 4: proposals (2026-11-09, tickets 09–11)
+- **Where it lives:** the three tools are in `supabase/functions/ai-assistant/proposals.ts`, which has no Supabase client, so it can't write. `chat.ts` keeps the turn's one checked draft and stores it in `ai_messages.proposal`. The card is `components/ProposalCard.js`.
+- **One draft per answer.** A second propose call in the same turn gets an error, and the prompt tells the model to draft the first and ask for the next after saving. Drafting several entries at once (bulk add) isn't built.
+- **Checks beyond §4.2:**
+  - transactions: the date is not in the future and not more than 5 years back; the note is cut to 120 characters;
+  - budgets: `category_id` is an expense category of theirs or `"all"`; a custom range needs both dates, hasn't already ended, and covers at most 366 days;
+  - bills: the name is 1–60 characters; the next due date is today to 400 days ahead; the category is optional.
+- **Saved and Dismissed** are kept on the answer row as `proposal.status` (`saved` | `dismissed`), written by the app through `setProposalStatus` in `lib/ai.js`. A reopened chat shows the mark. The sheets report a save through `onDone({ saved })` on dismiss, which `AddTransactionSheet` already had and `AddBudgetSheet` and `AddBillSheet` gained.
+- **History:** an earlier answer with a draft is sent to the model with a bracketed note giving the draft and its status. Without it, the model denied having made a draft it had made.
+- **Budget gate at Save:** `budgetLimitReached(hasPro)` in `lib/budgets.js` is shared by the Budgets screen and the sheet's Save. The custom-period gate also runs at Save for a new budget.
+- **Chat `max_tokens` 500 → 1500.** Haiku 5.5 was ending answers mid-sentence (`finish_reason: 'length'` on short answers), because its own reasoning counts against the cap. Empty and cut-off answers are now logged.

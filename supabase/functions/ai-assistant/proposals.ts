@@ -304,6 +304,11 @@ function cardText(p: Proposal, ctx: Ctx) {
 // An earlier answer's draft, for the history sent to the model. Without it
 // the model sees only its own words ("ready to review") and no tool call, and
 // may decide it never made the draft.
+// The note's own shape, so a look-alike the model wrote into an answer can be
+// taken out before the app's note goes on: only the app's note is trusted.
+const NOTE_PATTERN = /\s*\[A draft was shown under this answer[^\]]*\]/g;
+export const stripDraftNotes = (text: string) => text.replace(NOTE_PATTERN, '');
+
 export function historyNote(p: unknown, ctx: Ctx) {
   if (!p || typeof p !== 'object' || typeof (p as Proposal).kind !== 'string') return '';
   const proposal = p as Proposal;
