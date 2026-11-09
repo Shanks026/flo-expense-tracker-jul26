@@ -14,6 +14,9 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
+// Inter backs the Quiet Ledger redesign (theme/ledger.js); Manrope stays for
+// screens not yet rebuilt.
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { ThemeProvider, useTheme, MODE_PREFERENCES, DEFAULT_MODE_PREFERENCE } from '../theme/ThemeContext';
 import { DEFAULT_ACCENT_ID } from '../theme/themes';
@@ -394,7 +397,8 @@ function ThemeProfileSync() {
     // The accent is a choice again (spec 43); setAccent ignores unknown ids,
     // and ThemeContext keeps it on lime while FLAGS.themes is off.
     // Compared first, like the mode, so a profile refetch doesn't rewrite it.
-    if (profile?.theme_accent && profile.theme_accent !== accentPreference) setAccent(profile.theme_accent);
+    // FLAGS.accents off (spec 46): theme_accent isn't read at all.
+    if (FLAGS.accents && profile?.theme_accent && profile.theme_accent !== accentPreference) setAccent(profile.theme_accent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, setModePreference, setAccent]);
 
@@ -592,6 +596,10 @@ export default function RootLayout() {
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   const [ready, setReady] = useState(false);

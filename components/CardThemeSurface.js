@@ -188,6 +188,12 @@ export default function CardThemeSurface({ theme, style, children, animate = fal
             <SvgXml xml={CARD_SCENES[bg.scene].sceneXml} width="100%" height="100%" />
           </View>
         ))}
+      {/* A ready-made SVG (the Day time-of-day scenes, lib/dayScenes.js). */}
+      {bg.type === 'svg' && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <SvgXml xml={bg.xml} width="100%" height="100%" />
+        </View>
+      )}
       {bg.type === 'pattern' && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <SvgXml xml={buildPatternSvg(bg)} width="100%" height="100%" />

@@ -84,7 +84,8 @@ function PersonalizeScreen() {
     // version. It has to land before the card's notifyChanged() below, or
     // ThemeProfileSync's refetch could read the old theme_accent and put it
     // back (spec 43).
-    if (draftAccent !== accentId) {
+    // FLAGS.accents off (spec 46): never write theme_accent, whatever the draft.
+    if (FLAGS.accents && draftAccent !== accentId) {
       setAccent(draftAccent);
       const { error } = await updateProfile({ theme_accent: draftAccent }, { silent: true });
       if (error) {
@@ -132,34 +133,39 @@ function PersonalizeScreen() {
         {/* Appearance lives in Settings since spec 37 (System / Light / Dark),
             so the preview follows the mode on screen. */}
 
-        <Text style={styles.sectionLabel}>Accent color</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accentRow}>
-          {ACCENT_LIST.map((a) => {
-            const supported = accentSupportsMode(a, modeId);
-            const isSelected = draftAccent === a.id;
-            const lockLabel = accentModeLabel(a);
-            return (
-              <Pressable
-                key={a.id}
-                style={styles.accentOption}
-                onPress={() => supported && setDraftAccent(a.id)}
-                disabled={!supported}
-              >
-                <View style={[styles.swatchRing, isSelected && styles.swatchRingActive, !supported && styles.swatchRingLocked]}>
-                  <ColorSwatch id={`pz-${a.id}`} accent={a} size={40} />
-                  {!supported && (
-                    <View style={styles.swatchLockScrim}>
-                      <Lock size={13} color="#FFFFFF" strokeWidth={2.6} />
+        {/* FLAGS.accents off (spec 46): no swatches. */}
+        {FLAGS.accents && (
+          <>
+            <Text style={styles.sectionLabel}>Accent color</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accentRow}>
+              {ACCENT_LIST.map((a) => {
+                const supported = accentSupportsMode(a, modeId);
+                const isSelected = draftAccent === a.id;
+                const lockLabel = accentModeLabel(a);
+                return (
+                  <Pressable
+                    key={a.id}
+                    style={styles.accentOption}
+                    onPress={() => supported && setDraftAccent(a.id)}
+                    disabled={!supported}
+                  >
+                    <View style={[styles.swatchRing, isSelected && styles.swatchRingActive, !supported && styles.swatchRingLocked]}>
+                      <ColorSwatch id={`pz-${a.id}`} accent={a} size={40} />
+                      {!supported && (
+                        <View style={styles.swatchLockScrim}>
+                          <Lock size={13} color="#FFFFFF" strokeWidth={2.6} />
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-                <Text style={[styles.accentName, !supported && styles.accentNameLocked]} numberOfLines={1}>
-                  {supported ? a.name : lockLabel}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                    <Text style={[styles.accentName, !supported && styles.accentNameLocked]} numberOfLines={1}>
+                      {supported ? a.name : lockLabel}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
 
         <View style={styles.cardHeaderRow}>
           <Text style={styles.sectionLabel}>Card design</Text>
