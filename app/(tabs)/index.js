@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Receipt, ArrowLeftRight, Users, Flame } from 'lucide-react-native';
+import { Bell, Receipt, ArrowLeftRight, Users, Flame, Sparkles } from 'lucide-react-native';
 import { format } from 'date-fns';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -140,6 +140,17 @@ export default function Home() {
                   <Text style={[styles.streakCount, !streakLit && styles.streakCountEmpty]}>{streakCurrent}</Text>
                 </Pressable>
               </FadeIn>
+            )}
+            {/* Ask FLO (44-ai-assistant.md §3.3, ticket 08), beside the bell. */}
+            {FLAGS.ai && (
+              <Pressable
+                style={styles.headerIconButton}
+                onPress={() => router.push('/assistant')}
+                accessibilityRole="button"
+                accessibilityLabel="Ask FLO"
+              >
+                <Sparkles size={20} color={colors.ink} strokeWidth={2} />
+              </Pressable>
             )}
             <Pressable
               style={styles.headerIconButton}

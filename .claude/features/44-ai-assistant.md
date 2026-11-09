@@ -691,3 +691,12 @@ category, date and account all match.
   endpoint at all, and OpenRouter answered every call from the fallback
   without saying so. The function no longer sends `temperature`. The
   `ai_usage.model` column is where a silent fallback shows up.
+
+### Ticket 08: past chats and quicker entry (2026-11-09)
+- Past chats is `app/assistant/history.js`, as planned. A pick returns to the
+  chat with `router.dismissTo('/assistant', { id, at })`.
+- Deleting a chat is the app's one direct write to the chat tables
+  (`deleteConversation` in `lib/ai.js`); messages go by cascade.
+- The composer's mic sits in the Send button's place while the composer is
+  empty, and a spoken question is sent as if typed. Still to check on the
+  phone with real speech.

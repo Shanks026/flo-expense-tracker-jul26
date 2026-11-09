@@ -24,27 +24,30 @@ import Animated, {
   Easing,
   useReducedMotion,
 } from 'react-native-reanimated';
-import { Redirect } from 'expo-router';
+import { Redirect, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowUp } from 'lucide-react-native';
+import { ArrowUp, History, Mic, SquarePen } from 'lucide-react-native';
 import ArrowMark from '../components/ArrowMark';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ShimmerText from '../components/ShimmerText';
 import RichText from '../components/RichText';
 import BreakdownTable, { breakdownsFrom } from '../components/BreakdownTable';
-import { fontFamily, spacing, radii, radius, type } from '../theme/tokens';
+import { fontFamily, spacing, radii, radius, type, hitTarget } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useAssistantConversation from '../hooks/useAssistantConversation';
 import { useAccount } from '../lib/AccountContext';
 import { aiChat } from '../lib/ai';
 import { FLAGS } from '../lib/flags';
+import { voiceSupported, micPermission, startListening } from '../lib/voice';
+import useVoiceLanguage from '../hooks/useVoiceLanguage';
 
 const MAX_MESSAGE = 500;
 const FAIL_TEXT = {
   cap: "That's today's limit for questions. Try again tomorrow.",
   error: "Couldn't answer that. Check your connection and try again.",
+  unheard: "Couldn't hear that. Hold the mic and speak.",
 };
 // What the thinking line says while a turn runs, in order. The last one
 // stays until the answer arrives. Generic on purpose: the screen doesn't
@@ -71,6 +74,11 @@ const SHIFT = LinearTransition.springify().damping(20).stiffness(180);
 // function ran; the function also writes both sides of each turn, so this
 // screen only sends and reads back. A turn that fails writes nothing, and
 // the question goes back into the composer.
+//
+// Ticket 08: `id` (a route param) opens a past chat, from Past chats
+// (app/assistant/history.js); `at` makes a repeat pick land. The mic in the
+// composer works like the quick-add mic: hold, speak, let go, and the words
+// are sent as if typed.
 export default function Assistant() {
   if (!FLAGS.ai) return <Redirect href="/more" />;
   return <AssistantChat />;
@@ -81,9 +89,11 @@ function AssistantChat() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const params = useLocalSearchParams();
   const { activeAccountId } = useAccount();
-  const [conversationId, setConversationId] = useState(null);
-  const { messages, loading, refetch } = useAssistantConversation(conversationId);
+  const [conversationId, setConversationId] = useState(params.id || null);
+  const { messages, loading, loadedId, refetch } = useAssistantConversation(conversationId);
   const [list, setList] = useState([]);
   const [text, setText] = useState('');
   const [pending, setPending] = useState(null); // { key, text } of the question being answered
@@ -94,7 +104,42 @@ function AssistantChat() {
   // A stored row's id → the key its bubble was first drawn with, so the
   // question doesn't animate in a second time when the refetch replaces it.
   const keysRef = useRef(new Map());
+  // Bumped whenever another chat is opened, so an answer to the old one that
+  // arrives later isn't drawn into the new one. The function stored it anyway.
+  const chatRef = useRef(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Voice (ticket 08): only where the build and phone support it, and gone
+  // for good once the permission is denied with no way to ask again.
+  const { language } = useVoiceLanguage();
+  const [micAllowed, setMicAllowed] = useState(() => voiceSupported());
+  const [listening, setListening] = useState(false);
+  const sessionRef = useRef(null);
+  const heldRef = useRef(false);
+
+  useEffect(() => {
+    if (micAllowed) {
+      micPermission().then(({ granted, canAskAgain }) => {
+        if (!granted && !canAskAgain) setMicAllowed(false);
+      });
+    }
+    return () => sessionRef.current?.stop();
+  }, []);
+
+  function openChat(id) {
+    chatRef.current += 1;
+    keysRef.current = new Map();
+    setConversationId(id || null);
+    setList([]);
+    setPending(null);
+    setFailure(null);
+    setFreshReplyId(null);
+  }
+
+  // A pick from Past chats (or New chat there).
+  useEffect(() => {
+    if (params.at) openChat(params.id);
+  }, [params.id, params.at]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return undefined;
@@ -111,22 +156,27 @@ function AssistantChat() {
   }, []);
 
   // The stored conversation is the truth; `list` also holds a just-answered
-  // turn until the refetch brings it back. A stored conversation is never
-  // empty, so an empty `messages` is the previous id's, not yet refetched.
+  // turn until the refetch brings it back. Only rows loaded for this very id
+  // count (`loadedId`), so switching chats never shows the old one's rows.
   useEffect(() => {
-    if (conversationId && messages.length) setList(messages);
-  }, [messages, conversationId]);
+    if (!conversationId || loadedId !== conversationId) return;
+    // Loaded and empty: it was deleted from Past chats. Start a new one.
+    if (messages.length) setList(messages);
+    else if (!pending) openChat(null);
+  }, [messages, loadedId, conversationId]);
 
   // Sends a starter chip's `question`, or what's typed when there's none.
   async function send(question) {
     const message = (question ?? text).trim();
     if (!message || pending) return;
+    const chat = chatRef.current;
     turnRef.current += 1;
     const key = `turn-${turnRef.current}`;
     setFailure(null);
     setPending({ key, text: message });
     setText('');
     const result = await aiChat({ conversationId, message, accountId: activeAccountId });
+    if (chat !== chatRef.current) return;
     if (result.ok) {
       const question = result.question ?? { id: key, role: 'user', content: message };
       keysRef.current.set(question.id, key);
@@ -144,7 +194,57 @@ function AssistantChat() {
     setPending(null);
   }
 
-  const canSend = text.trim().length > 0 && !pending;
+  async function handleMicIn() {
+    if (listening || pending) return;
+    heldRef.current = true;
+    const { granted } = await micPermission();
+    if (!granted) {
+      // The first press only asks; the next hold talks.
+      const asked = await micPermission({ ask: true });
+      if (!asked.granted && !asked.canAskAgain) setMicAllowed(false);
+      return;
+    }
+    if (!heldRef.current) return;
+    Keyboard.dismiss();
+    setFailure(null);
+    setListening(true);
+    const session = await startListening({
+      lang: language,
+      continuous: true,
+      onText: setText,
+      onEnd: ({ text: heard, error }) => {
+        sessionRef.current = null;
+        setListening(false);
+        if (error === 'not-allowed') {
+          setMicAllowed(false);
+          return;
+        }
+        if (!heard) {
+          setFailure(FAIL_TEXT.unheard);
+          return;
+        }
+        // Sent exactly as if typed. This callback was made in an older
+        // render, so it goes through the ref to the latest send().
+        sendRef.current(heard);
+      },
+    });
+    sessionRef.current = session;
+    // Let go before the recognizer was ready.
+    if (!heldRef.current) session.stop();
+  }
+
+  function handleMicOut() {
+    heldRef.current = false;
+    sessionRef.current?.stop();
+  }
+
+  const sendRef = useRef(send);
+  sendRef.current = send;
+
+  const canSend = text.trim().length > 0 && !pending && !listening;
+  // The mic takes the send button's place while the composer is empty, as
+  // in messaging apps, and stays while it listens.
+  const showMic = micAllowed && !pending && (listening || text.trim().length === 0);
   const showEmpty = !loading && list.length === 0 && !pending;
 
   return (
@@ -157,6 +257,24 @@ function AssistantChat() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={headerHeight}
     >
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <View style={styles.headerButtons}>
+              {list.length > 0 ? (
+                <HeaderButton icon={SquarePen} label="New chat" onPress={() => openChat(null)} colors={colors} styles={styles} />
+              ) : null}
+              <HeaderButton
+                icon={History}
+                label="Past chats"
+                onPress={() => router.push('/assistant/history')}
+                colors={colors}
+                styles={styles}
+              />
+            </View>
+          ),
+        }}
+      />
       <ScrollView
         ref={scrollRef}
         style={styles.flex}
@@ -222,16 +340,38 @@ function AssistantChat() {
           style={styles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Ask about your spending"
+          placeholder={listening ? 'Listening…' : 'Ask about your spending'}
           placeholderTextColor={colors.muted}
           multiline
           maxLength={MAX_MESSAGE}
-          editable={!pending}
+          editable={!pending && !listening}
           accessibilityLabel="Your question"
         />
-        <SendButton enabled={canSend} onPress={() => send()} colors={colors} styles={styles} />
+        {showMic ? (
+          <Pressable
+            onPressIn={handleMicIn}
+            onPressOut={handleMicOut}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={listening ? 'Listening. Let go to send' : 'Hold to speak'}
+          >
+            <View style={[styles.send, listening ? styles.micListening : styles.mic]}>
+              <Mic size={20} color={listening ? colors.brandText : colors.ink} strokeWidth={2.4} />
+            </View>
+          </Pressable>
+        ) : (
+          <SendButton enabled={canSend} onPress={() => send()} colors={colors} styles={styles} />
+        )}
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+function HeaderButton({ icon: Icon, label, onPress, colors, styles }) {
+  return (
+    <Pressable onPress={onPress} style={styles.headerButton} hitSlop={4} accessibilityRole="button" accessibilityLabel={label}>
+      <Icon size={20} color={colors.ink} strokeWidth={2} />
+    </Pressable>
   );
 }
 
@@ -472,6 +612,22 @@ function makeStyles(colors) {
       fontFamily: fontFamily.semibold,
       fontSize: type.body,
       color: colors.ink,
+    },
+    mic: {
+      backgroundColor: colors.chipBg,
+    },
+    micListening: {
+      backgroundColor: colors.brand,
+    },
+    headerButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    headerButton: {
+      width: hitTarget,
+      height: hitTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     send: {
       width: 44,

@@ -6,15 +6,20 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 // oldest first. Only the person's questions and the answers. An answer's
 // tool_calls (the tool log, results included) is loaded so its breakdown
 // tables can be drawn again. A null id is a new chat: no messages.
+//
+// `loadedId` is the id `messages` belong to, so a screen that switches
+// conversations (past chats, ticket 08) never shows one chat's rows under
+// another's id. A loaded id with no messages means the conversation is gone
+// (deleted from Past chats): stored conversations are never empty.
 export default function useAssistantConversation(conversationId) {
   const { version } = useDataRefresh();
   const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(!!conversationId);
+  const [loadedId, setLoadedId] = useState(conversationId ? undefined : null);
 
   const refetch = useCallback(async () => {
     if (!conversationId) {
       setMessages([]);
-      setLoading(false);
+      setLoadedId(null);
       return;
     }
     const { data, error } = await supabase
@@ -23,13 +28,15 @@ export default function useAssistantConversation(conversationId) {
       .eq('conversation_id', conversationId)
       .in('role', ['user', 'assistant'])
       .order('created_at', { ascending: true });
-    if (!error) setMessages(data ?? []);
-    setLoading(false);
+    if (error) return;
+    setMessages(data ?? []);
+    setLoadedId(conversationId);
   }, [conversationId]);
 
   useEffect(() => {
     refetch();
   }, [refetch, version]);
 
-  return { messages, loading, refetch };
+  const loading = loadedId !== conversationId;
+  return { messages: loading ? [] : messages, loading, loadedId, refetch };
 }

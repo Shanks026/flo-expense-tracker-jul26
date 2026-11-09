@@ -17,12 +17,13 @@ Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say w
   - every number comes from server code, never from the model.
 
 ## Where it stands
-- **Branch:** `feat/spec44-ai-quick-add-voice` (PR #1). Not pushed since `cc325c5`.
-- **Done and resolved:** tickets 01–07 and 12, with these commits:
+- **Branch:** `feat/spec44-ai-quick-add-voice` (PR #1), pushed after ticket 08.
+- **Done and resolved:** tickets 01–08 and 12, with these commits:
   - `20edc1c`: ticket 06;
   - `ddba4e0`: ticket 12;
-  - `0ac1991`: ticket 07.
-- **Next:** ticket 08 (past chats, the Home sparkle, and the mic in the composer), then 09, 10 and 11 (proposals). Ticket 09 waits for 08.
+  - `0ac1991`: ticket 07;
+  - the ticket 08 commit (past chats, Home sparkle, composer mic; app only, no function change).
+- **Next:** tickets 09, 10 and 11 (proposals), in that order.
 - **`ai-assistant` is deployed** with every change up to ticket 07.
 
 ## What Ask FLO is now
@@ -54,7 +55,7 @@ Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say w
 Build one standalone APK when 08–11 are done. The phone currently runs a pre-06 APK, with no Ask FLO. Then check on the phone:
 - **Ticket 07:** the median chat turn is ≤ 4 s. The function's p50 is 3.7 s and the app adds about 0.4 s, so it's likely just over. The ideas in spec 44's Implementation Notes apply: parallel lookups, a shorter prompt, the region.
 - **Ask FLO overall,** in light and dark: the keyboard and composer, the tables, and the chips.
-- **The phone checks from tickets 09 and 11.**
+- **The phone checks from tickets 08 (a spoken question in the composer), 09 and 11.**
 
 ## Decisions made today
 - **Paise:** answers show paise when there are any, to match `formatMoney` and so match Insights exactly. Spec 44 still says "no decimals"; update the spec at some point.
