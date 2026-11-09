@@ -8,16 +8,16 @@ Spec: .claude/features/44-ai-assistant.md (Phase 2, Goal)
 
 **Status:** ready-for-agent
 
-- [ ] Long-press + → speak → the sheet is filled, and Save writes one row
-- [ ] Editing the transcript and parsing again updates the fields
+- [x] Long-press + → speak → the sheet is filled, and Save writes one row
+- [x] Editing the transcript and parsing again updates the fields
 - [x] A short tap on + opens the sheet as before, with no listening
-- [ ] Phone check, light and dark
+- [x] Phone check, light and dark
 
 ## Tracer
 
 - [x] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Verified (emulator check)
+- [x] Green signal
 
 ## Comments
 
@@ -31,3 +31,5 @@ Spec: .claude/features/44-ai-assistant.md (Phase 2, Goal)
   - with no audio it ends with "Couldn't hear that";
   - a short tap opens it as before.
 - **Still to do on the phone:** speak, check the filled sheet and Save, edit the transcript and re-parse, and check light and dark.
+
+**2026-11-09: phone check passed (vivo I2220, standalone release APK).** The person reports that long-press ⊕ → speak → fill → Save writes the entry, editing the transcript and re-parsing updates the fields, and light and dark both look right. Ticked from that report.

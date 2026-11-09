@@ -4,11 +4,16 @@
 // and calls OpenRouter over plain HTTP, with no SDK. The app never holds the
 // key and never calls a model itself.
 //
-// Mode so far (ticket 02):
+// Modes:
 //   POST { mode: 'quick_add', text, today: 'YYYY-MM-DD', time: 'HH:mm', tz }
 //   → { ok: true, prefill: { type, amount, categoryId, accountId, date, note } }
 //   | { ok: false, reason: 'unread' | 'transfer' | 'cap' | 'error' }
-// Chat comes in later tickets.
+//
+//   POST { mode: 'chat', conversation_id?, message, today, time, tz, account_id? }
+//   → { ok: true, conversation_id, question, reply }
+//   | { ok: false, reason: 'cap' | 'error' }
+//   Read-only chat (phase 3, see chat.ts). account_id is the app's active
+//   account, the one Insights shows by default.
 //
 // The phase 1 test screen (app/dev/ai-eval.js, ticket 03) adds
 //   eval: { accounts: [{ id, name }], categories: [{ id, name, type }] }
@@ -32,31 +37,13 @@
 // Secrets: OPENROUTER_API_KEY, AI_MODEL_QUICK, AI_MODEL_FALLBACK,
 // AI_DAILY_QUICK (default 200).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { CORS_HEADERS, OPENROUTER_URL, json, isYmd } from './shared.ts';
+import { handleChat } from './chat.ts';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const QUICK_TIMEOUT_MS = 8000;
 const MAX_TEXT = 200;
 const MAX_AMOUNT = 10_000_000; // ₹1 crore, the same ceiling as the phone's parser
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-  });
-}
-
-// A real calendar date: Date.parse alone would roll 2026-02-31 into March.
-const isYmd = (s: unknown): s is string => {
-  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-};
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: 'expense' | 'income' };
@@ -198,6 +185,7 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'bad_request' }, 400);
   }
+  if (body.mode === 'chat') return handleChat(supabase, body);
   if (body.mode !== 'quick_add') return json({ error: 'unknown_mode' }, 400);
 
   const text = typeof body.text === 'string' ? body.text.trim() : '';

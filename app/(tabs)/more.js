@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Wallet, Receipt, Users, Landmark, Grid2x2, Settings, Crown } from 'lucide-react-native';
+import { Wallet, Receipt, Users, Landmark, Grid2x2, Settings, Crown, Sparkles } from 'lucide-react-native';
 import Screen from '../../components/Screen';
 import Row, { RowGroup } from '../../components/Row';
 import { fontFamily, fontSize, spacing } from '../../theme/tokens';
@@ -21,6 +21,13 @@ export default function More() {
         More
       </Text>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Ask FLO (44-ai-assistant.md, phase 3), hidden with the AI flag. */}
+        {FLAGS.ai && (
+          <RowGroup>
+            <Row icon={Sparkles} title="Ask FLO" onPress={() => router.push('/assistant')} />
+          </RowGroup>
+        )}
+
         <RowGroup title="Money">
           <Row icon={Wallet} title="Budgets" onPress={() => router.push('/budgets')} />
           <Row icon={Receipt} title="Bills" onPress={() => router.push('/bills')} />

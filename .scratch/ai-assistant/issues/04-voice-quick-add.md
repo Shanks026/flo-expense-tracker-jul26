@@ -11,15 +11,15 @@ This is the native rebuild: the speech library (`expo-speech-recognition` is rec
 **Status:** ready-for-agent
 
 - [x] If the permission is denied, the mic hides and typing still works
-- [ ] 9 of 10 spoken test phrases fill the sheet correctly, on the phone
-- [ ] Release-to-text takes under 1 s, on the phone
+- [x] 9 of 10 spoken test phrases fill the sheet correctly, on the phone
+- [x] Release-to-text takes under 1 s, on the phone
 - [x] The language setting switches between English and Tamil, and is remembered
 
 ## Tracer
 
 - [x] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Verified (emulator check)
+- [x] Green signal
 
 ## Comments
 
@@ -39,3 +39,5 @@ This is the native rebuild: the speech library (`expo-speech-recognition` is rec
   - release-to-text under 1 s (dev builds log `voice: release to text … ms`).
   The emulator's mic doesn't receive host audio.
 - The phone needs this new native build, installed over adb / `expo run:android`.
+
+**2026-11-09: phone check passed (vivo I2220, standalone release APK).** The person reports that at least 9 of 10 spoken phrases filled the sheet correctly and the text appeared in under 1 s. Ticked from that report.
