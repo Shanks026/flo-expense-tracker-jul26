@@ -1,9 +1,11 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Keyboard } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { Sparkles } from 'lucide-react-native';
-import { spacing, fontFamily, fontSize } from '../theme/tokens';
+import { Sparkles, Mic } from 'lucide-react-native';
+import { spacing, fontFamily, fontSize, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
+import { voiceSupported, micPermission, startListening } from '../lib/voice';
+import useVoiceLanguage from '../hooks/useVoiceLanguage';
 
 // The Add sheet's quick-add line (44-ai-assistant.md, Phase 1 §1.3). The
 // person types "120 lunch nethu" and taps the keyboard's done key; `parse`
@@ -21,10 +23,17 @@ import { useTheme } from '../theme/ThemeContext';
 // text, cleared whenever `resetKey` changes (once per open). The sheet keeps
 // it mounted rather than remounting it per open: Android won't raise the
 // keyboard for a focus() on an input that was only just mounted.
+//
+// Voice (Phase 2, ticket 04): hold the mic at the end of the line and speak.
+// The words appear in the line as they're heard; letting go submits them
+// exactly as if typed, and the text stays editable for a fix and a re-run.
+// The mic permission is asked on the first press, never earlier; once it's
+// denied for good the mic hides and typing works as before.
 const MESSAGES = {
   unread: "Couldn't read that",
   transfer: 'Use Transfer for two accounts',
   cap: 'Daily AI limit reached',
+  unheard: "Couldn't hear that",
 };
 
 const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, resetKey, hidden }, ref) {
@@ -38,19 +47,83 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
   // still matches.
   const requestRef = useRef(0);
 
+  // Voice: shown only where the build and the phone support it, and hidden
+  // for good once the permission is denied without a way to ask again.
+  const { language } = useVoiceLanguage();
+  const [micAllowed, setMicAllowed] = useState(() => voiceSupported());
+  const [listening, setListening] = useState(false);
+  const sessionRef = useRef(null);
+  const heldRef = useRef(false);
+
+  useEffect(() => {
+    if (!micAllowed) return;
+    micPermission().then(({ granted, canAskAgain }) => {
+      if (!granted && !canAskAgain) setMicAllowed(false);
+    });
+  }, []);
+
   useEffect(() => {
     requestRef.current += 1;
     setText('');
     setMessage(null);
     setThinking(false);
+    sessionRef.current?.stop();
   }, [resetKey]);
 
-  async function handleSubmit() {
+  async function handleMicIn() {
+    heldRef.current = true;
+    const { granted } = await micPermission();
+    if (!granted) {
+      // The first press only asks; the next hold talks.
+      const asked = await micPermission({ ask: true });
+      if (!asked.granted && !asked.canAskAgain) setMicAllowed(false);
+      return;
+    }
+    if (!heldRef.current) return;
+    requestRef.current += 1;
+    Keyboard.dismiss();
+    setMessage(null);
+    setThinking(false);
+    setListening(true);
+    setText('');
+    const session = await startListening({
+      lang: language,
+      onText: setText,
+      onEnd: ({ text: heard, error }) => {
+        sessionRef.current = null;
+        setListening(false);
+        if (error === 'not-allowed') {
+          setMicAllowed(false);
+          return;
+        }
+        if (!heard) {
+          setMessage('unheard');
+          return;
+        }
+        setText(heard);
+        submit(heard);
+      },
+    });
+    sessionRef.current = session;
+    // Let go before the recognizer was ready.
+    if (!heldRef.current) session.stop();
+  }
+
+  function handleMicOut() {
+    heldRef.current = false;
+    sessionRef.current?.stop();
+  }
+
+  function handleSubmit() {
+    submit(text);
+  }
+
+  async function submit(line) {
     // One model call at a time: a second ✓ while it thinks would be billed
     // and counted against the daily cap for nothing.
-    if (!text.trim() || thinking) return;
+    if (!line.trim() || thinking || listening) return;
     const request = ++requestRef.current;
-    const local = parse(text);
+    const local = parse(line);
     if (local) {
       setMessage(null);
       setThinking(false);
@@ -63,7 +136,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
     }
     setMessage(null);
     setThinking(true);
-    const { prefill, reason } = await ask(text);
+    const { prefill, reason } = await ask(line);
     if (request !== requestRef.current) return;
     setThinking(false);
     if (prefill) {
@@ -91,7 +164,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
             }
           }}
           onSubmitEditing={handleSubmit}
-          placeholder="Type it: 40 lunch today"
+          placeholder={listening ? 'Listening…' : micAllowed ? 'Type or hold the mic' : 'Type it: 40 lunch today'}
           placeholderTextColor={colors.mutedLight}
           returnKeyType="done"
           autoCorrect={false}
@@ -107,6 +180,18 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
           <Text style={styles.message} accessibilityLiveRegion="polite">
             {MESSAGES[message]}
           </Text>
+        )}
+        {micAllowed && !thinking && (
+          <Pressable
+            onPressIn={handleMicIn}
+            onPressOut={handleMicOut}
+            hitSlop={8}
+            style={[styles.mic, listening && styles.micListening]}
+            accessibilityRole="button"
+            accessibilityLabel={listening ? 'Listening. Let go to finish' : 'Hold to speak'}
+          >
+            <Mic size={18} color={listening ? colors.brandText : colors.ink} strokeWidth={2.2} />
+          </Pressable>
         )}
       </View>
     </View>
@@ -140,6 +225,17 @@ function makeStyles(colors) {
       fontSize: fontSize.md,
       color: colors.ink,
       paddingVertical: 8,
+    },
+    mic: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.full,
+      backgroundColor: colors.chipBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    micListening: {
+      backgroundColor: colors.brand,
     },
     message: {
       fontFamily: fontFamily.medium,

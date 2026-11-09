@@ -10,13 +10,32 @@ This is the native rebuild: the speech library (`expo-speech-recognition` is rec
 
 **Status:** ready-for-agent
 
-- [ ] If the permission is denied, the mic hides and typing still works
+- [x] If the permission is denied, the mic hides and typing still works
 - [ ] 9 of 10 spoken test phrases fill the sheet correctly, on the phone
 - [ ] Release-to-text takes under 1 s, on the phone
-- [ ] The language setting switches between English and Tamil, and is remembered
+- [x] The language setting switches between English and Tamil, and is remembered
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-11-09: built and checked on Pixel_API_36. The spoken checks need the phone.**
+- **Library:** `expo-speech-recognition@3.1.3`, the library's own `sdk-54` release. The 58.x line is for newer SDKs.
+- **Personal build only:** `app.config.js` adds the speech plugin and lifts the `RECORD_AUDIO` block. It also drops expo-image-picker's `microphonePermission: false`, which was stripping `RECORD_AUDIO` from the manifest. The lite build keeps the mic blocked and the button hidden (`extra.voiceEnabled`).
+- **Manifest** after `prebuild --clean`: `RECORD_AUDIO` is present, CAMERA is still removed, and there are queries for `googlequicksearchbox` and `com.google.android.tts` RecognitionService.
+- **Code:** `lib/voice.js` holds the language (`en-IN` / `ta-IN`, kept on the device), the permission, and the hold-to-talk session. It prefers on-device recognition when the language pack is installed. `QuickAddField` gets the mic. Settings → Preferences gets a Voice language row.
+- **Emulator:**
+  - the first hold asks for the permission;
+  - two denials hide the mic and typing still works;
+  - after a grant, holding shows "Listening…" and Android's mic indicator;
+  - release with no audio gives "Couldn't hear that";
+  - Tamil survives an app restart.
+- **Still to do on the phone:**
+  - 9 of 10 spoken phrases fill the sheet;
+  - release-to-text under 1 s (dev builds log `voice: release to text … ms`).
+  The emulator's mic doesn't receive host audio.
+- The phone needs this new native build, installed over adb / `expo run:android`.

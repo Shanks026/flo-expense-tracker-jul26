@@ -9,6 +9,13 @@ const AUTO_DETECT = process.env.FLO_VARIANT !== 'lite';
 
 const AUTO_DETECT_MODULE = 'flo-notification-listener';
 
+// Voice quick add (44-ai-assistant.md, Phase 2) is personal-build only for
+// now. app.json blocks RECORD_AUDIO for every build (32-safe-closed-test-build.md);
+// the personal build lifts that and adds the speech plugin, while lite (the
+// store/closed-test variant) keeps the mic blocked and the mic button hidden,
+// until a store build can justify the permission.
+const VOICE = process.env.FLO_VARIANT !== 'lite';
+
 // expo-modules-autolinking resolves its `exclude` list from package.json's
 // `expo.autolinking.exclude` at prebuild time — that's the ONLY thing that
 // actually keeps the native FloNotificationListenerService (and the
@@ -53,6 +60,32 @@ syncAutolinkingExclude();
 
 module.exports = ({ config }) => ({
   ...config,
+  plugins: VOICE
+    ? [
+        // expo-image-picker's `microphonePermission: false` (app.json) also
+        // strips RECORD_AUDIO from the manifest, so the personal build drops
+        // that one option; the picker itself never records audio here.
+        ...(config.plugins ?? []).map((plugin) => {
+          if (!Array.isArray(plugin) || plugin[0] !== 'expo-image-picker') return plugin;
+          const { microphonePermission, ...options } = plugin[1] ?? {};
+          return [plugin[0], options];
+        }),
+        [
+          'expo-speech-recognition',
+          {
+            microphonePermission: 'Allow FLO to use the microphone to hear what you spent.',
+            speechRecognitionPermission: 'Allow FLO to turn what you say into text.',
+            androidSpeechServicePackages: ['com.google.android.googlequicksearchbox', 'com.google.android.tts'],
+          },
+        ],
+      ]
+    : config.plugins,
+  android: {
+    ...config.android,
+    blockedPermissions: VOICE
+      ? (config.android?.blockedPermissions ?? []).filter((p) => p !== 'android.permission.RECORD_AUDIO')
+      : config.android?.blockedPermissions,
+  },
   extra: {
     ...config.extra,
     // Read via Constants.expoConfig.extra.autoDetectEnabled (lib/detect.js,
@@ -61,5 +94,7 @@ module.exports = ({ config }) => ({
     // on boot (JS tries to call a native module that isn't linked) or show
     // dead UI for a feature that can't work.
     autoDetectEnabled: AUTO_DETECT,
+    // Read via Constants.expoConfig.extra.voiceEnabled (lib/voice.js).
+    voiceEnabled: VOICE,
   },
 });

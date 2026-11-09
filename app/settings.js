@@ -27,6 +27,7 @@ import {
   CalendarDays,
   Cat,
   Sparkles,
+  Mic,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
@@ -44,6 +45,8 @@ import useProfile from '../hooks/useProfile';
 import useCurrency from '../hooks/useCurrency';
 import useEntitlement from '../hooks/useEntitlement';
 import useAnalyticsConsent from '../hooks/useAnalyticsConsent';
+import useVoiceLanguage from '../hooks/useVoiceLanguage';
+import { voiceSupported, VOICE_LANGUAGES } from '../lib/voice';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
@@ -105,6 +108,8 @@ function timeOnTodayFromString(timeStr, fallbackHour, fallbackMinute) {
 }
 
 export default function Settings() {
+  const { language: voiceLanguage, setLanguage: setVoiceLanguage } = useVoiceLanguage();
+  const showVoiceLanguage = useMemo(() => voiceSupported(), []);
   const router = useRouter();
   const { session, deleteAccount, signOut } = useAuth();
   const { profile, avatarUrl, updateProfile, loading: profileLoading } = useProfile();
@@ -617,6 +622,18 @@ export default function Settings() {
               value={format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
               onPress={() => setShowResetDatePicker(true)}
             />
+          )}
+          {/* The quick-add mic's language (44-ai-assistant.md, Phase 2),
+              kept on this device. */}
+          {showVoiceLanguage && (
+            <Row icon={Mic} title="Voice language" hint="What the quick-add mic listens for">
+              <SegmentedChoice
+                accessibilityLabel="Voice language"
+                options={VOICE_LANGUAGES}
+                value={voiceLanguage}
+                onChange={setVoiceLanguage}
+              />
+            </Row>
           )}
           {/* value is the EFFECTIVE display currency (useCurrency →
               activeAccount.currency), matching what the app actually shows,
