@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingScreen from '../../../components/OnboardingScreen';
-import Koban from '../../../components/koban/Koban';
+import Illustration from '../../../components/ledger/Illustration';
 import { useToast } from '../../../components/Toast';
 import { fontFamily, fontSize, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
@@ -12,7 +12,7 @@ import { track, trackStepViewed } from '../../../lib/track';
 import useAnalyticsConsent from '../../../hooks/useAnalyticsConsent';
 
 
-// The opener (35-onboarding-v3.md) — the whole pre-auth intro now. Koban, one
+// The opener (35-onboarding-v3.md) — the whole pre-auth intro now. One object, one
 // line of value, and Continue with Google; email sign-up sits behind "Other
 // options", and "I have an account" goes to sign-in. No questions: the
 // account, INR, categories and weekly report are set up at sign-up, and the
@@ -23,7 +23,7 @@ import useAnalyticsConsent from '../../../hooks/useAnalyticsConsent';
 // through wait in the queue; the first sign-in copies it to a new account's
 // profile (lib/track.js).
 export default function Opener() {
-  const { colors, modeId } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { showToast } = useToast();
@@ -72,7 +72,7 @@ export default function Opener() {
       bg="light"
       hero={
         <View style={styles.heroWrap}>
-          <Koban size={136} pose="hello" mood="happy" scarf surface={modeId} style={styles.mascotSpacing} />
+          <Illustration name="coins" size="large" style={styles.heroObject} />
           <Text style={styles.value}>Know where your money goes, a few seconds a day.</Text>
         </View>
       }
@@ -118,7 +118,7 @@ function makeStyles(colors) {
     alignSelf: 'stretch',
     alignItems: 'center',
   },
-  mascotSpacing: {
+  heroObject: {
     marginBottom: spacing.lg,
   },
   value: {

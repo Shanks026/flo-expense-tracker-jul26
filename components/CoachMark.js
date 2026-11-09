@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
-import Koban from './koban/Koban';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
@@ -10,7 +9,7 @@ import { useRewardBurst } from './RewardBurst';
 import { useAnyMomentActive } from '../lib/momentQueue';
 
 
-// Coach marks (35-onboarding-v3.md): a Koban moment that rings one element,
+// Coach marks (35-onboarding-v3.md): a moment that rings one element,
 // says one line, and goes away on a tap — shown once per mark, per user, and
 // only to users who finished onboarding after these shipped (anyone earlier
 // already knows the app). They wait while any celebration is on screen.
@@ -66,7 +65,7 @@ function useSeen(userId, id) {
 // `active`: the owning screen's own condition (e.g. "on Home", "has logged").
 // `after`: another mark's id that must be seen first.
 export default function CoachMark({ id, targetRef, text, active = true, after = null }) {
-  const { colors, modeId } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { width: screenWidth } = useWindowDimensions();
   const { session } = useAuth();
@@ -144,7 +143,6 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
         {frame ? <View style={[styles.ring, ring]} pointerEvents="none" /> : null}
         {frame ? (
           <View style={[styles.bubble, bubblePosition, { maxWidth: screenWidth - spacing.lg * 2 }]}>
-            <Koban size={40} pose="tip" mood="happy" surface={modeId} style={styles.koban} />
             <View style={styles.bubbleBody}>
               <Text style={styles.text}>{text}</Text>
               <Text style={styles.hint}>Tap anywhere to continue</Text>
@@ -173,15 +171,9 @@ function makeStyles(colors) {
       position: 'absolute',
       left: spacing.lg,
       right: spacing.lg,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
       backgroundColor: colors.surface,
       borderRadius: radii.card,
       padding: spacing.lg,
-    },
-    koban: {
-      alignSelf: 'flex-end',
     },
     bubbleBody: {
       flex: 1,

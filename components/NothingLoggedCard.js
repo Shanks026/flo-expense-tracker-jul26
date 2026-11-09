@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { format } from 'date-fns';
 import Card from './Card';
 import Button from './Button';
-import Koban from './koban/Koban';
 import { useToast } from './Toast';
 import { fontFamily, spacing, type } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -19,7 +18,7 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 // (34-streak-only.md), which has no other home. Hidden while the day's state
 // loads, so it never flashes on a day that's already covered.
 export default function NothingLoggedCard() {
-  const { colors, modeId } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { state, loading } = useDayState();
   const { notifyChanged } = useDataRefresh();
@@ -59,8 +58,6 @@ export default function NothingLoggedCard() {
               style={styles.noSpendButton}
             />
           </View>
-          {/* Stands on the card's bottom edge, wondering. */}
-          <Koban size={84} pose="hmm" surface={modeId} style={styles.koban} accessibilityLabel="Koban" />
         </View>
       </Card>
 
@@ -86,18 +83,14 @@ function makeStyles(colors) {
   return StyleSheet.create({
     card: {
       marginBottom: spacing.md,
-      // Koban sits on the bottom edge, so the card's own bottom padding
-      // goes; the text column keeps its breathing room instead.
-      paddingBottom: 0,
     },
     row: {
       flexDirection: 'row',
-      alignItems: 'flex-end',
+      alignItems: 'center',
       gap: spacing.md,
     },
     body: {
       flex: 1,
-      paddingBottom: spacing.lg,
     },
     title: {
       fontFamily: fontFamily.extrabold,
@@ -115,9 +108,6 @@ function makeStyles(colors) {
       alignSelf: 'flex-start',
       paddingHorizontal: spacing.xl,
       marginTop: spacing.md,
-    },
-    koban: {
-      marginRight: -spacing.xs,
     },
     overlay: {
       flex: 1,

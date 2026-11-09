@@ -30,7 +30,7 @@ Three decisions the plan left open were settled for this spec on 2026-11-10:
 
 ```
 Phase 1 — Foundations
-  Finish the token set, add FLAGS.accents and FLAGS.mascot (both off), build
+  Finish the token set, add FLAGS.accents (off), delete Koban, build
   the ten missing kit components, make Day the free default card theme, apply
   the paise rule, and rebuild the Ask FLO proposal card and Settings on the
   kit as the proving ground.
@@ -193,7 +193,7 @@ Every feature stays. Flagged-off features keep their flags and get the same look
 
 ### Flags and the developer (both phases)
 100. As the developer, I want `FLAGS.accents` (off) to hide the accent picker while keeping the code and stored `theme_accent`, so that "flagged off" never means deleted.
-101. As the developer, I want `FLAGS.mascot` (off) to stop Koban rendering anywhere, with his components and the dev gallery kept, so that he can come back after a redraw.
+101. As the developer, I want Koban deleted (code, poses and dev gallery), with each of his places showing an `Illustration` object or nothing, so that no placeholder cartoon is left in the app.
 102. As the developer, I want `economy`, `plans`, `billing`, `splitInvites` and `currencyPicker` to keep working exactly as now on every moved screen, so that the restyle changes no behaviour.
 103. As the developer, I want the old components left in place until the last screen moves, so that unmoved screens keep working between tickets.
 104. As the developer, I want one node check script for the pure rules, so that I can check money formatting, grouping, filtering and history without the app.
@@ -227,9 +227,10 @@ Every feature stays. Flagged-off features keep their flags and get the same look
   - the stored `profiles.theme_accent` is neither read nor written;
   - unmoved old-token screens resolve the default accent until they move.
   - Turning it on later lets the choice repaint `accent` only (never the primary).
-- **`FLAGS.mascot`**, off:
-  - the Koban component renders an `Illustration` instead of the cat, using a fixed pose → object map (for example a celebrating pose → `trophy`, the default → `coins`), so every existing call site degrades in one place;
-  - the Koban components, poses and the dev gallery stay.
+- **Koban is deleted (decided 2026-11-10, replacing the planned `FLAGS.mascot`):**
+  - his component, art, faces, poses and the dev gallery are removed, with no flag;
+  - each call site changes directly: the onboarding opener, the share-usage ask, streak celebrations and the old `EmptyState` show an `Illustration` object (the old `EmptyState` maps the pose its callers pass to the nearest object); the coach mark, the nothing-logged card and the streak hero show no art;
+  - the streak copy helpers in `lib/koban.js` are text and stay.
   - Phases 3 and 5 replace those call sites properly.
 - Existing flags are respected on every moved screen:
   - `economy`: no coins, XP or rank on Home or in Settings;
@@ -258,13 +259,13 @@ Built components are adopted. "Retires" means the old file stops being used by m
 | `Callout` | new (P1) | ad-hoc info cards and paragraph rows | `info` (sunk), `warn` (warnSoft), `danger` (dangerSoft); icon plus one line, optional action | — |
 | `ProgressBar` | new (P1) | `components/ProgressBar.js` | 4 dp, `accent` on a `surfaceSunk` track; `warn` past 80 %, `danger` past 100 % | — |
 | `Timeline` | new (P1) | — | a vertical step list: a dot per step, a title, a muted time/sub, a connecting hairline; the last step has no line | — |
-| `Illustration` | new (P1) | Koban on everyday screens, emoji art | named objects `coins`, `token`, `whistle`, `calendar`, `receipt`, `spark`, `trophy`; sizes `small` / `large`. **Until the 3D assets exist** (plan §6 open item 2), each name renders a lucide glyph in a large sunk circle. Swapping in the PNG/WebP files later is a data change inside this component only | `mascot` |
-| `EmptyState` | new (P1) | `components/EmptyState.js` (Koban) | small `Illustration`, a title, one line, an optional secondary button | `mascot` |
+| `Illustration` | new (P1) | Koban on everyday screens, emoji art | named objects `coins`, `token`, `whistle`, `calendar`, `receipt`, `spark`, `trophy`; sizes `small` / `large`. **Until the 3D assets exist** (plan §6 open item 2), each name renders a lucide glyph in a large sunk circle. Swapping in the PNG/WebP files later is a data change inside this component only | — |
+| `EmptyState` | new (P1) | `components/EmptyState.js` (Koban) | small `Illustration`, a title, one line, an optional secondary button | — |
 | `Sheet` | new (P1) | the per-sheet chrome inside every `Add*Sheet` | wraps `@gorhom/bottom-sheet`: one handle, a title row with a circle X, a scrollable body, a `PinnedFooter`; radius 20; a soft shadow in light mode, a hairline top edge in dark mode. **Keeps the existing `<XSheetProvider>` + `useXSheet()` opener pattern**: `Sheet` is the visual shell inside each provider, not a new provider | — |
 | `QuickActions` | built | Home's action buttons | three equal 64 dp sunk tiles; hides Transfer with fewer than 2 accounts | `ai` |
 | `WeekLine` | built | `IncomeExpenseChart` / daily bars on Home | line plus area in `accent`, dotted average, today's dot, tap a day for its total, empty-week note | — |
 | `AccountCardCarousel` | built | `AccountHeroCarousel`, `AccountDots` | 2:1 themed card, name, optional `•••• last4` (spec 45), swipe, dots, card-shaped skeleton | `themes` |
-| Today prompt | new (P2), a `ListRow` composition | `NothingLoggedCard` | a bordered row "Nothing logged today" with a compact No spend button; shown only while nothing is logged today | `mascot` (no Koban) |
+| Today prompt | new (P2), a `ListRow` composition | `NothingLoggedCard` | a bordered row "Nothing logged today" with a compact No spend button; shown only while nothing is logged today | — |
 | Tab bar | restyled (P2) | `components/TabBar.js` look | ink + button; labels Home, Activity, Insights, You; long-press + unchanged | — |
 | Toast | restyled (P2) | `components/Toast.js` entrance | fades in place, no slide; Undo stays | — |
 | `ProposalCard` | restyled (P1) | its `Card` usage | the one `surface` card with a hairline border; Review primary, Dismiss quiet, "Saved ✓" positive caption | `ai` |
@@ -412,7 +413,7 @@ revoke execute on function public.stamp_transaction_updated_at() from public, an
 - Bill and plan icons from names (plan §2.6, Phase 4).
 - An audit-log table or a full edit history. History shows created, last edited and split link only.
 - Backfilling `source` for existing rows.
-- Changing any feature's behaviour, gate, query or flag default other than adding `accents` and `mascot` (both off).
+- Changing any feature's behaviour, gate, query or flag default other than adding `accents` (off) and deleting Koban.
 
 ## Further Notes
 

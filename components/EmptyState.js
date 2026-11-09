@@ -1,21 +1,30 @@
 import { useMemo } from 'react';
 import { Text, StyleSheet } from 'react-native';
 import Card from './Card';
-import Koban from './koban/Koban';
+import Illustration from './ledger/Illustration';
 import { fontFamily, spacing, type } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
-// A page's "nothing here yet" (the person's call, 2026-10-27): Koban in a pose
-// that fits the page, a short title, and one line on what to do. For whole
-// lists and sections only; a small note inside a card stays plain text. Koban
-// never sits on a money figure (37-design-system-and-koban.md).
-export default function EmptyState({ pose = 'idle', mood, title, body, style }) {
-  const { colors, modeId } = useTheme();
+// The old screens' "nothing here yet": an object, a short title, and one line
+// on what to do. Koban was deleted (spec 46, 2026-11-10); callers still pass
+// the pose he used to strike, so it maps to the object closest to it. Each
+// screen moves to the ledger EmptyState (components/ledger/) in its own
+// redesign ticket, and this file goes in the cleanup.
+const POSE_OBJECTS = {
+  notepad: 'receipt',
+  report: 'receipt',
+  magnifier: 'receipt',
+  hmm: 'calendar',
+  tip: 'spark',
+};
+
+export default function EmptyState({ pose = 'idle', title, body, style }) {
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <Card style={[styles.card, style]}>
-      <Koban size={96} pose={pose} mood={mood} surface={modeId} style={styles.koban} />
+      <Illustration name={POSE_OBJECTS[pose] ?? 'coins'} size="small" style={styles.object} />
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
@@ -30,7 +39,7 @@ function makeStyles(colors) {
       alignItems: 'center',
       paddingVertical: spacing.xl,
     },
-    koban: {
+    object: {
       marginBottom: spacing.md,
     },
     title: {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from './Button';
-import Koban from './koban/Koban';
+import Illustration from './ledger/Illustration';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
@@ -56,7 +56,7 @@ export default function ShareUsageSource() {
 }
 
 export function ShareUsageMoment({ onDone }) {
-  const { colors, modeId } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const { consent, setConsent } = useAnalyticsConsent();
@@ -83,7 +83,7 @@ export function ShareUsageMoment({ onDone }) {
     <Modal visible transparent animationType="fade" onRequestClose={() => answer(false)}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Koban size={96} pose="hello" mood="happy" scarf surface={modeId} style={styles.mascot} />
+          <Illustration name="spark" size="small" style={styles.object} />
           <Text style={styles.title}>Help improve FLO?</Text>
           <Text style={styles.body}>
             Share anonymous usage, like which screens you open. Never your amounts or notes. You can change this
@@ -115,7 +115,7 @@ function makeStyles(colors) {
     padding: spacing.xl,
     alignItems: 'center',
   },
-  mascot: {
+  object: {
     marginBottom: spacing.md,
   },
   title: {

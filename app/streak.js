@@ -14,7 +14,6 @@ import {
   isAfter,
 } from 'date-fns';
 import Card from '../components/Card';
-import Koban from '../components/koban/Koban';
 import IconTile from '../components/IconTile';
 import { StreakFlame } from '../components/StreakDays';
 import useStreak from '../hooks/useStreak';
@@ -25,11 +24,7 @@ import { fontFamily, fontSize, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
 
-// Koban stands at the hero card's right edge (37-design-system-and-koban.md),
-// beside the day count — never on a money figure. His width; the card is
-// tall enough that only the ground shadow is cropped.
 const HERO_CARD_MIN_HEIGHT = 132;
-const HERO_KOBAN_SIZE = 92;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 // The streak's own screen — the destination behind Home's header flame.
@@ -40,7 +35,7 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // day as logged, no-spend or frozen. The Milestones tab, its badge wall and
 // reward sheet, and the manual "use a freeze" card went with the economy.
 export default function StreakScreen() {
-  const { colors, modeId } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { current, loggedToday, isNewStreak, history, freezesHeld, loading } = useStreak();
 
@@ -77,8 +72,7 @@ export default function StreakScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Count and label left; Koban on the right, happy once today is
-            logged, curious while the streak waits for today, asleep at 0. */}
+        {/* The count and its label (Koban deleted, spec 46). */}
         <Card style={styles.hero}>
           <View style={styles.heroText}>
             <View style={styles.heroCountRow}>
@@ -88,12 +82,6 @@ export default function StreakScreen() {
             {/* "day streak" regardless of count: "days streak" is not English. */}
             <Text style={[styles.caption, !lit && styles.captionEmpty]}>day streak!</Text>
           </View>
-          <Koban
-            size={HERO_KOBAN_SIZE}
-            mood={loggedToday ? 'happy' : lit ? 'curious' : 'sleepy'}
-            surface={modeId}
-            style={styles.heroKoban}
-          />
         </Card>
 
         <Text style={styles.headline}>{streakHeadline({ current, loggedToday, isNewStreak })}</Text>
@@ -214,24 +202,14 @@ function makeStyles(colors) {
     paddingVertical: spacing.xl,
     marginBottom: spacing.lg,
     minHeight: HERO_CARD_MIN_HEIGHT,
-    // Crops Koban's ground shadow at the card's rounded bottom edge.
-    overflow: 'hidden',
   },
   heroText: {
     flex: 1,
-    // Koban is absolutely positioned (out of flow), so the text keeps clear
-    // of him.
-    paddingRight: HERO_KOBAN_SIZE,
   },
   heroCountRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  heroKoban: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: -10,
   },
   count: {
     fontFamily: fontFamily.extrabold,

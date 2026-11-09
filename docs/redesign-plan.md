@@ -33,7 +33,7 @@
 - card themes stay and are the app's stand-out feature;
 - the accent picker is flagged off;
 - the streak stays in a quieter form;
-- Koban is flagged off.
+- Koban is flagged off (superseded 2026-11-10: deleted, see §2.6).
 
 ### 2.1 Principles
 1. **Money first.** On every screen the main figure is the largest type, set in tabular figures. Everything else steps down.
@@ -127,7 +127,7 @@
 - **Icons:** keep lucide, at a 1.75 stroke, inside **tinted circles** (the category's colour washed behind, a deeper shade for the glyph). Drop the filled square tiles. No emoji in the UI.
 - **Bill (and plan) icons, Phase 4:** most bill rows show the same generic icon. Pick an icon from the bill's name: a local keyword map first (Netflix → film, electricity → zap, rent → home, Jio → smartphone, LIC → shield, SIP → trending-up, EMI → landmark…), and for names it doesn't know, one `ai-assistant` call **at save time** that may only return a key from FLO's icon set. The result is stored in a new `icon` column and the person can change it in the sheet (spec 44 rule: the model proposes, the person decides). No brand logos (trademarks).
 - **Illustration:** a small set of rendered 3D objects in FLO's palette (warm metal, matte paper, one blue accent), used on onboarding, empty states, celebrations, the notification ask and the Ask FLO intro. **Never on working screens.**
-- **Koban: flagged off** (a new `FLAGS.mascot`, off; the components, poses and dev gallery stay). He was placeholder art, nothing depends on him, and he makes the app read as a toy. His places go to the 3D objects. A redraw in that style can bring him back later.
+- **Koban: deleted (decided 2026-11-10).** First planned as flagged off; the person then chose to delete him outright, because he won't be used again. His drawing code, poses, faces and dev gallery are gone, and there is no `FLAGS.mascot`. He was placeholder art and made the app read as a toy. His places go to the 3D objects (`Illustration`), or to nothing where the plan says the screen has no art. The streak copy helpers in `lib/koban.js` are text, not art, and stay.
 - **Card art is the exception to "no art on working screens":** the themed card on Home and in Personalize. Seasonal skins (spec 43 Phase 1b) become a recurring drop, for example Diwali, Christmas, New Year and Holi. Each one follows spec 43's skin rules (text in the left two-thirds, art in the right third) and animates once when Home gains focus.
 
 ### 2.7 Motion and feedback
@@ -347,7 +347,7 @@ Today a tap opens the edit sheet directly. Wise 180 shows a calmer pattern: **re
 | Appearance (System / Light / Dark) | Settings |
 | Notifications, summary period, voice language, detection, consent, export all, delete account, log out | Settings |
 | Onboarding, reminder ask, first expense, coach mark, set-up questions (accounts, month start, budget, card) | Onboarding |
-| Koban mascot and gallery | flagged off (`FLAGS.mascot`); components and dev gallery kept |
+| Koban mascot and gallery | deleted (2026-11-10); his places use `Illustration` objects |
 | Economy, Plans, Pro (flagged off) | unchanged routes, restyled with the same kit |
 | Alerts | the bell's sheet |
 
@@ -358,7 +358,7 @@ Today a tap opens the edit sheet directly. Wise 180 shows a calmer pattern: **re
 - card themes stay as the signature, with seasonal skins as a recurring drop;
 - the accent picker is flagged off;
 - the streak stays, quieter;
-- Koban is flagged off;
+- Koban is flagged off (superseded 2026-11-10: deleted);
 - the typeface is Inter (§2.3).
 
 **Settled (2026-11-10, after the first Home preview):**
@@ -394,8 +394,8 @@ Each phase is one spec ticket group. The emulator check follows the per-ticket T
 Start a new chat and run `/mattpocock-skills:to-spec` for **Phases 1 and 2 only** (Foundations + Core loop), then `/mattpocock-skills:to-tickets`. Phases 3–6 stay here until they're reached. What that session needs to know:
 - **Read first:** this document (all of it), `theme/ledger.js`, `components/ledger/`, `lib/dayScenes.js`, `app/dev/home-preview.js`, then `.claude/features/00-index.md` and specs 37, 38, 43 and 44 for what the current screens do.
 - **Approach:** the ledger tokens and components live **beside** `theme/tokens.js` and the old components. Each screen moves over in its own ticket; nothing global is restyled in one go, so the app keeps working between tickets. When the last screen has moved, Manrope and the old tokens go in a cleanup ticket.
-- **Every component and screen changes.** The spec must list each one from §2.5 and §4 with: what it replaces, which old file(s) it retires, and the feature flags it respects (`economy`, `plans`, `billing`, `splitInvites`, `currencyPicker`, plus new `accents` and `mascot`, both off).
+- **Every component and screen changes.** The spec must list each one from §2.5 and §4 with: what it replaces, which old file(s) it retires, and the feature flags it respects (`economy`, `plans`, `billing`, `splitInvites`, `currencyPicker`, plus new `accents`, off; `mascot` was dropped when Koban was deleted).
 - **Built already (adopt, don't redo):** tokens, Inter, `AmountText`, `Button`, `HeaderIconButton`, `ListRow` (with `toneColors`), `QuickActions`, `SectionHeader`, `AccountCardCarousel`, `WeekLine`, the Day scenes and the Home preview. `WeekBars` was replaced by `WeekLine` and deleted.
-- **Not built:** `ScreenHeader`, `PinnedFooter`, `Segmented`, `Chip`, `Callout`, `ProgressBar`, `Timeline`, `Illustration`, `EmptyState`, `Sheet`; Day as a catalog theme; `FLAGS.accents` and `FLAGS.mascot`; the paise rule app-wide.
+- **Not built:** `ScreenHeader`, `PinnedFooter`, `Segmented`, `Chip`, `Callout`, `ProgressBar`, `Timeline`, `Illustration`, `EmptyState`, `Sheet`; Day as a catalog theme; `FLAGS.accents`; the paise rule app-wide.
 - **Related specs:** 45 (account last 4, planned, one phase, not part of this spec; its card slot is already in `AccountCardCarousel`). Bill icons are §2.6, Phase 4.
 - **Verification:** each ticket ends with a Tracer checklist; "Verified" means a check on the Pixel_API_36 emulator in light and dark mode, not a build.

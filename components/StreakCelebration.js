@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
-import Koban from './koban/Koban';
+import Illustration from './ledger/Illustration';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { ZoomIn, FadeInDown } from 'react-native-reanimated';
 import { addDays, endOfDay, format } from 'date-fns';
@@ -70,16 +70,10 @@ export function StreakCelebrationMoment({ payload, onDone }) {
         {/* Content centers in the space above the button, which sits in its
             own footer pinned to the bottom edge. */}
         <View style={styles.content}>
-          {/* Koban: jumping for joy (in his scarf) on a milestone, waving on
-              the day a streak starts. The screen is always dark. */}
+          {/* A trophy on a milestone, a token on the day a streak starts
+              (Koban deleted, spec 46). */}
           <Animated.View entering={ZoomIn.duration(400)} style={styles.badgeWrap}>
-            <Koban
-              size={136}
-              pose={isMilestone ? 'jump' : 'hello'}
-              mood={isMilestone ? 'joy' : 'happy'}
-              scarf={isMilestone}
-              surface="dark"
-            />
+            <Illustration name={isMilestone ? 'trophy' : 'token'} size="large" surface="dark" />
           </Animated.View>
 
           <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={styles.title}>
@@ -117,13 +111,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // The illustrated badge's own art carries its circular medal shape/
-  // background (same as every other badge slot in this app) — no tinted
-  // fill/border-radius here. Was 140px (matching RankUpCelebration's own
-  // badge size, up from the earlier 80px Trophy Room grid size, per direct
-  // feedback at the time) — bumped again to 200px specifically for this
-  // screen once the illustrated streak mascot (day 1's fallback, shares this
-  // same style with the real STREAK_BADGE_ART medals) needed more presence.
+  // Room around the object; the Illustration draws its own circle.
   badgeWrap: {
     width: 200,
     height: 200,

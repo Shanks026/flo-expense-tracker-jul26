@@ -25,7 +25,6 @@ import {
   ChartColumn,
   CalendarClock,
   CalendarDays,
-  Cat,
   Sparkles,
   Mic,
   LayoutDashboard,
@@ -740,7 +739,6 @@ export default function Settings() {
             (32-safe-closed-test-build.md — no debug UI for testers). */}
         {__DEV__ && (
           <RowGroup title="Developer">
-            <Row icon={Cat} title="Koban gallery" onPress={() => router.push('/dev/koban')} />
             <Row icon={LayoutDashboard} title="Home preview (redesign)" onPress={() => router.push('/dev/home-preview')} />
             {FLAGS.ai && (
               <Row icon={Sparkles} title="AI test set" onPress={() => router.push('/dev/ai-eval')} />

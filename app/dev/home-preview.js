@@ -12,6 +12,8 @@ import HeaderIconButton from '../../components/ledger/HeaderIconButton';
 import QuickActions from '../../components/ledger/QuickActions';
 import AccountCardCarousel from '../../components/ledger/AccountCardCarousel';
 import WeekLine from '../../components/ledger/WeekLine';
+import Illustration, { ILLUSTRATION_NAMES } from '../../components/ledger/Illustration';
+import EmptyState from '../../components/ledger/EmptyState';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
@@ -359,6 +361,27 @@ function HomePreview() {
               );
             })}
           </View>
+        </View>
+
+        {/* Preview-only (spec 46 ticket 02): every Illustration object and the
+            ledger EmptyState. Moves to the kit gallery in ticket 06. */}
+        <View style={[styles.section, styles.previewBox]}>
+          <Text style={styles.groupLabel}>Illustration objects (dev only)</Text>
+          <View style={styles.choiceRow}>
+            {ILLUSTRATION_NAMES.map((n) => (
+              <View key={n} style={{ alignItems: 'center', gap: 4 }}>
+                <Illustration name={n} />
+                <Text style={styles.chipText}>{n}</Text>
+              </View>
+            ))}
+          </View>
+          <EmptyState
+            illustration="receipt"
+            title="No transactions yet"
+            body="Tap Add to log what you spend."
+            actionTitle="Clear filters"
+            onAction={() => {}}
+          />
         </View>
       </ScrollView>
 

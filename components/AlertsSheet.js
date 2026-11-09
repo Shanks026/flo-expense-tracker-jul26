@@ -81,7 +81,7 @@ const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
         </View>
 
         {alerts.length === 0 ? (
-          <EmptyState pose="idle" mood="content" title="You're all caught up" body="Bills due and budget warnings show up here." />
+          <EmptyState pose="idle" title="You're all caught up" body="Bills due and budget warnings show up here." />
         ) : (
           alerts.map((alert) => {
             const Icon = KIND_ICON[alert.kind] ?? Receipt;

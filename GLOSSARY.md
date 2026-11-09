@@ -8,11 +8,11 @@
 
 **Safe closed-test build** — the first lite build fit to start Play's closed test: auto-detect excluded and no price or Buy button shown. It need not contain the v1 reset; the reset reaches testers as later builds during the test.
 
-**Koban** — FLO's mascot: a curious, helpful ginger tabby cat who stands on two legs.
+**Koban** — FLO's former mascot, a ginger tabby cat. Deleted on 2026-11-10 in the Quiet Ledger redesign (spec 46); his places use Illustration objects.
 
 **Money screen** — any screen whose job is showing the user's money (Home figures, transactions, budgets, reports). Ledger-calm: numbers first, no decoration.
 
-**Character moment** — a screen or moment where Koban may appear: onboarding, empty states, coach marks, streak and milestones, the weekly recap. Never on top of a money figure.
+**Character moment** — a screen or moment that may carry one Illustration object: onboarding, empty states, celebrations, the notification ask, the Ask FLO intro. Never on a working screen or on top of a money figure.
 
 **Daily nudge** — the one evening push (21:00 local by default), sent only on days with nothing logged; it backs off when ignored.
 
