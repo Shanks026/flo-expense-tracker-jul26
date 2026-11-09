@@ -17,12 +17,10 @@ import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '..
 import { useTheme } from '../theme/ThemeContext';
 import useBudgets, { budgetStatus } from '../hooks/useBudgets';
 import usePullToRefresh from '../hooks/usePullToRefresh';
-import { formatPeriodLabel, isBudgetEnded } from '../lib/budgets';
+import { formatPeriodLabel, isBudgetEnded, budgetLimitReached } from '../lib/budgets';
 import { useAddBudgetSheet } from '../components/AddBudgetSheet';
-import { supabase } from '../lib/supabase';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
-import { FREE_LIMITS } from '../lib/pro';
 import { formatMoney } from '../lib/currency';
 import useCurrency from '../hooks/useCurrency';
 import EmptyState from '../components/EmptyState';
@@ -55,12 +53,9 @@ export default function Budgets() {
   const currency = useCurrency();
 
   async function handleNewBudget() {
-    if (!hasPro) {
-      const { count } = await supabase.from('budgets').select('id', { count: 'exact', head: true });
-      if ((count ?? 0) >= FREE_LIMITS.budgets) {
-        openProUpsell('Free includes 2 budgets');
-        return;
-      }
+    if (await budgetLimitReached(hasPro)) {
+      openProUpsell('Free includes 2 budgets');
+      return;
     }
     openAddBudget();
   }

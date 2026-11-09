@@ -9,7 +9,7 @@ import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
-import { previewPeriodDates } from '../lib/budgets';
+import { previewPeriodDates, budgetLimitReached } from '../lib/budgets';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -89,16 +89,43 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // A new budget's account: the opener's (an Ask FLO draft names one), else
+  // the active account. An edit never moves a budget between accounts.
+  const [accountId, setAccountId] = useState(null);
+  // Per open: `onDone({ saved })` runs once when the sheet closes (Ask FLO's
+  // card turns to "Saved ✓" from it). Refs: they only matter at save and
+  // dismiss time.
+  const onDoneRef = useRef(null);
+  const savedRef = useRef(false);
 
   const selectedCategory = expenseCategories.find((c) => c.id === categoryId);
   const isCustom = periodType === 'custom';
 
+  // open(budget):
+  // - an existing row (with `id`) opens it for editing;
+  // - an object without `id` (Ask FLO's draft, 44-ai-assistant.md phase 4)
+  //   fills the fields as a NEW budget: { amount, category_id, period_type,
+  //   start_date?, end_date?, account_id?, onDone? }. The free-plan gates
+  //   run at Save, since this path skips the Budgets screen's own check;
+  // - nothing opens a blank new budget.
   useImperativeHandle(ref, () => ({
     open(budget) {
       setError(null);
       setPickerOpen(false);
       setShowPicker(null);
-      if (budget) {
+      onDoneRef.current = budget?.onDone ?? null;
+      savedRef.current = false;
+      setAccountId(budget?.id ? null : budget?.account_id ?? null);
+      if (budget && !budget.id) {
+        const today = startOfDay(new Date());
+        const custom = budget.period_type === 'custom';
+        setEditingId(null);
+        setAmount(budget.amount ? String(budget.amount) : '');
+        setPeriodType(['calendar_week', 'calendar_month', 'custom'].includes(budget.period_type) ? budget.period_type : 'calendar_month');
+        setCategoryId(budget.category_id ?? null);
+        setStartDate(custom && budget.start_date ? parseISO(budget.start_date) : today);
+        setEndDate(custom && budget.end_date ? parseISO(budget.end_date) : addDays(today, 6));
+      } else if (budget) {
         setEditingId(budget.id);
         setAmount(String(budget.amount));
         setPeriodType(budget.period_type);
@@ -134,6 +161,29 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
       setError('The end date must be on or after the start date');
       return;
     }
+    // The free-plan gates, for a new budget only (create-time, never on an
+    // edit). The Budgets screen checks the count before opening a blank
+    // sheet; a draft from Ask FLO arrives here without that, so Save checks
+    // again. With FLAGS.billing off, hasPro is true and both pass.
+    if (!editingId) {
+      if (isCustom && !hasPro) {
+        openProUpsell('Custom periods are a Pro feature');
+        return;
+      }
+      setSaving(true);
+      const overLimit = await budgetLimitReached(hasPro);
+      setSaving(false);
+      if (overLimit) {
+        modalRef.current?.dismiss();
+        openProUpsell('Free includes 2 budgets');
+        return;
+      }
+    }
+    const targetAccountId = accountId ?? activeAccountId;
+    if (!editingId && !targetAccountId) {
+      setError('Still loading your account — try again in a moment');
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -150,13 +200,14 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
 
     const { error: saveError } = editingId
       ? await supabase.from('budgets').update(payload).eq('id', editingId)
-      : await supabase.from('budgets').insert({ ...payload, account_id: activeAccountId });
+      : await supabase.from('budgets').insert({ ...payload, account_id: targetAccountId });
 
     setSaving(false);
     if (saveError) {
       showToast({ message: saveError.message, variant: 'error' });
       return;
     }
+    if (!editingId) savedRef.current = true;
     notifyChanged();
     modalRef.current?.dismiss();
     showToast({ message: editingId ? 'Budget updated' : 'Budget created', variant: 'success' });
@@ -188,6 +239,13 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     showToast({ message: 'Budget deleted', variant: 'success' });
   }
 
+  // Hands the outcome to whoever opened the sheet, once per open.
+  const handleDismiss = useCallback(() => {
+    const onDone = onDoneRef.current;
+    onDoneRef.current = null;
+    onDone?.({ saved: savedRef.current });
+  }, []);
+
   const renderBackdrop = useCallback(
     (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
     []
@@ -197,6 +255,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
+      onDismiss={handleDismiss}
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

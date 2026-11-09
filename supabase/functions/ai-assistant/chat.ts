@@ -674,7 +674,10 @@ async function callModel(apiKey: string, models: string[], messages: ChatMessage
         models,
         provider: { data_collection: 'deny', require_parameters: true },
         // No temperature: see index.ts (Haiku 5.5's endpoints reject it).
-        max_tokens: 500,
+        // Room for the model's own reasoning as well as the answer: at 500,
+        // Haiku 5.5 ran out mid-sentence on short answers (finish_reason
+        // 'length', ticket 10). The answer itself is cut to 2,000 characters.
+        max_tokens: 1500,
         tools: [...TOOLS, ...PROPOSAL_TOOLS],
         tool_choice: toolsAllowed ? 'auto' : 'none',
         messages,

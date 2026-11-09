@@ -8,11 +8,15 @@
 //
 // Shapes (spec §4.2), stored in ai_messages.proposal:
 //   { kind: 'transaction', type, amount, category_id, account_id, date, note }
+//   { kind: 'budget', amount, category_id | null, period_type, start_date?, end_date?, account_id }
 import { isYmd, formatInr, dayLong, addDays, type Ctx } from './shared.ts';
 
 export const MAX_AMOUNT = 1_00_00_000; // ₹1 crore
 const MAX_NOTE = 120;
 const OLDEST_YEARS = 5;
+// The values AddBudgetSheet writes (budgets.period_type's check).
+const PERIOD_TYPES = ['calendar_week', 'calendar_month', 'custom'];
+const MAX_CUSTOM_DAYS = 366;
 
 export type Proposal = Record<string, unknown> & { kind: string };
 export type ProposalResult = { proposal: Proposal; card: string } | { error: string };
@@ -42,6 +46,38 @@ export const PROPOSAL_TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_budget',
+      description:
+        'Drafts one new budget for them to review. It saves nothing: the app shows it as a card, and they tap Review, check it in the New Budget sheet and create it. A budget covers one expense category, or all their spending.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['amount', 'category_id', 'period_type'],
+        properties: {
+          amount: { type: 'number', description: 'The budget in rupees, as they said it. More than 0.' },
+          category_id: {
+            type: 'string',
+            description: 'An id from their expense categories, or "all" for a budget over all their spending.',
+          },
+          period_type: {
+            type: 'string',
+            enum: PERIOD_TYPES,
+            description:
+              'calendar_month: every month (also for "this month" or "monthly"). calendar_week: every week, Monday to Sunday. custom: one fixed range of days, with start_date and end_date.',
+          },
+          start_date: { type: 'string', description: 'custom only: first day, YYYY-MM-DD.' },
+          end_date: { type: 'string', description: 'custom only: last day, YYYY-MM-DD.' },
+          account_id: {
+            type: 'string',
+            description: 'An id from their accounts. Leave out to use their current account.',
+          },
+        },
+      },
+    },
+  },
 ];
 
 // Rupees with at most two decimals, above 0 and within ₹1 crore.
@@ -58,6 +94,65 @@ function cleanNote(raw: unknown) {
   return note || null;
 }
 
+// account_id → one of theirs, or their current account when left out.
+function pickAccount(raw: unknown, ctx: Ctx): { accountId: string } | { error: string } {
+  if (raw != null && raw !== '') {
+    return ctx.accounts.some((a) => a.id === raw)
+      ? { accountId: raw as string }
+      : { error: 'account_id is not one of their accounts' };
+  }
+  const accountId = ctx.activeAccountId ?? (ctx.accounts.length === 1 ? ctx.accounts[0].id : null);
+  return accountId ? { accountId } : { error: 'no current account; ask them which account' };
+}
+
+function proposeBudget(args: Record<string, unknown>, ctx: Ctx): ProposalResult {
+  const amountRes = checkAmount(args.amount);
+  if ('error' in amountRes) return amountRes;
+
+  let categoryId: string | null = null;
+  if (args.category_id !== 'all') {
+    const category = ctx.categories.find((c) => c.id === args.category_id);
+    if (!category) {
+      return {
+        error:
+          'category_id is not one of their categories. Do not guess: ask them which of their categories they meant (name the closest), or whether they want a budget over all spending',
+      };
+    }
+    if (category.type !== 'expense') return { error: `${category.name} is an income category; a budget needs an expense category` };
+    categoryId = category.id;
+  }
+
+  const periodType = args.period_type;
+  if (typeof periodType !== 'string' || !PERIOD_TYPES.includes(periodType)) {
+    return { error: `period_type must be one of ${PERIOD_TYPES.join(', ')}` };
+  }
+  let startDate: string | null = null;
+  let endDate: string | null = null;
+  if (periodType === 'custom') {
+    const { start_date: start, end_date: end } = args;
+    if (!isYmd(start) || !isYmd(end)) return { error: 'a custom budget needs start_date and end_date, YYYY-MM-DD' };
+    if (end < start) return { error: 'end_date is before start_date' };
+    if (end < ctx.today) return { error: 'that range has already ended; check the dates with them' };
+    if (end > addDays(start, MAX_CUSTOM_DAYS - 1)) return { error: `a custom budget can cover at most ${MAX_CUSTOM_DAYS} days` };
+    startDate = start;
+    endDate = end;
+  }
+
+  const accountRes = pickAccount(args.account_id, ctx);
+  if ('error' in accountRes) return accountRes;
+
+  const proposal: Proposal = {
+    kind: 'budget',
+    amount: amountRes.amount,
+    category_id: categoryId,
+    period_type: periodType,
+    start_date: startDate,
+    end_date: endDate,
+    account_id: accountRes.accountId,
+  };
+  return { proposal, card: cardText(proposal, ctx) };
+}
+
 function proposeTransaction(args: Record<string, unknown>, ctx: Ctx): ProposalResult {
   const { type } = args;
   if (type !== 'expense' && type !== 'income') {
@@ -70,15 +165,9 @@ function proposeTransaction(args: Record<string, unknown>, ctx: Ctx): ProposalRe
   if (!category) return { error: 'category_id is not one of their categories; pick one from their list, or ask them' };
   if (category.type !== type) return { error: `${category.name} is a ${category.type} category, not ${type}` };
 
-  let accountId: string | null = null;
-  if (args.account_id != null && args.account_id !== '') {
-    if (!ctx.accounts.some((a) => a.id === args.account_id)) return { error: 'account_id is not one of their accounts' };
-    accountId = args.account_id as string;
-  } else {
-    accountId = ctx.activeAccountId ?? (ctx.accounts.length === 1 ? ctx.accounts[0].id : null);
-    if (!accountId) return { error: 'no current account; ask them which account' };
-  }
-  const account = ctx.accounts.find((a) => a.id === accountId)!;
+  const accountRes = pickAccount(args.account_id, ctx);
+  if ('error' in accountRes) return accountRes;
+  const account = ctx.accounts.find((a) => a.id === accountRes.accountId)!;
 
   const date = args.date;
   if (!isYmd(date)) return { error: 'date must be a real day, YYYY-MM-DD' };
@@ -116,6 +205,23 @@ function cardText(p: Proposal, ctx: Ctx) {
       .filter(Boolean)
       .join(' · ');
   }
+  if (p.kind === 'budget') {
+    const period =
+      p.period_type === 'calendar_week'
+        ? 'every week'
+        : p.period_type === 'custom' && isYmd(p.start_date) && isYmd(p.end_date)
+          ? `${dayLong(p.start_date)} to ${dayLong(p.end_date)}`
+          : 'every month';
+    return [
+      'Budget',
+      p.category_id ? name(ctx.categories, p.category_id) : 'All spending',
+      formatInr(Number(p.amount)),
+      period,
+      name(ctx.accounts, p.account_id),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
   return p.kind;
 }
 
@@ -136,6 +242,7 @@ export function historyNote(p: unknown, ctx: Ctx) {
 
 const HANDLERS: Record<string, (args: Record<string, unknown>, ctx: Ctx) => ProposalResult> = {
   propose_transaction: proposeTransaction,
+  propose_budget: proposeBudget,
 };
 
 export const isProposalTool = (name: string) => name in HANDLERS;
@@ -151,6 +258,9 @@ export const PROPOSAL_RULES = [
   '  - Use only an amount they gave. If they gave none, ask for it instead of drafting.',
   '  - The date is today unless they say otherwise; work out words like yesterday or last Friday from the local date.',
   '  - Pick the one category of theirs that fits best (auto → Auto, or Travel or Transport if that is what they have). If none fits and they have Other, use Other. If it could be two quite different categories, ask.',
+  '- Drafting budgets. When they ask to set or create a budget, call propose_budget. It saves nothing either; say in one sentence it is ready to review.',
+  '  - A budget covers exactly one category or all spending, never several categories together, so never offer a combination. Use a category only when one of theirs is plainly the one they named (the same name, or a near spelling). If none is, do not pick one, even a related one: ask which of their categories they meant, naming the closest few, or whether they want a budget over all spending. "Monthly spending" or "overall" means "all".',
+  '  - "This month", "a month" or "monthly" is calendar_month, which repeats every month. "Weekly" is calendar_week. Use custom only for a fixed range of dates they give.',
   '  - One draft per answer. If they list several entries, draft the first and say to send the next one after saving it.',
   '  - You cannot change, delete or transfer money between accounts from here; say they can do that in the app.',
   '  - Earlier answers may end with a note in square brackets about the draft shown under them and whether they saved it. That note is the app\'s record, so trust it. Never write such a note yourself.',

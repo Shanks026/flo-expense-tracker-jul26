@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
-import { ReceiptText } from 'lucide-react-native';
+import { ReceiptText, Target } from 'lucide-react-native';
 import Card from './Card';
 import { fontFamily, spacing, radii, type } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -11,6 +11,7 @@ import { useAccount } from '../lib/AccountContext';
 import { setProposalStatus } from '../lib/ai';
 import useCategories from '../hooks/useCategories';
 import { useAddTransactionSheet } from './AddTransactionSheet';
+import { useAddBudgetSheet } from './AddBudgetSheet';
 
 // A draft from Ask FLO (44-ai-assistant.md, phase 4), in plain words, with
 // Review and Dismiss. Review opens the matching sheet pre-filled as a NEW
@@ -29,6 +30,7 @@ export default function ProposalCard({ messageId, proposal }) {
   const { accounts } = useAccount();
   const { categories } = useCategories();
   const { openAdd } = useAddTransactionSheet();
+  const { openAddBudget } = useAddBudgetSheet();
   const [status, setStatus] = useState(proposal?.status ?? null);
 
   // A refetch can bring a mark made on another device, or after a reload.
@@ -51,7 +53,7 @@ export default function ProposalCard({ messageId, proposal }) {
   }
 
   function review() {
-    view.open({ openAdd }, ({ saved }) => {
+    view.open({ openAdd, openAddBudget }, ({ saved }) => {
       if (saved) mark('saved');
     });
   }
@@ -135,6 +137,38 @@ function describe(p, { accounts, categories }) {
           date: p.date,
           note: p.note ?? '',
           source: 'assistant',
+          onDone,
+        }),
+    };
+  }
+  if (p.kind === 'budget') {
+    const periods = ['calendar_week', 'calendar_month', 'custom'];
+    if (!periods.includes(p.period_type)) return null;
+    const custom = p.period_type === 'custom';
+    if (custom && !(/^\d{4}-\d{2}-\d{2}$/.test(p.start_date ?? '') && /^\d{4}-\d{2}-\d{2}$/.test(p.end_date ?? ''))) return null;
+    // A category deleted since the chat would make an "All spending" budget
+    // out of a category one, so the card shows nothing to review instead.
+    const category = p.category_id ? categories.find((c) => c.id === p.category_id && c.type === 'expense') : null;
+    if (p.category_id && !category) return null;
+    const account = accounts.find((a) => a.id === p.account_id);
+    const period = custom
+      ? `${format(parseISO(p.start_date), 'd MMM')} – ${format(parseISO(p.end_date), 'd MMM yyyy')}`
+      : p.period_type === 'calendar_week'
+        ? 'Every week'
+        : 'Every month';
+    return {
+      Icon: Target,
+      kicker: 'New budget',
+      amount: formatMoney(Number(p.amount), account?.currency),
+      lines: [[category?.name ?? 'All spending', period, accounts.length > 1 ? account?.name : null].filter(Boolean).join(' · ')],
+      open: ({ openAddBudget }, onDone) =>
+        openAddBudget({
+          amount: Number(p.amount),
+          category_id: category?.id ?? null,
+          period_type: p.period_type,
+          start_date: custom ? p.start_date : null,
+          end_date: custom ? p.end_date : null,
+          account_id: account?.id ?? null,
           onDone,
         }),
     };
