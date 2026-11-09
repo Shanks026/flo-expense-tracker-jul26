@@ -34,6 +34,7 @@ import EmptyState from '../components/EmptyState';
 import ShimmerText from '../components/ShimmerText';
 import RichText from '../components/RichText';
 import BreakdownTable, { breakdownsFrom } from '../components/BreakdownTable';
+import ProposalCard from '../components/ProposalCard';
 import { fontFamily, spacing, radii, radius, type, hitTarget } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useAssistantConversation from '../hooks/useAssistantConversation';
@@ -320,8 +321,10 @@ function AssistantChat() {
           return (
             <Answer
               key={m.key}
+              id={m.id}
               text={m.content}
               toolCalls={m.tool_calls}
+              proposal={m.proposal}
               reveal={m.id === freshReplyId}
               onRevealed={() => setFreshReplyId(null)}
               styles={styles}
@@ -391,7 +394,8 @@ function UserBubble({ text, styles }) {
 // word at a time, the way chat replies stream in; stored ones and
 // reduce-motion show the whole text. Stopping the reveal for any reason (a
 // new answer arriving, reduce-motion turning on) shows it whole at once.
-function Answer({ text, toolCalls, reveal, onRevealed, styles }) {
+// A draft (phase 4) shows as a ProposalCard under the words, once they're out.
+function Answer({ id, text, toolCalls, proposal, reveal, onRevealed, styles }) {
   const reduce = useReducedMotion();
   const words = useMemo(() => text.split(/(\s+)/), [text]);
   const tables = useMemo(() => breakdownsFrom(toolCalls), [toolCalls]);
@@ -436,6 +440,11 @@ function Answer({ text, toolCalls, reveal, onRevealed, styles }) {
             </Animated.View>
           ))
         : null}
+      {done && proposal ? (
+        <Animated.View entering={animate ? FadeIn.duration(260) : undefined}>
+          <ProposalCard messageId={id} proposal={proposal} />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 }

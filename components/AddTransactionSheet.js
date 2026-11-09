@@ -345,7 +345,15 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         // plan_id from the opener (Plan Detail's "Add Expense") still lands,
         // and an edit keeps its plan (the branch above).
         setPlanId(payload?.plan_id ?? null);
-        setDate(payload?.date ? new Date(payload.date) : new Date());
+        // A bare 'YYYY-MM-DD' (Ask FLO's drafts) is a local day: new Date()
+        // would read it as UTC midnight, the day before west of Greenwich.
+        setDate(
+          !payload?.date
+            ? new Date()
+            : typeof payload.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.date)
+              ? parseISO(payload.date)
+              : new Date(payload.date)
+        );
         setNote(payload?.note ?? '');
       }
       modalRef.current?.present();
