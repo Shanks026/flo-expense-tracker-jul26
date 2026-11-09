@@ -71,6 +71,8 @@ export default function StreakScreen() {
     start: startOfWeek(monthStart, { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(today), { weekStartsOn: 1 }),
   });
+  const gridWeeks = [];
+  for (let i = 0; i < gridDays.length; i += 7) gridWeeks.push(gridDays.slice(i, i + 7));
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
@@ -135,29 +137,34 @@ export default function StreakScreen() {
             ))}
           </View>
 
-          <View style={styles.grid}>
-            {gridDays.map((day) => {
-              const key = format(day, 'yyyy-MM-dd');
-              const inMonth = isSameMonth(day, today);
-              const future = isAfter(day, today);
-              const type = typeByDate.get(key);
+          {/* One row per week, seven flex cells each. A wrapping grid of
+              100/7 % cells rounded past the row's width on Android and
+              wrapped at six, putting every date under the wrong weekday. */}
+          {gridWeeks.map((week) => (
+            <View key={format(week[0], 'yyyy-MM-dd')} style={styles.weekRow}>
+              {week.map((day) => {
+                const key = format(day, 'yyyy-MM-dd');
+                const inMonth = isSameMonth(day, today);
+                const future = isAfter(day, today);
+                const type = typeByDate.get(key);
 
-              return (
-                <View key={key} style={styles.gridCell}>
-                  <StreakFlame type={type} size={34} dimmed={!inMonth || future} />
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      isToday(day) && styles.dayNumberToday,
-                      (!inMonth || future) && styles.dayNumberDim,
-                    ]}
-                  >
-                    {format(day, 'd')}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+                return (
+                  <View key={key} style={styles.gridCell}>
+                    <StreakFlame type={type} size={34} dimmed={!inMonth || future} />
+                    <Text
+                      style={[
+                        styles.dayNumber,
+                        isToday(day) && styles.dayNumberToday,
+                        (!inMonth || future) && styles.dayNumberDim,
+                      ]}
+                    >
+                      {format(day, 'd')}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
 
           <View style={styles.legendRow}>
             {LEGEND.map(([type, label]) => (
@@ -291,18 +298,17 @@ function makeStyles(colors) {
     marginBottom: spacing.sm,
   },
   weekday: {
-    width: `${100 / 7}%`,
+    flex: 1,
     textAlign: 'center',
     fontFamily: fontFamily.bold,
     fontSize: fontSize.xs,
     color: colors.mutedLight,
   },
-  grid: {
+  weekRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
   },
   gridCell: {
-    width: `${100 / 7}%`,
+    flex: 1,
     alignItems: 'center',
     paddingVertical: 5,
     gap: 2,
