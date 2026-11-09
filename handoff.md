@@ -1,71 +1,76 @@
-# Handoff — 2026-11-08
+# Handoff — 2026-11-09
 
-Read this first in a new session, then `AGENTS.md`, `.claude/features/00-index.md` (standing rules) and `.claude/features/44-ai-assistant.md`. The full roadmap is under "Direction change" in `docs/matt-implement-flo.md`.
+Read this first in a new session, then `AGENTS.md`, `.claude/features/00-index.md` (standing rules) and `.claude/features/44-ai-assistant.md` (its Implementation Notes hold the phase 1 results). Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say what was checked.
 
-## Direction (decided 2026-11-08)
-- **FLO is a personal-use app first. AI is the priority.** The store launch comes later.
-- The old "no AI" rule is **lifted** (`00-index.md`, `AGENTS.md`). OpenRouter is the one allowed third-party service (`CLAUDE.md`). It's called over HTTP from one Edge Function (`ai-assistant`), with no SDK, and the key exists only as a secret.
-- **AI design rules:**
-  - a local parser handles simple entries first;
+## Direction (unchanged since 2026-11-08)
+- **FLO is a personal-use app first. AI is the priority.** The store launch comes later. OpenRouter is the one allowed third-party service, called over HTTP from the `ai-assistant` Edge Function, with no SDK. The key exists only as a secret.
+- **AI rules:**
+  - the local parser goes first;
   - speech-to-text runs on the device;
-  - **the model never writes**: it drafts or proposes, the person taps Save, and the existing sheet code writes;
-  - every number comes from server code, never from model arithmetic;
-  - phase 1 must pass a 40-phrase test (≥90% correct, p50 ≤ 1.5 s) before the chat is built.
-- **Model:** `anthropic/claude-haiku-5.5` ($0.10 / $0.50 per M tokens), with fallback `google/gemini-3.1-flash-lite`. Prices were checked on 2026-11-08.
+  - the model only drafts, and the person's Save writes;
+  - every number comes from server code.
 
-## Done this session
-- **Docs:**
-  - spec 44 is written and indexed;
-  - the AI rule is reversed;
-  - testing moves to the **`Pixel_API_36`** emulator (Android 16, AVD on `D:\Android\avd`), **boot-checked 2026-11-08** (boots in ~2 min, adb `emulator-5554`, screencap works; FLO not installed yet);
-  - the SDK's `system-images` and `.sdk` folders are junctions to D: because C: is nearly full.
-- **Tracker mod:** `flo-ticket-tracker/` is a copy of the ticket-tracker mod that reads `.scratch` tickets. Load it with `claude --plugin-dir ./flo-ticket-tracker`.
-- **Supabase cleanup:**
-  - the `ai-interpret` and `ai-report-summary` functions are deleted (only `send-push` remains);
-  - the `GEMINI_API_KEY` secret is removed;
-  - **only `chrisaustin2001@gmail.com` remains** (358 transactions, 3 accounts, 3 budgets, 1 split; 7 other accounts deleted, every table checked);
-  - **there's no test account**, so make one for emulator checks (random email; skip the email link).
-- **RLS hardening** (`rls_hardening_ownership_and_splits`):
-  - split members can only edit `display_name`;
-  - ownership checks on account, category and plan ids for transactions, budgets, plans, bills and splits;
-  - split-share writes limited to the entry author or the organizer.
+## Done 2026-11-09 (spec 44, tickets 01–05)
+- **01, typed quick add on the phone.** A quick-add line sits at the top of the Add sheet. Only the ⊕ tab asks for it (`openAdd({ quickAdd: true })`). It's behind `FLAGS.ai`, which is on.
+- **02, the model fills what the parser can't.** `supabase/functions/ai-assistant` is deployed (verify_jwt on, runs as the caller under RLS) and is called from `lib/ai.js`.
+  - The `ai_usage` table is live with RLS (migration `ai_usage_metering`). Each call writes one row with the model, tokens, cost and latency.
+  - Daily cap: `AI_DAILY_QUICK`.
+  - Two of your accounts named in one line → "Use Transfer for two accounts".
+- **Model order (the person's choice: the quickest).** `AI_MODEL_QUICK=google/gemini-3.1-flash-lite`, with `AI_MODEL_FALLBACK=anthropic/claude-haiku-5.5`. The function sends **no `temperature`**: Haiku 5.5's endpoints reject it, and with `require_parameters` that made OpenRouter answer every call from the fallback without saying so. Watch `ai_usage.model` for silent fallbacks.
+- **03, the phase 1 gate: passed (the person's decision).**
+  - Starting set on Gemini: 40/40, with the phone answering 72%.
+  - Model p50: 1.28 s at the function and 1.65 s in the app.
+  - The test screen is in dev builds under Settings → Developer → AI test set.
+- **04, voice (hold the mic on the quick-add line).**
+  - Library: `expo-speech-recognition@3.1.3`, its sdk-54 release.
+  - Settings → Preferences → Voice language: English or Tamil, kept on the device.
+  - Personal build only: `app.config.js` adds the plugin and RECORD_AUDIO. Lite keeps the mic blocked.
+  - Checked on the emulator.
+  - **Open: the spoken checks on the phone** (9 of 10 phrases right, release-to-text under 1 s).
+- **05, long-press ⊕ opens the sheet listening.**
+  - It ends by itself when you stop speaking. A short tap is unchanged.
+  - Checked on the emulator.
+  - **Open: the phone checks** (speak → fill → Save, edit the transcript and re-parse, light and dark).
 
-  12 rolled-back checks pass, and the advisor shows only the pre-existing WARNs. The SQL is in `.scratch/rls-hardening.sql`, and the test in `.scratch/rls-hardening-test.sql`. It's **not** in `supabase_migrations` (it was applied with the CLI).
-- **Build health:**
-  - `node_modules` was missing and is reinstalled with `npm ci` (expo 54.0.37);
-  - `npx expo export --platform android` bundles cleanly (4,185 modules);
-  - `supabase/.temp/` is git-ignored.
-
-## Tooling notes (important)
-- **The Supabase MCP auto-declines every write** (`execute_sql` deletes, `apply_migration`): "declined" comes back with no prompt. Reads work. For writes, either:
-  - apply with the CLI after the person says yes: `npx supabase db query --remote=uergtlcfpwajztqgncim --yes -f <file.sql>`; or
-  - have the person paste the SQL into the Dashboard SQL editor.
-- **CLI reads:** `npx supabase db query --linked --project-ref uergtlcfpwajztqgncim --read-only "<select>"`. Functions and secrets go through the CLI; auto mode blocks agent secret writes, so the person sets secrets.
-- If the MCP says "needs sign in": `/mcp`, and pick **FLO's organization**, not "Austin's Org".
+## Builds and devices
+- **Emulator `Pixel_API_36`:**
+  - FLO debug build installed;
+  - test account in the gitignored `.env.test.local`;
+  - Supabase keys in the gitignored `.env.local`;
+  - `hw.keyboard=no` and stylus handwriting off, so Gboard docks like a phone;
+  - the mic is granted, but the emulator hears no audio.
+- **Phone (vivo I2220, arm64, Android 16):**
+  - a debug build was installed over USB (`com.anonymous.flo`, fresh install, sign in with your own account);
+  - a **standalone release APK** (`android/app/build/outputs/apk/release/app-release.apk`, JavaScript bundled, debug-signed) was being built for testing without the PC.
+- **A native rebuild is needed only when a native library changes.** Tickets 06–11 should be JavaScript only: Metro reloads them, and the next standalone APK is a ~3–8 min `./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a` (in `android/`).
+- **Metro:**
+  - run it without `CI=1`, so files are watched;
+  - stop it before Gradle builds, because its watcher crashes on Gradle's temporary folders in `node_modules`;
+  - stopping the shell task can leave the node process holding port 8081.
 
 ## Next, in order
-1. **The "weekly report ready" push** still goes out through `send-push`, and Settings no longer has a control for it. Either switch it off for the profile (check the `profiles` report columns; an UPDATE needs a yes and goes through the CLI), or pull spec 39 ticket 01's push removal forward.
-2. **Add sheet phone check** (the person, on the vivo, with the existing dev client and Metro): saving, the Undo toast, a prefilled open (share text), and the keyboard staying clear of Save. AI fills this sheet.
-3. **Spec 44 tickets:** `/mattpocock-skills:to-tickets .claude/features/44-ai-assistant.md`, then `/mattpocock-skills:implement` for ticket 01.
-4. **Spec 44 phase 1 code** (no key needed):
-   - `lib/quickParse.js`;
-   - `components/QuickAddField.js` in the Add sheet;
-   - `FLAGS.ai`;
-   - `lib/ai.js`;
-   - `supabase/functions/ai-assistant/` (written, not deployed);
-   - `app/dev/ai-eval.js` with `lib/aiEvalCases.js`;
-   - the `ai_usage` SQL (show it and get a yes; apply with the CLI).
-5. **OpenRouter (the person, 2026-11-09 morning):**
-   - buy credits;
-   - create a key with a credit limit;
-   - turn off logging and training;
-   - revoke the old August key and the old Gemini key;
-   - then run `npx supabase secrets set OPENROUTER_API_KEY=… AI_MODEL_QUICK=anthropic/claude-haiku-5.5 AI_MODEL_CHAT=anthropic/claude-haiku-5.5 AI_MODEL_FALLBACK=google/gemini-3.1-flash-lite --project-ref uergtlcfpwajztqgncim`.
-6. **Deploy `ai-assistant` and run the phase 1 gate** (`app/dev/ai-eval.js`). If it fails, stop and decide.
-7. **Phase 2 (voice): this is where the native rebuild happens.** `expo-speech-recognition` is a new native dependency (name it to the person first). Then run `npx expo prebuild --clean` (stop Metro first) and `npx expo run:android`. One build covers the phone, and the emulator once it's booted.
-8. Phases 3–4 (chat read-only, then proposals). Then spec 39 and spec 40.
+1. **Phone checks for 04 and 05**, on the standalone APK:
+   - say 10 phrases from the test set (English, and a few in Tamil);
+   - check that long-press ⊕ fills the sheet and Save writes;
+   - check light and dark.
+   Then tick the tickets.
+2. **Ticket 06, the first Ask FLO question** (phase 3, chat read-only), then 07–11 in order. Phase 3 needs the `ai_conversations` / `ai_messages` SQL from spec 44 §3.1: show it to the person and get a yes first.
+3. Cutting the app's round trip, if wanted. Ideas in spec 44's Implementation Notes:
+   - run the function's database lookups in parallel;
+   - shorten the prompt;
+   - check how far the Supabase region is.
+4. Still open from before:
+   - the "weekly report ready" push has no Settings control;
+   - specs 39 and 40.
 
-**Parked until launch:** spec 44 phase 5, spec 32 tickets 05/07/08, the closed test, Play Billing (41), forgot password (42), PKCE for Google sign-in, and the smaller RLS items (a member-in-split trigger for settlements, hiding `splits.account_id`).
+**Parked until launch:** spec 44 phase 5, spec 32 tickets 05/07/08, the closed test, Play Billing (41), forgot password (42), PKCE for Google sign-in, the smaller RLS items, and the mic permission for a store build.
 
-## On the long native build
-**Don't do a clean native build now.** Phase 1 is JavaScript only (a parser, a component and an Edge Function), so it runs on the dev client already installed on the phone, through Metro. The first native change is phase 2's speech library, and it forces a rebuild anyway. Building now would mean building twice. Build once, at the start of phase 2, after adding `expo-speech-recognition`.
+## Tooling notes
+- **Supabase MCP:**
+  - reads, `execute_sql` and `apply_migration` worked on 2026-11-09;
+  - secret writes are blocked for the agent, so the person runs `npx supabase secrets set …`;
+  - deploy with `npx supabase functions deploy ai-assistant --remote=uergtlcfpwajztqgncim --use-api --yes`, after a yes.
+- **adb on the emulator:**
+  - use `input touchscreen tap`;
+  - KEYCODE_ENTER can land on the wrong window, so tap the keyboard's ✓;
+  - the first sheet open after a cold start may not raise the keyboard (this predates spec 44).
