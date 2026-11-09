@@ -603,3 +603,50 @@ See the SQL in §3.1.
 - **Auto-detect (notification listener) feeding the AI.** It stays the
   personal-build bonus as it is.
 - **Multi-currency.** INR only, as the app.
+
+---
+
+## Implementation Notes
+
+### Phase 1 gate: test set results (2026-11-09, ticket 03)
+
+Run on Pixel_API_36 from `app/dev/ai-eval.js` (Settings → Developer → AI
+test set). Each of the 40 phrases goes through the phone's parser first. The
+ones it isn't sure about go to `ai-assistant` with the test set's own accounts
+and categories and the fixed moment (Thu 12 Nov 2026, 13:30 IST). Only the
+chosen model is asked, with no fallback. "Fully correct" means amount, type,
+category, date and account all match.
+
+| Category set | Model | Fully correct | Phone answered | Model right | App p50 / p90 |
+|---|---|---|---|---|---|
+| **Starting (gate)** | **Default: `google/gemini-3.1-flash-lite`** | **40/40 (100%)** | 29 (72%) | 11/11 | 1.65 s / 2.59 s |
+| Starting | Challenger: `anthropic/claude-haiku-5.5` | 37/40 (92.5%) | 29 | 8/11 | 1.89 s / 3.35 s |
+| Current | Default: Gemini 3.1 Flash Lite | 37/40 | 31 | 6/9 | 2.13 s / 2.45 s |
+| Current | Challenger: Haiku 5.5 | 39/40 | 31 | 8/9 | 1.83 s / 4.35 s |
+
+- **Timing.** "App p50" is the round trip the app sees. The function's own
+  time, from the `ai_usage.latency_ms` of the same 40 calls, is shorter:
+  Gemini p50 1.28 s, p90 2.05 s; Haiku p50 1.73 s, p90 3.58 s. The gap of
+  about 0.4 s is the trip from the phone to the Supabase function. The first
+  call of a run can be a cold start: Gemini's first was 5.1 s.
+- **Cost.** About $0.00032 a call on Gemini and $0.00020 on Haiku.
+- **Haiku's misses on the starting set:**
+  - "shirt 1200 sunday": no read;
+  - "sent 2000 to amma" and "amma ku 1000 anupinen": no category, where Other
+    was expected.
+- **Gemini's misses on the current set:**
+  - the same two "amma" lines went to Lend instead of Transfer, which is
+    arguable since both categories exist;
+  - "refund 349 amazon" got no category, where Other was expected.
+- **The phone is never wrong.** All 29 and 31 phone answers were right.
+- **Gate:**
+  - ≥ 90% fully correct on the starting set with the default model: passed (100%);
+  - phone answers ≥ 50%: passed (72%);
+  - **model p50 ≤ 1.5 s: passed at the function (1.28 s), failed in the app (1.65 s).**
+- **Model order.** Gemini became the primary on 2026-11-09, at the person's
+  choice of the quickest. Haiku is the fallback.
+- **Haiku had never been answering until 2026-11-09.** Haiku 5.5's endpoints
+  don't accept `temperature`. With `require_parameters` that left no
+  endpoint at all, and OpenRouter answered every call from the fallback
+  without saying so. The function no longer sends `temperature`. The
+  `ai_usage.model` column is where a silent fallback shows up.

@@ -13,44 +13,8 @@
 // than half the cases on the starting set.
 
 import { quickParse } from '../lib/quickParse.js';
-import {
-  EVAL_ACCOUNTS,
-  EVAL_ACTIVE_ACCOUNT,
-  EVAL_CASES,
-  EVAL_CATEGORY_SETS,
-  EVAL_TODAY,
-} from '../lib/aiEvalCases.js';
-
-const SCORED = ['amount', 'type', 'category', 'date', 'account'];
-
-function categoriesFor(setName) {
-  const set = EVAL_CATEGORY_SETS[setName];
-  return [
-    ...set.expense.map((name) => ({ id: `expense:${name}`, name, type: 'expense' })),
-    ...set.income.map((name) => ({ id: `income:${name}`, name, type: 'income' })),
-  ];
-}
-
-function readable(result, categories) {
-  if (!result) return null;
-  const category = categories.find((c) => c.id === result.categoryId);
-  const account = EVAL_ACCOUNTS.find((a) => a.id === result.accountId)?.name ?? EVAL_ACTIVE_ACCOUNT;
-  return {
-    amount: result.amount,
-    type: result.type,
-    category: category?.name ?? null,
-    date: result.date,
-    account,
-    note: result.note,
-  };
-}
-
-function wrongFields(got, expected, setName) {
-  const want = { ...expected, category: expected.category[setName] };
-  return SCORED.filter((field) => got[field] !== want[field]).map(
-    (field) => `${field}: got ${JSON.stringify(got[field])}, want ${JSON.stringify(want[field])}`
-  );
-}
+import { EVAL_ACCOUNTS, EVAL_CASES, EVAL_TODAY } from '../lib/aiEvalCases.js';
+import { categoriesFor, readable, scoreCase } from '../lib/aiEvalScore.js';
 
 function run(setName) {
   const categories = categoriesFor(setName);
@@ -73,12 +37,8 @@ function run(setName) {
     } else if (!got) {
       outcome = '→ model';
       toModel++;
-    } else if (!testCase.expected) {
-      outcome = 'local ✗';
-      detail = `should be refused, got ${JSON.stringify(got)}`;
-      wrong++;
     } else {
-      const problems = wrongFields(got, testCase.expected, setName);
+      const { problems } = scoreCase(testCase, got, setName);
       if (problems.length) {
         outcome = 'local ✗';
         detail = problems.join('; ');

@@ -556,6 +556,7 @@ function RootNavigator() {
                                       <Stack.Screen name="accounts" options={{ headerShown: true, title: 'Accounts' }} />
                                       <Stack.Screen name="streak" options={{ headerShown: true, title: 'Streak' }} />
                                       <Stack.Screen name="dev/koban" options={{ headerShown: true, title: 'Koban gallery' }} />
+                                      <Stack.Screen name="dev/ai-eval" options={{ headerShown: true, title: 'AI test set' }} />
                                     </Stack>
                                   </AlertsSheetProvider>
                                 </RewardsHistorySheetProvider>

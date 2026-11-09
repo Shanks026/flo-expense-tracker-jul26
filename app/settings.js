@@ -26,6 +26,7 @@ import {
   CalendarClock,
   CalendarDays,
   Cat,
+  Sparkles,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import Card from '../components/Card';
@@ -722,6 +723,9 @@ export default function Settings() {
         {__DEV__ && (
           <RowGroup title="Developer">
             <Row icon={Cat} title="Koban gallery" onPress={() => router.push('/dev/koban')} />
+            {FLAGS.ai && (
+              <Row icon={Sparkles} title="AI test set" onPress={() => router.push('/dev/ai-eval')} />
+            )}
             {notifEnabled && (
               <Row
                 icon={Send}

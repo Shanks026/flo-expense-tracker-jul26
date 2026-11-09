@@ -10,6 +10,15 @@
 //   | { ok: false, reason: 'unread' | 'transfer' | 'cap' | 'error' }
 // Chat comes in later tickets.
 //
+// The phase 1 test screen (app/dev/ai-eval.js, ticket 03) adds
+//   eval: { accounts: [{ id, name }], categories: [{ id, name, type }] }
+//   model: 'default' | 'challenger'
+// The test set's own accounts and categories then stand in for the caller's,
+// and only the chosen model is asked, with no fallback, so each one is
+// measured on its own. Only the two configured models (AI_MODEL_QUICK and
+// AI_MODEL_FALLBACK) can be chosen. Nothing is written either way except the
+// usage row, so the option can't reach anyone's data.
+//
 // Runs as the caller: the Supabase client carries their Authorization
 // header, so every read and the usage insert go through RLS. The service
 // role is never used here. verify_jwt stays on, so the gateway turns away
@@ -51,6 +60,30 @@ const isYmd = (s: unknown): s is string => {
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: 'expense' | 'income' };
+
+const shortString = (v: unknown, max = 60): v is string => typeof v === 'string' && v.length > 0 && v.length <= max;
+
+// The test screen's stand-in context, or null if absent or malformed.
+function readEvalContext(raw: unknown): { accounts: Account[]; categories: Category[] } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const { accounts, categories } = raw as Record<string, unknown>;
+  if (!Array.isArray(accounts) || !Array.isArray(categories)) return null;
+  const list = { accounts: accounts as Record<string, unknown>[], categories: categories as Record<string, unknown>[] };
+  if (list.accounts.length > 20 || list.categories.length > 60) return null;
+  const okAccounts = list.accounts.every((a) => a && shortString(a.id) && shortString(a.name));
+  const okCategories = list.categories.every(
+    (c) => c && shortString(c.id) && shortString(c.name) && (c.type === 'expense' || c.type === 'income')
+  );
+  if (!okAccounts || !okCategories) return null;
+  return {
+    accounts: list.accounts.map((a) => ({ id: a.id as string, name: a.name as string })),
+    categories: list.categories.map((c) => ({
+      id: c.id as string,
+      name: c.name as string,
+      type: c.type as Category['type'],
+    })),
+  };
+}
 
 // Two of the person's own accounts named in one line reads as a transfer
 // between them, which quick add doesn't do (the Transfer flow on Accounts
@@ -172,6 +205,8 @@ Deno.serve(async (req) => {
   const time = typeof body.time === 'string' && /^\d{2}:\d{2}$/.test(body.time) ? body.time : '12:00';
   const tz = typeof body.tz === 'string' && body.tz.length <= 64 ? body.tz : 'Asia/Kolkata';
   if (!text || text.length > MAX_TEXT || !isYmd(today)) return json({ error: 'bad_request' }, 400);
+  const evalContext = body.eval === undefined ? null : readEvalContext(body.eval);
+  if (body.eval !== undefined && !evalContext) return json({ error: 'bad_request' }, 400);
 
   // One usage row per call that gets this far, whatever happens next.
   const startedAt = Date.now();
@@ -207,21 +242,28 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: 'cap' });
   }
 
-  const [accountsRes, categoriesRes, profileRes] = await Promise.all([
-    supabase.from('accounts').select('id, name').order('created_at'),
-    supabase.from('categories').select('id, name, type').order('name'),
-    supabase.from('profiles').select('currency').eq('id', userData.user.id).maybeSingle(),
-  ]);
-  if (accountsRes.error || categoriesRes.error) {
-    console.error('context load failed:', accountsRes.error?.message ?? categoriesRes.error?.message);
-    await record({ ok: false });
-    return json({ ok: false, reason: 'error' });
+  let accounts: Account[];
+  let categories: Category[];
+  let currency = 'INR';
+  if (evalContext) {
+    ({ accounts, categories } = evalContext);
+  } else {
+    const [accountsRes, categoriesRes, profileRes] = await Promise.all([
+      supabase.from('accounts').select('id, name').order('created_at'),
+      supabase.from('categories').select('id, name, type').order('name'),
+      supabase.from('profiles').select('currency').eq('id', userData.user.id).maybeSingle(),
+    ]);
+    if (accountsRes.error || categoriesRes.error) {
+      console.error('context load failed:', accountsRes.error?.message ?? categoriesRes.error?.message);
+      await record({ ok: false });
+      return json({ ok: false, reason: 'error' });
+    }
+    accounts = (accountsRes.data ?? []) as Account[];
+    categories = ((categoriesRes.data ?? []) as Category[]).filter(
+      (c) => c.type === 'expense' || c.type === 'income'
+    );
+    currency = profileRes.data?.currency ?? 'INR';
   }
-  const accounts = (accountsRes.data ?? []) as Account[];
-  const categories = ((categoriesRes.data ?? []) as Category[]).filter(
-    (c) => c.type === 'expense' || c.type === 'income'
-  );
-  const currency = profileRes.data?.currency ?? 'INR';
 
   if (namesTwoAccounts(text, accounts)) {
     await record({ ok: false });
@@ -236,6 +278,17 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: 'error' });
   }
   const fallback = Deno.env.get('AI_MODEL_FALLBACK');
+  // A test run asks one named model; a real quick add asks the primary and
+  // lets OpenRouter fall back.
+  let models = fallback ? [primary, fallback] : [primary];
+  if (evalContext) {
+    const chosen = body.model === 'challenger' ? fallback : primary;
+    if (!chosen) {
+      await record({ ok: false });
+      return json({ ok: false, reason: 'error' });
+    }
+    models = [chosen];
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), QUICK_TIMEOUT_MS);
@@ -250,7 +303,7 @@ Deno.serve(async (req) => {
         'X-OpenRouter-Title': 'FLO',
       },
       body: JSON.stringify({
-        models: fallback ? [primary, fallback] : [primary],
+        models,
         provider: { data_collection: 'deny', require_parameters: true },
         // No temperature: Claude Haiku 5.5's endpoints don't accept it, and with
         // require_parameters OpenRouter would then find no endpoint at all and
@@ -292,7 +345,8 @@ Deno.serve(async (req) => {
     ok: !!prefill,
   });
 
-  if (!reply) return json({ ok: false, reason: 'error' });
-  if (!prefill) return json({ ok: false, reason: 'unread' });
-  return json({ ok: true, prefill });
+  const model = typeof reply?.model === 'string' ? reply.model : null;
+  if (!reply) return json({ ok: false, reason: 'error', model });
+  if (!prefill) return json({ ok: false, reason: 'unread', model });
+  return json({ ok: true, prefill, model });
 });
