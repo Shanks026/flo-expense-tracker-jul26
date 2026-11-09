@@ -21,7 +21,7 @@ This ticket also produces the 40-phrase test set, weighted as in the spec. **The
 
 - [x] Code implementation
 - [x] Verified (emulator check)
-- [ ] Green signal
+- [x] Green signal
 
 ## Comments
 
