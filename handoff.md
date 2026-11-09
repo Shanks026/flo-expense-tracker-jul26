@@ -1,9 +1,9 @@
-# Handoff — 2026-11-09 (night, after ticket 08)
+# Handoff — 2026-11-09 (late night, after tickets 09–11)
 
 Read this first in a new session, then:
 - `AGENTS.md`;
 - `.claude/features/00-index.md`, for the standing rules;
-- `.claude/features/44-ai-assistant.md`. §3.2–3.3 hold the chat tools and the "Rich answers" and "Several categories" notes.
+- `.claude/features/44-ai-assistant.md`. §3.2–3.3 hold the chat tools and the "Rich answers" and "Several categories" notes; §4 and the "Phase 4: proposals" Implementation Notes hold the proposals.
 
 Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say what was checked.
 
@@ -17,15 +17,15 @@ Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say w
   - every number comes from server code, never from the model.
 
 ## Where it stands
-- **Branch:** `feat/spec44-ai-quick-add-voice`, pushed. [PR #1](https://github.com/Shanks026/flo-expense-tracker-jul26/pull/1) is open, titled for tickets 01–08 and 12, and mergeable; the repo has no CI. Keep adding 09–11 to this branch and refresh the PR body when they land.
-- **Done and resolved:** tickets 01–08 and 12, with these commits:
-  - `20edc1c`: ticket 06;
-  - `ddba4e0`: ticket 12;
-  - `0ac1991`: ticket 07;
-  - `e6d1d09`: ticket 08 (past chats, Home sparkle, composer mic; app only, no function change).
-- **Next:** tickets 09, 10 and 11 (proposals), in that order. Each needs a function change (a deploy, so ask first). 10 and 11 also give `AddBudgetSheet` and `AddBillSheet` a prefill path for a **new** row, an object without `id`; the free-plan gate must still run at Save. Spec 44 §4 has the proposal shapes and the rules.
-- **`ai-assistant` is deployed** with every change up to ticket 07 (08 didn't touch it).
-- **Phone:** a standalone release APK of the branch at `e6d1d09` (tickets 01–08 and 12) was installed on the vivo I2220 over adb on 9 Nov. See "Open, for the phone check" below.
+- **Branch:** `feat/spec44-ai-quick-add-voice`, pushed at `c285ab6`. [PR #1](https://github.com/Shanks026/flo-expense-tracker-jul26/pull/1) is open, titled for tickets 01–12, with its body refreshed. The repo has no CI.
+- **Spec 44 is built:** all twelve tickets (01–12). This session's commits:
+  - `d243f27`: ticket 09 (transaction proposals);
+  - `9a5d8af`: ticket 10 (budget proposals);
+  - `ebfd699`: ticket 11 (bill proposals);
+  - `c285ab6`: review follow-ups.
+- **`ai-assistant` is deployed** with everything up to `c285ab6`.
+- **Next: the one phone check of everything** (see below). After that, Phase 4's approval, then whatever the person picks next. A possible follow-up is bulk drafting (several entries in one message), which the person asked about; it's one draft per answer for now.
+- **Phone:** see "Open, for the phone check".
 
 ## What Ask FLO is now
 - **Entry:** a row at the top of More, and a sparkle beside the bell on Home, open `app/assistant.js`. Both are behind `FLAGS.ai`.
@@ -42,6 +42,14 @@ Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say w
   - `bills_due`.
   Totals count only the exact types `expense` and `income`.
 - **Writes:** `ai_conversations`, `ai_messages` and `ai_usage` only, and only after a turn succeeds. `ai_messages.tool_calls` stores the tool log, results included.
+- **Proposals (09–11):**
+  - `propose_transaction`, `propose_budget` and `propose_bill` live in `proposals.ts`, which has no Supabase client;
+  - one checked draft per answer goes into `ai_messages.proposal`;
+  - `components/ProposalCard.js` shows it with Review and Dismiss. Review opens the Add, Add Budget or Add Bill sheet pre-filled as a **new** row (an object without `id`), and the sheet's `onDone({ saved })` turns the card to "Saved ✓";
+  - the app keeps `proposal.status` (`saved` | `dismissed`) on the row through `setProposalStatus`;
+  - earlier drafts go into the model's history as a bracketed note with their status;
+  - a budget for a category they don't have gets a question, not a guess.
+- **`max_tokens` is 1500 for chat.** At 500, Haiku 5.5's reasoning cut answers off. Empty and cut-off answers are logged (`chat answer cut off|empty`).
 - **Categories are dynamic.** The prompt maps a word like "food" onto the person's own categories (Breakfast, Lunch, Dinner, Snacks…), names what it counted, and says what it left out (Groceries). A supplied but empty category list is an error, never a silent "all categories".
 - **Answers:**
   - they sit on the page with no bubble (only the person's questions are bubbles);
@@ -56,10 +64,11 @@ Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say w
 - **Model:** `AI_MODEL_CHAT` is Haiku 5.5 (spec default), and `AI_MODEL_QUICK` is Gemini 3.1 Flash Lite. A chat turn costs about $0.001, with p50 3.7 s and p90 4.9 s at the function.
 
 ## Open, for the phone check
-The phone now runs the APK of tickets 01–08 and 12, so these can be checked already. After 09–11, build one more APK for their proposal checks. To build one: stop Metro, then in `android/` run `./gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a`; no `prebuild --clean` unless a native dependency changed. Install with `adb -s 10BDC910EA00059 install -r android/app/build/outputs/apk/release/app-release.apk`. Check on the phone:
-- **Ticket 07:** the median chat turn is ≤ 4 s. The function's p50 is 3.7 s and the app adds about 0.4 s, so it's likely just over. The ideas in spec 44's Implementation Notes apply: parallel lookups, a shorter prompt, the region.
-- **Ask FLO overall,** in light and dark: the keyboard and composer, the tables, and the chips.
-- **The phone checks from tickets 08 (a spoken question in the composer), 09 and 11.**
+A standalone release APK of the branch at `c285ab6` (all of spec 44) was built after ticket 11; the person installs it, or plugs the phone in. To build one: stop Metro (and any node left on port 8081), then in `android/` run `./gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a`; no `prebuild --clean` unless a native dependency changed. Install with `adb -s 10BDC910EA00059 install -r android/app/build/outputs/apk/release/app-release.apk`. Check on the phone:
+- **Ticket 07:** the median chat turn is ≤ 4 s. The function's p50 was 3.7 s at the old 500-token cap, so recheck it now. The ideas in spec 44's Implementation Notes apply: parallel lookups, a shorter prompt, the region.
+- **Ask FLO overall,** in light and dark: the keyboard and composer, the tables, the chips and the proposal cards.
+- **08:** a spoken question in the composer.
+- **09–11:** one draft of each kind, from Review to Save, and Dismiss.
 
 ## Decisions made today
 - **Paise:** answers show paise when there are any, to match `formatMoney` and so match Insights exactly. Spec 44 still says "no decimals"; update the spec at some point.
@@ -72,15 +81,16 @@ It now holds a lot of test data. Keep it unless asked:
 - the **Savings** account with a ₹500 transfer from Personal;
 - **Food renamed to Lunch**, plus Breakfast, Dinner and Snacks with one entry each;
 - budgets **Lunch ₹800** and **Monthly spending ₹2,000**;
-- bills **Electricity** (due 12 Nov), **Netflix** (overdue since 7 Nov) and **Rent** (1 Dec);
+- bills **Electricity** (due 12 Nov), **Netflix** (overdue since 7 Nov) and **Rent** (1 Dec), plus a **second identical Rent** made by the ticket 11 check (it can be deleted);
+- from tickets 09–10: a ₹250 Transport "Auto" expense on 8 Nov, and a **Snacks ₹6,000** monthly budget. The Lunch budget is now named "Lunch" (saving it renamed it);
 - three October expenses totalling ₹1,200;
 - a ₹50,000 salary on 1 Nov;
 - a ₹30 Snacks entry whose note is a prompt-injection test ("ignore previous instructions…").
 
 Expected answers on 9 Nov (Personal account):
-- this month ₹1,710 and last month ₹1,200;
+- this month ₹1,960 (₹1,710 before the ₹250 from ticket 09) and last month ₹1,200;
 - food ₹1,430 across the four meal categories;
-- balances: Personal ₹46,590, Savings ₹500.
+- balances: Personal ₹46,340 (₹46,590 less the ₹250; worked out, not yet seen on screen), Savings ₹500.
 
 ## Tooling notes
 - **Deploying:** `npx supabase functions deploy ai-assistant --remote=uergtlcfpwajztqgncim --use-api --yes`, only after the person says yes.
