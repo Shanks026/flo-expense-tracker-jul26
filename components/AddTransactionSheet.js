@@ -207,6 +207,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // picked after seeing the parsed one.
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickKey, setQuickKey] = useState(0);
+  // Set (non-zero) to make the quick-add line start listening (long-press ⊕).
+  const [listenKey, setListenKey] = useState(0);
   const categoryTappedRef = useRef(false);
   // Bumped by every hand edit (amount, category, type, date, note). A model
   // answer that started before the latest edit is dropped, so a slow reply
@@ -356,9 +358,17 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // bottom-sheet + keyboard interactions.
       // With the quick-add line showing, the keyboard opens there instead;
       // tapping the amount still works as before.
+      // A long-press on ⊕ (`listen: true`) opens it listening instead.
+      // The sheet's content remounts on each open, so every other open
+      // clears the request; otherwise the line would listen again on mount.
+      setListenKey(0);
       if (isBlankEntry) {
-        const target = quickAdd ? quickInputRef : amountInputRef;
-        setTimeout(() => target.current?.focus(), 300);
+        if (quickAdd && payload?.listen) {
+          setTimeout(() => setListenKey(Date.now()), 300);
+        } else {
+          const target = quickAdd ? quickInputRef : amountInputRef;
+          setTimeout(() => target.current?.focus(), 300);
+        }
       }
     },
   }));
@@ -739,6 +749,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           <QuickAddField
             ref={quickInputRef}
             resetKey={quickKey}
+            listenKey={listenKey}
+            onCantListen={() => quickInputRef.current?.focus()}
             hidden={!showQuickAdd}
             parse={parseQuickLine}
             ask={askQuickLine}

@@ -6,6 +6,8 @@ import { radii, fontFamily, hitTarget } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAddTransactionSheet } from './AddTransactionSheet';
 import CoachMark from './CoachMark';
+import * as Haptics from 'expo-haptics';
+import { voiceSupported } from '../lib/voice';
 
 const ICONS = { index: Home, transactions: List, insights: ChartColumn, more: Ellipsis };
 const LABELS = { index: 'Home', transactions: 'Transactions', insights: 'Insights', more: 'More' };
@@ -72,6 +74,16 @@ export default function TabBar({ state, navigation }) {
         // quickAdd: the one opener that gets the quick-add line
         // (44-ai-assistant.md, Phase 1).
         onPress={() => openAdd({ quickAdd: true })}
+        // Long-press: the sheet opens already listening (44-ai-assistant.md,
+        // Phase 2, ticket 05). Checked at press time, not render: on a cold
+        // start the speech module may not answer yet when the bar first
+        // renders. Without voice, a long-press opens it as a tap does.
+        onLongPress={() => {
+          const listen = voiceSupported();
+          if (listen) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          openAdd({ quickAdd: true, listen });
+        }}
+        delayLongPress={400}
         accessibilityRole="button"
         accessibilityLabel="Add a transaction"
       >

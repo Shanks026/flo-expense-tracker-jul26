@@ -10,11 +10,24 @@ Spec: .claude/features/44-ai-assistant.md (Phase 2, Goal)
 
 - [ ] Long-press + → speak → the sheet is filled, and Save writes one row
 - [ ] Editing the transcript and parsing again updates the fields
-- [ ] A short tap on + opens the sheet as before, with no listening
+- [x] A short tap on + opens the sheet as before, with no listening
 - [ ] Phone check, light and dark
 
 ## Tracer
 
-- [ ] Code implementation
+- [x] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+**2026-11-09: built and checked on Pixel_API_36. The spoken checks need the phone.**
+- **How it works:** a long-press on ⊕ (400 ms, with a haptic) opens the sheet with `listen: true`. The quick-add line then listens without holding, in non-continuous mode, and stops by itself when the person stops speaking. What it hears is submitted like a typed line. Tapping the mic while it listens ends it early. Without voice (lite build, unsupported, or permission refused), the long-press opens the sheet as a tap does and focuses the line.
+- **Two bugs found on the emulator and fixed:**
+  - The sheet's content remounts on every open, so a short tap after a long-press listened again. Every other open now clears the listen request.
+  - On a cold start the speech module may not answer when the tab bar first renders, so the long-press handler was missing. Support is now checked at press time.
+- **Emulator:**
+  - long-press opens the sheet listening, including the first open after a cold start;
+  - with no audio it ends with "Couldn't hear that";
+  - a short tap opens it as before.
+- **Still to do on the phone:** speak, check the filled sheet and Save, edit the transcript and re-parse, and check light and dark.

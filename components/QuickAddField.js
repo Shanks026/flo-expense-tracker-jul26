@@ -36,7 +36,7 @@ const MESSAGES = {
   unheard: "Couldn't hear that",
 };
 
-const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, resetKey, hidden }, ref) {
+const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, resetKey, listenKey, onCantListen, hidden }, ref) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [text, setText] = useState('');
@@ -70,7 +70,33 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
     sessionRef.current?.stop();
   }, [resetKey]);
 
+  // Long-press ⊕ (ticket 05): the sheet opens already listening, and the
+  // session ends by itself when the person stops speaking. If voice can't run
+  // here, the sheet falls back to typing.
+  useEffect(() => {
+    if (!listenKey) return;
+    (async () => {
+      if (!micAllowed) {
+        onCantListen?.();
+        return;
+      }
+      let { granted } = await micPermission();
+      if (!granted) {
+        const asked = await micPermission({ ask: true });
+        granted = asked.granted;
+        if (!granted && !asked.canAskAgain) setMicAllowed(false);
+      }
+      if (!granted) {
+        onCantListen?.();
+        return;
+      }
+      listen({ continuous: false });
+    })();
+  }, [listenKey]);
+
   async function handleMicIn() {
+    // During a long-press session, a press only ends it (on release).
+    if (listening) return;
     heldRef.current = true;
     const { granted } = await micPermission();
     if (!granted) {
@@ -80,6 +106,12 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
       return;
     }
     if (!heldRef.current) return;
+    const session = await listen({ continuous: true });
+    // Let go before the recognizer was ready.
+    if (!heldRef.current) session.stop();
+  }
+
+  async function listen({ continuous }) {
     requestRef.current += 1;
     Keyboard.dismiss();
     setMessage(null);
@@ -88,6 +120,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
     setText('');
     const session = await startListening({
       lang: language,
+      continuous,
       onText: setText,
       onEnd: ({ text: heard, error }) => {
         sessionRef.current = null;
@@ -105,8 +138,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
       },
     });
     sessionRef.current = session;
-    // Let go before the recognizer was ready.
-    if (!heldRef.current) session.stop();
+    return session;
   }
 
   function handleMicOut() {
