@@ -32,6 +32,8 @@ import ArrowMark from '../components/ArrowMark';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ShimmerText from '../components/ShimmerText';
+import RichText from '../components/RichText';
+import BreakdownTable, { breakdownsFrom } from '../components/BreakdownTable';
 import { fontFamily, spacing, radii, radius, type } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import useAssistantConversation from '../hooks/useAssistantConversation';
@@ -176,9 +178,10 @@ function AssistantChat() {
           if (m.role === 'user') return <UserBubble key={m.key} text={m.content} styles={styles} />;
           if (m.role === 'thinking') return <Thinking key={m.key} colors={colors} styles={styles} />;
           return (
-            <AnswerBubble
+            <Answer
               key={m.key}
               text={m.content}
+              toolCalls={m.tool_calls}
               reveal={m.id === freshReplyId}
               onRevealed={() => setFreshReplyId(null)}
               styles={styles}
@@ -222,15 +225,18 @@ function UserBubble({ text, styles }) {
   );
 }
 
-// An answer. A fresh one writes itself out a word at a time, the way chat
-// replies stream in; stored ones and reduce-motion show the whole text.
-function AnswerBubble({ text, reveal, onRevealed, styles }) {
+// An answer, on the page with no bubble. A fresh one writes itself out a
+// word at a time, the way chat replies stream in; stored ones and
+// reduce-motion show the whole text. Stopping the reveal for any reason (a
+// new answer arriving, reduce-motion turning on) shows it whole at once.
+function Answer({ text, toolCalls, reveal, onRevealed, styles }) {
   const reduce = useReducedMotion();
   const words = useMemo(() => text.split(/(\s+)/), [text]);
+  const tables = useMemo(() => breakdownsFrom(toolCalls), [toolCalls]);
   const animate = reveal && !reduce;
   const [shown, setShown] = useState(animate ? 0 : words.length);
 
-  const done = shown >= words.length;
+  const done = !animate || shown >= words.length;
   useEffect(() => {
     if (!animate || done) return undefined;
     const timer = setInterval(() => {
@@ -242,16 +248,32 @@ function AnswerBubble({ text, reveal, onRevealed, styles }) {
 
   // Done: tell the screen once, outside the state update.
   useEffect(() => {
-    if (animate && done) onRevealed?.();
-  }, [animate, done]);
+    if (animate && shown >= words.length) onRevealed?.();
+  }, [animate, shown >= words.length]);
 
+  // Mid-reveal, a last line that is only a list or heading marker so far
+  // ("-", "1.", "###") waits for its first word instead of showing raw.
+  const partial = done
+    ? text
+    : words
+        .slice(0, shown)
+        .join('')
+        .replace(/\n\s*(#{1,6}|[-*•]|\d{1,2}[.)])\s*$/, '\n');
+
+  // No layout spring here: the answer grows every few milliseconds while it
+  // reveals, and a spring per step would pile up.
   return (
-    <Animated.View style={styles.answerWrap} entering={ENTER} layout={SHIFT}>
-      <Card style={styles.answer}>
-        <Text style={styles.answerText} selectable accessibilityLabel={text}>
-          {done ? text : words.slice(0, shown).join('')}
-        </Text>
-      </Card>
+    <Animated.View style={styles.answer} entering={ENTER}>
+      <RichText text={partial} />
+      {done
+        ? tables.map((t, i) => (
+            <Animated.View key={i} entering={animate ? FadeIn.duration(260) : undefined}>
+              <Card style={styles.tableCard}>
+                <BreakdownTable table={t} />
+              </Card>
+            </Animated.View>
+          ))
+        : null}
     </Animated.View>
   );
 }
@@ -273,24 +295,22 @@ function Thinking({ colors, styles }) {
   const label = `${THINKING_STEPS[step]}…`;
   return (
     <Animated.View
-      style={styles.answerWrap}
+      style={styles.thinking}
       entering={ENTER}
       exiting={FadeOut.duration(120)}
       layout={SHIFT}
       accessibilityLiveRegion="polite"
       accessibilityLabel={label}
     >
-      <Card style={[styles.answer, styles.thinking]}>
-        <ArrowMark size={18} color={colors.ink} />
-        <Animated.View key={step} entering={FadeIn.duration(220)} exiting={FadeOut.duration(120)}>
-          <ShimmerText
-            text={label}
-            style={styles.thinkingText}
-            baseColor={colors.muted}
-            highlightColor={colors.ink}
-          />
-        </Animated.View>
-      </Card>
+      <ArrowMark size={18} color={colors.ink} />
+      <Animated.View key={step} entering={FadeIn.duration(220)} exiting={FadeOut.duration(120)}>
+        <ShimmerText
+          text={label}
+          style={styles.thinkingText}
+          baseColor={colors.muted}
+          highlightColor={colors.ink}
+        />
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -361,23 +381,23 @@ function makeStyles(colors) {
       lineHeight: 20,
       color: colors.brandText,
     },
-    answerWrap: {
-      alignItems: 'flex-start',
-    },
+    // Answers sit on the page, full width, with no bubble, as in other AI
+    // chats; only the person's questions are bubbles. A little side room
+    // lines the text up with the bubbles' own text.
     answer: {
-      maxWidth: '92%',
-      borderBottomLeftRadius: radius.sm,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.xs,
     },
-    answerText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      lineHeight: 21,
-      color: colors.ink,
+    tableCard: {
+      marginTop: spacing.md,
+      paddingVertical: spacing.sm,
     },
     thinking: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.sm,
     },
     thinkingText: {
       fontFamily: fontFamily.semibold,

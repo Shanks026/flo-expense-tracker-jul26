@@ -471,6 +471,43 @@ so transfers and settlements never count. Balances come from
   - a sparkle icon in the Home header, beside the bell.
 - Empty state: `EmptyState` with Koban (pose `report`), "Ask about your money".
 
+#### Rich answers (added 2026-11-09, ticket 12)
+The person found a by-day answer written as one paragraph hard to read.
+- **Formatting the model may write:** bold, bullet and numbered lists, and a
+  short heading. `components/RichText.js` (the app's own, no library) draws
+  them with FLO's type. Anything else, such as links, code or a model-written
+  table, is shown as plain words, never as raw symbols.
+- **Breakdowns are tables drawn from the tool result, not from the model's
+  text.** Each assistant row already stores its tool log, results included,
+  in `ai_messages.tool_calls`. Every `by_day`, `by_week`, `by_month` or
+  `by_category` list there becomes a table under the answer (label, count,
+  right-aligned amount, a thin bar, and the tool's total). The rows carry a
+  numeric `value` next to the formatted `total` for the bars only; the text
+  shown is always the tool's own ₹ string.
+- **The prompt:** use formatting only when it helps. A one-number answer
+  stays one sentence. Don't repeat a breakdown's rows (the app shows the
+  table); name at most the one or two that matter.
+- No database change: `tool_calls` already exists.
+
+#### Several categories in one question (added 2026-11-09, ticket 12)
+Categories are the person's own, so "food" may be a Food category or
+Breakfast, Lunch, Dinner and Snacks with no Food at all. A single category
+argument made that question unreliable: the model would count one meal, give
+up, or add totals itself.
+- `spend_summary` takes `category_ids` (one or several, same type), and the
+  function adds them up. A total over several categories always comes broken
+  down by category, so the table shows exactly what was counted, and the
+  result lists `categories_counted` by name.
+- The prompt's category rules: read their whole list first; a category named
+  as asked is counted, plus any that plainly belong with it; a broad word
+  counts every category that is plainly a kind of it (examples are hints, the
+  person's real names decide); leave out the arguable ones (Groceries for
+  food) and say so in one line; always name what was counted; ask when a word
+  could mean two quite different sets.
+- Checked on the test account with no Food category: "how much did I spend
+  on food this month?" → ₹1,430 across Breakfast, Lunch, Dinner and Snacks,
+  with Groceries named as left out, matching the database.
+
 ### 3.4 Checklist
 - [ ] Both tables exist with RLS. User A can't read user B's conversations, or insert a message into one of B's conversation ids (checked via MCP).
 - [ ] 15 scripted questions give numbers that match the Insights screen and the account card exactly for the same period and account.
