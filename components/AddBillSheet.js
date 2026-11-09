@@ -4,7 +4,7 @@ import Switch from './Switch';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, Trash2 } from 'lucide-react-native';
-import { format, addWeeks, addMonths, addYears } from 'date-fns';
+import { format, addWeeks, addMonths, addYears, parseISO } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
 import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
@@ -70,14 +70,41 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  // Per open: `onDone({ saved })` runs once when the sheet closes (Ask FLO's
+  // card turns to "Saved ✓" from it).
+  const onDoneRef = useRef(null);
+  const savedRef = useRef(false);
+
   const selectedCategory = expenseCategories.find((c) => c.id === categoryId);
 
+  // open(bill):
+  // - an existing row (with `id`) opens it for editing;
+  // - an object without `id` (Ask FLO's draft, 44-ai-assistant.md phase 4)
+  //   fills the fields as a NEW bill: { name, amount, cadence,
+  //   next_due_date, category_id?, onDone? }. The date counts as picked, so
+  //   switching the cadence doesn't move it;
+  // - nothing opens a blank new bill.
   useImperativeHandle(ref, () => ({
     open(bill) {
       setError(null);
       setPickerOpen(false);
       setShowDatePicker(false);
-      if (bill) {
+      onDoneRef.current = bill?.onDone ?? null;
+      savedRef.current = false;
+      if (bill && !bill.id) {
+        const due = typeof bill.next_due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(bill.next_due_date);
+        setEditingId(null);
+        setName(bill.name ?? '');
+        setAmount(bill.amount ? String(bill.amount) : '');
+        // Currency picker flagged off (lib/flags.js): new bills are INR.
+        setCurrency(FLAGS.currencyPicker ? (profile?.currency ?? DEFAULT_CURRENCY) : DEFAULT_CURRENCY);
+        setCadence(CADENCES.some((c) => c.key === bill.cadence) ? bill.cadence : 'monthly');
+        // parseISO: a bare 'YYYY-MM-DD' is a local day, not UTC midnight.
+        setNextDueDate(due ? parseISO(bill.next_due_date) : new Date());
+        setDateTouched(due);
+        setCategoryId(bill.category_id ?? null);
+        setIsActive(true);
+      } else if (bill) {
         setEditingId(bill.id);
         setName(bill.name);
         setAmount(String(bill.amount));
@@ -145,10 +172,18 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
       showToast({ message: saveError.message, variant: 'error' });
       return;
     }
+    if (!editingId) savedRef.current = true;
     notifyChanged();
     modalRef.current?.dismiss();
     showToast({ message: editingId ? 'Bill updated' : 'Bill created', variant: 'success' });
   }
+
+  // Hands the outcome to whoever opened the sheet, once per open.
+  const handleDismiss = useCallback(() => {
+    const onDone = onDoneRef.current;
+    onDoneRef.current = null;
+    onDone?.({ saved: savedRef.current });
+  }, []);
 
   async function handleDelete() {
     if (!editingId) return;
@@ -174,6 +209,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     <BottomSheetModal
       ref={modalRef}
       onChange={handleSheetChange}
+      onDismiss={handleDismiss}
       snapPoints={useMemo(() => ['92%'], [])}
       enableDynamicSizing={false}
       backdropComponent={renderBackdrop}

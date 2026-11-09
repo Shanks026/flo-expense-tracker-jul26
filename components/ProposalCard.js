@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
-import { ReceiptText, Target } from 'lucide-react-native';
+import { CalendarClock, ReceiptText, Target } from 'lucide-react-native';
 import Card from './Card';
 import { fontFamily, spacing, radii, type } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -12,6 +12,7 @@ import { setProposalStatus } from '../lib/ai';
 import useCategories from '../hooks/useCategories';
 import { useAddTransactionSheet } from './AddTransactionSheet';
 import { useAddBudgetSheet } from './AddBudgetSheet';
+import { useAddBillSheet } from './AddBillSheet';
 
 // A draft from Ask FLO (44-ai-assistant.md, phase 4), in plain words, with
 // Review and Dismiss. Review opens the matching sheet pre-filled as a NEW
@@ -31,6 +32,7 @@ export default function ProposalCard({ messageId, proposal }) {
   const { categories } = useCategories();
   const { openAdd } = useAddTransactionSheet();
   const { openAddBudget } = useAddBudgetSheet();
+  const { openAddBill } = useAddBillSheet();
   const [status, setStatus] = useState(proposal?.status ?? null);
 
   // A refetch can bring a mark made on another device, or after a reload.
@@ -53,7 +55,7 @@ export default function ProposalCard({ messageId, proposal }) {
   }
 
   function review() {
-    view.open({ openAdd, openAddBudget }, ({ saved }) => {
+    view.open({ openAdd, openAddBudget, openAddBill }, ({ saved }) => {
       if (saved) mark('saved');
     });
   }
@@ -169,6 +171,33 @@ function describe(p, { accounts, categories }) {
           start_date: custom ? p.start_date : null,
           end_date: custom ? p.end_date : null,
           account_id: account?.id ?? null,
+          onDone,
+        }),
+    };
+  }
+  if (p.kind === 'bill') {
+    const cadences = { weekly: 'Every week', monthly: 'Every month', yearly: 'Every year' };
+    if (!cadences[p.cadence] || typeof p.name !== 'string' || !p.name.trim()) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.next_due_date ?? '')) return null;
+    const category = p.category_id ? categories.find((c) => c.id === p.category_id && c.type === 'expense') : null;
+    return {
+      Icon: CalendarClock,
+      kicker: 'New bill',
+      amount: formatMoney(Number(p.amount)),
+      lines: [
+        // "Rent · Rent" says nothing twice: the category only when it differs.
+        [p.name, category && category.name.toLowerCase() !== p.name.trim().toLowerCase() ? category.name : null]
+          .filter(Boolean)
+          .join(' · '),
+        `${cadences[p.cadence]} · next due ${format(parseISO(p.next_due_date), 'EEE d MMM yyyy')}`,
+      ],
+      open: ({ openAddBill }, onDone) =>
+        openAddBill({
+          name: p.name,
+          amount: Number(p.amount),
+          cadence: p.cadence,
+          next_due_date: p.next_due_date,
+          category_id: category?.id ?? null,
           onDone,
         }),
     };

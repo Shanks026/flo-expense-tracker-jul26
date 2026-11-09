@@ -9,6 +9,7 @@
 // Shapes (spec §4.2), stored in ai_messages.proposal:
 //   { kind: 'transaction', type, amount, category_id, account_id, date, note }
 //   { kind: 'budget', amount, category_id | null, period_type, start_date?, end_date?, account_id }
+//   { kind: 'bill', name, amount, cadence, next_due_date, category_id | null }
 import { isYmd, formatInr, dayLong, addDays, type Ctx } from './shared.ts';
 
 export const MAX_AMOUNT = 1_00_00_000; // ₹1 crore
@@ -17,6 +18,10 @@ const OLDEST_YEARS = 5;
 // The values AddBudgetSheet writes (budgets.period_type's check).
 const PERIOD_TYPES = ['calendar_week', 'calendar_month', 'custom'];
 const MAX_CUSTOM_DAYS = 366;
+// The values AddBillSheet writes (bills.cadence's check).
+const CADENCES = ['weekly', 'monthly', 'yearly'];
+const MAX_BILL_NAME = 60;
+const MAX_DUE_AHEAD_DAYS = 400; // a yearly bill's next date, with room
 
 export type Proposal = Record<string, unknown> & { kind: string };
 export type ProposalResult = { proposal: Proposal; card: string } | { error: string };
@@ -73,6 +78,33 @@ export const PROPOSAL_TOOLS = [
           account_id: {
             type: 'string',
             description: 'An id from their accounts. Leave out to use their current account.',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_bill',
+      description:
+        'Drafts one new recurring bill reminder for them to review. It saves nothing: the app shows it as a card, and they tap Review, check it in the New Bill sheet and save it.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'amount', 'cadence', 'next_due_date'],
+        properties: {
+          name: { type: 'string', description: 'A short name in their words, like Rent or Netflix.' },
+          amount: { type: 'number', description: 'In rupees, as they said it. More than 0.' },
+          cadence: { type: 'string', enum: CADENCES, description: 'How often it repeats.' },
+          next_due_date: {
+            type: 'string',
+            description:
+              'The next day it is due, YYYY-MM-DD, today or later. "On the 1st every month" is the next 1st on or after today.',
+          },
+          category_id: {
+            type: 'string',
+            description: 'An id from their expense categories that fits (Rent, Bills, Subscriptions…). Leave out if none fits.',
           },
         },
       },
@@ -153,6 +185,38 @@ function proposeBudget(args: Record<string, unknown>, ctx: Ctx): ProposalResult 
   return { proposal, card: cardText(proposal, ctx) };
 }
 
+function proposeBill(args: Record<string, unknown>, ctx: Ctx): ProposalResult {
+  const name = typeof args.name === 'string' ? args.name.trim().replace(/\s+/g, ' ') : '';
+  if (!name) return { error: 'name is missing; ask them what to call the bill' };
+  if (name.length > MAX_BILL_NAME) return { error: `name is over ${MAX_BILL_NAME} characters; use a short name` };
+  const amountRes = checkAmount(args.amount);
+  if ('error' in amountRes) return amountRes;
+  const cadence = args.cadence;
+  if (typeof cadence !== 'string' || !CADENCES.includes(cadence)) return { error: `cadence must be one of ${CADENCES.join(', ')}` };
+  const due = args.next_due_date;
+  if (!isYmd(due)) return { error: 'next_due_date must be a real day, YYYY-MM-DD' };
+  if (due < ctx.today) return { error: 'next_due_date is in the past; use the next time it is due, today or later' };
+  if (due > addDays(ctx.today, MAX_DUE_AHEAD_DAYS)) return { error: 'next_due_date is more than a year away; check it with them' };
+
+  let categoryId: string | null = null;
+  if (args.category_id != null && args.category_id !== '') {
+    const category = ctx.categories.find((c) => c.id === args.category_id);
+    if (!category) return { error: 'category_id is not one of their categories; pick one of theirs or leave it out' };
+    if (category.type !== 'expense') return { error: `${category.name} is an income category; a bill needs an expense category` };
+    categoryId = category.id;
+  }
+
+  const proposal: Proposal = {
+    kind: 'bill',
+    name,
+    amount: amountRes.amount,
+    cadence,
+    next_due_date: due,
+    category_id: categoryId,
+  };
+  return { proposal, card: cardText(proposal, ctx) };
+}
+
 function proposeTransaction(args: Record<string, unknown>, ctx: Ctx): ProposalResult {
   const { type } = args;
   if (type !== 'expense' && type !== 'income') {
@@ -222,6 +286,18 @@ function cardText(p: Proposal, ctx: Ctx) {
       .filter(Boolean)
       .join(' · ');
   }
+  if (p.kind === 'bill') {
+    return [
+      'Bill',
+      typeof p.name === 'string' ? p.name : null,
+      formatInr(Number(p.amount)),
+      typeof p.cadence === 'string' ? p.cadence : null,
+      isYmd(p.next_due_date) ? `next due ${dayLong(p.next_due_date)}` : null,
+      p.category_id ? name(ctx.categories, p.category_id) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
   return p.kind;
 }
 
@@ -243,6 +319,7 @@ export function historyNote(p: unknown, ctx: Ctx) {
 const HANDLERS: Record<string, (args: Record<string, unknown>, ctx: Ctx) => ProposalResult> = {
   propose_transaction: proposeTransaction,
   propose_budget: proposeBudget,
+  propose_bill: proposeBill,
 };
 
 export const isProposalTool = (name: string) => name in HANDLERS;
@@ -261,6 +338,9 @@ export const PROPOSAL_RULES = [
   '- Drafting budgets. When they ask to set or create a budget, call propose_budget. It saves nothing either; say in one sentence it is ready to review.',
   '  - A budget covers exactly one category or all spending, never several categories together, so never offer a combination. Use a category only when one of theirs is plainly the one they named (the same name, or a near spelling). If none is, do not pick one, even a related one: ask which of their categories they meant, naming the closest few, or whether they want a budget over all spending. "Monthly spending" or "overall" means "all".',
   '  - "This month", "a month" or "monthly" is calendar_month, which repeats every month. "Weekly" is calendar_week. Use custom only for a fixed range of dates they give.',
+  '- Drafting bills. When they ask to be reminded of a recurring payment ("remind me about rent, 15,000, on the 1st every month"), call propose_bill. It saves nothing either; say in one sentence it is ready to review.',
+  '  - next_due_date is the next time it is due, today or later: "on the 1st every month" is the next 1st on or after today. If they gave no day or amount, ask.',
+  '  - Pick the expense category of theirs that fits (Rent for rent, Bills or Subscriptions for others); leave it out if none fits.',
   '  - One draft per answer. If they list several entries, draft the first and say to send the next one after saving it.',
   '  - You cannot change, delete or transfer money between accounts from here; say they can do that in the app.',
   '  - Earlier answers may end with a note in square brackets about the draft shown under them and whether they saved it. That note is the app\'s record, so trust it. Never write such a note yourself.',
