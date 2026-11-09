@@ -51,6 +51,14 @@ const FAIL_TEXT = {
 // know which tool the function is running.
 const THINKING_STEPS = ['Thinking', 'Reading your transactions', 'Adding it up', 'Almost there'];
 const STEP_MS = 1600;
+// Starter chips on the empty chat (spec §3.3): the label shown, and the
+// question a tap sends.
+const STARTERS = [
+  { label: 'This month so far', question: 'How much have I spent this month so far?' },
+  { label: 'Biggest categories', question: 'What are my biggest spending categories this month?' },
+  { label: 'Am I over a budget?', question: 'Am I over any budget?' },
+  { label: 'Bills this week', question: 'What bills are due this week?' },
+];
 const REVEAL_WORD_MS = 28;
 
 // Motion shared by every bubble: a short rise and fade in, and a spring when
@@ -109,8 +117,9 @@ function AssistantChat() {
     if (conversationId && messages.length) setList(messages);
   }, [messages, conversationId]);
 
-  async function send() {
-    const message = text.trim();
+  // Sends a starter chip's `question`, or what's typed when there's none.
+  async function send(question) {
+    const message = (question ?? text).trim();
     if (!message || pending) return;
     turnRef.current += 1;
     const key = `turn-${turnRef.current}`;
@@ -162,6 +171,19 @@ function AssistantChat() {
               title="Ask about your money"
               body="Try “How much did I spend on food this month?”"
             />
+            <View style={styles.chips}>
+              {STARTERS.map((s) => (
+                <Pressable
+                  key={s.label}
+                  style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+                  onPress={() => send(s.question)}
+                  accessibilityRole="button"
+                  accessibilityHint={s.question}
+                >
+                  <Text style={styles.chipText}>{s.label}</Text>
+                </Pressable>
+              ))}
+            </View>
           </Animated.View>
         ) : null}
         {/* One flat list, so the question being answered keeps its bubble
@@ -207,7 +229,7 @@ function AssistantChat() {
           editable={!pending}
           accessibilityLabel="Your question"
         />
-        <SendButton enabled={canSend} onPress={send} colors={colors} styles={styles} />
+        <SendButton enabled={canSend} onPress={() => send()} colors={colors} styles={styles} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -387,6 +409,27 @@ function makeStyles(colors) {
     answer: {
       paddingHorizontal: spacing.xs,
       paddingVertical: spacing.xs,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+    },
+    chip: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    chipPressed: {
+      backgroundColor: colors.chipBg,
+    },
+    chipText: {
+      fontFamily: fontFamily.semibold,
+      fontSize: type.body,
+      color: colors.ink,
     },
     tableCard: {
       marginTop: spacing.md,
