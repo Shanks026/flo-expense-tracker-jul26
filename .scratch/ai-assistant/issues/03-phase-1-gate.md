@@ -9,7 +9,7 @@ Spec: .claude/features/44-ai-assistant.md (§1.7)
 **Status:** ready-for-agent
 
 - [x] **≥ 90%** fully correct on the starting category set, on the default model
-- [ ] Model-path **p50 ≤ 1.5 s**
+- [x] Model-path **p50 ≤ 1.5 s**
 - [x] The phone answers at least 50% of the cases
 - [x] The results for both models, and for the current category set, are recorded in the spec
 
@@ -19,7 +19,7 @@ Spec: .claude/features/44-ai-assistant.md (§1.7)
 
 - [x] Code implementation
 - [x] Verified (emulator check)
-- [ ] Green signal
+- [x] Green signal
 
 ## Comments
 
@@ -30,3 +30,5 @@ Spec: .claude/features/44-ai-assistant.md (§1.7)
 - Full table: spec 44 → Implementation Notes.
 - The screen is `app/dev/ai-eval.js`, under Settings → Developer → AI test set. The function takes an `eval` context and a `model` choice limited to the two configured models.
 - Green signal is waiting on the person's call about the p50 criterion.
+
+**2026-11-09: the person passed the gate.** The p50 criterion counts as met on the function's own time (1.28 s). The app's round trip (1.65 s) is recorded but not held against the gate.

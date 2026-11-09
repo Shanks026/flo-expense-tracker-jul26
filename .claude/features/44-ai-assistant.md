@@ -643,6 +643,10 @@ category, date and account all match.
   - ≥ 90% fully correct on the starting set with the default model: passed (100%);
   - phone answers ≥ 50%: passed (72%);
   - **model p50 ≤ 1.5 s: passed at the function (1.28 s), failed in the app (1.65 s).**
+  - **Decision (2026-11-09):** the person passed the gate. Phase 1 is approved,
+    and the p50 counts at the function. Ideas for cutting the app round trip
+    later: run the function's database lookups in parallel, shorten the
+    prompt, and check how far the Supabase region is.
 - **Model order.** Gemini became the primary on 2026-11-09, at the person's
   choice of the quickest. Haiku is the fallback.
 - **Haiku had never been answering until 2026-11-09.** Haiku 5.5's endpoints
