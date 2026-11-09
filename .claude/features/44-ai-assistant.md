@@ -217,18 +217,32 @@ verification below can't run.
 ### 1.2 Data Layer
 - **`lib/quickParse.js`** (new, pure, no imports beyond `date-fns`):
   `quickParse(text, { categories, accounts, today }) → { amount, type, categoryId, accountId, date, note, confidence } | null`.
-  - **Amount:** the first number, allowing `₹`, `rs`, `rupees` and `k` (2k = 2000).
-  - **Type:** income on "got", "received", "salary", "credited" or "refund";
-    otherwise expense.
-  - **Date:** today, yesterday, day before yesterday, a weekday name (the most
-    recent one), and dd/mm.
-  - **Category:** a category whose name, or a short synonym list ("lunch",
-    "dinner", "swiggy" → Food; "petrol", "uber", "auto" → Transport), appears
-    as a word.
-  - **Account:** an account whose name appears ("hdfc", "cash").
-  - **Note:** the leftover words.
+  (Rules settled in the 2026-11-09 grilling; see "Quick-add decisions" below.)
+  - **Amount:** the only number, allowing `₹`, `rs`, `rupees` and `k` (2k = 2000).
+    Two numbers ("2 chai 40") → `null`.
+  - **Type:** income on got, received, credited, refund, mila, salary,
+    trade/trading/profit, amma/mom; otherwise expense. The type picks which
+    "Other" is used.
+  - **Date:** today/inniki/indru, yesterday/nethu, day before
+    yesterday/munnaal, a weekday name (the most recent *past* one, never
+    today), and a day number ("5th", "5/11", always day first) meaning this
+    month, or last month if that day is still ahead.
+  - **Category:** a category's own name always matches. Words also carry an
+    **ordered fallback list**, and the first category the user has wins (lunch
+    → Lunch, else Food; chai → Snacks, else Coffee, else Food; auto → Transport,
+    else Travel; petrol → Fuel, else Transport; recharge → Bills, else
+    Utilities; transfer/sent → Transfer). The lists are generic, because the
+    person's new account starts from the onboarding bank (`lib/categoryBank.js`),
+    not from today's categories. No match → `null`.
+  - **Account:** an account's name, plus shortcuts (bob/baroda → Bank of
+    Baroda). If none is named, the active account.
+  - **Note:** the leftover words, after the amount, category, date, account and
+    filler words (spent, paid, for, on, rs) are removed. "120 lunch with ravi"
+    → "with ravi"; "120 lunch" → no note.
   - **Confidence:** high only when the amount and category are both found and
-    nothing is ambiguous. Below that → `null`, and the model is called.
+    nothing is ambiguous. Below that → `null`, and the model is called. The
+    model gets the local time, so a bare "food" or "swiggy" can be read as the
+    right meal.
 - **`lib/ai.js`** (new): `aiQuickAdd(text)` calls
   `supabase.functions.invoke('ai-assistant', { body: { mode: 'quick_add', text, today, tz } })`
   and maps the reply's ids back onto the sheet's prefill keys. It drops any
@@ -237,8 +251,24 @@ verification below can't run.
   The function then checks the reply: amount above 0 and at most ₹1 crore;
   ids in the lists it sent; date within ±1 year of `today`. If any check
   fails, it returns `{ ok: false }` instead.
-- **Transfers are out of scope** for quick add ("moved 500 to savings" fails
-  the check). Use the sheet's Transfer tab.
+- **Account-to-account transfers are out of scope** for quick add ("500 SBI to
+  Axis", naming two of your accounts, fails the check). Use the sheet's
+  Transfer tab. "Transfer 500" or "500 sent to ravi" is an ordinary expense in
+  a Transfer category, if the person has one.
+
+#### Quick-add decisions (grilling, 2026-11-09)
+- **The test set** (`lib/aiEvalCases.js`, 40 phrases) is weighted to what the
+  person logs: about a third meals and snacks, then transport, groceries and
+  bills, about 6 income, about 6 edge cases ("asdf", two accounts, two numbers,
+  no amount) and about 4 Tanglish phrases in English letters. There's no
+  Hinglish. Expected categories are given by name. The agent drafts the
+  phrases and the person reviews them before the parser is written.
+- **Two category sets:** each case runs against the onboarding starting set
+  (Food, Groceries, Transport, Shopping, Bills, Rent, Other; Salary, Other),
+  which the gate counts, and against the person's current set, which is
+  reported only.
+- **"Fully correct"** means amount, type, category, date and account are all
+  right. The note isn't scored. The gate stays at ≥ 90% and model p50 ≤ 1.5 s.
 
 ### 1.3 Components
 - **`components/QuickAddField.js`**: a one-line input with a sparkle icon and
@@ -279,7 +309,7 @@ verification below can't run.
 - [ ] `ai_usage` exists with RLS. As user A, another user's rows read as 0 and an insert for another user is refused (checked via MCP).
 - [ ] The secrets are set by the person; the key appears nowhere in the repo or the app bundle (grep the `expo export` output for `sk-or-`).
 - [ ] `ai-assistant` deploys and answers a quick add in a dev build. An expired session gets 401.
-- [ ] The test set (`app/dev/ai-eval.js`, 40 phrases: English, Hinglish, amounts with k and ₹, relative dates, account names, income) gives **≥ 90% fully correct** and **model-path p50 ≤ 1.5 s** on the default model. Results and the model compared are written into Implementation Notes.
+- [ ] The test set (`app/dev/ai-eval.js`, 40 phrases: English, about 4 Tanglish, amounts with k and ₹, relative dates, account names, income, edge cases; gate counted on the starting category set) gives **≥ 90% fully correct** and **model-path p50 ≤ 1.5 s** on the default model. Results and the model compared are written into Implementation Notes.
 - [ ] At least 50% of the test phrases are answered by `quickParse` alone, instantly.
 - [ ] A model timeout, or a nonsense input ("asdf"), leaves the sheet usable and unchanged, with a quiet "Couldn't read that" line.
 - [ ] Saving after a parse writes the same row as a manual entry, and Undo still works.
@@ -295,11 +325,15 @@ verification below can't run.
 A mic button at the end of `QuickAddField`. Hold it, say "forty rupees lunch
 today", let go, and the words appear in the field and go through the phase 1
 pipeline. Long-pressing the ⊕ tab opens the Add sheet already listening.
+**The filled-in Add sheet is the preview** (decided 2026-11-09): the
+transcript stays editable in the quick-add line, so a wrong word can be fixed
+and parsed again, every field can be edited, and Save writes the entry. There's
+no separate preview card.
 
 ### Before Starting — Confirm Phase 1 is Approved
 - Choose the speech library. The recommended one is **`expo-speech-recognition`**
   (it wraps Android's `SpeechRecognizer`, works with a config plugin and
-  supports `en-IN` and `hi-IN`). Check that it supports SDK 54 and the new
+  supports `en-IN` and `ta-IN`). Check that it supports SDK 54 and the new
   architecture. It's an on-device library, not a third-party service, but it
   is a new native dependency: name it to the person before adding it.
 - Check whether `RECORD_AUDIO` is acceptable in the personal build's manifest.
@@ -317,7 +351,7 @@ No database changes in this phase.
 - `QuickAddField` gets a mic button, hold-to-talk with a live transcript. On
   release, the final text is submitted as if typed.
 - Settings → AI section: a voice language toggle between English (India) and
-  Hindi, stored on the device.
+  Tamil (`ta-IN`), stored on the device. There's no Hindi (decided 2026-11-09).
 - The runtime mic permission is asked the first time you use it, never at
   launch.
 - A native rebuild is needed (`npx expo prebuild`, then `expo run:android`).

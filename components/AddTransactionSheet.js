@@ -365,9 +365,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     setLeadCategoryId(initialCategory);
   }
 
-  // Transfer's empty state (< 2 accounts) — same hasPro gate shape as
-  // handleScanReceipt used to have (13-ai-features.md, removed 2026-07-22):
-  // free users hit the upsell, Pro users go straight to Add Account.
+  // Transfer's empty state (< 2 accounts), behind a hasPro gate: free users
+  // hit the upsell, Pro users go straight to Add Account.
   // Dismisses this sheet first, same as the existing "Adding to <account>"
   // row's handoff to the account switcher — a second account needs a real
   // trip to another sheet, not a stack of two.
