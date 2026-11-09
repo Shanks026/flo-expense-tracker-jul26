@@ -13,8 +13,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { X, Trash2, ChevronDown, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
-import { format, isToday, isYesterday, subDays } from 'date-fns';
+import { format, isToday, isYesterday, parseISO, subDays } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
+import QuickAddField from './QuickAddField';
 import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
@@ -38,6 +39,8 @@ import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import { useAddAccountSheet } from './AddAccountSheet';
 import { destructiveHaptic } from '../lib/haptics';
+import { FLAGS } from '../lib/flags';
+import { quickParse } from '../lib/quickParse';
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -126,6 +129,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   }, []);
   const modalRef = useRef(null);
   const amountInputRef = useRef(null);
+  const quickInputRef = useRef(null);
   const handleBackChange = useSheetBackHandler(modalRef);
   // The open sheet blocks the moment queue, so celebrations and coach marks
   // wait until it closes instead of interrupting entry (36-add-sheet-3-tap.md,
@@ -195,6 +199,14 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const prefilledCategoryRef = useRef(null);
   const onDoneRef = useRef(null);
   const savedRef = useRef(false);
+  // The quick-add line (44-ai-assistant.md, Phase 1): shown only for the ⊕
+  // tab's blank entry, and only with FLAGS.ai on. `quickKey` remounts it per
+  // open so it starts empty. `categoryTappedRef` records a chip tap since
+  // the last parse, so re-parsing never overrides a category the person
+  // picked after seeing the parsed one.
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickKey, setQuickKey] = useState(0);
+  const categoryTappedRef = useRef(false);
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   // The smart default and the row's order (36-add-sheet-3-tap.md), from the
@@ -237,6 +249,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       prefilledCategoryRef.current = null;
       onDoneRef.current = payload?.onDone ?? null;
       savedRef.current = false;
+      categoryTappedRef.current = false;
       setError(null);
       // Never sticky: a split chosen for one expense must not silently apply to
       // the next one logged from the same sheet.
@@ -254,6 +267,12 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // category chips below it, and is especially jarring right after a
       // notification tap, before the user has even seen the sheet.
       const isBlankEntry = !payload?.id && !payload?.amount;
+      // The quick-add line is for the ⊕ tab alone, which asks for it with
+      // `quickAdd: true`. Every other opener (an edit, share, a notification,
+      // auto-detect, onboarding) gets the sheet as it was.
+      const quickAdd = FLAGS.ai && !!payload?.quickAdd && isBlankEntry;
+      setShowQuickAdd(quickAdd);
+      if (quickAdd) setQuickKey((k) => k + 1);
 
       if (payload?.id && isTransfer(payload)) {
         // Editing a transfer: recover From/To from whichever leg was tapped.
@@ -304,9 +323,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         prefilledCategoryRef.current = initialCategory;
         setCategoryId(initialCategory);
         setLeadCategoryId(initialCategory);
-        // Defaults to the active account, same as before — now changeable
-        // via the inline dropdown before saving, instead of fixed.
-        setAccountId(activeAccountId);
+        // The opener's account if it names one, else the active account —
+        // changeable via the inline dropdown before saving.
+        setAccountId(payload?.accountId ?? activeAccountId);
         // Transfer From/To seed: From = the account the transfer was started
         // from (Accounts screen), else the account you're in; To = unset.
         setFromAccountId(payload?.fromAccountId ?? activeAccountId);
@@ -327,8 +346,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // The short delay lets the sheet's present() animation settle first;
       // focusing mid-animation is a known source of jank/no-ops with
       // bottom-sheet + keyboard interactions.
+      // With the quick-add line showing, the keyboard opens there instead;
+      // tapping the amount still works as before.
       if (isBlankEntry) {
-        setTimeout(() => amountInputRef.current?.focus(), 300);
+        const target = quickAdd ? quickInputRef : amountInputRef;
+        setTimeout(() => target.current?.focus(), 300);
       }
     },
   }));
@@ -354,6 +376,42 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     setCategoryId(initialCategory);
     setLeadCategoryId(initialCategory);
   }, [categoryId, editingId, type, categories.length]);
+
+  // Fills the open sheet from a parsed quick-add line. Only what the line
+  // says changes; Save stays the person's tap. The parsed category counts as
+  // the sheet's own choice for category_was_prefilled, so a chip tapped
+  // afterwards reads as a change. A chip tapped after a parse survives a
+  // re-parse of the same type; one tapped before any parse gives way.
+  function parseQuickLine(text) {
+    return quickParse(text, {
+      categories: [...expenseCategories, ...incomeCategories],
+      accounts,
+      today: format(new Date(), 'yyyy-MM-dd'),
+    });
+  }
+
+  function handleQuickParsed(prefill) {
+    setError(null);
+    sourceRef.current = 'quick_local';
+    const keepTapped = categoryTappedRef.current && prefill.type === type && categoryId;
+    // Still protected on the next parse if kept; otherwise the parse took over.
+    if (!keepTapped) categoryTappedRef.current = false;
+    setType(prefill.type);
+    // A split takes expenses only; its row hides for income.
+    if (prefill.type !== 'expense') setSplitId(null);
+    setAmount(String(prefill.amount));
+    if (!keepTapped) {
+      prefilledCategoryRef.current = prefill.categoryId;
+      setCategoryId(prefill.categoryId);
+      setLeadCategoryId(prefill.categoryId);
+    }
+    setAccountId(prefill.accountId ?? activeAccountId);
+    setAccountPickerOpen(false);
+    // parseISO, not new Date('YYYY-MM-DD'): that reads as UTC midnight.
+    setDate(parseISO(prefill.date));
+    setNote(prefill.note ?? '');
+    Keyboard.dismiss();
+  }
 
   function handleTypeChange(nextType) {
     setError(null);
@@ -654,6 +712,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             keypad), the way the sheet read before spec 36. Save lives in the
             footer, pinned above the keyboard. Transfers start from Accounts
             and have no toggle. */}
+        {showQuickAdd && (
+          <QuickAddField key={quickKey} ref={quickInputRef} parse={parseQuickLine} onParsed={handleQuickParsed} />
+        )}
+
         {type !== 'transfer' && (
           <View style={styles.segmentWrap}>
             <Pressable
@@ -781,7 +843,14 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
               {rowCategories.map((cat) => {
                 const selected = cat.id === categoryId;
                 return (
-                  <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
+                  <Pressable
+                    key={cat.id}
+                    style={styles.chip}
+                    onPress={() => {
+                      categoryTappedRef.current = true;
+                      setCategoryId(cat.id);
+                    }}
+                  >
                     <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
                       <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
                     </View>

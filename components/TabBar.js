@@ -69,7 +69,9 @@ export default function TabBar({ state, navigation }) {
       <Pressable
         ref={addButtonRef}
         style={styles.addButton}
-        onPress={() => openAdd()}
+        // quickAdd: the one opener that gets the quick-add line
+        // (44-ai-assistant.md, Phase 1).
+        onPress={() => openAdd({ quickAdd: true })}
         accessibilityRole="button"
         accessibilityLabel="Add a transaction"
       >

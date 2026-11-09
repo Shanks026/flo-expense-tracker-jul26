@@ -33,3 +33,12 @@ This ticket also produces the 40-phrase test set, weighted as in the spec. **The
 - One rule was added while testing: "amma"/"mom" next to a word pointing outward ("ku", "to", "gave", "anupinen") goes to the model.
 
 **Still to do:** the AI flag, the quick-add line, and re-filling the sheet with the `accountId` prefill, the `quick_local` source and focus, plus the emulator check. "Code implementation" stays unticked until then.
+
+**2026-11-09: the sheet half is written; the emulator check is still to do.**
+- `FLAGS.ai` (on) is in `lib/flags.js`. `components/QuickAddField.js` is the line: a sparkle icon, "Type it: 40 lunch today", and done to parse. A failed parse shows "Couldn't read that" in a row that's always laid out, so the height doesn't change.
+- Only the ⊕ tab asks for the line (`openAdd({ quickAdd: true })`). Editing, share, the nudge, auto-detect and onboarding get the sheet as it was. The keyboard opens on the line.
+- A parse fills type, amount, category, account (a new `accountId` prefill key, defaulting to the active account), date and note. It sets `source` to `quick_local` and dismisses the keyboard. Save and Undo use the existing path.
+- The parsed category counts as prefilled. A chip tapped after a parse is kept on a re-parse of the same type; a chip tapped before any parse gives way.
+- `expo export --platform android` bundles cleanly. The quick-parse check still has 0 wrong.
+- The model spinner waits for ticket 02.
+- Not yet run on a device: FLO isn't installed on Pixel_API_36. The handoff says to hold the native build until phase 2.
