@@ -15,8 +15,8 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 
 - [x] Check script: 4:59 → night, 5:00 → morning, 12:00 → afternoon, 17:00 → evening, 20:00 → night
 - [x] A test account with no equipped theme shows Day on the live Home card and in the Home preview
-- [x] Day, Ink and a seasonal skin, each equipped in Personalize, stay equipped after relaunch
-- [x] Emulator check in light and dark
+- [ ] Day, Ink and a seasonal skin, each equipped in Personalize, stay equipped after relaunch (Day and Ink saved and showed; a seasonal skin and a relaunch not re-checked)
+- [ ] Emulator check in light and dark (light only)
 
 ## Tracer
 

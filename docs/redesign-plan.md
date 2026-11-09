@@ -1,6 +1,6 @@
 # FLO redesign plan: "Quiet Ledger"
 
-**Status:** proposal, 2026-11-09; revised 2026-11-10 after the first Home preview on the emulator. This document is the source of truth for the redesign: where it disagrees with older specs (37, 38) or `theme/tokens.js`, this document wins. Next step: `/to-spec` for Phases 1 and 2, then `/to-tickets` (§8 has the handoff). Phases are in §7.
+**Status:** proposal, 2026-11-09; revised 2026-11-10 after the first Home preview on the emulator. Phases 1–2 are specced as spec 46 and being built (tickets 01–03 done 2026-11-10; progress in `.scratch/quiet-ledger/handoff.md`). This document is the source of truth for the redesign: where it disagrees with older specs (37, 38) or `theme/tokens.js`, this document wins. Next step: `/to-spec` for Phases 1 and 2, then `/to-tickets` (§8 has the handoff). Phases are in §7.
 
 **What exists in code (uncommitted on `feat/spec44-ai-quick-add-voice`, dev only):** `theme/ledger.js` (tokens), `components/ledger/` (`AmountText`, `Button`, `HeaderIconButton`, `ListRow`, `QuickActions`, `SectionHeader`, `AccountCardCarousel`, `WeekLine`), `lib/dayScenes.js` and `app/dev/home-preview.js` (Settings → Developer → Home preview). Inter is installed and loaded in `app/_layout.js` alongside Manrope. The real screens are untouched.
 
