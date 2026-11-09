@@ -8,7 +8,7 @@ This needs three things from the person: a yes on the usage-table SQL (applied w
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The usage table exists with RLS; as user A, B's rows read as 0, and an insert for B is refused (rolled-back check); the advisor shows no new WARN
 - [x] A phrase the parser can't read fills the sheet in a dev build; analytics `source` is `quick_ai`

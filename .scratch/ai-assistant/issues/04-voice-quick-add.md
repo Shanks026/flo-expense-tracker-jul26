@@ -8,7 +8,7 @@ This is the native rebuild: the speech library (`expo-speech-recognition` is rec
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] If the permission is denied, the mic hides and typing still works
 - [x] 9 of 10 spoken test phrases fill the sheet correctly, on the phone

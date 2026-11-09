@@ -412,12 +412,17 @@ export const register: Register = on => {
   on('skill.prompt', async ($, e, next) => {
     const out = await next(e)
     if (IMPLEMENT_SKILL.test(e.skill)) {
+      // The pane opens on every implement run (the person's call, 2026-11-09),
+      // not only when a ticket is new to the board: a new chat, or a ticket
+      // already tracked, still shows it. A named ticket is added if needed and
+      // made active.
       const argsText = /ARGUMENTS:\s*([\s\S]*)$/.exec(e.text)?.[1] ?? ''
       const refs: Ref[] = [...argsText.matchAll(TICKET_PATH)].flatMap(m => (m[1] ? [{ feature: m[1], number: Number(m[2]) }] : []))
+      const open = () => void $.ui.open({ id: PANE, title: 'FLO tickets' })
       if (refs.length > 0) {
-        void addRefs($, refs).then(r => {
-          if (r.added.length > 0) void $.ui.open({ id: PANE, title: 'FLO tickets' })
-        })
+        void addRefs($, refs).then(open, open)
+      } else {
+        open()
       }
     } else if (REVIEW_SKILL.test(e.skill)) {
       const active = await activeTicket($)

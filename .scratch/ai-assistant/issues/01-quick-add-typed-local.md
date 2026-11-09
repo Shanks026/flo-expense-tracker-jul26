@@ -8,7 +8,7 @@ This ticket also produces the 40-phrase test set, weighted as in the spec. **The
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The person has approved the 40 phrases
 - [x] The parser answers at least 20 of the 40 on the starting set, all correctly; every case it isn't sure about returns "not sure", never a wrong answer

@@ -6,7 +6,7 @@ Spec: .claude/features/44-ai-assistant.md (§1.7)
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] **≥ 90%** fully correct on the starting category set, on the default model
 - [x] Model-path **p50 ≤ 1.5 s**

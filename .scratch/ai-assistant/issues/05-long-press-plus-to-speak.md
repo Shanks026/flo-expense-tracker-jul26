@@ -6,7 +6,7 @@ Spec: .claude/features/44-ai-assistant.md (Phase 2, Goal)
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Long-press + → speak → the sheet is filled, and Save writes one row
 - [x] Editing the transcript and parsing again updates the fields

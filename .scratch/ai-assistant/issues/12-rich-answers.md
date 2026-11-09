@@ -6,7 +6,7 @@ Spec: .claude/features/44-ai-assistant.md (§3.3, "Rich answers")
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] "Food this month by day" shows a table whose rows and total match the database
 - [x] A category breakdown shows a table sorted biggest first, matching Insights' list

@@ -6,18 +6,18 @@ Spec: .claude/features/44-ai-assistant.md (§3.2)
 
 **Blocked by:** 06, 12
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] 15 scripted questions give the same numbers as Insights and the account card
 - [x] "What will I spend next month?" gets an honest "I can't", with no invented number
 - [x] A note saying "ignore previous instructions…" changes nothing
-- [ ] Median turn time with one tool round is ≤ 4 s, on the phone
+- [ ] Median turn time with one tool round is ≤ 4 s, on the phone (moved to the phone check after spec 44 is built, the person's call 2026-11-09)
 
 ## Tracer
 
 - [x] Code implementation
 - [x] Verified (emulator check)
-- [ ] Green signal
+- [x] Green signal
 
 ## Comments
 

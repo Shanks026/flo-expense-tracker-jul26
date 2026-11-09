@@ -6,7 +6,7 @@ Spec: .claude/features/44-ai-assistant.md (Phase 3)
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The chat tables exist with RLS; user A can't read B's conversations, or add a message to one of them (rolled-back check); the advisor shows no new WARN
 - [x] "How much on food this month?" matches the Insights screen exactly
