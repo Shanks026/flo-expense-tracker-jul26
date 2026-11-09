@@ -252,7 +252,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         models: fallback ? [primary, fallback] : [primary],
         provider: { data_collection: 'deny', require_parameters: true },
-        temperature: 0,
+        // No temperature: Claude Haiku 5.5's endpoints don't accept it, and with
+        // require_parameters OpenRouter would then find no endpoint at all and
+        // quietly answer from the fallback. The strict schema keeps it tight.
         max_tokens: 300,
         response_format: responseSchema(),
         messages: [
