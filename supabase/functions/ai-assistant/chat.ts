@@ -84,9 +84,12 @@ const TOOLS = [
       parameters: {
         type: 'object',
         additionalProperties: false,
-        required: ['start', 'end', 'type'],
+        required: ['end', 'type'],
         properties: {
-          start: { type: 'string', description: 'First day, YYYY-MM-DD, inclusive.' },
+          start: {
+            type: 'string',
+            description: 'First day, YYYY-MM-DD, inclusive. Leave out for all time (lifetime, ever, since they started).',
+          },
           end: { type: 'string', description: 'Last day, YYYY-MM-DD, inclusive.' },
           type: { type: 'string', enum: ['expense', 'income'] },
           category_ids: {
@@ -208,6 +211,74 @@ const TOOLS = [
   },
 ];
 
+// The one place sums are done: the model never adds or subtracts itself.
+// Each amount comes from a tool result this turn or from the person's own
+// words, and the line says which, so the answer can say what was logged and
+// what they only told us.
+const CALCULATE_TOOL = {
+  type: 'function',
+  function: {
+    name: 'calculate',
+    description:
+      'Adds and subtracts amounts in code, for questions like "how much is left" that combine a total from a tool with money the person mentions (sent, paid back, still owed). Use it instead of doing any sum yourself.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['items'],
+      properties: {
+        items: {
+          type: 'array',
+          description: 'The amounts, in order. The first is usually a tool total.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['label', 'amount', 'op', 'source'],
+            properties: {
+              label: { type: 'string', description: 'What it is, in a few words ("Amma Sav received", "sent to Amma").' },
+              amount: { type: 'number', description: 'In rupees, above 0.' },
+              op: { type: 'string', enum: ['add', 'subtract'] },
+              source: {
+                type: 'string',
+                enum: ['tool', 'person'],
+                description: 'tool: copied from a tool result this turn. person: a number they said that is not logged in FLO.',
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const MAX_CALC_ITEMS = 20;
+
+function calculate(_supabase: SupabaseClient, args: Record<string, unknown>): Promise<ToolResult> {
+  const items = args.items;
+  if (!Array.isArray(items) || items.length === 0) return Promise.resolve({ error: 'items must be a list of amounts' });
+  if (items.length > MAX_CALC_ITEMS) return Promise.resolve({ error: `at most ${MAX_CALC_ITEMS} amounts` });
+  let paise = 0;
+  const lines: { label: string; amount: string; op: string; source: string }[] = [];
+  for (const raw of items) {
+    const item = (raw ?? {}) as Record<string, unknown>;
+    const amount = typeof item.amount === 'string' ? Number(item.amount.replace(/[₹,\s]/g, '')) : Number(item.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return Promise.resolve({ error: 'every amount must be a number of rupees above 0' });
+    if (item.op !== 'add' && item.op !== 'subtract') return Promise.resolve({ error: 'op must be add or subtract' });
+    const p = Math.round(amount * 100);
+    paise += item.op === 'add' ? p : -p;
+    lines.push({
+      label: typeof item.label === 'string' ? item.label.slice(0, 60) : 'amount',
+      amount: `${item.op === 'add' ? '+' : '−'}${formatInr(p / 100)}`,
+      op: String(item.op),
+      source: item.source === 'person' ? 'they told you (not logged in FLO)' : 'from FLO',
+    });
+  }
+  return Promise.resolve({
+    lines,
+    result: paise < 0 ? `−${formatInr(-paise / 100)}` : formatInr(paise / 100),
+    negative: paise < 0,
+  });
+}
+
 type ToolResult = Record<string, unknown>;
 
 // account_id → one of their accounts, null for every account ("all"), or
@@ -244,10 +315,17 @@ function resolveCategories(
 }
 
 async function spendSummary(supabase: SupabaseClient, args: Record<string, unknown>, ctx: Ctx): Promise<ToolResult> {
-  const { start, end, type } = args;
-  if (!isYmd(start) || !isYmd(end) || start > end) return { error: 'start and end must be YYYY-MM-DD with start <= end' };
-  if ((toDate(end).getTime() - toDate(start).getTime()) / DAY_MS > MAX_SPAN_DAYS) {
-    return { error: 'the range can be at most 3 years' };
+  const { end, type } = args;
+  // No start means all time: every entry up to `end`. A dated range is
+  // capped; all time has no window to cap, only the breakdown size below.
+  const allTime = args.start == null || args.start === '';
+  const start = allTime ? null : args.start;
+  if (!isYmd(end)) return { error: 'end must be YYYY-MM-DD' };
+  if (start !== null) {
+    if (!isYmd(start) || start > end) return { error: 'start must be YYYY-MM-DD and not after end; leave it out for all time' };
+    if ((toDate(end).getTime() - toDate(start).getTime()) / DAY_MS > MAX_SPAN_DAYS) {
+      return { error: 'a dated range can be at most 3 years; leave start out for all time' };
+    }
   }
   if (type !== 'expense' && type !== 'income') return { error: 'type must be expense or income' };
 
@@ -279,10 +357,10 @@ async function spendSummary(supabase: SupabaseClient, args: Record<string, unkno
       .from('transactions')
       .select('id, amount, category_id, occurred_at')
       .eq('type', type)
-      .gte('occurred_at', start)
       .lte('occurred_at', end)
       .order('id')
       .range(from, from + PAGE - 1);
+    if (start !== null) q = q.gte('occurred_at', start);
     if (account) q = q.eq('account_id', account.id);
     if (categories.length) q = q.in('category_id', categories.map((c) => c.id));
     const { data, error } = await q;
@@ -305,7 +383,7 @@ async function spendSummary(supabase: SupabaseClient, args: Record<string, unkno
   }
 
   const result: ToolResult = {
-    period: periodLabel(start, end),
+    period: start === null ? `All time, up to ${bucketLabel('day', end)} ${end.slice(0, 4)}` : periodLabel(start, end),
     start,
     end,
     type,
@@ -611,6 +689,7 @@ const TOOL_HANDLERS: Record<
   find_transactions: findTransactions,
   budget_status: budgetStatus,
   bills_due: billsDue,
+  calculate,
 };
 
 async function runTool(supabase: SupabaseClient, name: string, rawArgs: unknown, ctx: Ctx): Promise<ToolResult> {
@@ -638,7 +717,10 @@ function systemPrompt(p: { today: string; time: string; tz: string; ctx: Ctx }) 
     `Their current account: ${active ? active.name : 'none'}. Tools use it when you leave account_id out.`,
     `Their categories (JSON): ${JSON.stringify(p.ctx.categories)}`,
     'Rules:',
-    '- Every number you give about their money must come from a tool result in this turn. Never add, subtract, average or estimate numbers yourself, and never reuse a number from earlier in the chat without asking the tool again. (An amount they ask you to log is theirs, not a number you report.)',
+    '- Every number you give about their money must come from a tool result in this turn. Never add, subtract, average or estimate numbers yourself, and never reuse a number from earlier in the chat without asking the tool again. (An amount they ask you to log is theirs, not a number you report.) When an answer needs a sum, call calculate with the tool totals and any amounts they told you; quote its result.',
+    '- Money they mention that is not in FLO ("I sent her 4,000 and she sent back 1,000"): search for it once at most (find_transactions). If it is not logged, do not keep searching. Use calculate with source "person" for their amounts, say plainly which part is logged in FLO and which is only what they told you, and offer to draft the missing entries.',
+    '- All time: for lifetime, ever or since they started, leave start out of spend_summary.',
+    '- A category holds only one type (income or expense), so a category total is money in or money out, never a balance. For "how much is left" in something, add what came in and take away what went out with calculate.',
     '- Copy money amounts exactly as the tool gives them (for example "₹4,250").',
     '- Always say the period you used, using the tool\'s "period" text, and the account when it is not their current one or when they have more than one account.',
     '- Use the ready-made periods for words like this month or last week. Leave account_id out unless they name an account or ask about all accounts (then use "all").',
@@ -679,7 +761,7 @@ async function callModel(apiKey: string, models: string[], messages: ChatMessage
         // Haiku 5.5 ran out mid-sentence on short answers (finish_reason
         // 'length', ticket 10). The answer itself is cut to 2,000 characters.
         max_tokens: 1500,
-        tools: [...TOOLS, ...PROPOSAL_TOOLS],
+        tools: [...TOOLS, CALCULATE_TOOL, ...PROPOSAL_TOOLS],
         tool_choice: toolsAllowed ? 'auto' : 'none',
         messages,
       }),
@@ -860,6 +942,29 @@ export async function handleChat(supabase: SupabaseClient, body: Record<string, 
     }
     if (text) answer = text.slice(0, 2000);
     break;
+  }
+
+  // Lookups ran out (or the model answered with nothing) but tools did run:
+  // one last call with no tools, asked to answer from what it has, instead of
+  // failing a turn that gathered real results. Seen on 9 Nov, when a
+  // question about money that was never logged kept the model searching.
+  const lastChanceMs = TURN_BUDGET_MS - (Date.now() - startedAt);
+  if (!answer && !proposal && toolLog.length && lastChanceMs > 4000) {
+    messages.push({
+      role: 'user',
+      content:
+        '(From the app, not the person: no more lookups this turn. Answer now from the tool results above. Say plainly what you could not find, and what they could ask or log next.)',
+    });
+    const reply = await callModel(apiKey, models, messages, false, lastChanceMs);
+    if (reply) {
+      const u = reply.usage ?? {};
+      if (Number.isFinite(u.prompt_tokens)) usage.prompt_tokens += u.prompt_tokens;
+      if (Number.isFinite(u.completion_tokens)) usage.completion_tokens += u.completion_tokens;
+      if (Number.isFinite(u.cost)) usage.cost_usd += u.cost;
+      const text = typeof reply.choices?.[0]?.message?.content === 'string' ? reply.choices[0].message.content.trim() : '';
+      if (text) answer = text.slice(0, 2000);
+      else console.error('chat answer empty after the last-chance call', { model: reply.model });
+    }
   }
 
   // A draft with no words to go with it still gets a line above its card.

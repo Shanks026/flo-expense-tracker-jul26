@@ -47,7 +47,8 @@ import useVoiceLanguage from '../hooks/useVoiceLanguage';
 const MAX_MESSAGE = 500;
 const FAIL_TEXT = {
   cap: "That's today's limit for questions. Try again tomorrow.",
-  error: "Couldn't answer that. Check your connection and try again.",
+  network: "Couldn't reach FLO. Check your connection and try again.",
+  error: "Couldn't work that one out. Try asking it another way.",
   unheard: "Couldn't hear that. Hold the mic and speak.",
 };
 // What the thinking line says while a turn runs, in order. The last one

@@ -712,3 +712,20 @@ category, date and account all match.
 - **History:** an earlier answer with a draft is sent to the model with a bracketed note giving the draft and its status. Without it, the model denied having made a draft it had made.
 - **Budget gate at Save:** `budgetLimitReached(hasPro)` in `lib/budgets.js` is shared by the Budgets screen and the sheet's Save. The custom-period gate also runs at Save for a new budget.
 - **Chat `max_tokens` 500 → 1500.** Haiku 5.5 was ending answers mid-sentence (`finish_reason: 'length'` on short answers), because its own reasoning counts against the cap. Empty and cut-off answers are now logged.
+
+### Phone bug: "how much is left" questions failed (2026-11-09, after ticket 11)
+- **Seen on the person's own account:** "How much do I have under amma savings" was answered (₹8,000 received, income only). The follow-up, "I've sent her 4000 from amma savings and she sent me back 1000 last month. Now how much is remaining", failed with "check your connection", and so did "calculate lifetime data of amma savings".
+- **Cause:**
+  - `ai_usage` showed the failed turns at about 24k prompt tokens over 11–13 s: every tool round used up, and then an empty answer (the old 500-token cap made it worse). The function returned `{ ok: false }` with no log, and the app blamed the connection.
+  - The ₹4,000 and ₹1,000 were never logged, so the model kept searching for them.
+  - With no way to do a sum, it could never answer.
+  - Lifetime ranges needed dates and were capped at 3 years.
+- **Fix:**
+  - **a `calculate` tool:** code adds and subtracts amounts from tool results or from the person's words, each marked "from FLO" or "they told you". The model still never does arithmetic;
+  - **all time:** `spend_summary` takes no `start` for "all time";
+  - **the prompt:** one search at most for money that isn't logged; say what's logged and what isn't; offer to draft the missing entries; a category total is money in or money out, never a balance;
+  - **a last-chance call:** when lookups run out with no answer, one tool-less call answers from the results so far;
+  - **the app's message:** it now tells a network failure ("Couldn't reach FLO…") from a question the function couldn't work out ("Couldn't work that one out. Try asking it another way.").
+- **Checked on the emulator test account:**
+  - "salary lifetime" gives ₹50,000, all time;
+  - "I sent amma 4000 from that salary and she sent me back 1000 last month. Now how much is remaining" gives **₹47,000**, with the logged and unlogged parts named. Tools used: `find_transactions`, `spend_summary`, `calculate`. It took 9.9 s, so multi-step questions stay over the 4 s target.

@@ -49,6 +49,7 @@ Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say w
   - the app keeps `proposal.status` (`saved` | `dismissed`) on the row through `setProposalStatus`;
   - earlier drafts go into the model's history as a bracketed note with their status;
   - a budget for a category they don't have gets a question, not a guess.
+- **`calculate` tool and all-time ranges** (fix after the person's phone test): sums are done in code from tool totals and amounts the person mentions; `spend_summary` with no `start` means all time; when lookups run out, a last-chance call answers from what was found. Spec 44's Implementation Notes ("Phone bug: how much is left") have the details.
 - **`max_tokens` is 1500 for chat.** At 500, Haiku 5.5's reasoning cut answers off. Empty and cut-off answers are logged (`chat answer cut off|empty`).
 - **Categories are dynamic.** The prompt maps a word like "food" onto the person's own categories (Breakfast, Lunch, Dinner, Snacks…), names what it counted, and says what it left out (Groceries). A supplied but empty category list is an error, never a silent "all categories".
 - **Answers:**
