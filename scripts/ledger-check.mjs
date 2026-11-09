@@ -6,6 +6,8 @@
 // code 1 if any case fails.
 
 import { amountParts } from '../lib/currency.js';
+import { dayPeriod } from '../lib/dayScenes.js';
+import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
 
 let passed = 0;
 const failures = [];
@@ -40,6 +42,21 @@ check('amount', 'en-IN lakh grouping', amountParts(100000).text, '₹1,00,000');
 check('amount', 'float noise is not paise', amountParts(0.1 + 0.2 + 99.7).text, '₹100');
 check('amount', 'unknown currency reads as INR', amountParts(1200, { currency: 'XYZ' }).text, '₹1,200');
 check('amount', 'garbage value reads as zero', amountParts('abc'), { sign: '', tone: 'ink', text: '₹0' });
+
+// --- Day card (ticket 03) ---
+const at = (h, m = 0) => new Date(2026, 10, 10, h, m);
+check('day', '4:59 is night', dayPeriod(at(4, 59)), 'night');
+check('day', '5:00 is morning', dayPeriod(at(5)), 'morning');
+check('day', '12:00 is afternoon', dayPeriod(at(12)), 'afternoon');
+check('day', '17:00 is evening', dayPeriod(at(17)), 'evening');
+check('day', '20:00 is night', dayPeriod(at(20)), 'night');
+check('day', 'stored ink (never chose) shows Day', resolveEquippedTheme('ink', at(9)).id, 'day');
+check('day', 'no theme shows Day', resolveEquippedTheme(null, at(9)).id, 'day');
+check('day', 'Day follows the clock', resolveEquippedTheme('day', at(21)).period, 'night');
+check('day', 'a chosen Ink stays Ink', resolveEquippedTheme('ink-classic', at(9)).name, 'Ink');
+check('day', 'an equipped skin wins', resolveEquippedTheme('christmas', at(9)).id, 'christmas');
+check('day', 'Day is listed first', CARD_THEMES[0].id, 'day');
+check('day', 'the stored-default ink is not listed', CARD_THEMES.some((t) => t.id === 'ink'), false);
 
 // --- Report ---
 for (const f of failures) {

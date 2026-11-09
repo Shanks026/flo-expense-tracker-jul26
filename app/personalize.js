@@ -14,7 +14,7 @@ import useProfile from '../hooks/useProfile';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from '../components/Toast';
 import useCardThemes from '../hooks/useCardThemes';
-import { CARD_THEMES, getTheme } from '../lib/cardThemes';
+import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes';
 import { ACCENT_LIST, DEFAULT_ACCENT_ID, accentSupportsMode, accentModeLabel, resolveColors } from '../theme/themes';
 import { equipTheme } from '../lib/cardThemeMutations';
 import { FLAGS } from '../lib/flags';
@@ -68,7 +68,7 @@ function PersonalizeScreen() {
   const previewColors = useMemo(() => resolveColors(draftAccent, modeId), [draftAccent, modeId]);
   // Ink previews the way Home shows it: the plain emphasis surface.
   const previewCardTheme = useMemo(() => {
-    const theme = getTheme(draftCard ?? equippedId);
+    const theme = resolveEquippedTheme(draftCard ?? equippedId);
     return theme.id === 'ink' ? { ...theme, background: { type: 'solid', color: previewColors.emphasisBg } } : theme;
   }, [draftCard, equippedId, previewColors.emphasisBg]);
 

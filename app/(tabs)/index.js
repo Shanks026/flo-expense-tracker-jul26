@@ -64,8 +64,8 @@ export default function Home() {
   const { current: streakCurrent, loading: streakLoading } = useStreak();
   // The equipped card design (spec 43). Ink, the default, keeps the plain
   // emphasis surface so it matches the other cards in dark mode.
-  const { equippedId, equippedTheme } = useCardThemes();
-  const heroCardTheme = FLAGS.themes && equippedId !== 'ink' ? equippedTheme : null;
+  const { equippedTheme } = useCardThemes();
+  const heroCardTheme = FLAGS.themes ? equippedTheme : null;
   const streakChipRef = useRef(null);
   const currency = useCurrency();
   const { refreshing, onRefresh } = usePullToRefresh();
