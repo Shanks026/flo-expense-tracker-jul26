@@ -12,15 +12,15 @@ This ticket also produces the 40-phrase test set, weighted as in the spec. **The
 
 - [x] The person has approved the 40 phrases
 - [x] The parser answers at least 20 of the 40 on the starting set, all correctly; every case it isn't sure about returns "not sure", never a wrong answer
-- [ ] "120 lunch nethu" fills the sheet; Save writes the same row as a manual entry, analytics `source` is `quick_local`, and Undo works
-- [ ] A category tapped after parsing is never overridden; `category_was_prefilled` stays truthful
-- [ ] Editing, share and notification opens show no quick-add line; with the AI flag off, the sheet is exactly as before
-- [ ] Pixel_API_36, light and dark: the keyboard covers neither the line nor Save, and the sheet height doesn't jump
+- [x] "120 lunch nethu" fills the sheet; Save writes the same row as a manual entry, analytics `source` is `quick_local`, and Undo works
+- [x] A category tapped after parsing is never overridden; `category_was_prefilled` stays truthful
+- [x] Editing, share and notification opens show no quick-add line; with the AI flag off, the sheet is exactly as before
+- [x] Pixel_API_36, light and dark: the keyboard covers neither the line nor Save, and the sheet height doesn't jump
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
+- [x] Code implementation
+- [x] Verified (emulator check)
 - [ ] Green signal
 
 ## Comments
@@ -42,3 +42,15 @@ This ticket also produces the 40-phrase test set, weighted as in the spec. **The
 - `expo export --platform android` bundles cleanly. The quick-parse check still has 0 wrong.
 - The model spinner waits for ticket 02.
 - Not yet run on a device: FLO isn't installed on Pixel_API_36. The handoff says to hold the native build until phase 2.
+
+**2026-11-09: emulator check on Pixel_API_36, with a new test account.**
+- "120 lunch nethu" filled ₹120 · Expense · Food · yesterday (the starting set has no Lunch, so it fell back to Food). The saved row matches a manual entry: expense, 120.00, Food, 2026-11-08, no note, Personal.
+- `expense_logged` recorded `source: quick_local`. "250 auto", then tapping Groceries, then re-parsing "250 auto yesterday" kept Groceries, moved the date and logged `category_was_prefilled: false`. "40 chai" logged `true`, and Undo deleted the row.
+- Editing, a share intent and onboarding's first expense show no line. With `FLAGS.ai` off, the sheet is as before. The nudge passes no payload, so it gets no line (checked in code, not fired).
+- "asdf" and "60 bus today 5" show "Couldn't read that" and leave the sheet alone.
+- Two fixes came out of the check:
+  - The message now sits inside the line's row. The extra row it used to keep pushed Save under a text keyboard by about 7 dp.
+  - The line stays mounted between opens instead of remounting.
+- With a docked keyboard, in light and dark, the line and Save both clear the text keyboard and the number pad.
+- The first ⊕ open after a cold app start gets focus but no keyboard. This happens with the flag off too (the amount field, 1 of 3 opens each way), so it predates this ticket.
+- The emulator now runs with `hw.keyboard=no` and stylus handwriting off, so Gboard docks the way it does on a phone. Supabase keys are in the gitignored `.env.local`, and test credentials are in `.env.test.local`.

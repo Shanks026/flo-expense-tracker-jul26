@@ -200,7 +200,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const onDoneRef = useRef(null);
   const savedRef = useRef(false);
   // The quick-add line (44-ai-assistant.md, Phase 1): shown only for the ⊕
-  // tab's blank entry, and only with FLAGS.ai on. `quickKey` remounts it per
+  // tab's blank entry, and only with FLAGS.ai on. `quickKey` clears it per
   // open so it starts empty. `categoryTappedRef` records a chip tap since
   // the last parse, so re-parsing never overrides a category the person
   // picked after seeing the parsed one.
@@ -712,8 +712,16 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             keypad), the way the sheet read before spec 36. Save lives in the
             footer, pinned above the keyboard. Transfers start from Accounts
             and have no toggle. */}
-        {showQuickAdd && (
-          <QuickAddField key={quickKey} ref={quickInputRef} parse={parseQuickLine} onParsed={handleQuickParsed} />
+        {/* Mounted whenever the flag is on, and hidden for other openers,
+            so the ⊕ tab's focus() lands on an input that's already there. */}
+        {FLAGS.ai && (
+          <QuickAddField
+            ref={quickInputRef}
+            resetKey={quickKey}
+            hidden={!showQuickAdd}
+            parse={parseQuickLine}
+            onParsed={handleQuickParsed}
+          />
         )}
 
         {type !== 'transfer' && (

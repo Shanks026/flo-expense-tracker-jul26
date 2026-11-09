@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { Sparkles } from 'lucide-react-native';
@@ -9,15 +9,22 @@ import { useTheme } from '../theme/ThemeContext';
 // person types "120 lunch nethu" and taps the keyboard's done key; `parse`
 // turns the line into the sheet's prefill (lib/quickParse.js, on the phone),
 // and `onParsed` fills the sheet. A line `parse` isn't sure about leaves the
-// sheet as it is, with a quiet "Couldn't read that" under the line.
+// sheet as it is, with a quiet "Couldn't read that" at the end of the line.
 //
 // A plain component the sheet renders above the amount. It keeps its own
-// text, so the sheet remounts it (a `key` per open) to start each open blank.
-const QuickAddField = forwardRef(function QuickAddField({ parse, onParsed }, ref) {
+// text, cleared whenever `resetKey` changes (once per open). The sheet keeps
+// it mounted rather than remounting it per open: Android won't raise the
+// keyboard for a focus() on an input that was only just mounted.
+const QuickAddField = forwardRef(function QuickAddField({ parse, onParsed, resetKey, hidden }, ref) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [text, setText] = useState('');
   const [parseFailed, setParseFailed] = useState(false);
+
+  useEffect(() => {
+    setText('');
+    setParseFailed(false);
+  }, [resetKey]);
 
   function handleSubmit() {
     if (!text.trim()) return;
@@ -31,7 +38,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, onParsed }, ref
   }
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, hidden && styles.hidden]}>
       <View style={styles.row}>
         <Sparkles size={16} color={colors.muted} strokeWidth={2.2} />
         <BottomSheetTextInput
@@ -50,11 +57,15 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, onParsed }, ref
           maxLength={200}
           style={styles.input}
         />
+        {/* Inside the row, not under it: the line stays one row tall, so the
+            sheet never changes height, and it leaves room for Save above a
+            text keyboard on a phone-height screen. */}
+        {parseFailed && (
+          <Text style={styles.parseFailed} accessibilityLiveRegion="polite">
+            Couldn't read that
+          </Text>
+        )}
       </View>
-      {/* Always laid out, so showing it never moves the sheet's height. */}
-      <Text style={[styles.parseFailed, !parseFailed && styles.parseFailedHidden]} accessibilityLiveRegion="polite">
-        Couldn't read that
-      </Text>
     </View>
   );
 });
@@ -65,6 +76,9 @@ function makeStyles(colors) {
   return StyleSheet.create({
     wrap: {
       marginBottom: spacing.sm,
+    },
+    hidden: {
+      display: 'none',
     },
     row: {
       flexDirection: 'row',
@@ -88,11 +102,6 @@ function makeStyles(colors) {
       fontFamily: fontFamily.medium,
       fontSize: fontSize.xs,
       color: colors.mutedMid,
-      marginTop: spacing.xs,
-      marginLeft: spacing.md,
-    },
-    parseFailedHidden: {
-      opacity: 0,
     },
   });
 }
