@@ -41,6 +41,7 @@ import { useAddAccountSheet } from './AddAccountSheet';
 import { destructiveHaptic } from '../lib/haptics';
 import { FLAGS } from '../lib/flags';
 import { quickParse } from '../lib/quickParse';
+import { aiQuickAdd } from '../lib/ai';
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -207,6 +208,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickKey, setQuickKey] = useState(0);
   const categoryTappedRef = useRef(false);
+  // Bumped by every hand edit (amount, category, type, date, note). A model
+  // answer that started before the latest edit is dropped, so a slow reply
+  // never overwrites something the person typed or tapped while it thought.
+  const editEpochRef = useRef(0);
+  const markEdited = () => {
+    editEpochRef.current += 1;
+  };
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   // The smart default and the row's order (36-add-sheet-3-tap.md), from the
@@ -390,9 +398,19 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     });
   }
 
-  function handleQuickParsed(prefill) {
+  // The line the phone isn't sure about goes to the ai-assistant function
+  // (ticket 02). It answers with the same prefill shape, or a reason.
+  async function askQuickLine(text) {
+    const epoch = editEpochRef.current;
+    const result = await aiQuickAdd(text, { categories: [...expenseCategories, ...incomeCategories], accounts });
+    if (result.prefill && epoch !== editEpochRef.current) return { prefill: null, reason: 'stale' };
+    return result;
+  }
+
+  // source: 'quick_local' (the phone's parser) or 'quick_ai' (the model).
+  function handleQuickParsed(prefill, source) {
     setError(null);
-    sourceRef.current = 'quick_local';
+    sourceRef.current = source;
     const keepTapped = categoryTappedRef.current && prefill.type === type && categoryId;
     // Still protected on the next parse if kept; otherwise the parse took over.
     if (!keepTapped) categoryTappedRef.current = false;
@@ -401,9 +419,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     if (prefill.type !== 'expense') setSplitId(null);
     setAmount(String(prefill.amount));
     if (!keepTapped) {
-      prefilledCategoryRef.current = prefill.categoryId;
-      setCategoryId(prefill.categoryId);
-      setLeadCategoryId(prefill.categoryId);
+      // The model may find no category that fits; the smart default stands in.
+      const nextCategory = prefill.categoryId ?? defaultCategoryFor(prefill.type);
+      prefilledCategoryRef.current = nextCategory;
+      setCategoryId(nextCategory);
+      setLeadCategoryId(nextCategory);
     }
     setAccountId(prefill.accountId ?? activeAccountId);
     setAccountPickerOpen(false);
@@ -414,6 +434,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   }
 
   function handleTypeChange(nextType) {
+    markEdited();
     setError(null);
     setType(nextType);
     if (nextType === 'transfer') return; // transfers have no category
@@ -720,6 +741,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             resetKey={quickKey}
             hidden={!showQuickAdd}
             parse={parseQuickLine}
+            ask={askQuickLine}
             onParsed={handleQuickParsed}
           />
         )}
@@ -748,7 +770,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             <BottomSheetTextInput
               ref={amountInputRef}
               value={amount}
-              onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
+              onChangeText={(v) => {
+                markEdited();
+                setAmount(sanitizeAmountInput(v));
+              }}
               placeholder="0"
               placeholderTextColor={colors.mutedLight}
               keyboardType="decimal-pad"
@@ -808,7 +833,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                   <Text style={styles.fieldLabel}>Note</Text>
                   <BottomSheetTextInput
                     value={note}
-                    onChangeText={setNote}
+                    onChangeText={(v) => {
+                      markEdited();
+                      setNote(v);
+                    }}
                     placeholder="Add a note…"
                     placeholderTextColor={colors.mutedLight}
                     style={styles.noteInput}
@@ -856,6 +884,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                     style={styles.chip}
                     onPress={() => {
                       categoryTappedRef.current = true;
+                      markEdited();
                       setCategoryId(cat.id);
                     }}
                   >
@@ -875,8 +904,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             <View style={styles.detailsBody}>
               <View style={styles.dateChipRow}>
                 {[
-                  { key: 'today', label: 'Today', active: isToday(date), onPress: () => setDate(new Date()) },
-                  { key: 'yesterday', label: 'Yesterday', active: isYesterday(date), onPress: () => setDate(subDays(new Date(), 1)) },
+                  { key: 'today', label: 'Today', active: isToday(date), onPress: () => { markEdited(); setDate(new Date()); } },
+                  { key: 'yesterday', label: 'Yesterday', active: isYesterday(date), onPress: () => { markEdited(); setDate(subDays(new Date(), 1)); } },
                   {
                     key: 'pick',
                     label: isToday(date) || isYesterday(date) ? 'Pick a date' : formatDateLabel(date),
@@ -898,7 +927,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
                 <Text style={styles.fieldLabel}>Note</Text>
                 <BottomSheetTextInput
                   value={note}
-                  onChangeText={setNote}
+                  onChangeText={(v) => {
+                    markEdited();
+                    setNote(v);
+                  }}
                   placeholder="Add a note…"
                   placeholderTextColor={colors.mutedLight}
                   style={styles.noteInput}
@@ -1009,7 +1041,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
             maximumDate={new Date()}
             onChange={(_event, selected) => {
               setShowDatePicker(false);
-              if (selected) setDate(selected);
+              if (selected) {
+                markEdited();
+                setDate(selected);
+              }
             }}
           />
         )}
