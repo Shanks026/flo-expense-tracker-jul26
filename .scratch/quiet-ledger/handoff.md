@@ -61,7 +61,9 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   Income `positive` stays green, deep cash green `#166534` / `#3FB97A`.
 - **Home has no chart (2026-11-10):** the week line is gone (WeekLine.js
   deleted). "Last 7 days" is one ListRow (it is rolling, while Insights Week is the calendar week): the spend, "₹X a day", and a
-  tap into Insights on Week. Charts belong in Insights, with y-axis numbers
+  tap into Insights on Week. Under the amount: a trend icon and the %
+  against the 7 days before (red up, green down; `lib/weekChange.js`,
+  hidden under ₹100 before, grey under 5 %). Charts belong in Insights, with y-axis numbers
   (the person wants the numbers).
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.

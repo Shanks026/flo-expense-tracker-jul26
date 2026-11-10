@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, RefreshControl, Modal, StyleSheet } 
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
-import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, Users, CalendarCheck, ChartColumn } from 'lucide-react-native';
+import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, Users, CalendarCheck, ChartColumn, TrendingUp, TrendingDown } from 'lucide-react-native';
 import AmountText from '../../components/ledger/AmountText';
 import ListRow from '../../components/ledger/ListRow';
 import SectionHeader from '../../components/ledger/SectionHeader';
@@ -36,6 +36,7 @@ import { isSettlement, settlementLabel } from '../../lib/settlements';
 import { markNoSpend } from '../../lib/streakMarks';
 import { track } from '../../lib/track';
 import { formatMoney } from '../../lib/currency';
+import { weekChange } from '../../lib/weekChange';
 import { resolveEquippedTheme } from '../../lib/cardThemes';
 import { GREETINGS, dayPeriod } from '../../lib/dayScenes';
 import { dateGroupKey, dateGroupLabel } from '../../lib/dateLabels';
@@ -65,6 +66,18 @@ function useDayPeriod() {
   return period;
 }
 
+// The Last 7 days row's change line: a trend icon (none when flat) and the
+// figure, both in the change's tone.
+function WeekChange({ change, color }) {
+  const Icon = change.direction === 'up' ? TrendingUp : change.direction === 'down' ? TrendingDown : null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+      {Icon && <Icon size={14} color={color} strokeWidth={2} />}
+      <Text style={[ledgerType.caption, tabular, { color }]}>{change.text}</Text>
+    </View>
+  );
+}
+
 export default function Home() {
   const { c } = useLedger();
   const { hydrated: themeHydrated } = useTheme();
@@ -79,8 +92,12 @@ export default function Home() {
   const { activeAccount, accounts, setActiveAccount, loading: accountsLoading } = useAccount();
   const { summaries, period: summaryPeriod, loading: summariesLoading } = useAllAccountSummaries();
   const { transactions, loading: txLoading } = useTransactions({ limit: RECENT_COUNT });
-  const { data: week, loading: weekLoading } = useSpendingTrend('7d');
-  const weekSpent = week.reduce((sum, d) => sum + (d.expense || 0), 0);
+  // 14 days, oldest first: the last 7 are the row's spend, the 7 before
+  // them are what it's compared with.
+  const { data: fortnight, loading: weekLoading } = useSpendingTrend('14d');
+  const spentIn = (days) => days.reduce((sum, d) => sum + (d.expense || 0), 0);
+  const weekSpent = spentIn(fortnight.slice(-7));
+  const change = weekChange(weekSpent, spentIn(fortnight.slice(0, -7)));
   const { bills, loading: billsLoading } = useBills();
   const { current: streakCurrent, history, loading: streakLoading } = useStreak();
   const { equippedTheme } = useCardThemes();
@@ -293,11 +310,12 @@ export default function Home() {
               icon={ChartColumn}
               divider={false}
               title="Last 7 days"
-              sub={weekSpent > 0 ? `${formatMoney(weekSpent / 7, currency)} a day` : 'Nothing spent in the last 7 days'}
+              sub={weekSpent > 0 ? `${formatMoney(weekSpent / 7, currency)} a day on average` : 'Nothing spent in the last 7 days'}
               right={<AmountText value={weekSpent} currency={currency} />}
+              rightSub={change && <WeekChange change={change} color={c[change.tone]} />}
               trailing="chevron"
               onPress={openWeekInsights}
-              accessibilityLabel={`Last 7 days, ${formatMoney(weekSpent, currency)} spent. Open Insights`}
+              accessibilityLabel={`Last 7 days, ${formatMoney(weekSpent, currency)} spent${change ? `, ${change.label}` : ''}. Open Insights`}
             />
           )}
         </View>

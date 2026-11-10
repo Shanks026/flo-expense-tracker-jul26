@@ -129,7 +129,7 @@ Every feature stays. Flagged-off features keep their flags and get the same look
 44. As a FLO user, I want Add, Transfer and Ask FLO as three quick-action tiles, so that my common actions are big targets.
 45. As a FLO user with only one account, I want no Transfer tile, so that I don't see an action I can't use.
 46. As a FLO user who hasn't logged anything today, I want a "Nothing logged today" row with a compact No spend button, so that I can keep my streak in one tap.
-47. As a FLO user, I want one "Last 7 days" row with that spend' spend and the daily average, so that I get the number without a chart taking half the screen. *(Changed 2026-11-10: the week line chart left Home. Kit and Wise keep charts a tap away from their money screens.)*
+47. As a FLO user, I want one "Last 7 days" row with that spend' spend and the daily average, so that I get the number without a chart taking half the screen. Under the amount, a TrendingUp (red) or TrendingDown (green) icon and the % change against the 7 days before; "About the same" in grey under 5 %, and nothing when the 7 days before had under ₹100 (`lib/weekChange.js`). *(Changed 2026-11-10: the week line chart left Home. Kit and Wise keep charts a tap away from their money screens.)*
 48. *(Dropped 2026-11-10 with the chart: tapping a day. Insights' Week view does this.)*
 49. As a FLO user, I want the This week row to open Insights on the Week view, so that I can dig deeper.
 50. As a FLO user with nothing spent in the last 7 days, I want the row to say "Nothing spent in the last 7 days", so that the empty state is honest.

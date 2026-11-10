@@ -11,6 +11,8 @@ import useLoadedFor from './useLoadedFor';
 // (Monday-start, matching the rest of the app's week convention).
 const RANGE_CONFIG = {
   '7d': { days: 7, granularity: 'day' },
+  // Home's Last 7 days row: two 7-day halves, compared (lib/weekChange.js).
+  '14d': { days: 14, granularity: 'day' },
   '1m': { days: 30, granularity: 'week' },
   '3m': { days: 90, granularity: 'week' },
 };

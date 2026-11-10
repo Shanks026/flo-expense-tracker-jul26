@@ -23,6 +23,9 @@ export function toneColors(tone, c, modeId) {
 // divider below unless it's the last row. `icon` is a lucide component;
 // `renderIcon(color)` draws anything else inside the circle.
 //
+// `rightSub` is a string (muted, or `rightSubColor`) or any node, such as
+// Home's trend icon and percentage.
+//
 // The trailing slot, after `right`:
 //   trailing="chevron" | "check" | any node (a compact Button, a badge);
 //   switchValue + onSwitchChange — the WHOLE row becomes one switch: a tap
@@ -91,7 +94,9 @@ export default function ListRow({
       {(right != null || rightSub != null) && (
         <View style={styles.right}>
           {typeof right === 'string' ? <Text style={[styles.title, styles.rightText]}>{right}</Text> : right}
-          {!!rightSub && <Text style={[styles.sub, rightSubColor && { color: rightSubColor }]}>{rightSub}</Text>}
+          {typeof rightSub === 'string'
+            ? !!rightSub && <Text style={[styles.sub, rightSubColor && { color: rightSubColor }]}>{rightSub}</Text>
+            : rightSub}
         </View>
       )}
       {trailingNode}

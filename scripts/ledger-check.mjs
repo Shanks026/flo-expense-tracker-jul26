@@ -10,6 +10,7 @@ import { dayPeriod } from '../lib/dayScenes.js';
 import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
 import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
+import { weekChange } from '../lib/weekChange.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 
 let passed = 0;
@@ -100,6 +101,18 @@ check('wcag', 'dark income green on surface (text)', passes(Dc.positive, Dc.surf
 // apart in lightness on top of the hue gap (the old green was 1.09 / 1.05).
 check('wcag', 'light income stands apart from the olive', contrastRatio(Lc.positive, Lc.accent) >= 1.3, true);
 check('wcag', 'dark income stands apart from the olive', contrastRatio(Dc.positive, Dc.accent) >= 1.3, true);
+
+// --- Home's Last 7 days row: change vs the 7 days before ---
+check('week', 'up 12% is red and up', weekChange(1120, 1000), { direction: 'up', tone: 'danger', text: '12%', label: '12% more than the 7 days before' });
+check('week', 'down 8% is green and down', weekChange(920, 1000), { direction: 'down', tone: 'positive', text: '8%', label: '8% less than the 7 days before' });
+check('week', 'under 5% is flat and grey', weekChange(1040, 1000), { direction: 'flat', tone: 'muted', text: 'About the same', label: 'About the same as the 7 days before' });
+check('week', '-4.6% rounds to 5, so it counts', weekChange(954, 1000).direction, 'down');
+check('week', 'nothing before means no change shown', weekChange(500, 0), null);
+check('week', 'a tiny week before means no change shown', weekChange(5000, 99), null);
+check('week', 'the floor itself counts', weekChange(200, 100).text, '100%');
+check('week', 'nothing this week is down 100%', weekChange(0, 1000).text, '100%');
+check('week', 'huge jumps are capped', weekChange(500000, 100).text, '999%+');
+check('week', 'garbage reads as no change shown', weekChange('abc', undefined), null);
 
 // --- Report ---
 for (const f of failures) {
