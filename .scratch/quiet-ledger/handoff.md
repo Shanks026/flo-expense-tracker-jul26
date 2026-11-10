@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after ticket 09.
+Last updated 2026-11-10, after ticket 09 and the Home Add tile change (`112e40b`).
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -14,16 +14,20 @@ source is `docs/redesign-plan.md`.
 | 02 Illustration, EmptyState, Koban deleted | done | `e5e529c` |
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
 | 04 Ask FLO proposal card | ready | |
-| 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | see git log |
+| 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
 | 06 Kit gallery and ProgressBar | ready | |
 | 07 Recording where each entry came from | ready (DB change: needs the person's yes before applying) | |
-| 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | see git log |
-| 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | see git log |
-| 10 Activity search and filters | blocked by 08, 09 | |
-| 11 Transaction detail | blocked by 05, 07, 08, 10 | |
-| 12 Olive accent replaces the blue | ready (WCAG table in the ticket) | |
+| 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
+| 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
+| 10 Activity search and filters | ready | |
+| 11 Transaction detail | blocked by 07, 10 | |
+| 12 Olive accent replaces the blue | ready (WCAG table in the ticket; the `positive` green-vs-teal choice needs the person) | |
 
 Suggested order: 12 (olive accent), 04, 07, 06, 10, 11.
+
+For 12: every accent use reads `c.accent` (or its aliases `chart` and
+`highlight`) from `theme/ledger.js`, so start there. Ticket 05's
+`Switch` and ticket 09's caret colour are in `components/ledger/`.
 
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 `design-inspirations/` is deliberately untracked (third-party screenshots).
@@ -61,15 +65,22 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   Start it on the tracker (`mcp__flo-ticket-tracker__tickets` start
   `quiet-ledger/NN`).
 - Pure rules go in `lib/` modules with no React Native imports, checked by
-  `node --no-warnings scripts/ledger-check.mjs` (23 cases so far). Imports
+  `node --no-warnings scripts/ledger-check.mjs` (31 cases so far). Imports
   inside modules the script loads need explicit `.js` extensions.
 - Verify on **Pixel_API_36**: start the emulator and `npx expo start
   --dev-client`, then `adb reverse tcp:8081 tcp:8081` and open
   `flo://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081`.
-  Deep links like `flo://personalize`, `flo://streak`, `flo://settings` and
-  `flo://dev/home-preview` work. The test account's email is in
+  Deep links like `flo://personalize`, `flo://streak` and `flo://settings`
+  work (`flo://dev/home-preview` is gone since ticket 08). The test account's email is in
   `.env.test.local`; never print the password. Its Appearance is Light and its
-  card is Dusk: put both back after a check.
+  card is Dusk, and Personal is the active account: put all three back
+  after a check. Delete test entries through the sheet's Delete button.
+- Tap by label, not by coordinate: `uiautomator dump`, then tap the centre
+  of the node's bounds (with `MSYS_NO_PATHCONV=1` in Git Bash). Blind taps
+  land on the bell or switch the account card when a sheet is mid-close. A
+  save takes about 2 s on this connection, so the Undo toast appears then.
+- The Supabase MCP (`execute_sql`, project `uergtlcfpwajztqgncim`) is the
+  quickest way to confirm a save or undo reached the database.
 - After a hot-reload error the app can keep stale code; force-stop and relaunch
   rather than trusting HMR.
 - Tick all three Tracer boxes once the emulator check passes (person's
