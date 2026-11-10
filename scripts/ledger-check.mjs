@@ -16,7 +16,7 @@ import { sourceLabel, buildHistory } from '../lib/entryDetail.js';
 import { progressState } from '../lib/progressState.js';
 import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
-import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS } from '../lib/setupPlan.js';
+import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME } from '../lib/setupPlan.js';
 
 let passed = 0;
 const failures = [];
@@ -334,6 +334,41 @@ check('wcag', 'dark disabled button text', passes(Dc.muted, Dc.surfaceSunk, AA_U
   check('setup', '30 characters is allowed', cleanAccountName('x'.repeat(30)), 'x'.repeat(30));
   check('setup', '31 characters is none', cleanAccountName('x'.repeat(31)), null);
   check('setup', 'a non-string is none', cleanAccountName(undefined), null);
+}
+
+// --- Set-up planner, monthly limit (spec 47, onboarding ticket 07) ---
+check('limit', '₹0 is no limit', cleanLimitAmount('0'), null);
+check('limit', 'blank is no limit', cleanLimitAmount(''), null);
+check('limit', 'spaces are no limit', cleanLimitAmount('   '), null);
+check('limit', 'garbage is no limit', cleanLimitAmount('abc'), null);
+check('limit', 'two decimal points is no limit', cleanLimitAmount('1.2.3'), null);
+check('limit', 'a negative is no limit', cleanLimitAmount('-500'), null);
+check('limit', 'under ₹1 is no limit', cleanLimitAmount('0.99'), null);
+check('limit', '₹1 is the least limit', cleanLimitAmount('1'), 1);
+check('limit', '₹5000 is 5000', cleanLimitAmount('5000'), 5000);
+check('limit', '₹1,234.50 is 1234.5', cleanLimitAmount('₹1,234.50'), 1234.5);
+check('limit', 'Indian grouping is read', cleanLimitAmount('1,00,000'), 100000);
+check('limit', 'a trailing point is whole rupees', cleanLimitAmount('5000.'), 5000);
+check('limit', 'more than two decimals rounds to paise', cleanLimitAmount('10.005'), 10.01);
+check('limit', 'the largest amount the column holds', cleanLimitAmount('9999999999.99'), 9999999999.99);
+check('limit', 'past what the column holds is no limit', cleanLimitAmount('10000000000'), null);
+check('limit', 'a non-string is no limit', cleanLimitAmount(undefined), null);
+{
+  const fields = (amount) => ({ name: LIMIT_BUDGET_NAME, amount, period_type: 'calendar_month', category_id: null, start_date: null, end_date: null });
+  const limit = { id: 'b1', name: 'Monthly limit', amount: 5000, period_type: 'calendar_month', category_id: null };
+  check('limit', 'the limit is found among other budgets', findLimitBudget([{ ...limit, id: 'x', category_id: 'food' }, limit]).id, 'b1');
+  check('limit', 'no budgets means no limit', findLimitBudget(undefined), null);
+  check('limit', 'no amount is no plan', planLimit({ amount: null, budgets: [] }), null);
+  check('limit', 'a first limit is created as an overall monthly budget', planLimit({ amount: 5000, budgets: [] }), { create: fields(5000) });
+  check('limit', 'Back and a new amount updates the same budget', planLimit({ amount: 6000, budgets: [limit] }), { update: { id: 'b1', fields: fields(6000) } });
+  check('limit', 'Back and the same amount writes nothing', planLimit({ amount: 5000, budgets: [limit] }), null);
+  const saved = { id: 'b1', amount: 5000, account_id: 'acc1' };
+  check('limit', 'the saved limit is updated even when the search misses it', planLimit({ amount: 6000, budgets: [], saved, accountId: 'acc1' }), { update: { id: 'b1', fields: fields(6000) } });
+  check('limit', 'the saved limit and the same amount writes nothing', planLimit({ amount: 5000, budgets: [], saved, accountId: 'acc1' }), null);
+  check('limit', 'a changed active account moves the saved limit', planLimit({ amount: 5000, budgets: [], saved, accountId: 'acc2' }), { update: { id: 'b1', fields: { ...fields(5000), account_id: 'acc2' } } });
+  check('limit', 'a category budget is not the limit', planLimit({ amount: 5000, budgets: [{ ...limit, category_id: 'food' }] }), { create: fields(5000) });
+  check('limit', 'a weekly budget is not the limit', planLimit({ amount: 5000, budgets: [{ ...limit, period_type: 'calendar_week' }] }), { create: fields(5000) });
+  check('limit', 'an overall budget with another name is not the limit', planLimit({ amount: 5000, budgets: [{ ...limit, name: 'Monthly' }] }), { create: fields(5000) });
 }
 
 // --- Set-up progress (spec 47, onboarding ticket 04) ---

@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: tickets 01 and 04 done; 05 next (its migration needs the person's yes), or 07/08.
+Last updated 2026-11-11: tickets 01, 04 and 07 done; 08 next, or 05 (its migration needs the person's yes).
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -19,7 +19,7 @@ there all apply here and aren't repeated.
 | 04 Question shell and "Where does your money live?" | done | (this commit) |
 | 05 Salary-day month | ready (migration needs the person's yes) | |
 | 06 "When does your month start?" | blocked by 04, 05 | |
-| 07 "Want a monthly spending limit?" | ready | |
+| 07 "Want a monthly spending limit?" | done | this commit |
 | 08 "Pick your card" | ready | |
 | 09 First expense and the reminder ask on the kit | ready | |
 | 10 First Home coach mark and the full-flow check | blocked by 02–09 | |
@@ -64,8 +64,16 @@ order), with 02, 03 and 09 whenever; 10 last.
 - Answers go in `useOnboardingDraft()` (`draft[key]`, `setAnswer`); seed from
   the saved data the first time the screen opens, as accounts does.
 - Pure rules go in `lib/setupPlan.js` with checks in `ledger-check.mjs`.
-- The emulator is signed in as the ticket 04 skip account, mid-flow on
-  question 1, with nothing written. Sign out to reuse the shared account.
+- A question that writes one row keeps the row Next saved in the draft
+  (as budget does with `draft.budgetSaved`), so a resubmit after Back
+  updates it even when question 1 changed the active account.
+- Budget's Next replaces into the first expense until 08 exists, so Back
+  from it can't be tried yet; once 08 is in, recheck "Back then Next" on
+  the limit, including after changing picks on question 1.
+- The emulator is signed in as the ticket 04 account (`FLO_ONB04_*`),
+  mid-flow on the first expense, with SBI, Cash and a ₹700 limit. The
+  ticket 04 skip account (`FLO_ONB04_SKIP_*`) is onboarded with HDFC and
+  a ₹6000 limit. Sign out to reuse the shared account.
 
 ## How the work is done
 
