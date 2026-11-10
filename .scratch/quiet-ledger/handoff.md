@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after ticket 03. Paused on the weekly usage limit.
+Last updated 2026-11-10, after ticket 05.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -14,15 +14,15 @@ source is `docs/redesign-plan.md`.
 | 02 Illustration, EmptyState, Koban deleted | done | `e5e529c` |
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
 | 04 Ask FLO proposal card | ready | |
-| 05 Settings on the kit | ready | |
-| 06 Kit gallery and ProgressBar | blocked by 05 | |
+| 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | see git log |
+| 06 Kit gallery and ProgressBar | ready | |
 | 07 Recording where each entry came from | ready (DB change: needs the person's yes before applying) | |
 | 08 Home goes live, new tab bar | ready | |
-| 09 Add sheet on the kit | blocked by 05 | |
+| 09 Add sheet on the kit | ready | |
 | 10 Activity search and filters | blocked by 08, 09 | |
 | 11 Transaction detail | blocked by 05, 07, 08, 10 | |
 
-Suggested order: 05 (unblocks 06 and 09), then 08, 09, 04, 07, 06, 10, 11.
+Suggested order: 08, 09, 04, 07, 06, 10, 11.
 
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 `design-inspirations/` is deliberately untracked (third-party screenshots).
@@ -40,6 +40,10 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   in `lib/cardThemes.js`, never `getTheme(equippedId)` for the hero card.
 - **`FLAGS.accents` is off**; `theme_accent` is neither read nor written.
 - **Tabs:** Activity and You (labels only, ticket 08).
+- **Kit (ticket 05):** a screen on the kit uses `ScreenHeader` + `LargeTitle` +
+  `useHeaderScroll` with `headerShown: false` on its route. `ListRow`'s
+  `trailing` / `switchValue` replace the old `Row` props. Callouts are one
+  line. Thumb, knob and edge colours are ledger tokens, not literals.
 
 ## How the work is done
 

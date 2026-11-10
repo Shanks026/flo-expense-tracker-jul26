@@ -42,6 +42,12 @@ const LIGHT = {
   // The public name (spec 46): charts, progress, selection marks. `chart`
   // and `highlight` stay as aliases for code written before the spec.
   accent: ACCENT_LIGHT,
+  // Segmented's selected thumb, the switch knob (white on the accent and on
+  // the off track, both modes), and the faint edge that keeps either visible.
+  thumb: '#FFFFFF',
+  knob: '#FFFFFF',
+  thumbEdge: 'rgba(0,0,0,0.12)',
+  shadow: '#000000',
 };
 
 const DARK = {
@@ -63,6 +69,10 @@ const DARK = {
   scrim: 'rgba(0,0,0,0.6)',
   chart: ACCENT_DARK,
   accent: ACCENT_DARK,
+  thumb: '#171717',
+  knob: '#FFFFFF',
+  thumbEdge: 'rgba(255,255,255,0.14)',
+  shadow: '#000000',
 };
 
 export const ledgerPalettes = { light: LIGHT, dark: DARK };
