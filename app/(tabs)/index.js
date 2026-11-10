@@ -128,7 +128,8 @@ export default function Home() {
   const dueBills = bills.filter((b) => b.is_active && BILL_WINDOW.includes(billStatus(b.next_due_date)));
 
   const quickActions = [
-    { key: 'add', label: 'Add', icon: Plus, onPress: () => openAdd() },
+    // Same opener as the tab bar's +: the quick-add line on top (story 62).
+    { key: 'add', label: 'Add', icon: Plus, onPress: () => openAdd({ quickAdd: true }) },
     accounts.length >= 2 && {
       key: 'transfer',
       label: 'Transfer',
