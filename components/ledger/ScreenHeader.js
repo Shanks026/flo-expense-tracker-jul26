@@ -20,7 +20,8 @@ import { useLedger, ledgerType, ledgerSpace, ledgerSize } from '../../theme/ledg
 //
 // `actions` is [{ icon, onPress, accessibilityLabel, dot? }], at most two.
 // Back goes back, or to Home when the screen was opened by a deep link with
-// nothing behind it; `onBack` overrides.
+// nothing behind it; `onBack` overrides. `showBack={false}` leaves it out
+// (the first onboarding question), keeping the bar's height.
 
 // How far the large title scrolls before the bar's small title has fully
 // faded in: the large title's own height.
@@ -35,7 +36,7 @@ export function useHeaderScroll() {
   return { scrollY, onScroll };
 }
 
-export default function ScreenHeader({ title, scrollY, actions = [], onBack }) {
+export default function ScreenHeader({ title, scrollY, actions = [], onBack, showBack = true }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useLedger();
@@ -57,7 +58,7 @@ export default function ScreenHeader({ title, scrollY, actions = [], onBack }) {
   return (
     <View style={[styles.wrap, { paddingTop: insets.top, backgroundColor: c.canvas }]}>
       <View style={styles.bar}>
-        <HeaderIconButton icon={ChevronLeft} onPress={handleBack} accessibilityLabel="Back" />
+        {showBack && <HeaderIconButton icon={ChevronLeft} onPress={handleBack} accessibilityLabel="Back" />}
         {/* With a LargeTitle on screen, that one is the header TalkBack reads. */}
         <Animated.View
           style={[styles.titleBox, { opacity: titleOpacity }]}

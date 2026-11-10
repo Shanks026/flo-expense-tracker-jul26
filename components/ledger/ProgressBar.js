@@ -9,7 +9,9 @@ import { progressState } from '../../lib/progressState';
 //
 // TalkBack hears it as a progress bar with the percentage; pass
 // `accessibilityLabel` for what it measures ("Groceries budget").
-export default function ProgressBar({ value, accessibilityLabel, style }) {
+// `plain` keeps the accent at every value, for a bar that measures steps
+// done rather than money spent (onboarding's "4 of 4" isn't over a limit).
+export default function ProgressBar({ value, accessibilityLabel, plain = false, style }) {
   const { c } = useLedger();
   const { tone, fill, pct } = progressState(value);
 
@@ -21,7 +23,7 @@ export default function ProgressBar({ value, accessibilityLabel, style }) {
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ min: 0, max: 100, now: Math.min(pct, 100), text: `${pct}%` }}
     >
-      <View style={[styles.fill, { width: `${fill * 100}%`, backgroundColor: c[tone] }]} />
+      <View style={[styles.fill, { width: `${fill * 100}%`, backgroundColor: c[plain ? 'accent' : tone] }]} />
     </View>
   );
 }

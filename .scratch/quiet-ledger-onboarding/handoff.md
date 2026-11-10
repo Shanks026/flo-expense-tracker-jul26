@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: ticket 01 done; 04 next.
+Last updated 2026-11-11: tickets 01 and 04 done; 05 next (its migration needs the person's yes), or 07/08.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -13,14 +13,14 @@ there all apply here and aren't repeated.
 
 | Ticket | State | Commit |
 |---|---|---|
-| 01 Account and budget writes move into lib | done | (this commit) |
+| 01 Account and budget writes move into lib | done | 5fdefd5 |
 | 02 Opener carousel | ready | |
 | 03 Sign up and sign in on the kit | ready | |
-| 04 Question shell and "Where does your money live?" | ready | |
+| 04 Question shell and "Where does your money live?" | done | (this commit) |
 | 05 Salary-day month | ready (migration needs the person's yes) | |
 | 06 "When does your month start?" | blocked by 04, 05 | |
-| 07 "Want a monthly spending limit?" | blocked by 04 | |
-| 08 "Pick your card" | blocked by 04 | |
+| 07 "Want a monthly spending limit?" | ready | |
+| 08 "Pick your card" | ready | |
 | 09 First expense and the reminder ask on the kit | ready | |
 | 10 First Home coach mark and the full-flow check | blocked by 02–09 | |
 
@@ -53,6 +53,19 @@ order), with 02, 03 and 09 whenever; 10 last.
 - To see onboarding again on the same phone, sign out (or clear app data for
   the opener): `OnboardingGate` sends any account without `onboarded_at` to
   the first step.
+
+## Built so far (for the next question tickets)
+
+- A question screen is `components/onboarding/SetupQuestion` with
+  `stepKey`, `title`, `note`, `nextDisabled` and `onNext` (async, resolves
+  true when saved). The shell handles progress, Back, Skip, the step event
+  and moving on. Register the route in `STEPS` in `lib/onboarding.js` in
+  flow order; `nextStep()` skips steps that aren't built yet.
+- Answers go in `useOnboardingDraft()` (`draft[key]`, `setAnswer`); seed from
+  the saved data the first time the screen opens, as accounts does.
+- Pure rules go in `lib/setupPlan.js` with checks in `ledger-check.mjs`.
+- The emulator is signed in as the ticket 04 skip account, mid-flow on
+  question 1, with nothing written. Sign out to reuse the shared account.
 
 ## How the work is done
 

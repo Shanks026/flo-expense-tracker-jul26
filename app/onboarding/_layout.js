@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { OnboardingDraftProvider } from '../../lib/OnboardingDraftContext';
 
 // gestureEnabled: false — onboarding is a linear flow with an explicit skip on
 // every screen. Swiping back out of it (on iOS) or popping past the first step
@@ -12,5 +13,11 @@ import { Stack } from 'expo-router';
 // Applies to every screen under app/onboarding/, including intro/ (no separate
 // _layout there, so intro/* screens are flattened into this same Stack).
 export default function OnboardingLayout() {
-  return <Stack screenOptions={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />;
+  // The draft holds the set-up answers across the question routes, so Back
+  // shows what was chosen (spec 47).
+  return (
+    <OnboardingDraftProvider>
+      <Stack screenOptions={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+    </OnboardingDraftProvider>
+  );
 }

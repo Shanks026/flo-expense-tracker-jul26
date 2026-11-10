@@ -16,6 +16,7 @@ import { sourceLabel, buildHistory } from '../lib/entryDetail.js';
 import { progressState } from '../lib/progressState.js';
 import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
+import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS } from '../lib/setupPlan.js';
 
 let passed = 0;
 const failures = [];
@@ -267,6 +268,84 @@ check('progress', 'garbage reads as empty', progressState('abc'), { tone: 'accen
 // Disabled buttons (ticket 11): muted text on the sunk fill, as graphics (3:1).
 check('wcag', 'light disabled button text', passes(Lc.muted, Lc.surfaceSunk, AA_UI), true);
 check('wcag', 'dark disabled button text', passes(Dc.muted, Dc.surfaceSunk, AA_UI), true);
+
+// --- Set-up planner, accounts (spec 47, onboarding ticket 04) ---
+{
+  const palette = ['#A', '#B', '#C', '#D'];
+  const personal = { id: 'p', name: 'Personal', color: '#A' };
+  const plan = (picks, existing = [personal], opts = {}) => planAccounts({ picks, existing, palette, ...opts });
+
+  check('setup', 'no picks is no plan', plan([]), null);
+  check('setup', 'one pick renames Personal and makes it active', plan(['SBI']), {
+    rename: { id: 'p', name: 'SBI' },
+    create: [],
+    active: { id: 'p' },
+  });
+  check('setup', 'three picks are a rename plus two creates, colours skip the used one', plan(['SBI', 'Cash', 'HDFC']), {
+    rename: { id: 'p', name: 'SBI' },
+    create: [
+      { name: 'Cash', color: '#B' },
+      { name: 'HDFC', color: '#C' },
+    ],
+    active: { id: 'p' },
+  });
+  const renamed = { id: 'p', name: 'SBI', color: '#A' };
+  check('setup', 'an already-renamed Personal is not renamed again', plan(['Cash'], [renamed]), {
+    rename: null,
+    create: [{ name: 'Cash', color: '#B' }],
+    active: { create: 0 },
+  });
+  const second = { id: 'q', name: 'Savings', color: '#C' };
+  check('setup', 'a second account already there means no rename', plan(['SBI'], [personal, second]), {
+    rename: null,
+    create: [{ name: 'SBI', color: '#B' }],
+    active: { create: 0 },
+  });
+  check('setup', 'Back then Next with the same picks writes nothing new', plan(['SBI', 'Cash'], [renamed, { id: 'c', name: 'Cash', color: '#B' }]), {
+    rename: null,
+    create: [],
+    active: { id: 'p' },
+  });
+  check('setup', 'names already there, in any case, are not created twice', plan(['cash', 'Cash', 'CASH'], [renamed, { id: 'c', name: 'Cash', color: '#B' }]), {
+    rename: null,
+    create: [],
+    active: { id: 'c' },
+  });
+  check('setup', 'duplicate picks collapse to the first spelling', plan(['SBI', 'sbi', 'Cash']).create.map((a) => a.name), ['Cash']);
+  check('setup', 'picking Personal itself keeps it as it is', plan(['personal', 'Cash']), {
+    rename: null,
+    create: [{ name: 'Cash', color: '#B' }],
+    active: { id: 'p' },
+  });
+  check('setup', 'colour comparison ignores case', plan(['SBI', 'Cash'], [{ id: 'p', name: 'Personal', color: '#a' }]).create[0].color, '#B');
+  check('setup', 'a full palette wraps to the start', plan(['SBI', 'A', 'B', 'C', 'D']).create.map((a) => a.color), ['#B', '#C', '#D', '#A']);
+  check('setup', 'without room for more accounts only the rename applies', plan(['SBI', 'Cash'], [personal], { canAddMore: false }), {
+    rename: { id: 'p', name: 'SBI' },
+    create: [],
+    active: { id: 'p' },
+  });
+  check('setup', 'without room and nothing to rename there is no plan', plan(['Cash'], [renamed], { canAddMore: false }), null);
+  check('setup', 'picks are trimmed', plan(['  SBI  ']).rename.name, 'SBI');
+  check('setup', 'blank picks are dropped', plan(['   ', '']), null);
+
+  check('setup', 'a custom name is trimmed', cleanAccountName('  Paytm  '), 'Paytm');
+  check('setup', 'inner runs of spaces collapse', cleanAccountName('Bank   of  Baroda'), 'Bank of Baroda');
+  check('setup', 'a blank custom name is none', cleanAccountName('   '), null);
+  check('setup', '30 characters is allowed', cleanAccountName('x'.repeat(30)), 'x'.repeat(30));
+  check('setup', '31 characters is none', cleanAccountName('x'.repeat(31)), null);
+  check('setup', 'a non-string is none', cleanAccountName(undefined), null);
+}
+
+// --- Set-up progress (spec 47, onboarding ticket 04) ---
+check('progress', 'four questions with themes on', SETUP_QUESTIONS.map((q) => q), ['accounts', 'month_start', 'budget', 'card']);
+check('progress', 'accounts is 1 of 4', setupProgress('accounts'), { label: '1 of 4', value: 0.25 });
+check('progress', 'month start is 2 of 4', setupProgress('month_start'), { label: '2 of 4', value: 0.5 });
+check('progress', 'budget is 3 of 4', setupProgress('budget'), { label: '3 of 4', value: 0.75 });
+check('progress', 'card is 4 of 4', setupProgress('card'), { label: '4 of 4', value: 1 });
+check('progress', 'themes off: budget is 3 of 3', setupProgress('budget', { themes: false }), { label: '3 of 3', value: 1 });
+check('progress', 'themes off: accounts is 1 of 3', setupProgress('accounts', { themes: false }), { label: '1 of 3', value: 1 / 3 });
+check('progress', 'themes off: card is not a question', setupProgress('card', { themes: false }), null);
+check('progress', 'a step that is not a question has no progress', setupProgress('first_expense'), null);
 
 // --- Report ---
 for (const f of failures) {
