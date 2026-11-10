@@ -15,6 +15,7 @@ import Illustration, { ILLUSTRATION_NAMES } from '../../components/ledger/Illust
 import EmptyState from '../../components/ledger/EmptyState';
 import Chip from '../../components/ledger/Chip';
 import TransactionRow from '../../components/ledger/TransactionRow';
+import Timeline from '../../components/ledger/Timeline';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
 
 // Developer → Kit (spec 46, ticket 06): every ledger component in its states,
@@ -110,6 +111,16 @@ function KitGallery() {
           <TransactionRow tx={SAMPLE_TX.income} onPress={noop} accountName="Savings" />
           <TransactionRow tx={SAMPLE_TX.transfer} title="Personal → Savings" onPress={noop} />
           <TransactionRow tx={SAMPLE_TX.settlement} onPress={noop} divider={false} />
+        </Section>
+
+        <Section title="Timeline">
+          <Timeline
+            steps={[
+              { key: 'a', title: 'Created', sub: 'Voice · 1 Nov 2026, 10:00 AM' },
+              { key: 'b', title: 'Added to Goa trip', sub: '2 Nov 2026, 12:00 PM' },
+              { key: 'c', title: 'Edited', sub: '3 Nov 2026, 9:00 AM' },
+            ]}
+          />
         </Section>
 
         <Section title="SectionHeader">

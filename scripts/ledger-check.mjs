@@ -12,6 +12,7 @@ import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
 import { weekChange } from '../lib/weekChange.js';
 import { ENTRY_SOURCES, entrySource } from '../lib/entrySource.js';
+import { sourceLabel, buildHistory } from '../lib/entryDetail.js';
 import { progressState } from '../lib/progressState.js';
 import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
@@ -227,6 +228,45 @@ check('progress', 'garbage reads as empty', progressState('abc'), { tone: 'accen
   check('activity', 'whitespace search is still default', isDefaultFilters(f({ search: '  ' })), true);
   check('activity', 'a picked account is not default', isDefaultFilters(f({ accountId: 'all' })), false);
 }
+
+// --- Transaction detail: source labels and History (ticket 11) ---
+{
+  const want = {
+    manual: 'Added by you',
+    quick_add: 'Quick add',
+    voice: 'Voice',
+    ai: 'Ask FLO',
+    share: 'Shared to FLO',
+    auto_detect: 'Auto-detected',
+    bill: 'Bill paid',
+    split: 'Split entry',
+    transfer: 'Transfer',
+  };
+  check('detail', 'every allowed source has a label', ENTRY_SOURCES.map((s) => sourceLabel(s)), ENTRY_SOURCES.map((s) => want[s]));
+  check('detail', 'no source is no label', sourceLabel(null), null);
+  check('detail', 'an unknown source is no label', sourceLabel('telepathy'), null);
+
+  const created = '2026-11-01T10:00:00Z';
+  const base = { id: 'a', source: 'voice', created_at: created, updated_at: null };
+  const steps = (h) => h.map((s) => [s.key, s.title, s.sub ?? null, s.at]);
+
+  check('detail', 'never edited is one step', steps(buildHistory(base)), [['created', 'Created', 'Voice', created]]);
+  check('detail', 'no source, no sub on Created', buildHistory({ ...base, source: null })[0].sub ?? null, null);
+  check('detail', 'edited is two steps', steps(buildHistory({ ...base, updated_at: '2026-11-03T09:00:00Z' })), [
+    ['created', 'Created', 'Voice', created],
+    ['edited', 'Edited', null, '2026-11-03T09:00:00Z'],
+  ]);
+  const split = { created_at: '2026-11-02T12:00:00Z', split: { id: 's1', name: 'Goa trip' } };
+  check('detail', 'split-linked and edited is three steps, oldest first', steps(buildHistory({ ...base, updated_at: '2026-11-03T09:00:00Z' }, split)).map((s) => s[0]), ['created', 'split', 'edited']);
+  check('detail', 'the split step names the split', buildHistory(base, split)[1].title, 'Added to Goa trip');
+  check('detail', 'a split added before an edit sorts by time', buildHistory({ ...base, updated_at: '2026-11-01T11:00:00Z' }, split).map((s) => s.key), ['created', 'edited', 'split']);
+  check('detail', 'a split with no name still reads', buildHistory(base, { created_at: '2026-11-02T12:00:00Z', split: null })[1].title, 'Added to a split');
+  check('detail', 'an edit stamp no later than creation is not an edit', buildHistory({ ...base, updated_at: created }).length, 1);
+}
+
+// Disabled buttons (ticket 11): muted text on the sunk fill, as graphics (3:1).
+check('wcag', 'light disabled button text', passes(Lc.muted, Lc.surfaceSunk, AA_UI), true);
+check('wcag', 'dark disabled button text', passes(Dc.muted, Dc.surfaceSunk, AA_UI), true);
 
 // --- Report ---
 for (const f of failures) {

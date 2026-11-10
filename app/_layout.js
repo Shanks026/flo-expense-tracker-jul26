@@ -561,6 +561,7 @@ function RootNavigator() {
                                       <Stack.Screen name="streak" options={{ headerShown: true, title: 'Streak' }} />
                                       <Stack.Screen name="dev/ai-eval" options={{ headerShown: true, title: 'AI test set' }} />
                                       <Stack.Screen name="dev/kit" options={{ headerShown: false }} />
+                                      <Stack.Screen name="transaction/[id]" options={{ headerShown: false }} />
                                       <Stack.Screen name="assistant" options={{ headerShown: true, title: 'Ask FLO' }} />
                                       <Stack.Screen name="assistant/history" options={{ headerShown: true, title: 'Past chats' }} />
                                     </Stack>

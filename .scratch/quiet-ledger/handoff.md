@@ -19,14 +19,14 @@ source is `docs/redesign-plan.md`.
 | 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | `c875cee` |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
-| 10 Activity search and filters | done (custom date pickers not driven; see Comments) | this commit |
-| 11 Transaction detail | ready | |
+| 10 Activity search and filters | done (custom date pickers not driven; see Comments) | `1218105` |
+| 11 Transaction detail | done (split-linked delete not run live; see Comments) | this commit |
 | 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | `b89f842` |
 
-Suggested order: **11 next** (07 and 10 are done).
+Phase 2 tickets are all done. Next: the Ask FLO chat restyle the person asked for (not ticketed yet; redesign plan §Ask FLO), or Phase 3 planning.
 
 Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
-are WCAG-checked in `scripts/ledger-check.mjs` (138 cases now). The kit gallery (Settings → Developer → Kit,
+are WCAG-checked in `scripts/ledger-check.mjs` (151 cases now). The kit gallery (Settings → Developer → Kit,
 `app/dev/kit.js`, `flo://dev/kit`) shows every ledger component; add new
 ones there. `ProgressBar` is `components/ledger/ProgressBar.js`.
 
@@ -99,8 +99,10 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 - **ProgressBar (ticket 06):** danger starts AT 100 % (spent to the limit
   is red), warn past 80 %. Rule in `lib/progressState.js`; Budgets (Phase 4)
   should use it rather than its own threshold.
-- **Activity (ticket 10):** rows open `openAdd(entry.tx)` (a paired transfer opens its out leg) until ticket 11 swaps in the detail route. Lists use `components/ledger/TransactionRow` (Home too). Filter chips wrap, they don't scroll. In a filter sheet whose rows carry an amount, the selection is an ink circle with a check in the icon slot, so amounts align; plain choice lists keep the trailing check.
+- **Activity (ticket 10):** rows open `/transaction/<id>` (ticket 11; a paired transfer opens its out leg). Lists use `components/ledger/TransactionRow` (Home too). Filter chips wrap, they don't scroll. In a filter sheet whose rows carry an amount, the selection is an ink circle with a check in the icon slot, so amounts align; plain choice lists keep the trailing check.
 - `expo run` caveat: Back to the launcher keeps the JS alive, so a relaunch can show old code. Force-stop before relaunching.
+- **Detail (ticket 11):** `updateTransfer` edits both legs in place (one upsert by id); it no longer replaces the pair. Deletes go through `lib/transactions.js` `deleteTransaction`.
+- **Kit Button disabled** is its own flat look (sunk fill, muted text), never an opacity fade. **Amount input** caret is pinned to the end.
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.
 

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Search, X, CalendarDays, Wallet, Shapes, ListFilter } from 'lucide-react-native';
 import { LargeTitle } from '../../components/ledger/ScreenHeader';
 import Chip from '../../components/ledger/Chip';
@@ -12,7 +13,6 @@ import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../../t
 import useActivity from '../../hooks/useActivity';
 import useCategories from '../../hooks/useCategories';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
-import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
 import { dateGroupLabel } from '../../lib/dateLabels';
 import { DEFAULT_CURRENCY } from '../../lib/currency';
@@ -40,7 +40,7 @@ export default function Activity() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const { accounts, activeAccountId, activeAccount } = useAccount();
   const { categories } = useCategories();
-  const { openAdd } = useAddTransactionSheet();
+  const router = useRouter();
   const { refreshing, onRefresh } = usePullToRefresh();
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -163,7 +163,7 @@ export default function Activity() {
                   // Across accounts, say which one (a paired transfer names both already).
                   accountName={allAccounts && entry.kind !== 'transfer' ? accountName(entry.tx.account_id) : undefined}
                   divider={i < g.items.length - 1}
-                  onPress={() => openAdd(entry.tx)}
+                  onPress={() => router.push(`/transaction/${entry.tx.id}`)}
                 />
               ))}
             </View>

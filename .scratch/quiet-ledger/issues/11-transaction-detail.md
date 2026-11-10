@@ -24,20 +24,29 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 
 **Blocked by:** 05, 07, 08, 10
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The check script covers every source value plus null, and the History builder: never edited → 1 step, edited → 2 steps, split-linked → 3 steps, oldest first
-- [ ] The screen opens from Home's recent rows and from Activity, and going back keeps Activity's filters
-- [ ] Edit opens the existing sheet. Afterwards the detail shows the saved change and an Edited step
-- [ ] Delete works for:
+- [x] The check script covers every source value plus null, and the History builder: never edited → 1 step, edited → 2 steps, split-linked → 3 steps, oldest first
+- [x] The screen opens from Home's recent rows and from Activity, and going back keeps Activity's filters
+- [x] Edit opens the existing sheet. Afterwards the detail shows the saved change and an Edited step
+- [x] Delete works for:
   - a normal entry;
   - a transfer (both legs are gone);
   - a split-linked entry (the split entry is kept).
-- [ ] An old entry with no source shows no source line
-- [ ] Emulator check in light and dark
+- [x] An old entry with no source shows no source line
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-11: route `app/transaction/[id].js`; read `hooks/useTransactionDetail.js`; rules `lib/entryDetail.js` (source labels, History; 13 cases, 151 checks pass); `lib/transactions.js` `deleteTransaction` (the Edit sheet uses it too); `components/ledger/Timeline` (in the Kit gallery). Home and Activity rows open the detail.
+- Checked on Pixel_API_36, light and dark: an old entry (no source line, one Created step); a new entry (Source "Added by you"); Edit ₹77 → ₹78 shows at once with an Edited step; Delete (confirm, back, row gone in the DB); a transfer reads "From Personal → To Savings", deletes both legs; Back keeps Activity's Type filter.
+- `updateTransfer` now updates both legs in place (one upsert) instead of replacing the pair, so an edited transfer keeps its ids: checked ₹1 → ₹2, both legs updated, Edited step shown. Deleting from the Edit sheet while the detail is open now goes back on its own.
+- "Edited" shows only when `updated_at` is later than `created_at` (the spec says "when it's set"); an equal stamp isn't an edit.
+- Not checked live: deleting a split-linked entry (the test account has no splits). The delete path is the normal one, verified; `split_entries.transaction_id` is ON DELETE SET NULL (checked in the live schema), so the split entry stays. The split link row and its History step weren't seen on screen.
+- Fixed at the person's ask during this ticket: the Add sheet's amount caret stays at the end (a tap mid-number put digits in front and Backspace did nothing), and a disabled `Button` is a flat sunk pill with muted text (the 40 % fade left a dark ring on Android).

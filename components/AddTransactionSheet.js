@@ -28,6 +28,7 @@ import { rankCategories, defaultCategoryId } from '../lib/categoryDefaults';
 import useSplits from '../hooks/useSplits';
 import { createEntryFromTransaction } from '../lib/splits';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
+import { deleteTransaction } from '../lib/transactions';
 import { entrySource } from '../lib/entrySource';
 import { claimDailyLog } from '../lib/rewardsMutations';
 import { track } from '../lib/track';
@@ -656,7 +657,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     const { error: deleteError } = editingTransferId
       ? await deleteTransfer(editingTransferId)
       : editingId
-        ? await supabase.from('transactions').delete().eq('id', editingId)
+        ? await deleteTransaction({ id: editingId })
         : { error: null };
     if (!editingTransferId && !editingId) {
       setSaving(false);
@@ -757,6 +758,10 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         <BottomSheetTextInput
           ref={amountInputRef}
           value={amount}
+          // The caret stays at the end, like a calculator: a tap on a big
+          // centred number otherwise drops it mid-number (often first), so
+          // digits went in front and Backspace had nothing to delete.
+          selection={{ start: amount.length, end: amount.length }}
           onChangeText={(v) => {
             markEdited();
             setAmount(sanitizeAmountInput(v));

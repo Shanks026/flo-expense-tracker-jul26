@@ -8,12 +8,20 @@ import { useLedger, ledgerType, ledgerRadius, ledgerSize, ledgerSpace } from '..
 // for TalkBack when the title alone is vague ("Review").
 export default function Button({ title, onPress, variant = 'primary', compact = false, loading = false, disabled = false, accessibilityLabel, style }) {
   const { c } = useLedger();
-  const v = {
-    primary: { bg: c.ink, fg: c.inkOnInk, border: c.ink },
-    secondary: { bg: 'transparent', fg: c.ink, border: c.ink },
-    quiet: { bg: 'transparent', fg: c.ink, border: 'transparent' },
-    danger: { bg: c.dangerSoft, fg: c.danger, border: c.dangerSoft },
-  }[variant];
+  const v = disabled
+    ? // Its own flat look, not a faded button: on Android the fill and the
+      // border faded separately and stacked into a dark ring.
+      {
+        bg: variant === 'primary' || variant === 'danger' ? c.surfaceSunk : 'transparent',
+        fg: c.muted,
+        border: variant === 'secondary' ? c.hairline : variant === 'quiet' ? 'transparent' : c.surfaceSunk,
+      }
+    : {
+        primary: { bg: c.ink, fg: c.inkOnInk, border: c.ink },
+        secondary: { bg: 'transparent', fg: c.ink, border: c.ink },
+        quiet: { bg: 'transparent', fg: c.ink, border: 'transparent' },
+        danger: { bg: c.dangerSoft, fg: c.danger, border: c.dangerSoft },
+      }[variant];
 
   return (
     <Pressable
@@ -21,13 +29,14 @@ export default function Button({ title, onPress, variant = 'primary', compact = 
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       hitSlop={compact ? 7 : 0}
       style={({ pressed }) => [
         styles.base,
         compact && styles.compact,
         variant === 'quiet' && styles.quiet,
         { backgroundColor: v.bg, borderColor: v.border },
-        (pressed || disabled) && { opacity: disabled ? 0.4 : 0.75 },
+        pressed && !disabled && { opacity: 0.75 },
         style,
       ]}
     >

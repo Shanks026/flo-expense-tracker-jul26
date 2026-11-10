@@ -177,7 +177,7 @@ export default function Home() {
   }
 
   function renderTx(tx, isLast) {
-    return <TransactionRow key={tx.id} tx={tx} accounts={accounts} divider={!isLast} onPress={() => openAdd(tx)} />;
+    return <TransactionRow key={tx.id} tx={tx} accounts={accounts} divider={!isLast} onPress={() => router.push(`/transaction/${tx.id}`)} />;
   }
 
   return (
