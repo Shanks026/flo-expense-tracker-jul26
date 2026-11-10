@@ -5,7 +5,7 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 **What to build:** The one accent colour changes from blue to a muted olive green (asked for on 2026-11-10, after Origin's use of a soft green). It stays decoration and meaning only: chart lines and fills, progress, selection marks, the switch, the caret, and soft info surfaces. Buttons and primary actions stay ink.
 
 - `theme/ledger.js`: `accent` becomes olive in both modes, plus a new `accentSoft` fill. `chart` and `highlight` stay aliases of `accent`.
-  - Light: `accent` `#5F7A1F`, `accentSoft` `#E9F0D2`.
+  - Light: `accent` `#76952B` (first `#5F7A1F`; lightened on the person's ask, 2026-11-10), `accentSoft` `#E9F0D2`.
   - Dark: `accent` `#B5CC6A`, `accentSoft` `#2A3315`.
 - **Info callout** (`Callout` tone `info`) moves from `surfaceSunk` to `accentSoft`, with ink text. The Today prompt's icon tone follows `accent`.
 - **Switch knob in dark mode:** on the olive track the knob turns `inkOnInk` (dark). The white knob fails there (see the table).
@@ -16,7 +16,7 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## WCAG check (2026-11-10)
 
@@ -37,17 +37,25 @@ Contrast ratios computed with the WCAG 2.x relative-luminance formula. AA thresh
 | White knob on dark olive track | 1.78 | **fails 3:1**: use the `inkOnInk` knob (10.54) |
 | Income green light `#1E7A46` on canvas | 5.35 | passes (unchanged) |
 | Income green dark `#5FD394` on dark canvas | 10.53 | passes (unchanged) |
+| Lightened light olive `#76952B` on canvas / sunk | 3.44 / 3.12 | passes graphics; never text |
+| White knob on the lightened olive | 3.44 | passes |
+| Income green light `#166534` / dark `#3FB97A` (new) | 7.13 / 7.90 | passes |
 | Today's blue, for reference: `#3B5BDB` light / `#8EA6FF` dark | 5.67 / 8.48 | passes |
 
-- [ ] The week line, progress bars, switches, the caret and selection marks show olive in light and dark
-- [ ] The info callout uses `accentSoft` with ink text
-- [ ] The dark switch knob is dark on the olive track
-- [ ] No button or primary action uses olive
-- [ ] The `positive` decision is recorded, and spending never reads as income on Home
-- [ ] Emulator check in light and dark
+- [x] The week line, progress bars, switches, the caret and selection marks show olive in light and dark
+- [x] The info callout uses `accentSoft` with ink text
+- [x] The dark switch knob is dark on the olive track
+- [x] No button or primary action uses olive
+- [x] The `positive` decision is recorded, and spending never reads as income on Home
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-10: done. Accent is olive; light `#76952B` after the person found `#5F7A1F` too dark. Income stays green, deeper and bluer than the olive (`#166534` light, `#3FB97A` dark; the person: "shades of green... green to denote cash"). Palettes moved to `theme/ledgerPalettes.js` so `scripts/ledger-check.mjs` checks the WCAG pairs (20 new cases). Also on the person's ask: Home's week line got its y-axis numbers back (round steps via `niceAxisMax`, faint rules).
+- Checked on Pixel_API_36 in light and dark: week line, switches (dark knob on the dark olive). Not seen on screen: the info callout (no screen uses tone `info` yet; ticket 06's gallery will), the Add sheet caret, ListRow check marks, and income amounts in the new green. Account left on Light, Dusk card, Personal.

@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after ticket 09 and the Home Add tile change (`112e40b`).
+Last updated 2026-11-10, after ticket 12 (olive accent, week-line y-axis).
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -21,13 +21,13 @@ source is `docs/redesign-plan.md`.
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
 | 10 Activity search and filters | ready | |
 | 11 Transaction detail | blocked by 07, 10 | |
-| 12 Olive accent replaces the blue | ready (WCAG table in the ticket; the `positive` green-vs-teal choice needs the person) | |
+| 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | this commit |
 
-Suggested order: 12 (olive accent), 04, 07, 06, 10, 11.
+Suggested order: 04, 07, 06, 10, 11.
 
-For 12: every accent use reads `c.accent` (or its aliases `chart` and
-`highlight`) from `theme/ledger.js`, so start there. Ticket 05's
-`Switch` and ticket 09's caret colour are in `components/ledger/`.
+Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
+are WCAG-checked in `scripts/ledger-check.mjs` (51 cases). Ticket 06's
+gallery should show a `Callout tone="info"`: nothing uses it on screen yet.
 
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 `design-inspirations/` is deliberately untracked (third-party screenshots).
@@ -56,6 +56,11 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   (ticket 06) is where Illustration and EmptyState samples go now.
 - **Sheets (ticket 09):** new sheets use `components/ledger/Sheet` with a
   `footer` of PinnedFooter props; chips are `components/ledger/Chip`.
+- **Colour (ticket 12):** accent is olive, light `#76952B` (lightened from
+  `#5F7A1F` at the person's ask; graphics only, never text), dark `#B5CC6A`.
+  Income `positive` stays green, deep cash green `#166534` / `#3FB97A`.
+  The dotted line on Home's week chart is the daily average; the chart has
+  a y-axis again (the person wants the numbers).
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.
 

@@ -9,6 +9,8 @@ import { amountParts } from '../lib/currency.js';
 import { dayPeriod } from '../lib/dayScenes.js';
 import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
 import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
+import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
+import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 
 let passed = 0;
 const failures = [];
@@ -71,6 +73,33 @@ check('dates', 'the group key is the local date', dateGroupKey(new Date(2026, 10
 // day, not UTC midnight (which is the day before anywhere west of UTC).
 check('dates', 'a date-only string keeps its day', dateGroupKey('2026-11-10'), '2026-11-10');
 check('dates', 'a date-only string labels as that day', dateGroupLabel('2026-11-09', now), 'Yesterday');
+
+// --- Olive accent and income green, WCAG AA (ticket 12) ---
+// Each case is a pair the app actually draws; `want` is pass (true) or fail.
+const { light: Lc, dark: Dc } = ledgerPalettes;
+const passes = (fg, bg, min) => contrastRatio(fg, bg) >= min;
+check('wcag', 'light accent is olive', Lc.accent, '#76952B');
+check('wcag', 'dark accent is olive', Dc.accent, '#B5CC6A');
+check('wcag', 'chart and highlight alias accent', [Lc.chart, Lc.highlight, Dc.chart, Dc.highlight], [Lc.accent, Lc.accent, Dc.accent, Dc.accent]);
+check('wcag', 'light olive line on canvas (graphics)', passes(Lc.accent, Lc.canvas, AA_UI), true);
+check('wcag', 'light olive line on sunk (graphics)', passes(Lc.accent, Lc.surfaceSunk, AA_UI), true);
+check('wcag', 'dark olive line on canvas (graphics)', passes(Dc.accent, Dc.canvas, AA_UI), true);
+check('wcag', 'dark olive line on sunk (graphics)', passes(Dc.accent, Dc.surfaceSunk, AA_UI), true);
+check('wcag', 'ink on light accentSoft (text)', passes(Lc.ink, Lc.accentSoft, AA_TEXT), true);
+check('wcag', 'ink on dark accentSoft (text)', passes(Dc.ink, Dc.accentSoft, AA_TEXT), true);
+check('wcag', 'muted on light accentSoft fails, so callouts use ink', passes(Lc.muted, Lc.accentSoft, AA_TEXT), false);
+check('wcag', 'light knob on the olive track', passes(Lc.knobOn, Lc.accent, AA_UI), true);
+check('wcag', 'dark knob on the olive track', passes(Dc.knobOn, Dc.accent, AA_UI), true);
+check('wcag', 'a white knob would fail on the dark olive', passes('#FFFFFF', Dc.accent, AA_UI), false);
+check('wcag', 'dark off knob on the sunk track', passes(Dc.knob, Dc.surfaceSunk, AA_UI), true);
+check('wcag', 'light income green on canvas (text)', passes(Lc.positive, Lc.canvas, AA_TEXT), true);
+check('wcag', 'light income green on sunk (text)', passes(Lc.positive, Lc.surfaceSunk, AA_TEXT), true);
+check('wcag', 'dark income green on canvas (text)', passes(Dc.positive, Dc.canvas, AA_TEXT), true);
+check('wcag', 'dark income green on surface (text)', passes(Dc.positive, Dc.surface, AA_TEXT), true);
+// Income and the olive must not read as the same colour: at least 1.3:1
+// apart in lightness on top of the hue gap (the old green was 1.09 / 1.05).
+check('wcag', 'light income stands apart from the olive', contrastRatio(Lc.positive, Lc.accent) >= 1.3, true);
+check('wcag', 'dark income stands apart from the olive', contrastRatio(Dc.positive, Dc.accent) >= 1.3, true);
 
 // --- Report ---
 for (const f of failures) {

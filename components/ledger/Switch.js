@@ -4,9 +4,9 @@ import { useLedger } from '../../theme/ledger';
 
 // The ledger switch, visual only: ListRow's `switchValue` makes the whole row
 // the accessible switch, so this draws the track and thumb and nothing else.
-// On is the accent blue (a selection mark, redesign §2.2); off is the sunk
-// grey with a hairline. The thumb is white in both modes, so it always
-// contrasts with its own track.
+// On is the olive accent (a selection mark, redesign §2.2); off is the sunk
+// grey with a hairline. The knob is white on the off track; on the olive it
+// is `knobOn` (white in light, dark in dark, where white would be 1.78:1).
 const TRACK_W = 44;
 const TRACK_H = 26;
 const THUMB = 20;
@@ -36,11 +36,12 @@ export default function Switch({ value }) {
   const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, TRAVEL] });
   const backgroundColor = anim.interpolate({ inputRange: [0, 1], outputRange: [c.surfaceSunk, c.accent] });
   const borderColor = anim.interpolate({ inputRange: [0, 1], outputRange: [c.hairline, c.accent] });
+  const knobColor = anim.interpolate({ inputRange: [0, 1], outputRange: [c.knob, c.knobOn] });
 
   return (
     <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       <Animated.View style={[styles.track, { backgroundColor, borderColor }]}>
-        <Animated.View style={[styles.thumb, { backgroundColor: c.knob, borderColor: c.thumbEdge, transform: [{ translateX }] }]} />
+        <Animated.View style={[styles.thumb, { backgroundColor: knobColor, borderColor: c.thumbEdge, transform: [{ translateX }] }]} />
       </Animated.View>
     </View>
   );

@@ -5,12 +5,14 @@ import { format, isToday } from 'date-fns';
 import { ChevronRight } from 'lucide-react-native';
 import AmountText from './AmountText';
 import SectionHeader from './SectionHeader';
-import { useLedger, ledgerType, ledgerSpace, ledgerSize } from '../../theme/ledger';
+import { niceAxisMax, formatAxisValue } from '../ChartAxis';
+import { useLedger, ledgerType, ledgerSpace, ledgerSize, tabular } from '../../theme/ledger';
 
 // "This week" on Home: a line with a soft area fill under it, in the one
-// chart colour (c.chart, a static blue). It replaced the 7 bars (WeekBars),
-// which read heavy next to the card. No axis or gridlines; a dotted line
-// marks the daily average. Today gets a dot. Tapping a day shows its total in
+// chart colour (c.chart, the static olive accent). It replaced the 7 bars (WeekBars),
+// which read heavy next to the card. A left axis labels round amounts (the
+// person wanted the numbers back, 2026-11-10) with faint rules at each one;
+// a dotted line marks the daily average. Today gets a dot. Tapping a day shows its total in
 // the header without navigating; tapping the header opens Insights on Week.
 //
 // The curve bends between points with horizontal tangents, so it never dips
@@ -20,10 +22,13 @@ const CHART_H = 96;
 const PAD_X = 10;
 const PAD_TOP = 10;
 const PAD_BOTTOM = 4;
+// The y-axis: 3 steps (4 labels, 0 at the baseline) in a column this wide.
+// Labels are right-aligned and may bleed left into the gutter for "100k".
+const AXIS_STEPS = 3;
+const AXIS_W = 30;
 
-function buildPaths(values, width) {
+function buildPaths(values, width, max) {
   const n = values.length;
-  const max = Math.max(1, ...values);
   const innerW = width - PAD_X * 2;
   const innerH = CHART_H - PAD_TOP - PAD_BOTTOM;
   const pts = values.map((v, i) => ({
@@ -41,7 +46,11 @@ function buildPaths(values, width) {
   const area = `${line} L${pts[n - 1].x},${base} L${pts[0].x},${base} Z`;
   const avg = values.reduce((s, v) => s + v, 0) / n;
   const avgY = PAD_TOP + innerH - (avg / max) * innerH;
-  return { line, area, pts, avgY, hasSpend: avg > 0 };
+  const ticks = Array.from({ length: AXIS_STEPS + 1 }, (_, i) => ({
+    value: (max * (AXIS_STEPS - i)) / AXIS_STEPS,
+    y: PAD_TOP + (i / AXIS_STEPS) * innerH,
+  }));
+  return { line, area, pts, avgY, ticks, hasSpend: avg > 0 };
 }
 
 export default function WeekLine({ data, currency, onOpenInsights }) {
@@ -54,7 +63,12 @@ export default function WeekLine({ data, currency, onOpenInsights }) {
   const total = values.reduce((s, v) => s + v, 0);
   const pick = selected != null ? data[selected] : null;
   const todayIndex = data.findIndex((d) => isToday(d.date));
-  const paths = useMemo(() => (width > 0 && values.length ? buildPaths(values, width) : null), [width, values.join(',')]);
+  // Scaled against the rounded axis ceiling, so the line meets the labels.
+  const axisMax = niceAxisMax(Math.max(...values, 0), AXIS_STEPS);
+  const paths = useMemo(
+    () => (width > 0 && values.length ? buildPaths(values, width, axisMax) : null),
+    [width, axisMax, values.join(',')],
+  );
   const markIndex = selected ?? todayIndex;
 
   return (
@@ -71,62 +85,77 @@ export default function WeekLine({ data, currency, onOpenInsights }) {
         />
       </Pressable>
 
-      <View style={styles.chart} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        {paths && (
-          <Svg width={width} height={CHART_H}>
-            <Defs>
-              <LinearGradient id="weekFill" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={c.chart} stopOpacity={0.22} />
-                <Stop offset="1" stopColor={c.chart} stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            {paths.hasSpend && (
-              <Line
-                x1={0}
-                x2={width}
-                y1={paths.avgY}
-                y2={paths.avgY}
-                stroke={c.muted}
-                strokeOpacity={0.45}
-                strokeWidth={1}
-                strokeDasharray="2 4"
-              />
-            )}
-            <Path d={paths.area} fill="url(#weekFill)" />
-            <Path d={paths.line} fill="none" stroke={c.chart} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" />
-            {selected != null && (
-              <Line
-                x1={paths.pts[selected].x}
-                x2={paths.pts[selected].x}
-                y1={0}
-                y2={CHART_H - PAD_BOTTOM}
-                stroke={c.chart}
-                strokeOpacity={0.35}
-                strokeWidth={1}
-              />
-            )}
-            {markIndex >= 0 && (
-              <Circle cx={paths.pts[markIndex].x} cy={paths.pts[markIndex].y} r={4.5} fill={c.chart} stroke={c.canvas} strokeWidth={2} />
-            )}
-          </Svg>
-        )}
-        {total === 0 && (
-          <View style={styles.emptyWrap} pointerEvents="none">
-            <Text style={styles.empty}>No spending logged this week</Text>
-          </View>
-        )}
-        {/* One tap column per day, full chart height (≥ 48 dp targets). */}
-        <View style={StyleSheet.absoluteFill}>
-          <View style={styles.hitRow}>
-            {data.map((d, i) => (
-              <Pressable
-                key={i}
-                style={styles.hit}
-                onPress={() => setSelected(selected === i ? null : i)}
-                accessibilityRole="button"
-                accessibilityLabel={format(d.date, 'EEEE')}
-              />
+      <View style={styles.plotRow}>
+        <View style={styles.axis} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {paths &&
+            total > 0 &&
+            paths.ticks.map((t) => (
+              <Text key={t.y} style={[styles.axisLabel, { top: t.y - 8 }]} numberOfLines={1}>
+                {formatAxisValue(t.value)}
+              </Text>
             ))}
+        </View>
+        <View style={styles.chart} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+          {paths && (
+            <Svg width={width} height={CHART_H}>
+              <Defs>
+                <LinearGradient id="weekFill" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor={c.chart} stopOpacity={0.22} />
+                  <Stop offset="1" stopColor={c.chart} stopOpacity={0} />
+                </LinearGradient>
+              </Defs>
+              {paths.hasSpend &&
+                paths.ticks.map((t) => (
+                  <Line key={t.y} x1={0} x2={width} y1={t.y} y2={t.y} stroke={c.hairline} strokeWidth={1} />
+                ))}
+              {paths.hasSpend && (
+                <Line
+                  x1={0}
+                  x2={width}
+                  y1={paths.avgY}
+                  y2={paths.avgY}
+                  stroke={c.muted}
+                  strokeOpacity={0.45}
+                  strokeWidth={1}
+                  strokeDasharray="2 4"
+                />
+              )}
+              <Path d={paths.area} fill="url(#weekFill)" />
+              <Path d={paths.line} fill="none" stroke={c.chart} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" />
+              {selected != null && (
+                <Line
+                  x1={paths.pts[selected].x}
+                  x2={paths.pts[selected].x}
+                  y1={0}
+                  y2={CHART_H - PAD_BOTTOM}
+                  stroke={c.chart}
+                  strokeOpacity={0.35}
+                  strokeWidth={1}
+                />
+              )}
+              {markIndex >= 0 && (
+                <Circle cx={paths.pts[markIndex].x} cy={paths.pts[markIndex].y} r={4.5} fill={c.chart} stroke={c.canvas} strokeWidth={2} />
+              )}
+            </Svg>
+          )}
+          {total === 0 && (
+            <View style={styles.emptyWrap} pointerEvents="none">
+              <Text style={styles.empty}>No spending logged this week</Text>
+            </View>
+          )}
+          {/* One tap column per day, full chart height (≥ 48 dp targets). */}
+          <View style={StyleSheet.absoluteFill}>
+            <View style={styles.hitRow}>
+              {data.map((d, i) => (
+                <Pressable
+                  key={i}
+                  style={styles.hit}
+                  onPress={() => setSelected(selected === i ? null : i)}
+                  accessibilityRole="button"
+                  accessibilityLabel={format(d.date, 'EEEE')}
+                />
+              ))}
+            </View>
           </View>
         </View>
       </View>
@@ -152,9 +181,27 @@ function makeStyles(c) {
       alignItems: 'center',
       gap: 2,
     },
-    chart: {
-      height: CHART_H,
+    plotRow: {
+      flexDirection: 'row',
       marginTop: ledgerSpace.sm,
+    },
+    axis: {
+      width: AXIS_W,
+      height: CHART_H,
+    },
+    axisLabel: {
+      ...ledgerType.caption,
+      ...tabular,
+      fontSize: 11,
+      lineHeight: 16,
+      position: 'absolute',
+      right: 6,
+      textAlign: 'right',
+      color: c.muted,
+    },
+    chart: {
+      flex: 1,
+      height: CHART_H,
     },
     emptyWrap: {
       ...StyleSheet.absoluteFillObject,
@@ -178,6 +225,8 @@ function makeStyles(c) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: 6,
+      // Under the plot, not the axis column.
+      marginLeft: AXIS_W,
     },
     day: {
       ...ledgerType.caption,

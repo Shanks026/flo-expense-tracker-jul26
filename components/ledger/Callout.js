@@ -2,12 +2,14 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Info, TriangleAlert, OctagonAlert } from 'lucide-react-native';
 import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../../theme/ledger';
 
-// A one-line note that isn't data (redesign §2.5): `info` on the sunk grey,
-// `warn` on warnSoft, `danger` on dangerSoft. An icon, the line, and an
+// A one-line note that isn't data (redesign §2.5): `info` on the olive
+// accentSoft with ink icon and text (muted fails AA there) and a hairline
+// edge (the soft fill alone is 1.18:1 on white), `warn` on warnSoft,
+// `danger` on dangerSoft. An icon, the line, and an
 // optional action ("Open settings") under it. `icon` overrides the tone's
 // default glyph.
 const TONES = {
-  info: { icon: Info, bg: 'surfaceSunk', fg: 'muted' },
+  info: { icon: Info, bg: 'accentSoft', fg: 'ink', edge: 'hairline' },
   warn: { icon: TriangleAlert, bg: 'warnSoft', fg: 'warn' },
   danger: { icon: OctagonAlert, bg: 'dangerSoft', fg: 'danger' },
 };
@@ -18,7 +20,7 @@ export default function Callout({ tone = 'info', icon, text, actionLabel, onActi
   const Icon = icon ?? t.icon;
   const fg = c[t.fg];
   return (
-    <View style={[styles.box, { backgroundColor: c[t.bg] }, style]}>
+    <View style={[styles.box, { backgroundColor: c[t.bg] }, t.edge && { borderWidth: StyleSheet.hairlineWidth, borderColor: c[t.edge] }, style]}>
       <Icon size={16} color={fg} strokeWidth={1.75} style={styles.icon} />
       <View style={styles.mid}>
         <Text style={[ledgerType.body, { color: c.ink }]}>{text}</Text>

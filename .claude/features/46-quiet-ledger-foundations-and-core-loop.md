@@ -209,7 +209,9 @@ Every feature stays. Flagged-off features keep their flags and get the same look
 
 ### Tokens and type (Phase 1)
 - The ledger palette, type scale, spacing, radii and sizes as already in `theme/ledger.js` are the source of truth (plan §2.2–2.4). Phase 1 adds what's missing:
-  - `accent` as the public name for the chart blue (`chart` and `highlight` stay as aliases);
+  - `accent` as the public name for the one accent colour (`chart` and `highlight` stay as aliases). Since ticket 12 (2026-11-10) it is a muted olive, `#76952B` light (lightened from `#5F7A1F` on the person's ask; 3.44:1 on white, 3.12:1 on sunk, so graphics only) / `#B5CC6A` dark, with an `accentSoft` fill (`#E9F0D2` / `#2A3315`);
+  - **olive rule:** the accent is decoration and meaning only (chart lines and fills, progress, selection marks, the switch, the caret, soft info fills). It is never a button fill or a primary action (those stay ink), and never text on white at body size. Text on `accentSoft` is ink, not muted (muted is 4.46:1 there), and a soft fill that marks a boundary keeps a hairline. On the dark olive track the switch knob is dark (`knobOn`); white fails at 1.78:1;
+  - **income green:** `positive` is a deep cash green, `#166534` light / `#3FB97A` dark (the person's choice on 2026-11-10: income stays green, darker, apart from the olive). The pairs are checked against WCAG AA in `scripts/ledger-check.mjs`;
   - `streak` orange;
   - a `ledgerType` entry for the greeting (18/24/600) and the quick-action label (12/16/500).
 - The `upper` helper is removed from use (no uppercase captions).

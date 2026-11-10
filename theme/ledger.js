@@ -1,81 +1,16 @@
 import { useMemo } from 'react';
 import { useTheme } from './ThemeContext';
+import { ledgerPalettes } from './ledgerPalettes';
 
 // "Quiet Ledger" design tokens (docs/redesign-plan.md §2.2–2.4). They live
 // alongside theme/tokens.js and theme/themes.js, not instead of them: only
 // screens built on components/ledger/ read these, so the rest of the app
 // looks exactly as before until each screen is rebuilt.
 //
-// Neutral black and white, with colour only where it means something: money
-// in (positive), warnings (danger, warn) and one small highlight mark.
-
-// The one accent blue (charts, progress, selection marks), defined once so
-// `accent`, `chart` and `highlight` can't drift apart.
-const ACCENT_LIGHT = '#3B5BDB';
-const ACCENT_DARK = '#8EA6FF';
-
-const LIGHT = {
-  canvas: '#FFFFFF',
-  surface: '#FFFFFF',
-  surfaceSunk: '#F4F4F2',
-  ink: '#121211',
-  inkOnInk: '#FFFFFF',
-  muted: '#6E6C66',
-  hairline: '#E4E1DA',
-  positive: '#1E7A46',
-  danger: '#B42318',
-  dangerSoft: '#FDECEA',
-  warn: '#B54708',
-  warnSoft: '#FFF6DB',
-  // Lime is gone (2026-11-10). `highlight` is now the accent blue, kept as a
-  // name so older call sites still work; prefer `chart` for new code.
-  highlight: ACCENT_LIGHT,
-  // The lit flame and logged streak days only (the orange from tokens.js).
-  streak: '#FF6B2C',
-  // Inactive chart bars: ink at 20 %.
-  inkFaint: 'rgba(18,18,17,0.2)',
-  scrim: 'rgba(0,0,0,0.45)',
-  // The one chart colour (Home's week line, Insights). A static calm blue:
-  // lime is gone, and a colour that moved with the card or the time of day
-  // would stop meaning anything.
-  chart: ACCENT_LIGHT,
-  // The public name (spec 46): charts, progress, selection marks. `chart`
-  // and `highlight` stay as aliases for code written before the spec.
-  accent: ACCENT_LIGHT,
-  // Segmented's selected thumb, the switch knob (white on the accent and on
-  // the off track, both modes), and the faint edge that keeps either visible.
-  thumb: '#FFFFFF',
-  knob: '#FFFFFF',
-  thumbEdge: 'rgba(0,0,0,0.12)',
-  shadow: '#000000',
-};
-
-const DARK = {
-  canvas: '#0B0B0B',
-  surface: '#171717',
-  surfaceSunk: '#1F1F1F',
-  ink: '#F3F2EE',
-  inkOnInk: '#121211',
-  muted: '#A3A19B',
-  hairline: '#2B2B28',
-  positive: '#5FD394',
-  danger: '#F97066',
-  dangerSoft: '#3A1715',
-  warn: '#FDB022',
-  warnSoft: '#3A3115',
-  highlight: ACCENT_DARK,
-  streak: '#FF6B2C',
-  inkFaint: 'rgba(243,242,238,0.2)',
-  scrim: 'rgba(0,0,0,0.6)',
-  chart: ACCENT_DARK,
-  accent: ACCENT_DARK,
-  thumb: '#171717',
-  knob: '#FFFFFF',
-  thumbEdge: 'rgba(255,255,255,0.14)',
-  shadow: '#000000',
-};
-
-export const ledgerPalettes = { light: LIGHT, dark: DARK };
+// The palettes live in ledgerPalettes.js (plain data, checked against WCAG
+// by scripts/ledger-check.mjs).
+export { ledgerPalettes };
+const { light: LIGHT, dark: DARK } = ledgerPalettes;
 
 // Inter (redesign §2.3). Weights: 400 body, 500 labels, 600 titles and
 // buttons, 700 only for money heroes. `extrabold` maps to 700 so nothing
