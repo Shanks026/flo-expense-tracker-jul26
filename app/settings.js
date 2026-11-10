@@ -29,6 +29,7 @@ import {
   Mic,
   Smartphone,
   Sun,
+  Shapes,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
@@ -773,6 +774,7 @@ export default function Settings() {
             (32-safe-closed-test-build.md: no debug UI for testers). */}
         {__DEV__ && (
           <Group title="Developer">
+            <ListRow icon={Shapes} title="Kit" sub="Every ledger component, light and dark" trailing="chevron" onPress={() => router.push('/dev/kit')} />
             {FLAGS.ai && <ListRow icon={Sparkles} title="AI test set" trailing="chevron" onPress={() => router.push('/dev/ai-eval')} />}
             {notifEnabled && (
               <ListRow

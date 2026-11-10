@@ -17,14 +17,19 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 
 **Blocked by:** 02, 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The gallery opens from Settings → Developer in a dev build and isn't there in other builds
-- [ ] ProgressBar shows accent, warn and danger at the right thresholds
-- [ ] Everything reads correctly in light and dark
+- [x] The gallery opens from Settings → Developer in a dev build and isn't there in other builds
+- [x] ProgressBar shows accent, warn and danger at the right thresholds
+- [x] Everything reads correctly in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-10: built as `components/ledger/ProgressBar.js` (the spec table says `components/ProgressBar.js`; the old one stays for Budgets/Plans until Phase 4) with the rule in `lib/progressState.js` (9 cases + warn/danger-on-sunk contrast in `ledger-check.mjs`, 94 pass). Gallery is `app/dev/kit.js`, row in Settings → Developer. Checked on Pixel_API_36 in Light and Dark (Appearance put back to Light); TalkBack values read 40/85/120 %.
+- Not checked: a release build (hidden there by `__DEV__` on the row and a Redirect on the route, same as the AI test set, but not run). Open question for the person: a bar at exactly 100 % is warn, not danger ("past 100 %" read literally).

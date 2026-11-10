@@ -12,6 +12,7 @@ import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
 import { weekChange } from '../lib/weekChange.js';
 import { ENTRY_SOURCES, entrySource } from '../lib/entrySource.js';
+import { progressState } from '../lib/progressState.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 
 let passed = 0;
@@ -134,6 +135,22 @@ check('source', 'an Ask FLO proposal is ai', entrySource({ source: 'assistant' }
 check('source', 'share to FLO is share', entrySource({ source: 'share' }), 'share');
 check('source', 'an origin wins', entrySource({ source: 'manual', origin: 'auto_detect' }), 'auto_detect');
 check('source', 'an unknown origin is ignored', entrySource({ source: 'share', origin: 'telepathy' }), 'share');
+
+// --- ProgressBar: fill width and colour (ticket 06) ---
+check('progress', '40% is accent', progressState(0.4), { tone: 'accent', fill: 0.4, pct: 40 });
+check('progress', '80% exactly is still accent', progressState(0.8).tone, 'accent');
+check('progress', 'just past 80% is warn', progressState(0.81).tone, 'warn');
+check('progress', '85% is warn', progressState(0.85), { tone: 'warn', fill: 0.85, pct: 85 });
+check('progress', '100% exactly is warn, not over', progressState(1).tone, 'warn');
+check('progress', '120% is danger, bar full', progressState(1.2), { tone: 'danger', fill: 1, pct: 120 });
+check('progress', 'nothing spent is an empty accent bar', progressState(0), { tone: 'accent', fill: 0, pct: 0 });
+// The fill on its sunk track, as graphics (3:1). Accent on sunk is in the wcag group.
+for (const [mode, pal] of [['light', Lc], ['dark', Dc]]) {
+  check('progress', `${mode} warn fill on the sunk track`, passes(pal.warn, pal.surfaceSunk, AA_UI), true);
+  check('progress', `${mode} danger fill on the sunk track`, passes(pal.danger, pal.surfaceSunk, AA_UI), true);
+}
+check('progress', 'negative reads as empty', progressState(-0.3), { tone: 'accent', fill: 0, pct: 0 });
+check('progress', 'garbage reads as empty', progressState('abc'), { tone: 'accent', fill: 0, pct: 0 });
 
 // --- Report ---
 for (const f of failures) {

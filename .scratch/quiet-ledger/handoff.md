@@ -15,7 +15,7 @@ source is `docs/redesign-plan.md`.
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
 | 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | `b8297ab`, `e076a9c` |
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
-| 06 Kit gallery and ProgressBar | ready | |
+| 06 Kit gallery and ProgressBar | done (exactly-100 % = warn is an open question; release build not run) | this commit |
 | 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | `c875cee` |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
@@ -23,12 +23,12 @@ source is `docs/redesign-plan.md`.
 | 11 Transaction detail | blocked by 07, 10 | |
 | 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | `b89f842` |
 
-Suggested order: **06 next**, then 10, then 11 (unblocked once 10 is done; 07 is done).
+Suggested order: **10 next**, then 11 (unblocked once 10 is done; 07 is done).
 
 Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
-are WCAG-checked in `scripts/ledger-check.mjs` (81 cases now). Ticket 06's
-gallery should show a `Callout tone="info"` and an income `AmountText`:
-neither is on any screen yet.
+are WCAG-checked in `scripts/ledger-check.mjs` (94 cases now). The kit gallery (Settings → Developer → Kit,
+`app/dev/kit.js`, `flo://dev/kit`) shows every ledger component; add new
+ones there. `ProgressBar` is `components/ledger/ProgressBar.js`.
 
 ## Since ticket 12 (all asked for by the person, 2026-11-10)
 
