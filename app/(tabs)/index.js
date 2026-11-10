@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, RefreshControl, Modal, StyleSheet } 
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
-import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, Users, CalendarCheck } from 'lucide-react-native';
+import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, Users, CalendarCheck, ChartColumn } from 'lucide-react-native';
 import AmountText from '../../components/ledger/AmountText';
 import ListRow from '../../components/ledger/ListRow';
 import SectionHeader from '../../components/ledger/SectionHeader';
@@ -11,7 +11,6 @@ import Button from '../../components/ledger/Button';
 import HeaderIconButton from '../../components/ledger/HeaderIconButton';
 import QuickActions from '../../components/ledger/QuickActions';
 import AccountCardCarousel from '../../components/ledger/AccountCardCarousel';
-import WeekLine from '../../components/ledger/WeekLine';
 import EmptyState from '../../components/ledger/EmptyState';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
@@ -49,6 +48,9 @@ import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular, inter } from
 // tried out in the old Home preview. Order: header → account card → balance
 // → quick actions → Today prompt → This week → Upcoming bills → Recent
 // activity, 24 between blocks on a 20 gutter. Existing read hooks only.
+// "This week" is one row (the last 7 days' spend and the daily average),
+// not a chart: money apps keep charts a tap away (2026-11-10), and the
+// row opens Insights on Week, which has the full chart.
 const BILL_WINDOW = ['overdue', 'due_soon'];
 const MAX_BILLS = 2;
 const RECENT_COUNT = 8;
@@ -78,6 +80,7 @@ export default function Home() {
   const { summaries, period: summaryPeriod, loading: summariesLoading } = useAllAccountSummaries();
   const { transactions, loading: txLoading } = useTransactions({ limit: RECENT_COUNT });
   const { data: week, loading: weekLoading } = useSpendingTrend('7d');
+  const weekSpent = week.reduce((sum, d) => sum + (d.expense || 0), 0);
   const { bills, loading: billsLoading } = useBills();
   const { current: streakCurrent, history, loading: streakLoading } = useStreak();
   const { equippedTheme } = useCardThemes();
@@ -281,9 +284,22 @@ export default function Home() {
           </View>
         )}
 
-        {/* 6. This week. */}
+        {/* 6. This week: one row, the chart lives in Insights. */}
         <View style={styles.section}>
-          {weekLoading ? <View style={styles.chartSkeleton} /> : <WeekLine data={week} currency={currency} onOpenInsights={openWeekInsights} />}
+          {weekLoading ? (
+            <View style={styles.weekSkeleton} />
+          ) : (
+            <ListRow
+              icon={ChartColumn}
+              divider={false}
+              title="Last 7 days"
+              sub={weekSpent > 0 ? `${formatMoney(weekSpent / 7, currency)} a day` : 'Nothing spent in the last 7 days'}
+              right={<AmountText value={weekSpent} currency={currency} />}
+              trailing="chevron"
+              onPress={openWeekInsights}
+              accessibilityLabel={`Last 7 days, ${formatMoney(weekSpent, currency)} spent. Open Insights`}
+            />
+          )}
         </View>
 
         {/* 7. Upcoming bills: only when something is due, at most 2. */}
@@ -424,8 +440,8 @@ function makeStyles(c) {
     section: {
       marginTop: ledgerSpace.section,
     },
-    chartSkeleton: {
-      height: 160,
+    weekSkeleton: {
+      height: ledgerSpace.rowTall,
       borderRadius: ledgerRadius.input,
       backgroundColor: c.surfaceSunk,
     },

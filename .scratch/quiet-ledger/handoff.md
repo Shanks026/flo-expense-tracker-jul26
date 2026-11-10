@@ -59,8 +59,10 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 - **Colour (ticket 12):** accent is olive, light `#76952B` (lightened from
   `#5F7A1F` at the person's ask; graphics only, never text), dark `#B5CC6A`.
   Income `positive` stays green, deep cash green `#166534` / `#3FB97A`.
-  The dotted line on Home's week chart is the daily average; the chart has
-  a y-axis again (the person wants the numbers).
+- **Home has no chart (2026-11-10):** the week line is gone (WeekLine.js
+  deleted). "Last 7 days" is one ListRow (it is rolling, while Insights Week is the calendar week): the spend, "₹X a day", and a
+  tap into Insights on Week. Charts belong in Insights, with y-axis numbers
+  (the person wants the numbers).
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.
 

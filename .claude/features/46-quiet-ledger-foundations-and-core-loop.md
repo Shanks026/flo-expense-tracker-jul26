@@ -69,7 +69,7 @@ A clean white ledger where the money is the loudest thing on screen. It's neutra
 Lists sit flat on the canvas with hairline dividers, and every screen uses the same header, back button, sheet and pinned footer. The themed account card stays the one decorative object, and its free default becomes **Day**: four landscapes that follow the local time.
 
 Phase 1 builds the shared kit beside the old components and proves it on two contained screens: the Ask FLO proposal card and Settings. Phase 2 moves the daily loop onto it:
-- **Home:** the greeting, the account card with the balance under it, quick actions, the Today prompt, the week line, upcoming bills and recent activity;
+- **Home:** the greeting, the account card with the balance under it, quick actions, the Today prompt, the This week row, upcoming bills and recent activity;
 - **the Add sheet:** reordered, with a centred amount;
 - **Activity:** search, filter chips and a one-line summary;
 - **Transaction detail (new):** read first, see where the entry came from and what happened to it, then edit or delete.
@@ -129,10 +129,10 @@ Every feature stays. Flagged-off features keep their flags and get the same look
 44. As a FLO user, I want Add, Transfer and Ask FLO as three quick-action tiles, so that my common actions are big targets.
 45. As a FLO user with only one account, I want no Transfer tile, so that I don't see an action I can't use.
 46. As a FLO user who hasn't logged anything today, I want a "Nothing logged today" row with a compact No spend button, so that I can keep my streak in one tap.
-47. As a FLO user, I want this week's spending as a blue line with a soft fill, a dotted daily-average line and today's dot, so that I see the shape of my week without reading axes.
-48. As a FLO user, I want to tap a day on the week line to see that day's total, so that I can check a day without leaving Home.
-49. As a FLO user, I want the week header to open Insights on the Week view, so that I can dig deeper.
-50. As a FLO user with nothing logged this week, I want "No spending logged this week" instead of a flat chart, so that the empty state is honest.
+47. As a FLO user, I want one "Last 7 days" row with that spend' spend and the daily average, so that I get the number without a chart taking half the screen. *(Changed 2026-11-10: the week line chart left Home. Kit and Wise keep charts a tap away from their money screens.)*
+48. *(Dropped 2026-11-10 with the chart: tapping a day. Insights' Week view does this.)*
+49. As a FLO user, I want the This week row to open Insights on the Week view, so that I can dig deeper.
+50. As a FLO user with nothing spent in the last 7 days, I want the row to say "Nothing spent in the last 7 days", so that the empty state is honest.
 51. As a FLO user with bills due soon, I want up to two upcoming bills on Home with "See all", so that I'm reminded without the full list.
 52. As a FLO user with an overdue bill, I want its circle and caption in red, so that it stands out.
 53. As a FLO user with no bills due in the window, I want no bills block at all, so that Home stays short.
@@ -265,7 +265,7 @@ Built components are adopted. "Retires" means the old file stops being used by m
 | `EmptyState` | new (P1) | `components/EmptyState.js` (Koban) | small `Illustration`, a title, one line, an optional secondary button | — |
 | `Sheet` | new (P1) | the per-sheet chrome inside every `Add*Sheet` | wraps `@gorhom/bottom-sheet`: one handle, a title row with a circle X, a scrollable body, a `PinnedFooter`; radius 20; a soft shadow in light mode, a hairline top edge in dark mode. **Keeps the existing `<XSheetProvider>` + `useXSheet()` opener pattern**: `Sheet` is the visual shell inside each provider, not a new provider | — |
 | `QuickActions` | built | Home's action buttons | three equal 64 dp sunk tiles; hides Transfer with fewer than 2 accounts | `ai` |
-| `WeekLine` | built | `IncomeExpenseChart` / daily bars on Home | line plus area in `accent`, dotted average, today's dot, tap a day for its total, empty-week note | — |
+| ~~`WeekLine`~~ | deleted 2026-11-10 (Home shows a This week `ListRow` instead) | `IncomeExpenseChart` / daily bars on Home | line plus area in `accent`, dotted average, today's dot, tap a day for its total, empty-week note | — |
 | `AccountCardCarousel` | built | `AccountHeroCarousel`, `AccountDots` | 2:1 themed card, name, optional `•••• last4` (spec 45), swipe, dots, card-shaped skeleton | `themes` |
 | Today prompt | new (P2), a `ListRow` composition | `NothingLoggedCard` | a bordered row "Nothing logged today" with a compact No spend button; shown only while nothing is logged today | — |
 | Tab bar | restyled (P2) | `components/TabBar.js` look | ink + button; labels Home, Activity, Insights, You; long-press + unchanged | — |
