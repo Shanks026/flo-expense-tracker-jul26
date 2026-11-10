@@ -1,7 +1,7 @@
 # Feature: Quiet Ledger redesign, Phase 3 (Onboarding)
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/47-quiet-ledger-onboarding.md`
-**Status**: ready-for-agent
+**Status**: ready-for-agent (tickets in `.scratch/quiet-ledger-onboarding/issues/`)
 **Last Updated**: 2026-11-11
 **Source of truth for the design**: `docs/redesign-plan.md` §4 "Onboarding" and §7 Phases. Where this spec and that document disagree on a visual detail, the document wins; where they disagree on scope, sequencing or data, this spec wins.
 
