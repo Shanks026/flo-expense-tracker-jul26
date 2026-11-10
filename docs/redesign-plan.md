@@ -115,7 +115,7 @@
 | `Segmented` | the Insights period switch, Expense/Income | a sunk track with a white thumb (Wise "Updates / Details") |
 | `Chip` | filter and category chips | outlined pills; selected = an ink fill with white text |
 | `Callout` | ad-hoc info cards | `info` (sunk), `warn` (warnSoft), `danger` (dangerSoft), with an icon and one line |
-| `ProgressBar` | budget bars | a 4 dp bar in `accent` on a `surfaceSunk` track; warn and danger colours past 80 % and 100 % |
+| `ProgressBar` | budget bars | a 4 dp bar in `accent` on a `surfaceSunk` track; warn past 80 %, danger from 100 % (spent to the limit is danger; 2026-11-10) |
 | `WeekLine` | the Home week bars | a line plus soft area fill in `accent`, a dotted daily-average line, today's dot, tap a day for its total, an empty-week note. **Built.** |
 | `AccountCardCarousel` | `AccountHeroCarousel` | the themed card (2:1) with the account name, optional `•••• last4` (spec 45), swipe between accounts, dots. **Built.** |
 | `Timeline` | new | a vertical step list (Wise transfer status), for bill history, split settle-ups and an AI proposal's status |

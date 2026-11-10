@@ -4,7 +4,7 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** A Developer → Kit gallery screen that shows every ledger component in its states. This ticket also builds `ProgressBar`, which has no real screen using it until Budgets in Phase 4.
 
-- `ProgressBar`: 4 dp, in accent on a sunk track. It turns warn past 80 % and danger past 100 %.
+- `ProgressBar`: 4 dp, in accent on a sunk track. It turns warn past 80 % and danger from 100 % (amended 2026-11-10).
 - The gallery shows:
   - Button variants and ListRow variants;
   - SectionHeader;
@@ -32,4 +32,5 @@ Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
 ## Comments
 
 - 2026-11-10: built as `components/ledger/ProgressBar.js` (the spec table says `components/ProgressBar.js`; the old one stays for Budgets/Plans until Phase 4) with the rule in `lib/progressState.js` (9 cases + warn/danger-on-sunk contrast in `ledger-check.mjs`, 94 pass). Gallery is `app/dev/kit.js`, row in Settings → Developer. Checked on Pixel_API_36 in Light and Dark (Appearance put back to Light); TalkBack values read 40/85/120 %.
-- Not checked: a release build (hidden there by `__DEV__` on the row and a Redirect on the route, same as the AI test set, but not run). Open question for the person: a bar at exactly 100 % is warn, not danger ("past 100 %" read literally).
+- Not checked: a release build (hidden there by `__DEV__` on the row and a Redirect on the route, same as the AI test set, but not run). 
+- 2026-11-10: the person chose danger at exactly 100 % (a budget spent to its limit is red). Rule, checks, spec 46 and the redesign plan amended; the gallery shows a 100 % bar too.

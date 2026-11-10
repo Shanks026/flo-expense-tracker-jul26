@@ -141,7 +141,8 @@ check('progress', '40% is accent', progressState(0.4), { tone: 'accent', fill: 0
 check('progress', '80% exactly is still accent', progressState(0.8).tone, 'accent');
 check('progress', 'just past 80% is warn', progressState(0.81).tone, 'warn');
 check('progress', '85% is warn', progressState(0.85), { tone: 'warn', fill: 0.85, pct: 85 });
-check('progress', '100% exactly is warn, not over', progressState(1).tone, 'warn');
+check('progress', '99% is still warn', progressState(0.99).tone, 'warn');
+check('progress', '100% exactly is danger', progressState(1), { tone: 'danger', fill: 1, pct: 100 });
 check('progress', '120% is danger, bar full', progressState(1.2), { tone: 'danger', fill: 1, pct: 120 });
 check('progress', 'nothing spent is an empty accent bar', progressState(0), { tone: 'accent', fill: 0, pct: 0 });
 // The fill on its sunk track, as graphics (3:1). Accent on sunk is in the wcag group.

@@ -93,7 +93,7 @@ Every feature stays. Flagged-off features keep their flags and get the same look
 12. As a FLO user, I want every bottom sheet to have the same handle, title row and circle X, so that sheets behave predictably.
 13. As a FLO user, I want the main action on a form pinned to the bottom above the keyboard and safe area, so that I can always reach Save.
 14. As a FLO user, I want info, warning and danger notes as one-line callouts with an icon, so that advice doesn't look like data.
-15. As a FLO user, I want progress shown as a thin blue bar that turns amber past 80 % and red past 100 %, so that I can read a budget at a glance.
+15. As a FLO user, I want progress shown as a thin blue bar that turns amber past 80 % and red at 100 % (amended 2026-11-10: a budget spent to its limit is red), so that I can read a budget at a glance.
 16. As a FLO user, I want choices like Expense/Income as a segmented control with a white thumb on a grey track, so that the selected option is clear without colour.
 17. As a FLO user, I want filter and category chips outlined, and filled ink when selected, so that the selection is clear without the accent.
 18. As a FLO user, I want empty screens to show one small object, one title, one line and at most one button, so that an empty state helps without lecturing.
@@ -259,7 +259,7 @@ Built components are adopted. "Retires" means the old file stops being used by m
 | `Segmented` | new (P1) | `SegmentedChoice`, the Expense/Income pills, `AppearanceToggle` | a sunk track with a white (dark: `surface`) thumb; 2–4 options; controlled `value` / `onChange`; 48 dp target | — |
 | `Chip` | new (P1) | `Pill`, the filter pills | outlined pill; selected = ink fill with `inkOnInk` text; optional leading icon and trailing ▾ for filter chips; 48 dp target via hitSlop | — |
 | `Callout` | new (P1) | ad-hoc info cards and paragraph rows | `info` (sunk), `warn` (warnSoft), `danger` (dangerSoft); icon plus one line, optional action | — |
-| `ProgressBar` | new (P1) | `components/ProgressBar.js` | 4 dp, `accent` on a `surfaceSunk` track; `warn` past 80 %, `danger` past 100 % | — |
+| `ProgressBar` | new (P1) | `components/ProgressBar.js` | 4 dp, `accent` on a `surfaceSunk` track; `warn` past 80 %, `danger` from 100 % (amended 2026-11-10; was "past 100 %") | — |
 | `Timeline` | new (P1) | — | a vertical step list: a dot per step, a title, a muted time/sub, a connecting hairline; the last step has no line | — |
 | `Illustration` | new (P1) | Koban on everyday screens, emoji art | named objects `coins`, `token`, `whistle`, `calendar`, `receipt`, `spark`, `trophy`; sizes `small` / `large`. **Until the 3D assets exist** (plan §6 open item 2), each name renders a lucide glyph in a large sunk circle. Swapping in the PNG/WebP files later is a data change inside this component only | — |
 | `EmptyState` | new (P1) | `components/EmptyState.js` (Koban) | small `Illustration`, a title, one line, an optional secondary button | — |

@@ -143,7 +143,7 @@ function KitGallery() {
 
         <Section title="ProgressBar">
           <View style={styles.stack}>
-            {[40, 85, 120].map((pct) => (
+            {[40, 85, 100, 120].map((pct) => (
               <View key={pct}>
                 <Text style={styles.label}>{`${pct} %`}</Text>
                 <ProgressBar value={pct / 100} accessibilityLabel={`Sample at ${pct} percent`} />

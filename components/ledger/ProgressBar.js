@@ -3,7 +3,7 @@ import { useLedger, ledgerRadius } from '../../theme/ledger';
 import { progressState } from '../../lib/progressState';
 
 // A 4 dp bar (redesign §2.5): `accent` on a `surfaceSunk` track, `warn` past
-// 80 %, `danger` past 100 % (the rule is lib/progressState.js). `value` is
+// 80 %, `danger` from 100 % (the rule is lib/progressState.js). `value` is
 // used/limit, so 1.2 is 20 % over. It replaces components/ProgressBar.js as
 // each screen (Budgets, Plans) moves to the ledger kit in Phase 4.
 //

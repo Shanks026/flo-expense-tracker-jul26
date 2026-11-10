@@ -15,7 +15,7 @@ source is `docs/redesign-plan.md`.
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
 | 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | `b8297ab`, `e076a9c` |
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
-| 06 Kit gallery and ProgressBar | done (exactly-100 % = warn is an open question; release build not run) | this commit |
+| 06 Kit gallery and ProgressBar | done (release build not run) | `acb514f` + the 100 % follow-up |
 | 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | `c875cee` |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
@@ -96,6 +96,9 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   `lib/dayScenes.js` names them (`type: 'image'`); the require()s are in
   `components/dayThemeImages.js` so node can still load dayScenes. Give the
   `<Image>` an explicit 100% size: absoluteFill alone cropped it on Android.
+- **ProgressBar (ticket 06):** danger starts AT 100 % (spent to the limit
+  is red), warn past 80 %. Rule in `lib/progressState.js`; Budgets (Phase 4)
+  should use it rather than its own threshold.
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.
 
