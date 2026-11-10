@@ -1,8 +1,9 @@
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { radii } from '../theme/tokens';
 import { CARD_SCENES } from '../lib/cardScenes';
 import AnimatedCardScene from './AnimatedCardScene';
+import { DAY_THEME_IMAGES } from './dayThemeImages';
 
 // Renders a card theme's background (solid / linear-gradient / pattern) with
 // `children` layered on top — same children-on-top-of-background shape
@@ -188,11 +189,10 @@ export default function CardThemeSurface({ theme, style, children, animate = fal
             <SvgXml xml={CARD_SCENES[bg.scene].sceneXml} width="100%" height="100%" />
           </View>
         ))}
-      {/* A ready-made SVG (the Day time-of-day scenes, lib/dayScenes.js). */}
-      {bg.type === 'svg' && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <SvgXml xml={bg.xml} width="100%" height="100%" />
-        </View>
+      {/* A painted image (the Day time-of-day landscapes, lib/dayScenes.js),
+          covering the card; `bg.color` shows while it decodes. */}
+      {bg.type === 'image' && DAY_THEME_IMAGES[bg.image] && (
+        <Image source={DAY_THEME_IMAGES[bg.image]} style={styles.image} resizeMode="cover" fadeDuration={0} />
       )}
       {bg.type === 'pattern' && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -205,6 +205,15 @@ export default function CardThemeSurface({ theme, style, children, animate = fal
 }
 
 const styles = StyleSheet.create({
+  // Explicit size: absoluteFill alone let Android draw the image at its own
+  // pixel size and crop it, so only a corner of the sky showed.
+  image: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     borderRadius: radii.cardLg,
     overflow: 'hidden',

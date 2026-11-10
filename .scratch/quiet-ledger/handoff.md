@@ -65,6 +65,12 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   against the 7 days before (red up, green down; `lib/weekChange.js`,
   hidden under ₹100 before, grey under 5 %). Charts belong in Insights, with y-axis numbers
   (the person wants the numbers).
+- **Day card art (2026-11-10):** the four SVG scenes are replaced by the
+  person's painted landscapes, `assets/day-themes/<period>.jpg` (resized
+  from their PNGs in the untracked `day-themes/` to 1200 px, ~40 KB each).
+  `lib/dayScenes.js` names them (`type: 'image'`); the require()s are in
+  `components/dayThemeImages.js` so node can still load dayScenes. Give the
+  `<Image>` an explicit 100% size: absoluteFill alone cropped it on Android.
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.
 

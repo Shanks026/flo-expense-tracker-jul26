@@ -6,7 +6,7 @@
 // code 1 if any case fails.
 
 import { amountParts } from '../lib/currency.js';
-import { dayPeriod } from '../lib/dayScenes.js';
+import { dayPeriod, DAY_THEMES } from '../lib/dayScenes.js';
 import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
 import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
@@ -101,6 +101,12 @@ check('wcag', 'dark income green on surface (text)', passes(Dc.positive, Dc.surf
 // apart in lightness on top of the hue gap (the old green was 1.09 / 1.05).
 check('wcag', 'light income stands apart from the olive', contrastRatio(Lc.positive, Lc.accent) >= 1.3, true);
 check('wcag', 'dark income stands apart from the olive', contrastRatio(Dc.positive, Dc.accent) >= 1.3, true);
+
+// --- Day card images: the account name reads on each top-left sky ---
+for (const [period, t] of Object.entries(DAY_THEMES)) {
+  check('day', `${period} is an image`, [t.background.type, t.background.image], ['image', period]);
+  check('day', `${period} name passes AA on its sky`, contrastRatio(t.textColor, t.background.color) >= AA_TEXT, true);
+}
 
 // --- Home's Last 7 days row: change vs the 7 days before ---
 check('week', 'up 12% is red and up', weekChange(1120, 1000), { direction: 'up', tone: 'danger', text: '12%', label: '12% more than the 7 days before' });
