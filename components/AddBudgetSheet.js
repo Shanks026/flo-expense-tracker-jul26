@@ -9,7 +9,7 @@ import Button from './Button';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
-import { previewPeriodDates, budgetLimitReached, BUDGET_LIMIT_MESSAGE } from '../lib/budgets';
+import { previewPeriodDates, budgetLimitReached, BUDGET_LIMIT_MESSAGE, createBudget, updateBudget } from '../lib/budgets';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -202,8 +202,8 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     };
 
     const { error: saveError } = editingId
-      ? await supabase.from('budgets').update(payload).eq('id', editingId)
-      : await supabase.from('budgets').insert({ ...payload, account_id: targetAccountId });
+      ? await updateBudget(editingId, payload)
+      : await createBudget(targetAccountId, payload);
 
     setSaving(false);
     if (saveError) {

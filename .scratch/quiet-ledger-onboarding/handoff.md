@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: spec written and cut into tickets 01–10; nothing built yet.
+Last updated 2026-11-11: ticket 01 done; 04 next.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -13,13 +13,13 @@ there all apply here and aren't repeated.
 
 | Ticket | State | Commit |
 |---|---|---|
-| 01 Account and budget writes move into lib | ready | |
+| 01 Account and budget writes move into lib | done | (this commit) |
 | 02 Opener carousel | ready | |
 | 03 Sign up and sign in on the kit | ready | |
-| 04 Question shell and "Where does your money live?" | blocked by 01 | |
+| 04 Question shell and "Where does your money live?" | ready | |
 | 05 Salary-day month | ready (migration needs the person's yes) | |
 | 06 "When does your month start?" | blocked by 04, 05 | |
-| 07 "Want a monthly spending limit?" | blocked by 01, 04 | |
+| 07 "Want a monthly spending limit?" | blocked by 04 | |
 | 08 "Pick your card" | blocked by 04 | |
 | 09 First expense and the reminder ask on the kit | ready | |
 | 10 First Home coach mark and the full-flow check | blocked by 02–09 | |

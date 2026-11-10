@@ -8,6 +8,7 @@ import CurrencyPicker from './CurrencyPicker';
 import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
+import { createAccount, updateAccount } from '../lib/accounts';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
@@ -103,8 +104,8 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
     const payload = { name: name.trim(), description: description.trim() || null, color, currency };
 
     const { data, error: saveError } = editingId
-      ? await supabase.from('accounts').update(payload).eq('id', editingId).select().single()
-      : await supabase.from('accounts').insert(payload).select().single();
+      ? await updateAccount(editingId, payload)
+      : await createAccount(payload);
 
     setSaving(false);
     if (saveError) {
