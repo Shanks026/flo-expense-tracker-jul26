@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after ticket 12 (olive accent, week-line y-axis).
+Last updated 2026-11-10, after tickets 12, 04 and 07 plus the Home and Day-card changes the person asked for (see "Since ticket 12" below).
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -13,24 +13,49 @@ source is `docs/redesign-plan.md`.
 | 01 Ledger tokens, money rule, check script | done | `a937827` |
 | 02 Illustration, EmptyState, Koban deleted | done | `e5e529c` |
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
-| 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | this commit |
+| 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | `b8297ab`, `e076a9c` |
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
 | 06 Kit gallery and ProgressBar | ready | |
-| 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | this commit |
+| 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | `c875cee` |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
 | 10 Activity search and filters | ready | |
 | 11 Transaction detail | blocked by 07, 10 | |
-| 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | this commit |
+| 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | `b89f842` |
 
-Suggested order: 06, 10, 11.
+Suggested order: **06 next**, then 10, then 11 (unblocked once 10 is done; 07 is done).
 
 Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
-are WCAG-checked in `scripts/ledger-check.mjs` (51 cases). Ticket 06's
-gallery should show a `Callout tone="info"`: nothing uses it on screen yet.
+are WCAG-checked in `scripts/ledger-check.mjs` (81 cases now). Ticket 06's
+gallery should show a `Callout tone="info"` and an income `AmountText`:
+neither is on any screen yet.
+
+## Since ticket 12 (all asked for by the person, 2026-11-10)
+
+- `bbf4057` Home has no chart: a "Last 7 days" ListRow (rolling, so not
+  "This week": Insights' Week is the calendar week). `WeekLine.js` deleted.
+- `9aa09a7` that row shows the change vs the 7 days before:
+  TrendingUp red / TrendingDown green + %, `lib/weekChange.js` (hidden when
+  the earlier week had < ₹100, grey "About the same" under 5 %).
+  `ListRow`'s `rightSub` accepts a node.
+- `550e0ae` Day card uses the person's painted landscapes
+  (`assets/day-themes/*.jpg`; originals in untracked `day-themes/`).
+- `b8297ab` / `e076a9c` ticket 04, plus the bill proposal's next-due date
+  on its own line. Kit `Button` takes `accessibilityLabel`.
+- `c875cee` ticket 07: `transactions.source` + `updated_at` live.
+  `lib/entrySource.js` maps the Add sheet's analytics source to the column;
+  openers can pass `origin` (auto-detect does). Ticket 11 shows it.
+- The person wants the Ask FLO chat screen restyled (redesign plan §Ask FLO,
+  Phase 5: ink bubbles, outlined starter chips, date-grouped past chats).
+  Not ticketed yet; offer to pull it forward when Phase 2 is done.
+- Test data hygiene: the test account's Tea proposal (`ai_messages`
+  `7cc79a2e…`) is `dismissed` and Electricity is due 2026-11-12 unpaid; put
+  them back if a check changes them. The person declined a SQL `delete`
+  once: delete test entries through the sheet's Delete button; SQL
+  `update` to restore state has been fine.
 
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
-`design-inspirations/` is deliberately untracked (third-party screenshots).
+`design-inspirations/` and `day-themes/` are deliberately untracked.
 
 ## Decisions made during 01–03 (not to re-litigate)
 
