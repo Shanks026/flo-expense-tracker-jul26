@@ -45,7 +45,7 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   `trailing` / `switchValue` replace the old `Row` props. Callouts are one
   line. Thumb, knob and edge colours are ledger tokens, not literals.
 - **Home (ticket 08):** the "in · out" line follows Settings → Summary period
-  (open question on the spec line, see ticket 08). Date-group labels come
+  (agreed 2026-11-10; spec 46 amended). Date-group labels come
   from `lib/dateLabels.js`; pass `occurred_at` straight in (date-only strings
   are read as local days). The Home preview route is gone; the kit gallery
   (ticket 06) is where Illustration and EmptyState samples go now.

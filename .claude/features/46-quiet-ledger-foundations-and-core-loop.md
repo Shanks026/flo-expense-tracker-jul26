@@ -121,7 +121,7 @@ Every feature stays. Flagged-off features keep their flags and get the same look
 36. As a FLO user with a streak, I want the flame filled orange only when today already counts, so that I know whether I've logged today.
 37. As a FLO user with unread alerts, I want a dot on the bell, so that I know there's something to see.
 38. As a FLO user, I want my account's themed card at the top of Home, showing its name (and last 4 when set), so that I know which account I'm looking at.
-39. As a FLO user, I want my in-hand balance as the largest text under the card, with "₹X in · ₹Y out this month" under it, so that I know where I stand in one look.
+39. As a FLO user, I want my in-hand balance as the largest text under the card, with "₹X in · ₹Y out this month" under it (the period follows Settings → Summary period: "this quarter", "this year", "since 3 Nov"), so that I know where I stand in one look.
 40. As a FLO user, I want the balance to count up on the first load of the day only, so that it feels alive once without being slow every time.
 41. As a FLO user with several accounts, I want to swipe the card to switch accounts, with dots under it, so that switching is quick.
 42. As a FLO user, I want the card's chevron to open the account switcher sheet, so that I can jump to any account.
@@ -283,7 +283,7 @@ Built components are adopted. "Retires" means the old file stops being used by m
 - Built from the preview's composition. The order is header → account card → balance block → quick actions (12 below) → Today prompt → This week → Upcoming bills → Recent activity, with 24 between blocks and a 20 gutter.
 - **Data:** the existing read hooks only (account summaries, spending trend, transactions with a limit, bills, alerts, streak). No new queries.
   - The in-hand balance is the transfer-aware `in_hand_balance` already used.
-  - "In · out this month" is this calendar month's income and expense.
+  - "In · out" is the income and expense for the profile's summary period (Settings → Summary period), labelled to match: "this month" for the default Monthly, "this quarter", "this year", or "since <date>" for Custom. Decided 2026-11-10 (ticket 08); it reuses the summaries hook's totals, so no new query.
   - It never shows ₹0 while loading.
 - **Count-up:** the balance counts up only on the first Home load of the local day, gated by a stored last-count-up date. Reduce motion skips it.
 - **Seasonal row:** shown when a seasonal skin is live and not equipped, until dismissed. Dismissal is stored on the device per skin.
