@@ -133,7 +133,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
           return;
         }
         setText(heard);
-        submit(heard);
+        submit(heard, { spoken: true });
       },
     });
     sessionRef.current = session;
@@ -149,7 +149,8 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
     submit(text);
   }
 
-  async function submit(line) {
+  // `spoken`: the line came from the mic (transactions.source 'voice').
+  async function submit(line, { spoken = false } = {}) {
     // One model call at a time: a second ✓ while it thinks would be billed
     // and counted against the daily cap for nothing.
     if (!line.trim() || thinking || listening) return;
@@ -158,7 +159,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
     if (local) {
       setMessage(null);
       setThinking(false);
-      onParsed(local, 'quick_local');
+      onParsed(local, 'quick_local', spoken);
       return;
     }
     if (!ask) {
@@ -171,7 +172,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
     if (request !== requestRef.current) return;
     setThinking(false);
     if (prefill) {
-      onParsed(prefill, 'quick_ai');
+      onParsed(prefill, 'quick_ai', spoken);
       return;
     }
     // 'stale': the person edited the sheet by hand meanwhile; say nothing.

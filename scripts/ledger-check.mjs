@@ -11,6 +11,7 @@ import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
 import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
 import { weekChange } from '../lib/weekChange.js';
+import { ENTRY_SOURCES, entrySource } from '../lib/entrySource.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 
 let passed = 0;
@@ -119,6 +120,20 @@ check('week', 'the floor itself counts', weekChange(200, 100).text, '100%');
 check('week', 'nothing this week is down 100%', weekChange(0, 1000).text, '100%');
 check('week', 'huge jumps are capped', weekChange(500000, 100).text, '999%+');
 check('week', 'garbage reads as no change shown', weekChange('abc', undefined), null);
+
+// --- Where an entry came from: the Add sheet's draft → transactions.source (ticket 07) ---
+check('source', 'the nine allowed values', ENTRY_SOURCES, ['manual', 'quick_add', 'voice', 'ai', 'share', 'auto_detect', 'bill', 'split', 'transfer']);
+check('source', 'a plain open is manual', entrySource({}), 'manual');
+check('source', 'onboarding is manual', entrySource({ source: 'onboarding' }), 'manual');
+check('source', 'typed quick add (phone parser)', entrySource({ source: 'quick_local' }), 'quick_add');
+check('source', 'typed quick add (model)', entrySource({ source: 'quick_ai' }), 'quick_add');
+check('source', 'spoken quick add is voice', entrySource({ source: 'quick_local', spoken: true }), 'voice');
+check('source', 'spoken, read by the model, is voice', entrySource({ source: 'quick_ai', spoken: true }), 'voice');
+check('source', 'spoken means nothing without a parse', entrySource({ source: 'manual', spoken: true }), 'manual');
+check('source', 'an Ask FLO proposal is ai', entrySource({ source: 'assistant' }), 'ai');
+check('source', 'share to FLO is share', entrySource({ source: 'share' }), 'share');
+check('source', 'an origin wins', entrySource({ source: 'manual', origin: 'auto_detect' }), 'auto_detect');
+check('source', 'an unknown origin is ignored', entrySource({ source: 'share', origin: 'telepathy' }), 'share');
 
 // --- Report ---
 for (const f of failures) {

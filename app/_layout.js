@@ -141,7 +141,7 @@ function DetectedTransactionHandler() {
     if (!pending.length) return;
 
     const [first, ...rest] = pending;
-    openAdd({ amount: first.amount, type: first.type });
+    openAdd({ amount: first.amount, type: first.type, origin: 'auto_detect' });
     if (rest.length) {
       showToast({ message: `${rest.length} more detected — add them manually`, variant: 'info' });
     }

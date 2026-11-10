@@ -28,6 +28,7 @@ import { rankCategories, defaultCategoryId } from '../lib/categoryDefaults';
 import useSplits from '../hooks/useSplits';
 import { createEntryFromTransaction } from '../lib/splits';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
+import { entrySource } from '../lib/entrySource';
 import { claimDailyLog } from '../lib/rewardsMutations';
 import { track } from '../lib/track';
 import { setMomentBlocker } from '../lib/momentQueue';
@@ -167,6 +168,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // expense (35-onboarding-v3.md) moves on from there. Refs, not state: they
   // only matter at save and dismiss time.
   const sourceRef = useRef('manual');
+  // For transactions.source (spec 46, ticket 07; lib/entrySource.js): an
+  // opener's `origin` when the analytics source can't tell it (auto-detect),
+  // and whether the quick-add line was filled by voice.
+  const originRef = useRef(null);
+  const spokenRef = useRef(false);
   // For the rest of `expense_logged` (36-add-sheet-3-tap.md): when this open
   // began, for seconds_to_save, and which category the sheet chose by itself,
   // for category_was_prefilled.
@@ -229,6 +235,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   useImperativeHandle(ref, () => ({
     open(payload) {
       sourceRef.current = payload?.source ?? 'manual';
+      originRef.current = payload?.origin ?? null;
+      spokenRef.current = false;
       openedAtRef.current = Date.now();
       prefilledCategoryRef.current = null;
       onDoneRef.current = payload?.onDone ?? null;
@@ -399,10 +407,12 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     return result;
   }
 
-  // source: 'quick_local' (the phone's parser) or 'quick_ai' (the model).
-  function handleQuickParsed(prefill, source) {
+  // source: 'quick_local' (the phone's parser) or 'quick_ai' (the model);
+  // spoken: the line came from the mic.
+  function handleQuickParsed(prefill, source, spoken = false) {
     setError(null);
     sourceRef.current = source;
+    spokenRef.current = spoken;
     const keepTapped = categoryTappedRef.current && prefill.type === type && categoryId;
     // Still protected on the next parse if kept; otherwise the parse took over.
     if (!keepTapped) categoryTappedRef.current = false;
@@ -542,7 +552,12 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     } else {
       const { data: inserted, error: insertError } = await supabase
         .from('transactions')
-        .insert({ ...payload, account_id: targetAccountId })
+        // Only a new entry gets a source; an edit (above) never changes it.
+        .insert({
+          ...payload,
+          account_id: targetAccountId,
+          source: entrySource({ source: sourceRef.current, origin: originRef.current, spoken: spokenRef.current }),
+        })
         .select('id')
         .single();
       saveError = insertError;

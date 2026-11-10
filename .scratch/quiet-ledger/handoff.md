@@ -16,14 +16,14 @@ source is `docs/redesign-plan.md`.
 | 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | this commit |
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
 | 06 Kit gallery and ProgressBar | ready | |
-| 07 Recording where each entry came from | ready (DB change: needs the person's yes before applying) | |
+| 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | this commit |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
 | 10 Activity search and filters | ready | |
 | 11 Transaction detail | blocked by 07, 10 | |
 | 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | this commit |
 
-Suggested order: 07, 06, 10, 11.
+Suggested order: 06, 10, 11.
 
 Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
 are WCAG-checked in `scripts/ledger-check.mjs` (51 cases). Ticket 06's
