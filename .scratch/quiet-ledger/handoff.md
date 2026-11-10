@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after tickets 12, 04 and 07 plus the Home and Day-card changes the person asked for (see "Since ticket 12" below).
+Last updated 2026-11-11, after tickets 06, 10 and 11: **Phases 1 and 2 are done** (all 12 tickets). Phase 3 (Onboarding) is next and has no spec yet. See "Since ticket 07" below for the changes the person asked for along the way.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -15,20 +15,29 @@ source is `docs/redesign-plan.md`.
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
 | 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | `b8297ab`, `e076a9c` |
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
-| 06 Kit gallery and ProgressBar | done (release build not run) | `acb514f` + the 100 % follow-up |
+| 06 Kit gallery and ProgressBar | done (release build not run) | `acb514f`, `af4c1e5` |
 | 07 Recording where each entry came from | done (migration applied with the person's yes; voice/share/auto-detect/split not run live) | `c875cee` |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | `3c8a165`, `d795f06` |
 | 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | `56bbe16`, `112e40b` |
 | 10 Activity search and filters | done (custom date pickers not driven; see Comments) | `1218105` |
-| 11 Transaction detail | done (split-linked delete not run live; see Comments) | this commit |
+| 11 Transaction detail | done (split-linked delete not run live; see Comments) | `4a5376f` |
 | 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | `b89f842` |
 
-Phase 2 tickets are all done. Next: the Ask FLO chat restyle the person asked for (not ticketed yet; redesign plan §Ask FLO), or Phase 3 planning.
+**Next: Phase 3, Onboarding** (redesign plan §4 Onboarding and §7; the person confirmed 2026-11-11 to follow the plan's order). It needs its own spec first: `/mattpocock-skills:to-spec`, then `/mattpocock-skills:to-tickets`, the way spec 46 was made. It covers the 3-slide opener, sign-up/sign-in with live password rules, the four set-up questions (accounts, month start, monthly limit, card), the first-expense strip and the reminder ask with a time picker. The set-up questions write real rows (accounts, `reset_period`, a budget), so their emulator checks need a fresh test account, not the shared one.
+
+After that: Phase 4 (Insights, Budgets, Bills + bill detail, Splits, Accounts, Categories; Plans is flagged off and only restyled, best done here), Phase 5 (moments, Alerts, Streak, Ask FLO chat, Personalize, You, Pro), Phase 6 (polish). The Ask FLO chat restyle the person asked for can be pulled forward as one small ticket at any point.
 
 Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
 are WCAG-checked in `scripts/ledger-check.mjs` (151 cases now). The kit gallery (Settings → Developer → Kit,
 `app/dev/kit.js`, `flo://dev/kit`) shows every ledger component; add new
 ones there. `ProgressBar` is `components/ledger/ProgressBar.js`.
+
+## Since ticket 07 (asked for by the person, 2026-11-10/11)
+
+- `af4c1e5` ProgressBar turns danger AT 100 %, not past it (spec 46 and the redesign plan amended).
+- In ticket 10 (`1218105`): Activity's filter chips wrap inside the gutter instead of scrolling off the edge; the Account filter sheet shows each account's in-hand balance and the total on All accounts; the selected account is an ink circle with a check in the icon slot (an olive check on grey was "not distinguishable enough"), so the amounts line up.
+- In ticket 11 (`4a5376f`): the Add sheet's amount caret is pinned to the end (a tap on the big number put the caret mid-number, so digits went in front and Backspace did nothing; the person spotted it); a disabled kit `Button` is a flat sunk pill with muted text (the 40 % fade left a dark ring on Android).
+- `updateTransfer` now edits both legs in place (found in review: replacing the pair left an open detail screen on a dead id).
 
 ## Since ticket 12 (all asked for by the person, 2026-11-10)
 
@@ -47,7 +56,7 @@ ones there. `ProgressBar` is `components/ledger/ProgressBar.js`.
   openers can pass `origin` (auto-detect does). Ticket 11 shows it.
 - The person wants the Ask FLO chat screen restyled (redesign plan §Ask FLO,
   Phase 5: ink bubbles, outlined starter chips, date-grouped past chats).
-  Not ticketed yet; offer to pull it forward when Phase 2 is done.
+  Not ticketed yet; offered 2026-11-11, the person chose Phase 3 first.
 - Test data hygiene: the test account's Tea proposal (`ai_messages`
   `7cc79a2e…`) is `dismissed` and Electricity is due 2026-11-12 unpaid; put
   them back if a check changes them. The person declined a SQL `delete`
@@ -57,7 +66,7 @@ ones there. `ProgressBar` is `components/ledger/ProgressBar.js`.
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 `design-inspirations/` and `day-themes/` are deliberately untracked.
 
-## Decisions made during 01–03 (not to re-litigate)
+## Decisions made during spec 46 (not to re-litigate)
 
 - **Koban is deleted**, not flagged off (2026-11-10). No `FLAGS.mascot`.
   His places use `Illustration` objects or nothing. `lib/koban.js` (streak
@@ -100,7 +109,6 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   is red), warn past 80 %. Rule in `lib/progressState.js`; Budgets (Phase 4)
   should use it rather than its own threshold.
 - **Activity (ticket 10):** rows open `/transaction/<id>` (ticket 11; a paired transfer opens its out leg). Lists use `components/ledger/TransactionRow` (Home too). Filter chips wrap, they don't scroll. In a filter sheet whose rows carry an amount, the selection is an ink circle with a check in the icon slot, so amounts align; plain choice lists keep the trailing check.
-- `expo run` caveat: Back to the launcher keeps the JS alive, so a relaunch can show old code. Force-stop before relaunching.
 - **Detail (ticket 11):** `updateTransfer` edits both legs in place (one upsert by id); it no longer replaces the pair. Deletes go through `lib/transactions.js` `deleteTransaction`.
 - **Kit Button disabled** is its own flat look (sunk fill, muted text), never an opacity fade. **Amount input** caret is pinned to the end.
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
@@ -112,7 +120,7 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   Start it on the tracker (`mcp__flo-ticket-tracker__tickets` start
   `quiet-ledger/NN`).
 - Pure rules go in `lib/` modules with no React Native imports, checked by
-  `node --no-warnings scripts/ledger-check.mjs` (31 cases so far). Imports
+  `node --no-warnings scripts/ledger-check.mjs` (151 cases now). Imports
   inside modules the script loads need explicit `.js` extensions.
 - Verify on **Pixel_API_36**: start the emulator and `npx expo start
   --dev-client`, then `adb reverse tcp:8081 tcp:8081` and open
@@ -129,7 +137,21 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 - The Supabase MCP (`execute_sql`, project `uergtlcfpwajztqgncim`) is the
   quickest way to confirm a save or undo reached the database.
 - After a hot-reload error the app can keep stale code; force-stop and relaunch
-  rather than trusting HMR.
+  rather than trusting HMR. Back to the launcher does NOT reset the JS either:
+  a relaunch after it can still run old code, so always `am force-stop
+  com.anonymous.flo` first. (2026-11-11: two fixes looked broken for this reason.)
+- On a cold launch the app may show the daily "Bill due today" pop-up over
+  Home; it covers the tab bar, so dismiss it ("Later") before tapping tabs.
+  After a cold launch Activity can sit on its skeleton for ~5 s; wait.
+- The Add sheet's amount field moves when the keyboard opens and closes:
+  re-dump bounds after each `keyevent 111`, or a tap lands on a keyboard
+  key (that typed a stray "6" once). Home's transfer rows are labelled
+  "Transfer to Savings", not their note.
+- A Blast Radius hook holds `rm` commands, even in the scratchpad; don't
+  retry them. Leave scratch files in place.
+- Test data: every entry made in this session was deleted through the app
+  (confirmed in the DB). The test account has **no splits**; a split-linked
+  check needs one created first, which is lasting test data, so ask.
 - Tick all three Tracer boxes once the emulator check passes (person's
   standing instruction), set `Status: resolved`, add a Comments line saying
   what wasn't checked, then commit with the attribution line.

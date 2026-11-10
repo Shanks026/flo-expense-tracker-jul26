@@ -1,7 +1,7 @@
 # Feature: Quiet Ledger redesign, Phases 1–2 (Foundations + Core loop)
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`
-**Status**: ready-for-agent
+**Status**: built (2026-11-11; all 12 tickets done, see `.scratch/quiet-ledger/handoff.md` for what each left unverified)
 **Last Updated**: 2026-11-10
 **Source of truth for the design**: `docs/redesign-plan.md` ("Quiet Ledger"). Where this spec and that document disagree on a visual detail, the document wins; where they disagree on scope, sequencing or data, this spec wins.
 
