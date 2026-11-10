@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after ticket 08.
+Last updated 2026-11-10, after ticket 09.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -18,11 +18,12 @@ source is `docs/redesign-plan.md`.
 | 06 Kit gallery and ProgressBar | ready | |
 | 07 Recording where each entry came from | ready (DB change: needs the person's yes before applying) | |
 | 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | see git log |
-| 09 Add sheet on the kit | ready | |
+| 09 Add sheet on the kit | done (see the ticket's Comments for what wasn't run) | see git log |
 | 10 Activity search and filters | blocked by 08, 09 | |
 | 11 Transaction detail | blocked by 05, 07, 08, 10 | |
+| 12 Olive accent replaces the blue | ready (WCAG table in the ticket) | |
 
-Suggested order: 09, 04, 07, 06, 10, 11.
+Suggested order: 12 (olive accent), 04, 07, 06, 10, 11.
 
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 `design-inspirations/` is deliberately untracked (third-party screenshots).
@@ -49,6 +50,8 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   from `lib/dateLabels.js`; pass `occurred_at` straight in (date-only strings
   are read as local days). The Home preview route is gone; the kit gallery
   (ticket 06) is where Illustration and EmptyState samples go now.
+- **Sheets (ticket 09):** new sheets use `components/ledger/Sheet` with a
+  `footer` of PinnedFooter props; chips are `components/ledger/Chip`.
 - `node` ignores `TZ` on this Windows machine, so timezone cases only run
   in IST here.
 

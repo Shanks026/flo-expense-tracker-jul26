@@ -88,10 +88,10 @@ function ToastItem({ toast, onDismiss }) {
     });
   }
 
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });
-
+  // Fades in place, with no slide (spec 46), so a fast tap on Undo lands
+  // where the button already is.
   return (
-    <Animated.View style={[styles.item, { opacity: progress, transform: [{ translateY }] }]}>
+    <Animated.View style={[styles.item, { opacity: progress }]}>
       <Pressable style={styles.itemPressable} onPress={handleDismiss}>
         <View style={[styles.iconWrap, { backgroundColor: v.iconBg }]}>
           <Icon size={16} color={v.iconColor} strokeWidth={2.6} />

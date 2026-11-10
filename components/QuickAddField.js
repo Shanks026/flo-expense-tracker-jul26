@@ -2,8 +2,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Keyboard } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { Sparkles, Mic } from 'lucide-react-native';
-import { spacing, fontFamily, fontSize, radius } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { voiceSupported, micPermission, startListening } from '../lib/voice';
 import useVoiceLanguage from '../hooks/useVoiceLanguage';
 
@@ -37,8 +36,8 @@ const MESSAGES = {
 };
 
 const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, resetKey, listenKey, onCantListen, hidden }, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [text, setText] = useState('');
   // null, or the key of MESSAGES to show at the end of the line.
   const [message, setMessage] = useState(null);
@@ -183,7 +182,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
   return (
     <View style={[styles.wrap, hidden && styles.hidden]}>
       <View style={styles.row}>
-        <Sparkles size={16} color={colors.muted} strokeWidth={2.2} />
+        <Sparkles size={16} color={c.muted} strokeWidth={1.75} />
         <BottomSheetTextInput
           ref={ref}
           value={text}
@@ -197,7 +196,8 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
           }}
           onSubmitEditing={handleSubmit}
           placeholder={listening ? 'Listening…' : micAllowed ? 'Type or hold the mic' : 'Type it: 40 lunch today'}
-          placeholderTextColor={colors.mutedLight}
+          placeholderTextColor={c.muted}
+          cursorColor={c.accent}
           returnKeyType="done"
           autoCorrect={false}
           autoCapitalize="none"
@@ -207,7 +207,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
         {/* Inside the row, not under it: the line stays one row tall, so the
             sheet never changes height, and it leaves room for Save above a
             text keyboard on a phone-height screen. */}
-        {thinking && <ActivityIndicator size="small" color={colors.muted} accessibilityLabel="Reading" />}
+        {thinking && <ActivityIndicator size="small" color={c.muted} accessibilityLabel="Reading" />}
         {message && (
           <Text style={styles.message} accessibilityLiveRegion="polite">
             {MESSAGES[message]}
@@ -222,7 +222,7 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
             accessibilityRole="button"
             accessibilityLabel={listening ? 'Listening. Let go to finish' : 'Hold to speak'}
           >
-            <Mic size={18} color={listening ? colors.brandText : colors.ink} strokeWidth={2.2} />
+            <Mic size={18} color={listening ? c.inkOnInk : c.ink} strokeWidth={1.75} />
           </Pressable>
         )}
       </View>
@@ -232,10 +232,10 @@ const QuickAddField = forwardRef(function QuickAddField({ parse, ask, onParsed, 
 
 export default QuickAddField;
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
     wrap: {
-      marginBottom: spacing.sm,
+      marginBottom: ledgerSpace.md,
     },
     hidden: {
       display: 'none',
@@ -243,36 +243,35 @@ function makeStyles(colors) {
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
+      gap: ledgerSpace.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.hairline,
+      borderRadius: ledgerRadius.input,
+      paddingLeft: ledgerSpace.md,
+      paddingRight: ledgerSpace.xs,
+      paddingVertical: ledgerSpace.xs,
     },
     input: {
       flex: 1,
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.ink,
+      ...ledgerType.body,
+      color: c.ink,
       paddingVertical: 8,
     },
+    // Listening turns the mic ink, so it reads without colour.
     mic: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.full,
-      backgroundColor: colors.chipBg,
+      width: 40,
+      height: 40,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.surfaceSunk,
       alignItems: 'center',
       justifyContent: 'center',
     },
     micListening: {
-      backgroundColor: colors.brand,
+      backgroundColor: c.ink,
     },
     message: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.xs,
-      color: colors.mutedMid,
+      ...ledgerType.caption,
+      color: c.muted,
     },
   });
 }
