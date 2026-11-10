@@ -13,6 +13,7 @@ import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
 import { weekChange } from '../lib/weekChange.js';
 import { ENTRY_SOURCES, entrySource } from '../lib/entrySource.js';
 import { progressState } from '../lib/progressState.js';
+import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 
 let passed = 0;
@@ -152,6 +153,80 @@ for (const [mode, pal] of [['light', Lc], ['dark', Dc]]) {
 }
 check('progress', 'negative reads as empty', progressState(-0.3), { tone: 'accent', fill: 0, pct: 0 });
 check('progress', 'garbage reads as empty', progressState('abc'), { tone: 'accent', fill: 0, pct: 0 });
+
+// --- Activity: filter, summary, transfer pairing, ranges (ticket 10) ---
+{
+  const food = { id: 'c-food', name: 'Food & Dining' };
+  const salary = { id: 'c-sal', name: 'Salary' };
+  const accts = [{ id: 'p', name: 'Personal' }, { id: 's', name: 'Savings' }];
+  const tea = { id: 't1', type: 'expense', amount: 120, note: 'Chai at Ravi', category_id: 'c-food', category: food, account_id: 'p', occurred_at: '2026-11-10' };
+  const rent = { id: 't2', type: 'expense', amount: 1200, note: null, category_id: 'c-food', category: food, account_id: 'p', occurred_at: '2026-11-09' };
+  const odd = { id: 't3', type: 'expense', amount: 1367.6, note: 'Room 4', category_id: null, category: null, account_id: 'p', occurred_at: '2026-11-09' };
+  const pay = { id: 't4', type: 'income', amount: 50000, note: 'Nov pay', category_id: 'c-sal', category: salary, account_id: 'p', occurred_at: '2026-11-01' };
+  const out = { id: 't5', type: 'transfer_out', amount: 2000, note: null, transfer_id: 'x1', account_id: 'p', transfer_account_id: 's', occurred_at: '2026-11-08' };
+  const inn = { id: 't6', type: 'transfer_in', amount: 2000, note: null, transfer_id: 'x1', account_id: 's', transfer_account_id: 'p', occurred_at: '2026-11-08' };
+  const settle = { id: 't7', type: 'settle_in', amount: 300, note: 'Asha paid back', category_id: null, category: null, account_id: 'p', occurred_at: '2026-11-07' };
+  const all = [tea, rent, odd, pay, out, inn, settle];
+  const ids = (list) => list.map((t) => t.id);
+  const f = (over) => ({ ...DEFAULT_FILTERS, ...over });
+
+  check('activity', 'no filter keeps everything', ids(filterActivity(all, f({}))), ids(all));
+  check('activity', 'search a note, any case', ids(filterActivity(all, f({ search: 'chai' }))), ['t1']);
+  check('activity', 'search a category name', ids(filterActivity(all, f({ search: 'dining' }))), ['t1', 't2']);
+  check('activity', 'search an amount matches as a prefix', ids(filterActivity(all, f({ search: '120' }))), ['t1', 't2']);
+  check('activity', 'grouping commas in the query are ignored', ids(filterActivity(all, f({ search: '1,200' }))), ['t2']);
+  check('activity', 'paise in the query', ids(filterActivity(all, f({ search: '1367.6' }))), ['t3']);
+  check('activity', 'an amount query also matches a note', ids(filterActivity(all, f({ search: '4' }))), ['t3']);
+  check('activity', 'a rupee sign is fine', ids(filterActivity(all, f({ search: '₹50' }))), ['t4']);
+  check('activity', 'spaces around the query are ignored', ids(filterActivity(all, f({ search: '  nov PAY ' }))), ['t4']);
+  check('activity', 'no match is empty', filterActivity(all, f({ search: 'zzz' })), []);
+  check('activity', 'type expense', ids(filterActivity(all, f({ type: 'expense' }))), ['t1', 't2', 't3']);
+  check('activity', 'type income leaves out a settlement', ids(filterActivity(all, f({ type: 'income' }))), ['t4']);
+  check('activity', 'type transfer keeps both legs', ids(filterActivity(all, f({ type: 'transfer' }))), ['t5', 't6']);
+  check('activity', 'category filter', ids(filterActivity(all, f({ categoryId: 'c-sal' }))), ['t4']);
+  check('activity', 'category and search together', ids(filterActivity(all, f({ categoryId: 'c-food', search: '1200' }))), ['t2']);
+
+  check('activity', 'summary leaves out transfers and settlements', summarizeActivity(all), { spent: 2687.6, received: 50000 });
+  check('activity', 'summary of nothing', summarizeActivity([]), { spent: 0, received: 0 });
+  check('activity', 'a settle_out is not spending', summarizeActivity([{ type: 'settle_out', amount: 500 }, { type: 'expense', amount: 20 }]), { spent: 20, received: 0 });
+  check('activity', 'summary has no float noise', summarizeActivity([{ type: 'expense', amount: 0.1 }, { type: 'expense', amount: 0.2 }]).spent, 0.3);
+
+  const paired = pairTransfers(all);
+  check('activity', 'two legs become one row', paired.map((e) => e.key), ['t1', 't2', 't3', 't4', 'x1', 't7']);
+  check(
+    'activity',
+    'the pair reads from → to',
+    (({ kind, fromAccountId, toAccountId, legs }) => ({ kind, fromAccountId, toAccountId, legs }))(paired[4]),
+    { kind: 'transfer', fromAccountId: 'p', toAccountId: 's', legs: 2 }
+  );
+  check('activity', 'the pair keeps the out leg', paired[4].tx.id, 't5');
+  const lone = pairTransfers([tea, inn]);
+  check('activity', 'one leg in view is one ⇄ row', lone.map((e) => [e.kind, e.key, e.legs]), [['tx', 't1', undefined], ['transfer', 'x1', 1]]);
+  check('activity', 'an in leg still reads from → to', [lone[1].fromAccountId, lone[1].toAccountId], ['p', 's']);
+  check('activity', 'title names both accounts', transferTitle(paired[4], accts), 'Personal → Savings');
+  check('activity', 'a deleted account reads as one', transferTitle({ fromAccountId: 'p', toAccountId: null }, accts), 'Personal → Deleted account');
+  check('activity', 'a leg with no transfer id stays a row', pairTransfers([{ ...out, transfer_id: null }]).map((e) => e.key), ['t5']);
+
+  const groups = groupEntries(paired);
+  check('activity', 'grouped by day, in list order', groups.map((g) => [g.key, g.items.length]), [['2026-11-10', 1], ['2026-11-09', 2], ['2026-11-01', 1], ['2026-11-08', 1], ['2026-11-07', 1]]);
+
+  const today = new Date(2026, 10, 10);
+  check('activity', 'this month', activityRange({ preset: 'this_month' }, today), { from: '2026-11-01', to: '2026-11-30' });
+  check('activity', 'last month', activityRange({ preset: 'last_month' }, today), { from: '2026-10-01', to: '2026-10-31' });
+  check('activity', 'last month across a year', activityRange({ preset: 'last_month' }, new Date(2026, 0, 5)), { from: '2025-12-01', to: '2025-12-31' });
+  check('activity', 'last 30 days includes today', activityRange({ preset: 'last_30' }, today), { from: '2026-10-12', to: '2026-11-10' });
+  check('activity', 'custom passes through', activityRange({ preset: 'custom', from: '2026-09-01', to: '2026-09-15' }, today), { from: '2026-09-01', to: '2026-09-15' });
+  check('activity', 'custom the wrong way round is swapped', activityRange({ preset: 'custom', from: '2026-09-15', to: '2026-09-01' }, today), { from: '2026-09-01', to: '2026-09-15' });
+  check('activity', 'range labels', ['this_month', 'last_month', 'last_30'].map((preset) => rangeLabel({ preset }, today)), ['This month', 'Last month', 'Last 30 days']);
+  check('activity', 'custom label', rangeLabel({ preset: 'custom', from: '2026-09-01', to: '2026-09-15' }, today), '1 Sep – 15 Sep');
+  check('activity', 'custom label in another year', rangeLabel({ preset: 'custom', from: '2025-12-20', to: '2026-01-04' }, today), '20 Dec 2025 – 4 Jan');
+  check('activity', 'a day round-trips', ymd(dateFromYmd('2026-03-09')), '2026-03-09');
+  check('activity', 'full day label', fullDayLabel('2026-10-01'), '1 Oct 2026');
+  check('activity', 'defaults are default', isDefaultFilters(DEFAULT_FILTERS), true);
+  check('activity', 'a search is not default', isDefaultFilters(f({ search: 'tea' })), false);
+  check('activity', 'whitespace search is still default', isDefaultFilters(f({ search: '  ' })), true);
+  check('activity', 'a picked account is not default', isDefaultFilters(f({ accountId: 'all' })), false);
+}
 
 // --- Report ---
 for (const f of failures) {

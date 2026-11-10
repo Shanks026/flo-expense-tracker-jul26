@@ -1,13 +1,15 @@
 import { Pressable, Text, StyleSheet } from 'react-native';
+import { ChevronDown } from 'lucide-react-native';
 import { useLedger, ledgerRadius, ledgerSize, inter } from '../../theme/ledger';
 
 // An outlined pill (redesign §2.5); selected is an ink fill with on-ink text,
 // so the choice reads without the accent. `icon` is an optional lucide
-// component drawn before the label. 36 dp tall, with hitSlop bringing the
+// component drawn before the label; `caret` adds a trailing ▾ for a filter
+// chip that opens a sheet. 36 dp tall, with hitSlop bringing the
 // target to 48 dp.
 const HEIGHT = 36;
 
-export default function Chip({ label, selected = false, onPress, icon: Icon, accessibilityLabel, style }) {
+export default function Chip({ label, selected = false, onPress, icon: Icon, caret = false, accessibilityLabel, accessibilityHint, style }) {
   const { c } = useLedger();
   const fg = selected ? c.inkOnInk : c.ink;
   return (
@@ -16,6 +18,7 @@ export default function Chip({ label, selected = false, onPress, icon: Icon, acc
       hitSlop={(ledgerSize.hit - HEIGHT) / 2}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ selected }}
       style={({ pressed }) => [
         styles.chip,
@@ -28,6 +31,7 @@ export default function Chip({ label, selected = false, onPress, icon: Icon, acc
       <Text style={[styles.label, { color: fg }]} numberOfLines={1}>
         {label}
       </Text>
+      {caret ? <ChevronDown size={14} color={fg} strokeWidth={1.75} /> : null}
     </Pressable>
   );
 }

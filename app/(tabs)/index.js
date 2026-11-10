@@ -3,9 +3,10 @@ import { View, Text, ScrollView, Pressable, RefreshControl, Modal, StyleSheet } 
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
-import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, Users, CalendarCheck, ChartColumn, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, CalendarCheck, ChartColumn, TrendingUp, TrendingDown } from 'lucide-react-native';
 import AmountText from '../../components/ledger/AmountText';
 import ListRow from '../../components/ledger/ListRow';
+import TransactionRow from '../../components/ledger/TransactionRow';
 import SectionHeader from '../../components/ledger/SectionHeader';
 import Button from '../../components/ledger/Button';
 import HeaderIconButton from '../../components/ledger/HeaderIconButton';
@@ -31,8 +32,6 @@ import useDailyCountUp from '../../hooks/useDailyCountUp';
 import { useAccount } from '../../lib/AccountContext';
 import { useAuth } from '../../lib/AuthContext';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
-import { isTransfer, transferLabel } from '../../lib/transfers';
-import { isSettlement, settlementLabel } from '../../lib/settlements';
 import { markNoSpend } from '../../lib/streakMarks';
 import { track } from '../../lib/track';
 import { formatMoney } from '../../lib/currency';
@@ -178,33 +177,7 @@ export default function Home() {
   }
 
   function renderTx(tx, isLast) {
-    const transfer = isTransfer(tx);
-    const settlement = isSettlement(tx);
-    const categoryName = tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense');
-    const note = tx.note?.trim();
-    // No note: the category is already the title, so it isn't repeated.
-    const baseSub = transfer ? 'Transfer' : settlement ? 'Settled up' : note ? categoryName : undefined;
-    const plan = FLAGS.plans && !transfer && !settlement ? tx.plan?.name : null;
-    return (
-      <ListRow
-        key={tx.id}
-        divider={!isLast}
-        onPress={() => openAdd(tx)}
-        tone={transfer || settlement ? undefined : tx.category?.color}
-        renderIcon={(tint) =>
-          transfer ? (
-            <ArrowLeftRight size={18} color={tint} strokeWidth={1.75} />
-          ) : settlement ? (
-            <Users size={18} color={tint} strokeWidth={1.75} />
-          ) : (
-            <CategoryIcon icon={tx.category?.icon} size={18} color={tint} strokeWidth={1.75} />
-          )
-        }
-        title={transfer ? transferLabel(tx, accounts) : settlement ? settlementLabel(tx) : note || categoryName}
-        sub={[baseSub, plan].filter(Boolean).join(' · ') || undefined}
-        right={<AmountText value={tx.amount} type={transfer ? 'neutral' : tx.type} signed currency={currency} />}
-      />
-    );
+    return <TransactionRow key={tx.id} tx={tx} accounts={accounts} divider={!isLast} onPress={() => openAdd(tx)} />;
   }
 
   return (

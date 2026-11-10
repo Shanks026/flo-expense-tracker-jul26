@@ -13,6 +13,8 @@ import Callout from '../../components/ledger/Callout';
 import ProgressBar from '../../components/ledger/ProgressBar';
 import Illustration, { ILLUSTRATION_NAMES } from '../../components/ledger/Illustration';
 import EmptyState from '../../components/ledger/EmptyState';
+import Chip from '../../components/ledger/Chip';
+import TransactionRow from '../../components/ledger/TransactionRow';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
 
 // Developer → Kit (spec 46, ticket 06): every ledger component in its states,
@@ -28,6 +30,14 @@ export default function KitGalleryScreen() {
 }
 
 const noop = () => {};
+
+// Rows for TransactionRow (no account list, so amounts read as INR).
+const SAMPLE_TX = {
+  expense: { id: 'e', type: 'expense', amount: 420, note: 'Weekly vegetables', category: { name: 'Groceries', icon: 'groceries', color: '#2F9E44' } },
+  income: { id: 'i', type: 'income', amount: 50000, note: null, category: { name: 'Salary', icon: 'salary', color: '#4C7031' } },
+  transfer: { id: 't', type: 'transfer_out', amount: 2000 },
+  settlement: { id: 's', type: 'settle_in', amount: 300 },
+};
 // A category colour is data, not a theme token: this stands in for one.
 const GROCERIES = '#2F9E44';
 
@@ -84,6 +94,22 @@ function KitGallery() {
           <ListRow icon={Smartphone} title="Compact button" trailing={<Button title="Send" variant="secondary" compact onPress={noop} />} />
           <ListRow icon={Wallet} title="Disabled" sub="Dimmed, ignores taps" disabled onPress={noop} />
           <ListRow icon={Trash2} title="Danger" danger onPress={noop} divider={false} />
+        </Section>
+
+        <Section title="Chip">
+          <View style={styles.inline}>
+            <Chip label="Plain" onPress={noop} />
+            <Chip label="Selected" selected onPress={noop} />
+            <Chip label="Filter" icon={Wallet} caret onPress={noop} />
+            <Chip label="Filter, set" icon={Wallet} caret selected onPress={noop} />
+          </View>
+        </Section>
+
+        <Section title="TransactionRow">
+          <TransactionRow tx={SAMPLE_TX.expense} onPress={noop} />
+          <TransactionRow tx={SAMPLE_TX.income} onPress={noop} accountName="Savings" />
+          <TransactionRow tx={SAMPLE_TX.transfer} title="Personal → Savings" onPress={noop} />
+          <TransactionRow tx={SAMPLE_TX.settlement} onPress={noop} divider={false} />
         </Section>
 
         <Section title="SectionHeader">
