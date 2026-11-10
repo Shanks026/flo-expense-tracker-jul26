@@ -4,8 +4,9 @@ import { useLedger, ledgerType, ledgerRadius, ledgerSize, ledgerSpace } from '..
 // Redesign §2.5: `primary` (ink fill), `secondary` (outlined ink), `quiet`
 // (text only), `danger` (dangerSoft fill, danger text). 52 dp, weight 600.
 // `compact` is a 34 dp version for inline actions inside a row (hitSlop
-// keeps its target near 48 dp).
-export default function Button({ title, onPress, variant = 'primary', compact = false, loading = false, disabled = false, style }) {
+// keeps its target near 48 dp). `accessibilityLabel` overrides the title
+// for TalkBack when the title alone is vague ("Review").
+export default function Button({ title, onPress, variant = 'primary', compact = false, loading = false, disabled = false, accessibilityLabel, style }) {
   const { c } = useLedger();
   const v = {
     primary: { bg: c.ink, fg: c.inkOnInk, border: c.ink },
@@ -19,7 +20,7 @@ export default function Button({ title, onPress, variant = 'primary', compact = 
       onPress={onPress}
       disabled={disabled || loading}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       hitSlop={compact ? 7 : 0}
       style={({ pressed }) => [
         styles.base,

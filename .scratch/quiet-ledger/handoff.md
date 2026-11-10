@@ -13,7 +13,7 @@ source is `docs/redesign-plan.md`.
 | 01 Ledger tokens, money rule, check script | done | `a937827` |
 | 02 Illustration, EmptyState, Koban deleted | done | `e5e529c` |
 | 03 Day as the free default card | done (two small checks open, see the ticket's Comments) | `3f624d5` |
-| 04 Ask FLO proposal card | ready | |
+| 04 Ask FLO proposal card | done (income proposal not seen; see Comments) | this commit |
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | `cb691ec` |
 | 06 Kit gallery and ProgressBar | ready | |
 | 07 Recording where each entry came from | ready (DB change: needs the person's yes before applying) | |
@@ -23,7 +23,7 @@ source is `docs/redesign-plan.md`.
 | 11 Transaction detail | blocked by 07, 10 | |
 | 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | this commit |
 
-Suggested order: 04, 07, 06, 10, 11.
+Suggested order: 07, 06, 10, 11.
 
 Palettes now live in `theme/ledgerPalettes.js` (plain data); colour pairs
 are WCAG-checked in `scripts/ledger-check.mjs` (51 cases). Ticket 06's

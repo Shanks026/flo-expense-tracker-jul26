@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { CalendarClock, ReceiptText, Target } from 'lucide-react-native';
-import Card from './Card';
-import { fontFamily, spacing, radii, type } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
-import { formatMoney } from '../lib/currency';
+import ListRow from './ledger/ListRow';
+import AmountText from './ledger/AmountText';
+import Button from './ledger/Button';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { useAccount } from '../lib/AccountContext';
 import { setProposalStatus } from '../lib/ai';
 import useCategories from '../hooks/useCategories';
@@ -24,10 +24,15 @@ import { useAddBillSheet } from './AddBillSheet';
 // person's current lists (the second lock, as aiQuickAdd does), so a
 // category deleted since the chat leaves the sheet to pick its default.
 //
+// On the Quiet Ledger kit (spec 46, ticket 04): the one surface card on the
+// chat, with a hairline edge. The draft is a ListRow (kind icon, what, when)
+// with its amount in AmountText; Review is the primary Button, Dismiss a
+// quiet one, and a saved draft says "Saved ✓" in the positive colour.
+//
 // `messageId` is the answer row the proposal lives on.
 export default function ProposalCard({ messageId, proposal }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { accounts } = useAccount();
   const { categories } = useCategories();
   const { openAdd } = useAddTransactionSheet();
@@ -61,47 +66,32 @@ export default function ProposalCard({ messageId, proposal }) {
   }
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.kickerRow}>
-        <view.Icon size={16} color={colors.muted} strokeWidth={2.2} />
-        <Text style={styles.kicker}>{view.kicker}</Text>
-      </View>
-      <Text style={styles.amount}>{view.amount}</Text>
-      {view.lines.map((line) => (
-        <Text key={line} style={styles.line} numberOfLines={2}>
-          {line}
-        </Text>
-      ))}
+    <View style={styles.card}>
+      <Text style={styles.kicker}>{view.kicker}</Text>
+      <ListRow
+        icon={view.Icon}
+        title={view.title}
+        sub={view.sub}
+        subLines={2}
+        right={<AmountText value={view.amount} currency={view.currency} type={view.type} signed={view.type === 'income'} />}
+        divider={false}
+      />
 
       {status === 'saved' ? (
-        <Animated.Text entering={FadeIn.duration(220)} style={styles.saved} accessibilityLiveRegion="polite">
+        <Animated.Text entering={FadeIn.duration(220)} style={[styles.status, { color: c.positive }]} accessibilityLiveRegion="polite">
           Saved ✓
         </Animated.Text>
       ) : status === 'dismissed' ? (
-        <Animated.Text entering={FadeIn.duration(220)} style={styles.dismissed}>
+        <Animated.Text entering={FadeIn.duration(220)} style={[styles.status, { color: c.muted }]}>
           Dismissed
         </Animated.Text>
       ) : (
         <View style={styles.actions}>
-          <Pressable
-            onPress={review}
-            style={({ pressed }) => [styles.action, styles.review, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel={`Review ${view.kicker.toLowerCase()}`}
-          >
-            <Text style={styles.reviewText}>Review</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => mark('dismissed')}
-            style={({ pressed }) => [styles.action, styles.dismiss, pressed && styles.dismissPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss"
-          >
-            <Text style={styles.dismissText}>Dismiss</Text>
-          </Pressable>
+          <Button title="Review" compact onPress={review} accessibilityLabel={`Review ${view.kicker.toLowerCase()}`} style={styles.review} />
+          <Button title="Dismiss" variant="quiet" compact onPress={() => mark('dismissed')} />
         </View>
       )}
-    </Card>
+    </View>
   );
 }
 
@@ -112,7 +102,7 @@ function dayLabel(ymd) {
   return format(d, 'EEE d MMM yyyy');
 }
 
-// proposal → { Icon, kicker, amount, lines, open(openers, onDone) }, or null
+// proposal → { Icon, kicker, type?, amount, currency?, title, sub, open(openers, onDone) }, or null
 // for a shape this build doesn't know (a newer function, a broken row).
 function describe(p, { accounts, categories }) {
   if (!p || typeof p !== 'object' || !(Number(p.amount) > 0)) return null;
@@ -123,13 +113,11 @@ function describe(p, { accounts, categories }) {
     return {
       Icon: ReceiptText,
       kicker: p.type === 'income' ? 'New income' : 'New expense',
-      amount: formatMoney(Number(p.amount), account?.currency),
-      lines: [
-        [category?.name ?? 'No category', accounts.length > 1 ? account?.name : null, dayLabel(p.date)]
-          .filter(Boolean)
-          .join(' · '),
-        p.note ? `“${p.note}”` : null,
-      ].filter(Boolean),
+      type: p.type,
+      amount: Number(p.amount),
+      currency: account?.currency,
+      title: category?.name ?? 'No category',
+      sub: [accounts.length > 1 ? account?.name : null, dayLabel(p.date), p.note ? `“${p.note}”` : null].filter(Boolean).join(' · '),
       open: ({ openAdd }, onDone) =>
         openAdd({
           type: p.type,
@@ -161,8 +149,10 @@ function describe(p, { accounts, categories }) {
     return {
       Icon: Target,
       kicker: 'New budget',
-      amount: formatMoney(Number(p.amount), account?.currency),
-      lines: [[category?.name ?? 'All spending', period, accounts.length > 1 ? account?.name : null].filter(Boolean).join(' · ')],
+      amount: Number(p.amount),
+      currency: account?.currency,
+      title: category?.name ?? 'All spending',
+      sub: [period, accounts.length > 1 ? account?.name : null].filter(Boolean).join(' · '),
       open: ({ openAddBudget }, onDone) =>
         openAddBudget({
           amount: Number(p.amount),
@@ -183,14 +173,16 @@ function describe(p, { accounts, categories }) {
     return {
       Icon: CalendarClock,
       kicker: 'New bill',
-      amount: formatMoney(Number(p.amount)),
-      lines: [
+      amount: Number(p.amount),
+      title: p.name,
+      sub: [
         // "Rent · Rent" says nothing twice: the category only when it differs.
-        [p.name, category && category.name.toLowerCase() !== p.name.trim().toLowerCase() ? category.name : null]
-          .filter(Boolean)
-          .join(' · '),
-        `${cadences[p.cadence]} · next due ${format(parseISO(p.next_due_date), 'EEE d MMM yyyy')}`,
-      ],
+        category && category.name.toLowerCase() !== p.name.trim().toLowerCase() ? category.name : null,
+        cadences[p.cadence],
+        `next due ${format(parseISO(p.next_due_date), 'EEE d MMM yyyy')}`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
       open: ({ openAddBill }, onDone) =>
         openAddBill({
           name: p.name,
@@ -205,79 +197,34 @@ function describe(p, { accounts, categories }) {
   return null;
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
     card: {
-      marginTop: spacing.md,
-      gap: spacing.xs,
-    },
-    kickerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
+      marginTop: ledgerSpace.md,
+      backgroundColor: c.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.hairline,
+      borderRadius: ledgerRadius.card,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingTop: ledgerSpace.md,
+      paddingBottom: ledgerSpace.lg,
     },
     kicker: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.caption,
-      color: colors.muted,
-    },
-    amount: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: type.title,
-      color: colors.ink,
-      marginTop: spacing.xs,
-    },
-    line: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      lineHeight: 20,
-      color: colors.ink,
+      ...ledgerType.caption,
+      color: c.muted,
     },
     actions: {
       flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: spacing.md,
-    },
-    action: {
-      flex: 1,
-      height: 44,
-      borderRadius: radii.pill,
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: ledgerSpace.sm,
+      marginTop: ledgerSpace.sm,
     },
     review: {
-      backgroundColor: colors.brand,
+      flex: 1,
     },
-    pressed: {
-      opacity: 0.85,
-    },
-    reviewText: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: type.body,
-      color: colors.brandText,
-    },
-    dismiss: {
-      backgroundColor: 'transparent',
-    },
-    dismissPressed: {
-      backgroundColor: colors.chipBg,
-    },
-    dismissText: {
-      fontFamily: fontFamily.bold,
-      fontSize: type.body,
-      color: colors.ink,
-    },
-    saved: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: type.body,
-      color: colors.ink,
-      marginTop: spacing.md,
-    },
-    dismissed: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      color: colors.muted,
-      marginTop: spacing.md,
+    status: {
+      ...ledgerType.rowTitle,
+      marginTop: ledgerSpace.sm,
     },
   });
 }
