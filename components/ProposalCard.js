@@ -175,14 +175,18 @@ function describe(p, { accounts, categories }) {
       kicker: 'New bill',
       amount: Number(p.amount),
       title: p.name,
+      // Two lines: what repeats, then when it's next due (a date never
+      // wraps mid-way).
       sub: [
-        // "Rent · Rent" says nothing twice: the category only when it differs.
-        category && category.name.toLowerCase() !== p.name.trim().toLowerCase() ? category.name : null,
-        cadences[p.cadence],
-        `next due ${format(parseISO(p.next_due_date), 'EEE d MMM yyyy')}`,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+        [
+          // "Rent · Rent" says nothing twice: the category only when it differs.
+          category && category.name.toLowerCase() !== p.name.trim().toLowerCase() ? category.name : null,
+          cadences[p.cadence],
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        `Next due ${format(parseISO(p.next_due_date), 'EEE d MMM yyyy')}`,
+      ].join('\n'),
       open: ({ openAddBill }, onDone) =>
         openAddBill({
           name: p.name,
