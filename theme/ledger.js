@@ -107,10 +107,6 @@ export const ledgerType = {
   quickAction: { fontFamily: inter.medium, fontSize: 12, lineHeight: 16 },
 };
 
-// Deprecated (spec 46: no uppercase captions). Kept only until the Home
-// preview's last call site goes with ticket 08; don't use it in new code.
-export const upper = (str) => String(str).toUpperCase();
-
 export const tabular = { fontVariant: ['tabular-nums'] };
 
 // §2.4: a 4-pt grid.

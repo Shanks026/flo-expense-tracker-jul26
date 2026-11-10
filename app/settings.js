@@ -27,7 +27,6 @@ import {
   CalendarDays,
   Sparkles,
   Mic,
-  LayoutDashboard,
   Smartphone,
   Sun,
 } from 'lucide-react-native';
@@ -774,7 +773,6 @@ export default function Settings() {
             (32-safe-closed-test-build.md: no debug UI for testers). */}
         {__DEV__ && (
           <Group title="Developer">
-            <ListRow icon={LayoutDashboard} title="Home preview (redesign)" trailing="chevron" onPress={() => router.push('/dev/home-preview')} />
             {FLAGS.ai && <ListRow icon={Sparkles} title="AI test set" trailing="chevron" onPress={() => router.push('/dev/ai-eval')} />}
             {notifEnabled && (
               <ListRow

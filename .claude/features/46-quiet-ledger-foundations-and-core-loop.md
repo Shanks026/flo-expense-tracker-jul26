@@ -15,7 +15,7 @@ Part of the foundation is already written, uncommitted, on `feat/spec44-ai-quick
 - the ledger tokens (`theme/ledger.js`) and the Inter font, loaded beside Manrope;
 - `AmountText`, `Button`, `HeaderIconButton`, `ListRow` (with `toneColors`), `QuickActions`, `SectionHeader`, `AccountCardCarousel` and `WeekLine` under `components/ledger/`;
 - the Day scenes (`lib/dayScenes.js`);
-- the Home preview (`app/dev/home-preview.js`, Settings → Developer → Home preview).
+- the Home preview (`app/dev/home-preview.js`, Settings → Developer → Home preview), deleted in ticket 08 once the real Home moved onto the kit.
 
 The old `WeekBars` was replaced by `WeekLine` and deleted.
 

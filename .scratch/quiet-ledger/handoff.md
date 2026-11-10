@@ -1,6 +1,6 @@
 # Quiet Ledger (spec 46): handoff
 
-Last updated 2026-11-10, after ticket 05.
+Last updated 2026-11-10, after ticket 08.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
@@ -17,12 +17,12 @@ source is `docs/redesign-plan.md`.
 | 05 Settings on the kit | done (see the ticket's Comments for what wasn't run) | see git log |
 | 06 Kit gallery and ProgressBar | ready | |
 | 07 Recording where each entry came from | ready (DB change: needs the person's yes before applying) | |
-| 08 Home goes live, new tab bar | ready | |
+| 08 Home goes live, new tab bar | done (seasonal row deferred; see the ticket's Comments) | see git log |
 | 09 Add sheet on the kit | ready | |
 | 10 Activity search and filters | blocked by 08, 09 | |
 | 11 Transaction detail | blocked by 05, 07, 08, 10 | |
 
-Suggested order: 08, 09, 04, 07, 06, 10, 11.
+Suggested order: 09, 04, 07, 06, 10, 11.
 
 Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
 `design-inspirations/` is deliberately untracked (third-party screenshots).
@@ -44,6 +44,13 @@ Branch: `feat/spec44-ai-quick-add-voice` (all commits local, nothing pushed).
   `useHeaderScroll` with `headerShown: false` on its route. `ListRow`'s
   `trailing` / `switchValue` replace the old `Row` props. Callouts are one
   line. Thumb, knob and edge colours are ledger tokens, not literals.
+- **Home (ticket 08):** the "in · out" line follows Settings → Summary period
+  (open question on the spec line, see ticket 08). Date-group labels come
+  from `lib/dateLabels.js`; pass `occurred_at` straight in (date-only strings
+  are read as local days). The Home preview route is gone; the kit gallery
+  (ticket 06) is where Illustration and EmptyState samples go now.
+- `node` ignores `TZ` on this Windows machine, so timezone cases only run
+  in IST here.
 
 ## How the work is done
 

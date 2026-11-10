@@ -23,6 +23,9 @@ export default function useAllAccountSummaries() {
   const { session, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
   const [summaries, setSummaries] = useState({});
+  // The reset period these totals cover, from the same profile read, so a
+  // label beside them (Home's "out this quarter") can't disagree with them.
+  const [period, setPeriod] = useState({ resetPeriod: null, customStart: null });
   // See hooks/useLoadedFor.js — a bare loading boolean reported "loaded" with
   // an empty map while the real post-sign-in request was still in flight, and
   // Home's hero rendered ₹0 balances as if they were the answer.
@@ -73,6 +76,7 @@ export default function useAllAccountSummaries() {
       map[row.account_id] = { ...row, period_income: totals.income, period_expense: totals.expense };
     });
     setSummaries(map);
+    setPeriod({ resetPeriod: profile?.reset_period ?? null, customStart: profile?.reset_custom_start ?? null });
     markLoaded(userId);
   }, [userId]);
 
@@ -80,5 +84,5 @@ export default function useAllAccountSummaries() {
     refetch();
   }, [refetch, version]);
 
-  return { summaries, loading };
+  return { summaries, period, loading };
 }

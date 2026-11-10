@@ -8,6 +8,7 @@
 import { amountParts } from '../lib/currency.js';
 import { dayPeriod } from '../lib/dayScenes.js';
 import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
+import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 
 let passed = 0;
 const failures = [];
@@ -57,6 +58,19 @@ check('day', 'a chosen Ink stays Ink', resolveEquippedTheme('ink-classic', at(9)
 check('day', 'an equipped skin wins', resolveEquippedTheme('christmas', at(9)).id, 'christmas');
 check('day', 'Day is listed first', CARD_THEMES[0].id, 'day');
 check('day', 'the stored-default ink is not listed', CARD_THEMES.some((t) => t.id === 'ink'), false);
+
+// --- Date-group labels on Home's recent activity (ticket 08) ---
+const now = new Date(2026, 10, 10, 9, 30); // Tue 10 Nov 2026, 09:30 local
+check('dates', 'same day is Today', dateGroupLabel(new Date(2026, 10, 10, 0, 5), now), 'Today');
+check('dates', 'the day before is Yesterday', dateGroupLabel(new Date(2026, 10, 9, 23, 59), now), 'Yesterday');
+check('dates', 'earlier this year has no year', dateGroupLabel(new Date(2026, 10, 7, 12), now), 'Sat 7 Nov');
+check('dates', 'another year shows the year', dateGroupLabel(new Date(2025, 11, 31, 12), now), 'Wed 31 Dec 2025');
+check('dates', 'Yesterday across a new year', dateGroupLabel(new Date(2025, 11, 31, 20), new Date(2026, 0, 1, 8)), 'Yesterday');
+check('dates', 'the group key is the local date', dateGroupKey(new Date(2026, 10, 10, 0, 5)), '2026-11-10');
+// occurred_at is a date-only 'yyyy-MM-dd' string; it must read as that local
+// day, not UTC midnight (which is the day before anywhere west of UTC).
+check('dates', 'a date-only string keeps its day', dateGroupKey('2026-11-10'), '2026-11-10');
+check('dates', 'a date-only string labels as that day', dateGroupLabel('2026-11-09', now), 'Yesterday');
 
 // --- Report ---
 for (const f of failures) {
