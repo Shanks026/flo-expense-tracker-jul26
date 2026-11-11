@@ -187,6 +187,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // the last parse, so re-parsing never overrides a category the person
   // picked after seeing the parsed one.
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  // A line over the sheet's fields for one opener: onboarding's first
+  // expense ("Log your first expense: type it or hold to say it", spec 47).
+  const [intro, setIntro] = useState(null);
   const [quickKey, setQuickKey] = useState(0);
   // Set (non-zero) to make the quick-add line start listening (long-press ⊕).
   const [listenKey, setListenKey] = useState(0);
@@ -265,6 +268,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // auto-detect, onboarding) gets the sheet as it was.
       const quickAdd = FLAGS.ai && !!payload?.quickAdd && isBlankEntry;
       setShowQuickAdd(quickAdd);
+      setIntro(payload?.intro ?? null);
       if (quickAdd) setQuickKey((k) => k + 1);
 
       if (payload?.id && isTransfer(payload)) {
@@ -729,6 +733,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
           Accounts. The quick-add line is mounted whenever the flag is on and
           hidden for other openers, so the + tab's focus() lands on an input
           that's already there. */}
+      {!!intro && <Text style={styles.intro}>{intro}</Text>}
       {FLAGS.ai && (
         <QuickAddField
           ref={quickInputRef}
@@ -1037,6 +1042,11 @@ function makeStyles(c) {
       minWidth: 60,
       textAlign: 'center',
       padding: 0,
+    },
+    intro: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginBottom: ledgerSpace.md,
     },
     sectionLabel: {
       ...ledgerType.group,

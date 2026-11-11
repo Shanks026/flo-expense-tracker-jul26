@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Image, Modal, ActivityIndicator, Link
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { timeOnTodayFromString, toTimeColumn, isEveningTime, MORNING_DEFAULT, EVENING_DEFAULT } from '../lib/reminderTime';
 import {
   CircleDollarSign,
   Palette,
@@ -108,30 +109,6 @@ function Group({ title, children }) {
       {items.map((el, i) => (i === lastRow ? cloneElement(el, { divider: false }) : el))}
     </View>
   );
-}
-
-// NOT new Date(0, 0, 0, hour, minute) — that resolves to Dec 31, 1899, and
-// India's timezone database applies the *historical* Madras Time offset
-// (+5:21) for pre-1906 dates, not modern IST (+5:30). The JS-side
-// getHours()/getMinutes() still read back correctly within the same
-// environment, but the native Android time picker widget converts the
-// underlying UTC timestamp using the *current* offset when rendering,
-// producing a ~9-minute-ahead display — confirmed via TZ=Asia/Kolkata node
-// repro during debugging (2026-07-12). Building on today's date sidesteps
-// the whole historical-offset class of bug.
-function timeOnToday(hour, minute) {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d;
-}
-
-// profiles.morning_reminder_time/evening_reminder_time come back from
-// Postgres as "HH:MM:SS" strings (the `time` column type) — parsed into a
-// Date the same way DateTimePicker/timeOnToday already expect.
-function timeOnTodayFromString(timeStr, fallbackHour, fallbackMinute) {
-  if (!timeStr) return timeOnToday(fallbackHour, fallbackMinute);
-  const [h, m] = timeStr.split(':').map(Number);
-  return timeOnToday(h, m);
 }
 
 export default function Settings() {
@@ -439,20 +416,17 @@ export default function Settings() {
     // "must be before/after the other" — so the two can never collide (a
     // user could otherwise set both to the same time, or "morning" later in
     // the day than "evening") without needing a second cross-field check.
-    const hours = selected.getHours();
-    if (field === 'morning' && hours >= 12) {
+    if (field === 'morning' && isEveningTime(selected)) {
       showToast({ message: 'Morning reminder must be before 12 PM', variant: 'error' });
       return;
     }
-    if (field === 'evening' && hours < 12) {
+    if (field === 'evening' && !isEveningTime(selected)) {
       showToast({ message: 'Evening reminder must be after 12 PM', variant: 'error' });
       return;
     }
 
-    const hh = String(hours).padStart(2, '0');
-    const mm = String(selected.getMinutes()).padStart(2, '0');
     const column = field === 'morning' ? 'morning_reminder_time' : 'evening_reminder_time';
-    await updateProfile({ [column]: `${hh}:${mm}:00` }, { silent: true });
+    await updateProfile({ [column]: toTimeColumn(selected) }, { silent: true });
   }
 
   // No local reschedule needed — setBillReminderSettings mirrors to
@@ -589,7 +563,7 @@ export default function Settings() {
             <ListRow
               icon={Sunrise}
               title="Morning"
-              right={format(timeOnTodayFromString(profile?.morning_reminder_time, 8, 0), 'h:mm a')}
+              right={format(timeOnTodayFromString(profile?.morning_reminder_time, MORNING_DEFAULT.hour, MORNING_DEFAULT.minute), 'h:mm a')}
               trailing="chevron"
               onPress={() => setTimePickerField('morning')}
             />
@@ -598,7 +572,7 @@ export default function Settings() {
             <ListRow
               icon={Moon}
               title="Evening"
-              right={format(timeOnTodayFromString(profile?.evening_reminder_time, 21, 0), 'h:mm a')}
+              right={format(timeOnTodayFromString(profile?.evening_reminder_time, EVENING_DEFAULT.hour, EVENING_DEFAULT.minute), 'h:mm a')}
               trailing="chevron"
               onPress={() => setTimePickerField('evening')}
             />
@@ -642,8 +616,8 @@ export default function Settings() {
           <DateTimePicker
             value={
               timePickerField === 'morning'
-                ? timeOnTodayFromString(profile?.morning_reminder_time, 8, 0)
-                : timeOnTodayFromString(profile?.evening_reminder_time, 21, 0)
+                ? timeOnTodayFromString(profile?.morning_reminder_time, MORNING_DEFAULT.hour, MORNING_DEFAULT.minute)
+                : timeOnTodayFromString(profile?.evening_reminder_time, EVENING_DEFAULT.hour, EVENING_DEFAULT.minute)
             }
             mode="time"
             display="default"

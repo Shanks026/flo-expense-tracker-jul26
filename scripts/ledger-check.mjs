@@ -16,6 +16,7 @@ import { sourceLabel, buildHistory } from '../lib/entryDetail.js';
 import { progressState } from '../lib/progressState.js';
 import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
+import { timeOnToday, timeOnTodayFromString, toTimeColumn, isEveningTime } from '../lib/reminderTime.js';
 import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -383,6 +384,22 @@ check('limit', 'a non-string is no limit', cleanLimitAmount(undefined), null);
   check('card', 'the real catalog starts with Day', real[0], 'day');
   check('card', 'the real catalog offers Ink as ink-classic and Dusk', real.includes('ink-classic') && real.includes('dusk') && !real.includes('ink'), true);
   check('card', 'the real catalog keeps every listed theme', real.length, CARD_THEMES.length);
+}
+
+// --- Reminder time (spec 47, onboarding ticket 09) ---
+{
+  const now = new Date(2026, 10, 11, 9, 15, 42);
+  const nine = timeOnToday(21, 0, now);
+  check('reminder', 'the picker value is built on today, not 1899', [nine.getFullYear(), nine.getMonth(), nine.getDate()], [2026, 10, 11]);
+  check('reminder', 'the picker value is 21:00:00.000', [nine.getHours(), nine.getMinutes(), nine.getSeconds(), nine.getMilliseconds()], [21, 0, 0, 0]);
+  const parsed = timeOnTodayFromString('20:30:00', 21, 0, now);
+  check('reminder', 'a stored time reads back', [parsed.getHours(), parsed.getMinutes(), parsed.getDate()], [20, 30, 11]);
+  check('reminder', 'no stored time is the fallback', timeOnTodayFromString(null, 21, 0, now).getHours(), 21);
+  check('reminder', 'a broken stored time is the fallback', timeOnTodayFromString('later', 21, 0, now).getHours(), 21);
+  check('reminder', '8:30 pm saves 20:30:00', toTimeColumn(new Date(2026, 10, 11, 20, 30, 59)), '20:30:00');
+  check('reminder', 'early hours pad to two digits', toTimeColumn(new Date(2026, 10, 11, 7, 5)), '07:05:00');
+  check('reminder', '12:00 is an evening time', isEveningTime(new Date(2026, 10, 11, 12, 0)), true);
+  check('reminder', '11:59 is not an evening time', isEveningTime(new Date(2026, 10, 11, 11, 59)), false);
 }
 
 // --- Set-up progress (spec 47, onboarding ticket 04) ---
