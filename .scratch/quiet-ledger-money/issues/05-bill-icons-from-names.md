@@ -26,3 +26,7 @@ Spec: .claude/features/48-quiet-ledger-money-screens.md
 - [ ] Code implementation
 - [ ] Verified (emulator check)
 - [ ] Green signal
+
+## Comments
+
+- 2026-11-12 (in progress, not resolved): migration `quiet_ledger_money_bill_icons` applied on the person's go-ahead and verified (an invalid icon is rejected); `lib/billIcons.js`, the four new glyphs in `CategoryIcon`, and the check-script group are written but uncommitted. Not yet built: `billIcon.ts` with its route and deploy, `IconPicker`, the bill sheet's icon row and save logic, showing `billIconKey` on the screens, the emulator check. Details in the handoff's "Ticket 05 in progress".

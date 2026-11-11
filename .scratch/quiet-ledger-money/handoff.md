@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 4, Money screens (spec 48): handoff
 
-Last updated 2026-11-12: tickets 01–03 done; the person asked to run 03–05 in one go (2026-11-12) and said not to wait for approval, which covers 04 and 05's migrations and the Edge Function deploy.
+Last updated 2026-11-12 (end of session): tickets 01–04 done and committed; **ticket 05 is half built, uncommitted** (see "Ticket 05 in progress" below). The person asked to run 03–05 in one go and said not to wait for approval, which covers 04 and 05's migrations (both applied) and 05's Edge Function deploy.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/48-quiet-ledger-money-screens.md`; the design source is
@@ -14,16 +14,20 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 
 | Ticket | Blocked by | State | Commit |
 |---|---|---|---|
-| 01 Insights on the kit | — | done | see git log |
-| 02 Budgets list, detail and sheet | — | done | see git log |
-| 03 Bills list and the bill sheets | — | done | see git log |
-| 04 Bill detail and payment history | 03 | done | see git log |
-| 05 Bill icons from names | 03 | ready | |
+| 01 Insights on the kit | — | done | `4b1ddbf` |
+| 02 Budgets list, detail and sheet | — | done | `8942e20` |
+| 03 Bills list and the bill sheets | — | done | `e5762d6` |
+| 04 Bill detail and payment history | 03 | done (dark mode of bill detail not checked) | `7b55760` |
+| **05 Bill icons from names** | 03 | **in progress, next** (migration applied, code partly written, uncommitted) | |
 | 06 Accounts with last 4 | — | ready | |
 | 07 Splits list and detail | 06 | ready | |
 | 08 Split sheets and "Add from my transactions" | — | ready | |
 | 09 Categories | — | ready | |
-| 10 Plans restyle (flag off) | 02, 07 | ready (droppable to Phase 5) | |
+| 10 Plans restyle (flag off) | 07 | ready (droppable to Phase 5) | |
+
+**Suggested order:** **05** (finish), then 06, 07, 08, 09, 10. 06, 08 and 09 are unblocked; 07 needs 06's `OverflowMenu`.
+
+**Review owed:** tickets 03 and 04 were committed without the two-agent review (the person asked for speed); run `/mattpocock-skills:code-review` over `8942e20..HEAD` together with 05 before closing 05.
 
 ## Decisions (2026-11-11, with the person)
 
@@ -67,6 +71,25 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 - The emulator was signed in as a fresh onboarding account; ticket 01 signed
   in as the shared test account and left it there (Light, Personal active).
 
+## Decisions made while building (2026-11-12, tickets 03–04)
+
+- **Mark paid in the Bills list is a round check** (40 dp, `toneColors(c.positive)` wash, hitSlop to 48), not a text button (the person's ask). The quiet `Button` still has its underline; spec 46 meant to drop it, left for a kit decision (Ask FLO's Dismiss uses it).
+- **Bill rows, Home's upcoming bills and bill alerts open bill detail** (`/bill/<id>`); the pay sheet opens from the check, the detail's pinned Mark paid, and the bills-due pop-up (Phase 5).
+- **Bill detail's band shows the terms** ("Monthly · Next due 7 Nov", danger when overdue); the status ("Overdue since…") is only the timeline's first step. "Last paid" has no sub (it may predate history or be a deleted payment).
+- Kit additions: `ListRow` `subColor`, `SectionHeader` `titleColor`, `Timeline` steps with `tone: 'danger'` and `onPress` (chevron). The None category in the bill sheet is a minus icon.
+- Category circles in the budget and bill sheets copy the Add sheet's row; a shared picker could serve them and 05's `IconPicker`.
+
+## Ticket 05 in progress (uncommitted in the working tree)
+
+- **Done:** migration `quiet_ledger_money_bill_icons` applied (`bills.icon` with a shape check, `bills.icon_picked`, `ai_usage` kind check now allows `bill_icon`; 'Film!' rejected, verified). `lib/billIcons.js` (`BILL_ICON_KEYS`, `iconForBillName`, `billIconKey`). `components/CategoryIcon.js` draws `wifi`, `water`, `gas`, `tv` (the category sheet's icon grid shows them too). The check-script group "bill icons" is written in `scripts/ledger-check.mjs`.
+- **The check script currently fails to load**: its bill-icons group reads `supabase/functions/ai-assistant/billIcon.ts`, which doesn't exist yet. Create it first; it must contain `export const BILL_ICON_KEYS = [...]` (single-quoted strings, same order as `lib/billIcons.js`), which the script parses with a regex.
+- **To do:**
+  - `billIcon.ts`: `{ mode: 'bill_icon', name }` → `{ icon }` or `{ icon: null }`; the quick model, a strict json_schema with an enum of the keys, the reply checked against the list, `ai_usage` kind `bill_icon` (latency and model only, never the name), a daily cap like quick_add. Route it in `index.ts` before the quick_add check, then deploy `ai-assistant` (the person's go-ahead covers it).
+  - `IconPicker` kit component, added to the kit gallery.
+  - Bill sheet: an icon row (preview from `iconForBillName` or the category; Change opens the picker; a pick sets `icon_picked`). On save write `icon` (picked, else the keyword match) and `icon_picked`. After a save with no pick and no match, with `FLAGS.ai`, call the function and update `icon` only if still not picked, then `notifyChanged()`. A rename re-runs the rules unless picked.
+  - Show `billIconKey(bill)` in the Bills list, bill detail and Home's upcoming rows (`useBills` / `useBillDetail` select `*`, so `icon` is already there).
+  - Emulator check in light and dark (bill detail's dark mode is owed from 04), then the review above.
+
 ## How the work is done
 
 Same as `.scratch/quiet-ledger/handoff.md` "How the work is done", with this
@@ -75,5 +98,8 @@ start `quiet-ledger-money/NN`.
 
 - The shared test account has **no splits**: tickets 07 and 08 need one
   created, which is lasting test data, so ask first.
-- The test account's Electricity bill is due 2026-11-12 unpaid; put it back
-  if a bills check pays it.
+- The test account's bills: Netflix due 2026-11-07 (overdue), Electricity due 2026-11-12, two Rent due 2026-12-01, all unpaid, `last_paid_date` null, no `icon` yet. Put them back by SQL `update` after a check (Netflix `bea4947a…`, Electricity `cbb318fb…`); delete test payments through Transaction detail's Delete.
+- **Tap timing:** taps sent right after a navigation or a sheet opening often land on the old screen (they opened the wrong bill's sheet twice). Wait ~3 s after a deep link before `tap.sh`, and re-dump if a label isn't found.
+- **A syntax error shows only a black screen** after a force-stop relaunch. Fetch the bundle to read it: `curl -s "http://localhost:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true&minify=false"` returns a 500 with the message.
+- Restoring data by SQL bypasses `notifyChanged`, so open lists stay stale until a pull-to-refresh.
+- Long inline `python - <<'EOF'` heredocs sometimes fail in Git Bash with "unexpected EOF while looking for matching `'`"; write the script to the scratchpad and run it from there.
