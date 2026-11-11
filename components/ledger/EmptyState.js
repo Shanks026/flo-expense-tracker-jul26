@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: ledgerSpace.gutter,
   },
   object: {
-    marginBottom: ledgerSpace.lg,
+    marginBottom: ledgerSpace.md,
   },
   center: {
     textAlign: 'center',

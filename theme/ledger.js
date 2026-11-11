@@ -59,7 +59,11 @@ export const ledgerSpace = {
 };
 
 export const ledgerRadius = {
+  // Small cards, tiles, skeletons and multi-line boxes.
   input: 12,
+  // Single-line inputs and segmented controls: a full capsule, like every
+  // button and chip (person, 2026-11-11; redesign plan §2.4 amended).
+  field: 999,
   sheet: 20,
   card: 20,
   full: 999,

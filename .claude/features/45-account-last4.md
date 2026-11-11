@@ -1,7 +1,7 @@
 # Feature: Account last 4 digits
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/45-account-last4.md`
-**Status**: Planned
+**Status**: Phase 1 folded into spec 48 (`48-quiet-ledger-money-screens.md`, Accounts) on 2026-11-11; Phase 2 unscheduled
 **Last Updated**: November 2026
 
 ---

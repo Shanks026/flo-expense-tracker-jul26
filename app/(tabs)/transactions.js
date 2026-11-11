@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Search, X, CalendarDays, Wallet, Shapes, ListFilter } from 'lucide-react-native';
 import { LargeTitle } from '../../components/ledger/ScreenHeader';
 import Chip from '../../components/ledger/Chip';
@@ -26,6 +26,7 @@ import {
   groupEntries,
   transferTitle,
   isDefaultFilters,
+  filtersFromLink,
 } from '../../lib/activity';
 
 // Activity (spec 46, ticket 10): a search field, then Type, Category,
@@ -44,6 +45,15 @@ export default function Activity() {
   const { refreshing, onRefresh } = usePullToRefresh();
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const params = useLocalSearchParams();
+
+  // Opened from a link (an Insights category, spec 48): its filters replace
+  // the current ones once per visit (`at` is fresh per tap); the chips then
+  // work as normal.
+  useEffect(() => {
+    const linked = filtersFromLink(params);
+    if (linked) setFilters(linked);
+  }, [params.at]);
   const [sheetKind, setSheetKind] = useState(null);
   const sheetRef = useRef(null);
 
@@ -203,8 +213,8 @@ function makeStyles(c) {
       gap: ledgerSpace.sm,
       height: 44,
       marginTop: ledgerSpace.md,
-      paddingHorizontal: ledgerSpace.md,
-      borderRadius: ledgerRadius.input,
+      paddingHorizontal: ledgerSpace.lg,
+      borderRadius: ledgerRadius.field,
       backgroundColor: c.surfaceSunk,
     },
     searchInput: {

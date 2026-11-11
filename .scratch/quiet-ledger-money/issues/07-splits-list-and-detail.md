@@ -1,0 +1,27 @@
+# 07: Splits list and detail on the kit
+
+Spec: .claude/features/48-quiet-ledger-money-screens.md
+
+**What to build:** Splits as flat rows with stacked member initials and "You're owed ₹600" / "You owe ₹200", and a split detail that leads with the person's balance, lists who owes whom with Settle up on each pair, and pins Settle up and Add entry. Spec 48 §Splits (list and detail).
+
+- `AvatarStack` joins the kit (and the gallery).
+- The net text is a pure rule in `lib/` (owed / owe / settled up, with a sub-paisa residue reading as square).
+- List: open splits, then a muted Closed group; `PinnedFooter` New split with the free gate unchanged; ledger `EmptyState`. Before starting, check how the splits hook exposes each split's net, so the list doesn't add a query per split.
+- Detail: `ScreenHeader` with export and the ⋯ `OverflowMenu` (Close/Reopen, Edit split, invites only with `FLAGS.splitInvites`); the sunk balance band with the `AvatarStack`; "Who owes whom" rows with compact Settle up; the collapsible "how this was worked out"; `Segmented` Entries · People · Settled with counts; "Add from my transactions" as the first Entries row; `PinnedFooter` Settle up + Add entry (Add entry alone when square; none when closed).
+- The sheets this screen opens are unchanged here (ticket 08 restyles them).
+
+**Blocked by:** 06 (`OverflowMenu`)
+
+**Status:** ready-for-agent
+
+- [ ] The check script covers the net text: owed, owe, square, sub-paisa residue
+- [ ] The list shows each split's net and the Closed group
+- [ ] On the detail: settle a pair, add an entry, remove a member (with its confirm), close and reopen, export
+- [ ] A closed split is read-only with no footer
+- [ ] Emulator check in light and dark. The test account has no splits: ask the person before creating one (it's lasting test data)
+
+## Tracer
+
+- [ ] Code implementation
+- [ ] Verified (emulator check)
+- [ ] Green signal

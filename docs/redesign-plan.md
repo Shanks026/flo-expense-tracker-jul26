@@ -99,7 +99,7 @@
 
 ### 2.4 Shape, space, elevation
 - **Spacing:** a 4-pt grid. Screen gutter 20 (nothing may cross it, chart labels included), **block gap 24** (was 28; gappy at the smaller type), 12 between a block and something that belongs to it (quick actions → Today prompt), 16 from the Home header to the card, row height 64 (two lines) or 52 (one line).
-- **Radius:** 12 for inputs and small cards, 20 for sheets and the account card, full for buttons, chips and icon circles.
+- **Radius:** full for buttons, chips, icon circles, **single-line inputs and segmented controls** (amended 2026-11-11: inputs and tabs were 12, which broke with the pill buttons; token `ledgerRadius.field`); 12 for small cards, tiles and multi-line boxes; 20 for sheets and the account card.
 - **Elevation:** none on the canvas. Sheets get one soft shadow in light mode and a `hairline` top edge in dark mode.
 - **Hit targets:** 48 dp minimum everywhere, including chart points (one tap column per day), "See all" and chips. Compact buttons are 34 dp with `hitSlop` to reach it.
 

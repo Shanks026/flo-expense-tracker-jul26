@@ -18,6 +18,7 @@ import TransactionRow from '../../components/ledger/TransactionRow';
 import Timeline from '../../components/ledger/Timeline';
 import DayOfMonthPicker from '../../components/ledger/DayOfMonthPicker';
 import PageDots from '../../components/ledger/PageDots';
+import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
 
 // Developer → Kit (spec 46, ticket 06): every ledger component in its states,
@@ -35,6 +36,10 @@ export default function KitGalleryScreen() {
 const noop = () => {};
 
 // Rows for TransactionRow (no account list, so amounts read as INR).
+// SpendChart samples: a week (Mon 9 Nov 2026 on) and a 30-day month.
+const SAMPLE_WEEK = [420, 0, 1250, 310, 860, 2200, 140].map((amount, i) => ({ date: new Date(2026, 10, 9 + i), amount }));
+const SAMPLE_MONTH = Array.from({ length: 30 }, (_, i) => ({ date: new Date(2026, 10, 1 + i), amount: [120, 640, 0, 980, 260, 1840][i % 6] }));
+
 const SAMPLE_TX = {
   expense: { id: 'e', type: 'expense', amount: 420, note: 'Weekly vegetables', category: { name: 'Groceries', icon: 'groceries', color: '#2F9E44' } },
   income: { id: 'i', type: 'income', amount: 50000, note: null, category: { name: 'Salary', icon: 'salary', color: '#4C7031' } },
@@ -124,6 +129,12 @@ function KitGallery() {
               { key: 'c', title: 'Edited', sub: '3 Nov 2026, 9:00 AM' },
             ]}
           />
+        </Section>
+
+        <Section title="SpendChart">
+          <SpendChart points={SAMPLE_WEEK} mode="week" />
+          <View style={{ height: ledgerSpace.section }} />
+          <SpendChart points={SAMPLE_MONTH} mode="month" />
         </Section>
 
         <Section title="SectionHeader">

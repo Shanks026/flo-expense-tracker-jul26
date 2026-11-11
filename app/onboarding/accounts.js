@@ -164,9 +164,9 @@ function makeStyles(c) {
     input: {
       flex: 1,
       height: 44,
-      paddingHorizontal: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.lg,
       paddingVertical: 0,
-      borderRadius: ledgerRadius.input,
+      borderRadius: ledgerRadius.field,
       backgroundColor: c.surfaceSunk,
       ...ledgerType.body,
       color: c.ink,

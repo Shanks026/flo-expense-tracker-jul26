@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { format, differenceInCalendarDays, subDays } from 'date-fns';
+import { priorRange } from '../lib/insights';
+import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -36,9 +37,9 @@ export default function useAnalyticsData({ from, to, allAccounts = false }) {
       return;
     }
 
-    const days = differenceInCalendarDays(to, from) + 1;
-    const priorTo = subDays(from, 1);
-    const priorFrom = subDays(priorTo, days - 1);
+    // A whole month compares with the whole month before; other ranges with
+    // the same number of days before them (lib/insights.js).
+    const { from: priorFrom, to: priorTo } = priorRange(from, to);
 
     let currentQuery = supabase
       .from('transactions')

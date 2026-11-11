@@ -14,11 +14,12 @@ import { weekChange } from '../lib/weekChange.js';
 import { ENTRY_SOURCES, entrySource } from '../lib/entrySource.js';
 import { sourceLabel, buildHistory } from '../lib/entryDetail.js';
 import { progressState } from '../lib/progressState.js';
-import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
+import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, filtersFromLink, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 import { timeOnToday, timeOnTodayFromString, toTimeColumn, isEveningTime } from '../lib/reminderTime.js';
 import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } from '../lib/periods.js';
 import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
+import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from '../lib/insights.js';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -488,6 +489,79 @@ check('auth error', 'a wrong password reads plainly', authErrorLine({ code: 'inv
 check('auth error', 'a taken email says sign in', authErrorLine({ code: 'user_already_exists', message: 'User already registered' }), 'That email already has an account. Sign in instead');
 check('auth error', 'an unknown code shows the message', authErrorLine({ code: 'x', message: 'Network down' }), 'Network down');
 check('auth error', 'no error, no line', authErrorLine(null), null);
+
+// --- Insights headline and comparison (spec 48, ticket 01) ---
+{
+  const nov = new Date(2026, 10, 1);
+  const today = new Date(2026, 10, 11);
+  const month = (spent, priorSpent) => spendHeadline({ spent, priorSpent, mode: 'month', from: nov, to: new Date(2026, 10, 30), today });
+  check('insights', 'spend leads with the amount', month(1984.5, 2414.5), { lead: 'You spent', amount: '₹1,984.50', comparison: '₹430 less than October' });
+  check('insights', 'more than the month before', month(3000, 1800).comparison, '₹1,200 more than October');
+  check('insights', 'nothing spent', month(0, 500), { lead: "You haven't spent anything", amount: null, comparison: '₹500 less than October' });
+  check('insights', 'prior zero, no comparison', month(1200, 0).comparison, null);
+  check('insights', 'under 5 % is about the same', month(1040, 1000).comparison, 'About the same as October');
+  check('insights', 'exactly 5 % is a change', month(1050, 1000).comparison, '₹50 more than October');
+  check('insights', 'January compares with December', spendHeadline({ spent: 100, priorSpent: 200, mode: 'month', from: new Date(2026, 0, 1), to: new Date(2026, 0, 31), today }).comparison, '₹100 less than December');
+  const week = (from, to) => spendHeadline({ spent: 900, priorSpent: 600, mode: 'week', from, to, today }).comparison;
+  check('insights', 'this week compares with last week', week(new Date(2026, 10, 9), new Date(2026, 10, 15)), '₹300 more than last week');
+  check('insights', 'a past week compares with the week before', week(new Date(2026, 10, 2), new Date(2026, 10, 8)), '₹300 more than the week before');
+  check('insights', 'custom compares with the days before', spendHeadline({ spent: 500, priorSpent: 800, mode: 'custom', from: new Date(2026, 10, 1), to: new Date(2026, 10, 7), today }).comparison, '₹300 less than the 7 days before');
+  check('insights', 'a one-day custom range', spendHeadline({ spent: 500, priorSpent: 800, mode: 'custom', from: today, to: today, today }).comparison, '₹300 less than the day before');
+}
+
+// --- Insights chart y-axis (spec 48, ticket 01) ---
+check('axis', 'about ₹2k steps in thousands', spendAxis(1984.5), { ticks: [0, 1000, 2000], top: 2000 });
+check('axis', 'a round top stays', spendAxis(300), { ticks: [0, 100, 200, 300], top: 300 });
+check('axis', 'steps of 2.5', spendAxis(7400), { ticks: [0, 2500, 5000, 7500], top: 7500 });
+check('axis', 'steps of 2', spendAxis(520), { ticks: [0, 200, 400, 600], top: 600 });
+check('axis', 'nothing spent still draws a scale', spendAxis(0), { ticks: [0, 100], top: 100 });
+check('axis', 'paise only', spendAxis(0.6), { ticks: [0, 1], top: 1 });
+check('axis', 'zero', axisLabel(0), '₹0');
+check('axis', 'hundreds', axisLabel(250), '₹250');
+check('axis', 'thousands', axisLabel(1000), '₹1k');
+check('axis', 'a half thousand', axisLabel(2500), '₹2.5k');
+check('axis', 'lakhs', axisLabel(150000), '₹1.5L');
+check('axis', 'crores', axisLabel(20000000), '₹2Cr');
+check('axis', 'another currency symbol', axisLabel(1000, 'USD'), '$1k');
+
+// --- Activity opened from an Insights category (spec 48, ticket 01) ---
+check('activity link', 'category, type, range and account', filtersFromLink({ categoryId: 'c1', type: 'expense', from: '2026-11-01', to: '2026-11-30', accountId: 'a2' }), {
+  ...DEFAULT_FILTERS,
+  type: 'expense',
+  categoryId: 'c1',
+  accountId: 'a2',
+  range: { preset: 'custom', from: '2026-11-01', to: '2026-11-30' },
+});
+check('activity link', 'no account keeps the active one', filtersFromLink({ categoryId: 'c1', from: '2026-11-01', to: '2026-11-07' }).accountId, null);
+check('activity link', 'all accounts', filtersFromLink({ accountId: 'all', from: '2026-11-01', to: '2026-11-07' }).accountId, 'all');
+check('activity link', 'uncategorized links to all categories', filtersFromLink({ categoryId: '', from: '2026-11-01', to: '2026-11-07' }).categoryId, null);
+check('activity link', 'a bad date leaves the range alone', filtersFromLink({ categoryId: 'c1', from: 'nope', to: '2026-11-07' }).range, DEFAULT_FILTERS.range);
+check('activity link', 'an unknown type reads as all', filtersFromLink({ type: 'transfer_in', from: '2026-11-01', to: '2026-11-07' }).type, 'all');
+check('activity link', 'nothing in the link, nothing applied', filtersFromLink({}), null);
+check('activity link', 'only the visit stamp, nothing applied', filtersFromLink({ at: '123' }), null);
+
+// --- Insights "Where it went" change line (spec 48, ticket 01) ---
+{
+  const nov = { mode: 'month', from: new Date(2026, 10, 1), to: new Date(2026, 10, 30), today: new Date(2026, 10, 11) };
+  check('category change', 'up', categoryChange({ pct: 137.5, direction: 'up' }, nov), '↑138 % vs October');
+  check('category change', 'down', categoryChange({ pct: -57.1, direction: 'down' }, nov), '↓57 % vs October');
+  check('category change', 'nothing the period before', categoryChange({ pct: null, direction: 'up' }, nov), 'None in October');
+  check('category change', 'flat', categoryChange({ pct: 0, direction: 'flat' }, nov), 'Same as October');
+  check('category change', 'nothing last week', categoryChange({ pct: null, direction: 'up' }, { mode: 'week', from: new Date(2026, 10, 9), to: new Date(2026, 10, 15), today: new Date(2026, 10, 11) }), 'None last week');
+  check('category change', 'last week', categoryChange({ pct: 10, direction: 'up' }, { mode: 'week', from: new Date(2026, 10, 9), to: new Date(2026, 10, 15), today: new Date(2026, 10, 11) }), '↑10 % vs last week');
+}
+
+// --- Insights: the period before (spec 48, ticket 01) ---
+{
+  const d = (y, m, day) => new Date(y, m, day);
+  const r = (from, to) => { const p = priorRange(from, to); return [p.from.toDateString(), p.to.toDateString()]; };
+  check('prior range', 'November compares with all of October', r(d(2026, 10, 1), d(2026, 10, 30)), [d(2026, 9, 1).toDateString(), d(2026, 9, 31).toDateString()]);
+  check('prior range', 'March compares with February', r(d(2026, 2, 1), d(2026, 2, 31)), [d(2026, 1, 1).toDateString(), d(2026, 1, 28).toDateString()]);
+  check('prior range', 'January compares with December', r(d(2027, 0, 1), d(2027, 0, 31)), [d(2026, 11, 1).toDateString(), d(2026, 11, 31).toDateString()]);
+  check('prior range', 'a week compares with the week before', r(d(2026, 10, 9), d(2026, 10, 15)), [d(2026, 10, 2).toDateString(), d(2026, 10, 8).toDateString()]);
+  check('prior range', 'a custom range compares with the same days before', r(d(2026, 10, 5), d(2026, 10, 11)), [d(2026, 9, 29).toDateString(), d(2026, 10, 4).toDateString()]);
+  check('prior range', 'a range not on month edges stays day-for-day', r(d(2026, 10, 2), d(2026, 10, 30)), [d(2026, 9, 4).toDateString(), d(2026, 10, 1).toDateString()]);
+}
 
 // --- Report ---
 for (const f of failures) {

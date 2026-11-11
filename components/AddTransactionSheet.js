@@ -1098,8 +1098,8 @@ function makeStyles(c) {
     field: {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: c.hairline,
-      borderRadius: ledgerRadius.input,
-      paddingHorizontal: ledgerSpace.md,
+      borderRadius: ledgerRadius.field,
+      paddingHorizontal: ledgerSpace.gutter,
       paddingVertical: ledgerSpace.sm + 2,
     },
     fieldLabel: {

@@ -238,9 +238,9 @@ function makeStyles(c) {
     },
     field: {
       height: ledgerSize.hit,
-      paddingHorizontal: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.lg,
       paddingVertical: 0,
-      borderRadius: ledgerRadius.input,
+      borderRadius: ledgerRadius.field,
       backgroundColor: c.surfaceSunk,
       ...ledgerType.body,
       color: c.ink,

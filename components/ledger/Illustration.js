@@ -21,8 +21,10 @@ const OBJECTS = {
 
 export const ILLUSTRATION_NAMES = Object.keys(OBJECTS);
 
-// `small` for empty states, `large` for onboarding and celebrations.
-const SIZES = { small: 72, large: 120 };
+// `small` for empty states, `large` for onboarding and celebrations. Small
+// was 72 and read as huge over a 16 dp title (person, 2026-11-11); 48 keeps
+// the glyph near the title's size until the 3D objects replace it.
+const SIZES = { small: 48, large: 120 };
 
 // `surface="dark"` is for a screen that's dark whatever the phone's mode
 // (the streak celebration); otherwise it follows light/dark.
