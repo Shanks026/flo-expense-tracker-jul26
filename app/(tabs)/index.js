@@ -143,7 +143,7 @@ export default function Home() {
   const balanceLoading = heroLoading || balance.pending;
   // The totals cover the profile's summary period (Settings → Summary
   // period), read with them; Monthly, the default, reads "this month".
-  const periodPhrase = resetPeriodPhrase(summaryPeriod.resetPeriod, summaryPeriod.customStart);
+  const periodPhrase = resetPeriodPhrase(summaryPeriod);
   const dueBills = bills.filter((b) => b.is_active && BILL_WINDOW.includes(billStatus(b.next_due_date)));
 
   const quickActions = [

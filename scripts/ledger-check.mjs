@@ -17,6 +17,7 @@ import { progressState } from '../lib/progressState.js';
 import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 import { timeOnToday, timeOnTodayFromString, toTimeColumn, isEveningTime } from '../lib/reminderTime.js';
+import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } from '../lib/periods.js';
 import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -412,6 +413,37 @@ check('progress', 'themes off: budget is 3 of 3', setupProgress('budget', { them
 check('progress', 'themes off: accounts is 1 of 3', setupProgress('accounts', { themes: false }), { label: '1 of 3', value: 1 / 3 });
 check('progress', 'themes off: card is not a question', setupProgress('card', { themes: false }), null);
 check('progress', 'a step that is not a question has no progress', setupProgress('first_expense'), null);
+
+// --- Salary-day month (spec 47, onboarding ticket 05) ---
+{
+  const salary = (day) => ({ resetPeriod: 'salary_day', monthDay: day });
+  const at = (y, m, d) => new Date(y, m - 1, d, 15, 0);
+  check('salary day', 'mid-month starts this month', resetPeriodStart(salary(10), at(2026, 11, 20)), '2026-11-10');
+  check('salary day', 'on the day starts today', resetPeriodStart(salary(25), at(2026, 10, 25)), '2026-10-25');
+  check('salary day', 'the day before is still last month', resetPeriodStart(salary(25), at(2026, 11, 24)), '2026-10-25');
+  check('salary day', 'the 31st in a 30-day month is its last day', resetPeriodStart(salary(31), at(2026, 4, 30)), '2026-04-30');
+  check('salary day', 'the 31st before a 30-day month ends reaches back', resetPeriodStart(salary(31), at(2026, 4, 29)), '2026-03-31');
+  check('salary day', 'the 30th in February (non-leap) is 28 Feb', resetPeriodStart(salary(30), at(2026, 2, 28)), '2026-02-28');
+  check('salary day', 'the 31st in February (leap) is 29 Feb', resetPeriodStart(salary(31), at(2028, 2, 29)), '2028-02-29');
+  check('salary day', 'the 30th on 28 Feb of a leap year is still January', resetPeriodStart(salary(30), at(2028, 2, 28)), '2028-01-30');
+  check('salary day', 'early March after a short February', resetPeriodStart(salary(30), at(2026, 3, 1)), '2026-02-28');
+  check('salary day', 'across a year boundary', resetPeriodStart(salary(25), at(2027, 1, 5)), '2026-12-25');
+  check('salary day', 'the 1st is the calendar month', resetPeriodStart(salary(1), at(2026, 11, 11)), '2026-11-01');
+  check('salary day', 'no day falls back to the calendar month', resetPeriodStart(salary(null), at(2026, 11, 11)), '2026-11-01');
+  check('salary day', 'a day out of range falls back', resetPeriodStart(salary(32), at(2026, 11, 11)), '2026-11-01');
+  check('salary day', 'the phrase', resetPeriodPhrase(salary(25), at(2026, 11, 11)), 'since 25 Oct');
+  check('salary day', 'the phrase on the day', resetPeriodPhrase(salary(11), at(2026, 11, 11)), 'since 11 Nov');
+  check('salary day', 'the phrase follows the fetched start', resetPeriodPhrase({ ...salary(25), since: '2026-10-25' }, at(2026, 11, 26)), 'since 25 Oct');
+  check('salary day', 'the phrase with no day', resetPeriodPhrase(salary(null), at(2026, 11, 11)), 'this month');
+  check('salary day', 'monthly ignores a stored day', resetPeriodStart({ resetPeriod: 'monthly', monthDay: 25 }, at(2026, 11, 11)), '2026-11-01');
+  check('salary day', 'monthly phrase', resetPeriodPhrase({ resetPeriod: 'monthly', monthDay: 25 }), 'this month');
+  check('salary day', 'custom still uses its anchor', resetPeriodStart({ resetPeriod: 'custom', customStart: '2026-11-03' }), '2026-11-03');
+  check('salary day', 'custom phrase', resetPeriodPhrase({ resetPeriod: 'custom', customStart: '2026-11-03' }), 'since 3 Nov');
+  check('salary day', 'quarterly', resetPeriodStart({ resetPeriod: 'quarterly' }, at(2026, 11, 11)), '2026-10-01');
+  check('salary day', 'no profile is monthly', resetPeriodStart(periodFromProfile(null), at(2026, 11, 11)), '2026-11-01');
+  check('salary day', 'the profile columns read across', periodFromProfile({ reset_period: 'salary_day', reset_custom_start: null, reset_month_day: 25 }), { resetPeriod: 'salary_day', customStart: null, monthDay: 25 });
+  check('salary day', 'ordinals', [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 25, 31].map(ordinalDay), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '25th', '31st']);
+}
 
 // --- Report ---
 for (const f of failures) {

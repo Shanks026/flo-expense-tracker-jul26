@@ -11,16 +11,20 @@ Spec: .claude/features/47-quiet-ledger-onboarding.md
 
 **Blocked by:** None (can start immediately; the migration needs the person's yes first)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The check script covers the period start: mid-month, on the day, the day before, day 31 in a 30-day month, February (leap and non-leap), across a year boundary; and the phrase
-- [ ] The migration is applied with the person's yes and recorded in 00-index.md
-- [ ] Choosing Salary day 25 in Settings changes Home's line to "since 25 Oct" and the totals to match (confirm against SQL)
-- [ ] Switching back to Monthly restores the calendar month
-- [ ] Emulator check in light and dark (put the test account's period back afterwards)
+- [x] The check script covers the period start: mid-month, on the day, the day before, day 31 in a 30-day month, February (leap and non-leap), across a year boundary; and the phrase
+- [x] The migration is applied with the person's yes and recorded in 00-index.md
+- [x] Choosing Salary day 25 in Settings changes Home's line to "since 25 Oct" and the totals to match (confirm against SQL)
+- [x] Switching back to Monthly restores the calendar month
+- [x] Emulator check in light and dark (put the test account's period back afterwards)
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-11: built and checked on Pixel_API_36 (account `FLO_ONB04_*`, light and dark). Migration `quiet_ledger_onboarding_salary_day_month` applied with the person's yes. Five periods no longer fit a Segmented, so Summary period is now a row that opens `SummaryPeriodSheet` (a choice list); picking Salary day with no day saved goes on to the day grid, so both columns are written together. `components/ledger/DayOfMonthPicker.js` (in the kit gallery) is there for ticket 06. Review (two agents): no hard violations or spec gaps; fixed the stale 00-index status, a raw padding value, and Home's phrase drifting from its totals past midnight (the phrase now uses the start the totals were fetched with). Left as judgement calls: a per-period map in `lib/periods.js`, and the local forwardRef sheet instead of a provider (as ActivityFilterSheet does). `resetPeriodStart`/`resetPeriodPhrase` now take one period object (`periodFromProfile`). Not checked: the totals at a real period boundary on the device (the account's only entry is today's, so every salary day includes it; the boundaries are covered by 25 cases in `ledger-check.mjs`, 249 in all). The account was put back to Monthly with `reset_month_day` null.

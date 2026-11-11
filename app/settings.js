@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useState, useEffect, useCallback, useMemo } from 'react';
+import { Children, cloneElement, isValidElement, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Image, Modal, ActivityIndicator, Linking, AppState, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,7 +81,8 @@ import {
   WATCHED_APP_LABELS,
 } from '../lib/detect';
 import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
-import { RESET_PERIOD_OPTIONS } from '../lib/periods';
+import { resetPeriodLabel, ordinalDay } from '../lib/periods';
+import SummaryPeriodSheet from '../components/SummaryPeriodSheet';
 import { destructiveHaptic } from '../lib/haptics';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
@@ -190,6 +191,10 @@ export default function Settings() {
   const [showResetDatePicker, setShowResetDatePicker] = useState(false);
   const resetPeriod = profile?.reset_period ?? 'monthly';
   const resetCustomStart = profile?.reset_custom_start ?? null;
+  const resetMonthDay = profile?.reset_month_day ?? null;
+  // Summary period's sheet (SummaryPeriodSheet): 'period' or 'day'.
+  const periodSheetRef = useRef(null);
+  const [periodSheetKind, setPeriodSheetKind] = useState('period');
 
   // Transaction Detection (06-transaction-auto-detect.md). Notification
   // access is granted outside the app (system settings), with no callback —
@@ -223,6 +228,29 @@ export default function Settings() {
     } else {
       await updateProfile({ reset_period: value });
     }
+  }
+
+  function openPeriodSheet(kind) {
+    setPeriodSheetKind(kind);
+    periodSheetRef.current?.present();
+  }
+
+  // Salary day writes reset_period and reset_month_day together: with no
+  // day saved yet, the sheet moves on to the day grid and nothing is written
+  // until a day is picked. A day saved earlier (kept when switching away) is
+  // reused.
+  async function handlePeriodPick(value) {
+    if (value === 'salary_day' && !resetMonthDay) {
+      setPeriodSheetKind('day');
+      return;
+    }
+    periodSheetRef.current?.dismiss();
+    if (value !== resetPeriod) await handleResetPeriodChange(value);
+  }
+
+  async function handleSalaryDayPick(day) {
+    periodSheetRef.current?.dismiss();
+    await updateProfile({ reset_period: 'salary_day', reset_month_day: day });
   }
 
   function handleResetCustomStartChange(_event, selected) {
@@ -626,14 +654,24 @@ export default function Settings() {
         )}
 
         <Group title="Preferences">
-          <ListRow icon={CircleDollarSign} title="Summary period" sub="When Home's spent and received totals reset">
-            <Segmented
-              accessibilityLabel="Summary period"
-              options={RESET_PERIOD_OPTIONS}
-              value={resetPeriod}
-              onChange={handleResetPeriodChange}
+          <ListRow
+            icon={CircleDollarSign}
+            title="Summary period"
+            sub="When Home's spent and received totals reset"
+            subLines={2}
+            right={resetPeriodLabel(resetPeriod)}
+            trailing="chevron"
+            onPress={() => openPeriodSheet('period')}
+          />
+          {resetPeriod === 'salary_day' && (
+            <ListRow
+              icon={CalendarDays}
+              title="Salary day"
+              right={resetMonthDay ? ordinalDay(resetMonthDay) : 'Pick a day'}
+              trailing="chevron"
+              onPress={() => openPeriodSheet('day')}
             />
-          </ListRow>
+          )}
           {resetPeriod === 'custom' && (
             <ListRow
               icon={CalendarDays}
@@ -823,6 +861,15 @@ export default function Settings() {
           </View>
         </View>
       </Modal>
+
+      <SummaryPeriodSheet
+        ref={periodSheetRef}
+        kind={periodSheetKind}
+        period={resetPeriod}
+        monthDay={resetMonthDay}
+        onPick={handlePeriodPick}
+        onPickDay={handleSalaryDayPick}
+      />
     </View>
   );
 }
