@@ -7,6 +7,13 @@ import { useDataRefresh } from '../lib/DataRefreshContext';
 // any single app session, and the hook re-signs whenever the profile refetches.
 const AVATAR_URL_TTL_SECONDS = 60 * 60 * 24;
 
+// A read that fails or comes back empty for a signed-in user is tried again
+// after 1, 2, 4 and 8 s. Without it one bad read right after sign-in (a
+// dropped request, or the profile row not there yet) left `profile` null
+// for good: OnboardingGate waits on it, so the person sat on sign-in after a
+// sign-in that had worked (seen 2026-11-11 after clearing app data).
+const PROFILE_RETRIES = 4;
+
 export default function useProfile() {
   const { session, verifyUser } = useAuth();
   const { version, notifyChanged } = useDataRefresh();
@@ -28,16 +35,19 @@ export default function useProfile() {
   // pattern) clears it synchronously, before any child effect reads the stale
   // value — same class of fix AccountContext already applies to activeAccountId
   // and ThemeProfileSync to accent/mode on a user switch.
+  const [retry, setRetry] = useState(0);
   const [trackedUserId, setTrackedUserId] = useState(userId);
   if (userId !== trackedUserId) {
     setTrackedUserId(userId);
     setProfile(null);
     setAvatarUrl(null);
     setLoading(true);
+    setRetry(0);
   }
 
+  // Resolves true when the profile row was read.
   const refetch = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) return false;
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (!error) setProfile(data);
 
@@ -63,11 +73,21 @@ export default function useProfile() {
       setAvatarUrl(null);
     }
     setLoading(false);
+    return !error && data !== null;
   }, [userId, verifyUser]);
 
   useEffect(() => {
-    refetch();
-  }, [refetch, version]);
+    let cancelled = false;
+    let timer = null;
+    refetch().then((read) => {
+      if (cancelled || read || !userId || retry >= PROFILE_RETRIES) return;
+      timer = setTimeout(() => setRetry((n) => n + 1), 1000 * 2 ** retry);
+    });
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [refetch, version, retry, userId]);
 
   // `silent` skips notifyChanged() — for fields like theme_accent/theme_mode
   // that no fetched data (transactions, budgets, etc.) depends on. Without

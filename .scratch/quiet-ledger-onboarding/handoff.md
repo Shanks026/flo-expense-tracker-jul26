@@ -24,7 +24,7 @@ there all apply here and aren't repeated.
 | 09 First expense and the reminder ask on the kit | done | a67ff15 |
 | 10 First Home coach mark and the full-flow check | blocked by 02, 03, 05, 06 | |
 
-Suggested order: 10. Before it, look at the one-off stuck sign-in noted in ticket 03's Comments.
+Suggested order: 10. The one-off stuck sign-in from ticket 03 is fixed (useProfile retries a failed or empty read).
 
 ## Decisions (2026-11-11, with the person, while writing spec 47)
 
