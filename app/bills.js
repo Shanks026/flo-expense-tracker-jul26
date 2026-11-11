@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, Animated, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { Receipt, Check } from 'lucide-react-native';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
@@ -19,8 +20,7 @@ import { track } from '../lib/track';
 // Bills on the ledger kit (spec 48, ticket 03): grouped under Overdue, This
 // week, Later and Paused (lib/billGroups.js), each a flat row with its icon,
 // "Monthly · Due 12 Nov", the amount and a round green check (Mark paid). A tap
-// opens the bill sheet (bill detail arrives in ticket 04). New bill is
-// pinned.
+// opens the bill's detail (ticket 04). New bill is pinned.
 export default function Bills() {
   const { c, modeId } = useLedger();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -28,6 +28,7 @@ export default function Bills() {
   useEffect(() => {
     track('feature_opened', { feature: 'bills' });
   }, []);
+  const router = useRouter();
   const { scrollY, onScroll } = useHeaderScroll();
   const { refreshing, onRefresh } = usePullToRefresh();
   const { bills, loading } = useBills();
@@ -99,7 +100,7 @@ export default function Bills() {
                         </Pressable>
                       ) : undefined
                     }
-                    onPress={() => openAddBill(bill)}
+                    onPress={() => router.push(`/bill/${bill.id}`)}
                     divider={i < g.items.length - 1}
                   />
                 );

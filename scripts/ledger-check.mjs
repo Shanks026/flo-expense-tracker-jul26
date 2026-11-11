@@ -21,7 +21,8 @@ import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } fr
 import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
 import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from '../lib/insights.js';
 import { budgetRowStatus } from '../lib/budgetRow.js';
-import { groupBills, billLine } from '../lib/billGroups.js';
+import { groupBills, billLine, billTerms } from '../lib/billGroups.js';
+import { billTimeline } from '../lib/billTimeline.js';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -600,7 +601,38 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('bills', 'line: due today', billLine(bill('A', '2026-11-12', { cadence: 'weekly' }), today), { sub: 'Weekly · Due today', tone: null });
   check('bills', 'line: overdue', billLine(bill('A', '2026-11-07'), today), { sub: 'Overdue since 7 Nov', tone: 'danger' });
   check('bills', 'line: paused', billLine(bill('A', '2026-11-07', { is_active: false, cadence: 'yearly' }), today), { sub: 'Yearly · Paused', tone: 'muted' });
+  check('bills', 'terms: due', billTerms(bill('A', '2026-12-07'), today), { text: 'Monthly · Next due 7 Dec', tone: null });
+  check('bills', 'terms: overdue', billTerms(bill('A', '2026-11-07'), today), { text: 'Monthly · Next due 7 Nov', tone: 'danger' });
+  check('bills', 'terms: paused', billTerms(bill('A', '2026-11-07', { is_active: false }), today), { text: 'Monthly · Paused', tone: 'muted' });
   check('bills', 'line: next year shows the year', billLine(bill('A', '2027-01-05', { cadence: 'yearly' }), today).sub, 'Yearly · Due 5 Jan 2027');
+}
+
+// --- Bill detail timeline (spec 48, ticket 04) ---
+{
+  const today = new Date(2026, 10, 12);
+  const bill = (extra = {}) => ({ id: 'b', name: 'Netflix', amount: 649, currency: 'INR', cadence: 'monthly', next_due_date: '2026-12-07', last_paid_date: null, is_active: true, created_at: '2026-09-01T10:00:00Z', ...extra });
+  const pay = (day, amount = 649, account = 'HDFC') => ({ id: `t${day}`, occurred_at: day, amount, accountName: account });
+  const shape = (steps) => steps.map((s) => [s.kind, s.title, s.sub ?? null, s.tone ?? null]);
+  check('bill timeline', 'never paid: next due, then added', shape(billTimeline(bill(), [], today)), [
+    ['due', 'Due 7 Dec', 'Next payment', null],
+    ['added', 'Added', '1 Sep', null],
+  ]);
+  check('bill timeline', 'payments newest first, with account', shape(billTimeline(bill({ last_paid_date: '2026-11-07' }), [pay('2026-11-07'), pay('2026-10-07', 599, 'Personal')], today)), [
+    ['due', 'Due 7 Dec', 'Next payment', null],
+    ['payment', 'Paid ₹649', '7 Nov · HDFC', null],
+    ['payment', 'Paid ₹599', '7 Oct · Personal', null],
+    ['added', 'Added', '1 Sep', null],
+  ]);
+  check('bill timeline', 'a payment links its entry', billTimeline(bill(), [pay('2026-11-07')], today)[1].txId, 't2026-11-07');
+  check('bill timeline', 'overdue open step in danger', shape(billTimeline(bill({ next_due_date: '2026-11-07' }), [], today))[0], ['due', 'Overdue since 7 Nov', 'Next payment', 'danger']);
+  check('bill timeline', 'due today', billTimeline(bill({ next_due_date: '2026-11-12' }), [], today)[0].title, 'Due today');
+  check('bill timeline', 'paused: no open step', billTimeline(bill({ is_active: false }), [], today).map((s) => s.kind), ['added']);
+  check('bill timeline', 'last paid before history began', shape(billTimeline(bill({ last_paid_date: '2026-10-07' }), [], today))[1], ['last_paid', 'Last paid 7 Oct', null, null]);
+  check('bill timeline', 'last paid matching a payment adds nothing', billTimeline(bill({ last_paid_date: '2026-11-07' }), [pay('2026-11-07')], today).map((s) => s.kind), ['due', 'payment', 'added']);
+  const many = Array.from({ length: 14 }, (_, i) => pay(`2025-${String(12 - (i % 12)).padStart(2, '0')}-${String(10 + Math.floor(i / 12)).padStart(2, '0')}`));
+  const capped = billTimeline(bill(), many, today);
+  check('bill timeline', 'twelve payments, then a pointer to Activity', [capped.filter((s) => s.kind === 'payment').length, capped[capped.length - 2].title], [12, 'Earlier payments are in Activity']);
+  check('bill timeline', 'another year shows the year', billTimeline(bill({ next_due_date: '2027-01-05', created_at: '2025-03-02T10:00:00Z' }), [], today).map((s) => s.title === 'Added' ? s.sub : s.title), ['Due 5 Jan 2027', '2 Mar 2025']);
 }
 
 // --- Report ---

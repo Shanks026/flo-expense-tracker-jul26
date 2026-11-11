@@ -17,7 +17,7 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 | 01 Insights on the kit | — | done | see git log |
 | 02 Budgets list, detail and sheet | — | done | see git log |
 | 03 Bills list and the bill sheets | — | done | see git log |
-| 04 Bill detail and payment history | 03 | ready | |
+| 04 Bill detail and payment history | 03 | done | see git log |
 | 05 Bill icons from names | 03 | ready | |
 | 06 Accounts with last 4 | — | ready | |
 | 07 Splits list and detail | 06 | ready | |

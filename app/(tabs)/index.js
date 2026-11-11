@@ -16,7 +16,6 @@ import EmptyState from '../../components/ledger/EmptyState';
 import CategoryIcon from '../../components/CategoryIcon';
 import { useToast } from '../../components/Toast';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
-import { usePayBillSheet } from '../../components/PayBillSheet';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
 import { useAlertsSheet } from '../../components/AlertsSheet';
 import useAlerts from '../../hooks/useAlerts';
@@ -102,7 +101,6 @@ export default function Home() {
   const { equippedTheme } = useCardThemes();
   const { count: alertCount } = useAlerts();
   const { openAdd } = useAddTransactionSheet();
-  const { openPayBill } = usePayBillSheet();
   const { openAccountSwitcher } = useAccountSwitcherSheet();
   const { openAlerts } = useAlertsSheet();
 
@@ -304,7 +302,7 @@ export default function Home() {
                 <ListRow
                   key={bill.id}
                   divider={i < arr.length - 1}
-                  onPress={() => openPayBill(bill)}
+                  onPress={() => router.push(`/bill/${bill.id}`)}
                   iconColor={overdue ? c.danger : undefined}
                   tone={overdue ? c.danger : bill.category?.color}
                   renderIcon={(tint) =>

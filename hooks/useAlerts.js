@@ -38,7 +38,7 @@ export default function useAlerts() {
           severity: 'danger',
           title: `${bill.name} overdue`,
           subtitle: `${formatMoney(bill.amount)} — was due ${format(new Date(bill.next_due_date), 'd MMM')}`,
-          route: '/bills',
+          route: `/bill/${bill.id}`,
         });
       } else if (status === 'due_soon') {
         list.push({
@@ -47,7 +47,7 @@ export default function useAlerts() {
           severity: 'warn',
           title: `${bill.name} due soon`,
           subtitle: `${formatMoney(bill.amount)} — due ${format(new Date(bill.next_due_date), 'd MMM')}`,
-          route: '/bills',
+          route: `/bill/${bill.id}`,
         });
       }
     }
