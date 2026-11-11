@@ -6,11 +6,13 @@ import { inter as fontFamily } from '../../theme/ledger';
 // right action ("See all") or a right node (the week's total). The first
 // pass used an uppercase muted caption; on device it read as faint and
 // shouty at once, so sections now lead with a slightly bolder ink title.
-export default function SectionHeader({ title, actionLabel, onAction, right, style }) {
+// `titleColor` tints the title for a group that means something (Bills'
+// "Overdue" in danger); default ink.
+export default function SectionHeader({ title, titleColor, actionLabel, onAction, right, style }) {
   const { c } = useLedger();
   return (
     <View style={[styles.row, style]}>
-      <Text style={[ledgerType.section, styles.title, { color: c.ink }]} numberOfLines={1} accessibilityRole="header">
+      <Text style={[ledgerType.section, styles.title, { color: titleColor ?? c.ink }]} numberOfLines={1} accessibilityRole="header">
         {title}
       </Text>
       {right}

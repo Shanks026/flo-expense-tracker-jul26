@@ -1,12 +1,13 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { View, Text, StyleSheet } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { X, SkipForward } from 'lucide-react-native';
+import { CalendarDays, Wallet, ChevronDown } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Button from './Button';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import Sheet from './ledger/Sheet';
+import ListRow from './ledger/ListRow';
+import Chip from './ledger/Chip';
+import { useLedger, ledgerType, ledgerSpace, tabular } from '../theme/ledger';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -36,8 +37,8 @@ export function usePayBillSheet() {
 }
 
 const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -110,239 +111,113 @@ const PayBillSheet = forwardRef(function PayBillSheet(_props, ref) {
     showToast({ message: `Skipped ${bill.name} this cycle`, variant: 'info' });
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={`Pay ${bill?.name ?? ''}`}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{
+        primary: { title: 'Mark as paid', onPress: handleMarkPaid, loading: saving },
+        // A charge that didn't happen this cycle: moves the due date on, logs nothing.
+        secondary: { title: 'Skip this cycle', onPress: handleSkip, disabled: saving },
+      }}
     >
-      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            Pay {bill?.name ?? ''}
-          </Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
+      {/* The amount, centred and large, with a muted symbol. */}
+      <View style={styles.amountWrap}>
+        <Text style={styles.amountCurrency}>{currencySymbol(bill?.currency)}</Text>
+        <BottomSheetTextInput
+          value={amount}
+          // The caret stays at the end, like the Add sheet's amount.
+          selection={{ start: amount.length, end: amount.length }}
+          onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
+          placeholder="0"
+          placeholderTextColor={c.inkFaint}
+          cursorColor={c.accent}
+          selectionColor={c.accent}
+          keyboardType="decimal-pad"
+          accessibilityLabel="Amount paid"
+          style={[styles.amountInput, tabular]}
+          autoFocus
+        />
+      </View>
+
+      <ListRow icon={CalendarDays} title="Paid on" right={format(paidDate, 'd MMM yyyy')} trailing="chevron" onPress={() => setShowDatePicker(true)} />
+      {showDatePicker && (
+        <DateTimePicker
+          value={paidDate}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={(_event, selected) => {
+            setShowDatePicker(false);
+            if (selected) setPaidDate(selected);
+          }}
+        />
+      )}
+
+      <ListRow
+        icon={Wallet}
+        title="Pay from"
+        right={selectedAccount?.name ?? '—'}
+        trailing={<ChevronDown size={18} color={c.muted} strokeWidth={1.75} />}
+        onPress={() => setAccountPickerOpen((v) => !v)}
+        divider={accountPickerOpen}
+      />
+      {accountPickerOpen && (
+        <View style={styles.optionRow}>
+          {accounts.map((account) => (
+            <Chip
+              key={account.id}
+              label={account.name}
+              selected={account.id === accountId}
+              onPress={() => {
+                setAccountId(account.id);
+                setAccountPickerOpen(false);
+              }}
+            />
+          ))}
         </View>
+      )}
 
-        <Text style={styles.fieldLabel}>Amount</Text>
-        <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>{currencySymbol(bill?.currency)}</Text>
-          <TextInput
-            value={amount}
-            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
-            placeholder="0"
-            placeholderTextColor={colors.mutedDarker}
-            keyboardType="number-pad"
-            style={styles.amountInput}
-            autoFocus
-          />
-        </View>
-
-        <Pressable style={[styles.row, { marginTop: spacing.md }]} onPress={() => setShowDatePicker(true)}>
-          <Text style={styles.fieldLabelInline}>Paid On</Text>
-          <Text style={styles.rowValue}>{format(paidDate, 'd MMM yyyy')}</Text>
-        </Pressable>
-        {showDatePicker && (
-          <DateTimePicker
-            value={paidDate}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            onChange={(_event, selected) => {
-              setShowDatePicker(false);
-              if (selected) setPaidDate(selected);
-            }}
-          />
-        )}
-
-        <Pressable style={[styles.row, { marginTop: spacing.md }]} onPress={() => setAccountPickerOpen((v) => !v)}>
-          <Text style={styles.fieldLabelInline}>Pay From</Text>
-          <View style={styles.accountValueRow}>
-            {selectedAccount && <View style={[styles.accountDot, { backgroundColor: selectedAccount.color }]} />}
-            <Text style={styles.rowValue}>{selectedAccount?.name ?? '—'}</Text>
-          </View>
-        </Pressable>
-
-        {accountPickerOpen && (
-          <View style={styles.accountList}>
-            {accounts.map((account) => (
-              <Pressable
-                key={account.id}
-                style={[styles.accountOption, account.id === accountId && styles.accountOptionSelected]}
-                onPress={() => {
-                  setAccountId(account.id);
-                  setAccountPickerOpen(false);
-                }}
-              >
-                <View style={[styles.accountDot, { backgroundColor: account.color }]} />
-                <Text
-                  style={[styles.accountOptionText, account.id === accountId && styles.accountOptionTextSelected]}
-                  numberOfLines={1}
-                >
-                  {account.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {error && <Text style={styles.errorText}>{error}</Text>}
-
-        <Button title="Mark as Paid" variant="primary" onPress={handleMarkPaid} loading={saving} style={{ marginTop: spacing.lg }} />
-        <Pressable style={styles.skipRow} onPress={handleSkip} disabled={saving}>
-          <SkipForward size={16} color={colors.mutedMid} strokeWidth={2} />
-          <Text style={styles.skipText}>Skip this cycle</Text>
-        </Pressable>
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      {error && <Text style={styles.error}>{error}</Text>}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    gap: spacing.md,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginBottom: spacing.sm,
-  },
-  amountBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  amountCurrency: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.title,
-    color: colors.mutedDarker,
-  },
-  amountInput: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 26,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    flex: 1,
-  },
-  row: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fieldLabelInline: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-  },
-  rowValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-  },
-  accountValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  accountDot: {
-    width: 8,
-    height: 8,
-    borderRadius: radii.pill,
-  },
-  accountList: {
-    marginTop: spacing.sm,
-    gap: spacing.xs,
-  },
-  accountOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  accountOptionSelected: {
-    backgroundColor: colors.brand,
-    borderWidth: 0,
-  },
-  accountOptionText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-    flexShrink: 1,
-  },
-  accountOptionTextSelected: {
-    color: colors.brandText,
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-    textAlign: 'center',
-    marginTop: spacing.md,
-  },
-  skipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  skipText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-  },
+    amountWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginBottom: ledgerSpace.lg,
+    },
+    amountCurrency: {
+      ...ledgerType.title,
+      fontSize: 28,
+      lineHeight: 34,
+      color: c.muted,
+    },
+    amountInput: {
+      ...ledgerType.display,
+      fontSize: 44,
+      lineHeight: 52,
+      color: c.ink,
+      minWidth: 60,
+      textAlign: 'center',
+      padding: 0,
+    },
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.sm,
+      paddingTop: ledgerSpace.md,
+    },
   });
 }

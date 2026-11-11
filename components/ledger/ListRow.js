@@ -31,6 +31,7 @@ export function toneColors(tone, c, modeId) {
 //   switchValue + onSwitchChange — the WHOLE row becomes one switch: a tap
 //     anywhere toggles, and TalkBack hears "<title>, switch, on/off".
 // `danger` draws the title and icon in the danger colour (Delete account).
+// `subColor` tints the sub line (an overdue bill's date in danger).
 // `disabled` dims the row and ignores taps. `children` render under the
 // title line, full width, for an in-row control such as a Segmented that
 // keeps its own roles. `subLines` lets a longer sub wrap (default one line).
@@ -42,6 +43,7 @@ export default function ListRow({
   title,
   sub,
   subLines = 1,
+  subColor,
   right,
   rightSub,
   rightSubColor,
@@ -86,7 +88,7 @@ export default function ListRow({
           title
         )}
         {!!sub && (
-          <Text style={styles.sub} numberOfLines={subLines}>
+          <Text style={[styles.sub, subColor && { color: subColor }]} numberOfLines={subLines}>
             {sub}
           </Text>
         )}

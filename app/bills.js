@@ -1,254 +1,158 @@
 import { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
-import { track } from '../lib/track';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Receipt } from 'lucide-react-native';
-import { format } from 'date-fns';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import IconTile from '../components/IconTile';
-import Pill from '../components/Pill';
+import { View, Text, Animated, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { Receipt, Check } from 'lucide-react-native';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import ListRow, { toneColors } from '../components/ledger/ListRow';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import EmptyState from '../components/ledger/EmptyState';
 import CategoryIcon from '../components/CategoryIcon';
-import Skeleton from '../components/Skeleton';
-import FadeIn from '../components/FadeIn';
-// Static palette (theme/tokens) only for white text on the always-dark pay button.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
-import useBills, { billStatus } from '../hooks/useBills';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
+import useBills from '../hooks/useBills';
 import usePullToRefresh from '../hooks/usePullToRefresh';
 import { useAddBillSheet } from '../components/AddBillSheet';
 import { usePayBillSheet } from '../components/PayBillSheet';
-import { formatMoney } from '../lib/currency';
-import EmptyState from '../components/EmptyState';
+import { groupBills, billLine } from '../lib/billGroups';
+import { amountParts } from '../lib/currency';
+import { track } from '../lib/track';
 
-const CADENCE_LABELS = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
-
+// Bills on the ledger kit (spec 48, ticket 03): grouped under Overdue, This
+// week, Later and Paused (lib/billGroups.js), each a flat row with its icon,
+// "Monthly · Due 12 Nov", the amount and a round green check (Mark paid). A tap
+// opens the bill sheet (bill detail arrives in ticket 04). New bill is
+// pinned.
 export default function Bills() {
-  const { colors } = useTheme();
+  const { c, modeId } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   // Which secondary features earn their place (38-home-insights-more.md).
   useEffect(() => {
     track('feature_opened', { feature: 'bills' });
   }, []);
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const { refreshing, onRefresh } = usePullToRefresh();
-  const STATUS_STYLES = {
-    overdue: { iconTone: 'danger', amountColor: colors.danger, pill: { label: 'Overdue', tone: 'danger' } },
-    due_soon: { iconTone: 'warn', amountColor: colors.warn, pill: { label: 'Due Soon', tone: 'warn' } },
-    scheduled: { iconTone: 'neutral', amountColor: colors.ink, pill: null },
-    // A paused bill isn't being tracked for payment, so it shouldn't show
-    // overdue/due-soon styling even if its stored next_due_date has passed.
-    paused: { iconTone: 'neutral', amountColor: colors.muted, pill: { label: 'Paused', tone: 'neutral' } },
-  };
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { bills, loading } = useBills();
   const { openAddBill } = useAddBillSheet();
   const { openPayBill } = usePayBillSheet();
 
-  return (
-    // Pushed from the menu sheet now, not a tab — so it needs its own back
-    // button and SafeAreaView, the same shape as Settings and Analytics.
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.title}>Bills</Text>
-      </View>
+  const groups = useMemo(() => groupBills(bills), [bills]);
+  const subColor = { danger: c.danger, muted: c.muted };
+  // Mark paid is a round check on a soft wash of the "paid" green (the
+  // person's call, 2026-11-12), lighter than a text button on every row.
+  const paidTint = toneColors(c.positive, c, modeId);
 
-      <ScrollView
-        style={{ flex: 1 }}
+  return (
+    <View style={styles.screen}>
+      <ScreenHeader title="Bills" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandStrong} colors={[colors.brandStrong]} />}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink} colors={[c.ink]} />}
       >
+        <LargeTitle title="Bills" scrollY={scrollY} />
+
         {loading ? (
-          <>
-            {[0, 1, 2].map((i) => (
-              <Card key={i} style={styles.billCard}>
-                <View style={styles.rowBetween}>
-                  <View style={styles.rowLeft}>
-                    <Skeleton width={42} height={42} radius={13} />
-                    <View>
-                      <Skeleton width={140} height={16} radius={6} style={{ marginBottom: 6 }} />
-                      <Skeleton width={100} height={12} radius={6} />
-                    </View>
-                  </View>
-                </View>
-              </Card>
-            ))}
-          </>
+          [0, 1, 2].map((i) => <View key={i} style={styles.rowSkeleton} />)
         ) : bills.length === 0 ? (
-          <FadeIn>
-            <EmptyState
-              pose="hmm"
-              title="No bills yet"
-              body="Tap New Bill to add a recurring bill or subscription."
-              style={{ marginTop: spacing.lg }}
-            />
-          </FadeIn>
+          <EmptyState
+            illustration="calendar"
+            title="No bills yet"
+            body="Add rent, subscriptions and anything else that repeats, and FLO reminds you."
+            actionTitle="New bill"
+            onAction={() => openAddBill()}
+          />
         ) : (
-          <FadeIn>
-          {bills.map((bill) => {
-            const status = bill.is_active ? billStatus(bill.next_due_date) : 'paused';
-            const s = STATUS_STYLES[status];
-
-            return (
-              <Pressable key={bill.id} onPress={() => openAddBill(bill)}>
-                <Card style={styles.billCard}>
-                  <View style={styles.rowBetween}>
-                    <View style={styles.rowLeft}>
-                      <IconTile tone={s.iconTone} size={42} radius={13}>
-                        {bill.category?.icon ? (
-                          <CategoryIcon icon={bill.category.icon} size={20} color={s.amountColor} />
-                        ) : (
-                          <Receipt size={20} color={s.amountColor} strokeWidth={2} />
-                        )}
-                      </IconTile>
-                      <View style={{ flexShrink: 1 }}>
-                        <Text style={styles.billName} numberOfLines={1}>
-                          {bill.name}
-                        </Text>
-                        <Text style={styles.billMeta}>
-                          {CADENCE_LABELS[bill.cadence]} · Due {format(new Date(bill.next_due_date), 'd MMM')}
-                        </Text>
-                      </View>
-                    </View>
-                    {s.pill && <Pill label={s.pill.label} tone={s.pill.tone} />}
-                  </View>
-
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.lastPaidText}>
-                      {bill.last_paid_date ? `Last paid ${format(new Date(bill.last_paid_date), 'd MMM')}` : 'Not paid yet'}
-                    </Text>
-                    <View style={styles.actionsRow}>
-                      <Text style={[styles.amountText, { color: s.amountColor }]}>
-                        {formatMoney(bill.amount, bill.currency)}
+          groups.map((g) => (
+            <View key={g.key} style={styles.group}>
+              <SectionHeader title={g.title} titleColor={g.key === 'overdue' ? c.danger : g.key === 'paused' ? c.muted : undefined} />
+              {g.items.map((bill, i) => {
+                const line = billLine(bill);
+                const overdue = g.key === 'overdue';
+                return (
+                  <ListRow
+                    key={bill.id}
+                    // An overdue bill's circle washes in danger; otherwise its
+                    // category's colour.
+                    tone={overdue ? c.danger : bill.category?.color ?? undefined}
+                    icon={bill.category?.icon ? undefined : Receipt}
+                    renderIcon={bill.category?.icon ? (tint) => <CategoryIcon icon={bill.category.icon} size={18} color={tint} strokeWidth={1.75} /> : undefined}
+                    title={bill.name}
+                    sub={line.sub}
+                    subColor={subColor[line.tone]}
+                    right={
+                      <Text style={[styles.money, !bill.is_active && { color: c.muted }]}>
+                        {amountParts(bill.amount, { currency: bill.currency }).text}
                       </Text>
-                      {bill.is_active && (
-                        <Pressable style={styles.payButton} onPress={() => openPayBill(bill)}>
-                          <Text style={styles.payButtonText}>Mark Paid</Text>
+                    }
+                    trailing={
+                      bill.is_active ? (
+                        <Pressable
+                          onPress={() => openPayBill(bill)}
+                          hitSlop={4}
+                          style={({ pressed }) => [styles.paid, { backgroundColor: paidTint.bg }, pressed && styles.pressed]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Mark ${bill.name} paid`}
+                        >
+                          <Check size={20} color={paidTint.fg} strokeWidth={2.25} />
                         </Pressable>
-                      )}
-                    </View>
-                  </View>
-                </Card>
-              </Pressable>
-            );
-          })}
-          </FadeIn>
+                      ) : undefined
+                    }
+                    onPress={() => openAddBill(bill)}
+                    divider={i < g.items.length - 1}
+                  />
+                );
+              })}
+            </View>
+          ))
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
-      {/* Fixed at the bottom, thumb-reachable — same move Plans and Budgets
-          already made away from a small header chip. No tab bar here (Bills is
-          a pushed screen), so the bottom safe area is handled explicitly. */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-        <Button title="New Bill" onPress={() => openAddBill()} />
-      </View>
-    </SafeAreaView>
+      <PinnedFooter primary={{ title: 'New bill', onPress: () => openAddBill() }} />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  footer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.display,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
-  scroll: {
-    // Screen used to supply the horizontal padding; a bare SafeAreaView
-    // doesn't. The 120 bottom pad existed to clear the tab bar — as a pushed
-    // screen there isn't one.
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: 60,
-    gap: spacing.md,
-  },
-  billCard: {
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    flexShrink: 1,
-    paddingRight: spacing.sm,
-  },
-  billName: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  billMeta: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
-  lastPaidText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-  },
-  amountText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  payButton: {
-    // Permanently-emphasized chip (same role as Card's `dark` prop) — reads
-    // colors.emphasisBg so it doesn't blend into Dark theme's own near-black
-    // screen, and its label stays pinned light since that surface is dark in
-    // both modes.
-    backgroundColor: colors.emphasisBg,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
-  },
-  payButtonText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xs,
-    color: staticColors.surface,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
+    },
+    group: {
+      marginTop: ledgerSpace.md,
+    },
+    money: {
+      ...ledgerType.rowTitle,
+      fontFamily: inter.semibold,
+      fontVariant: ['tabular-nums'],
+      color: c.ink,
+    },
+    // 40 dp, with hitSlop bringing the target to 48.
+    paid: {
+      width: 40,
+      height: 40,
+      borderRadius: ledgerRadius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: ledgerSpace.md,
+    },
+    pressed: {
+      opacity: 0.7,
+    },
+    rowSkeleton: {
+      height: 64,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      marginTop: ledgerSpace.md,
+    },
   });
 }

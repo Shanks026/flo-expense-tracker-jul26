@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 4, Money screens (spec 48): handoff
 
-Last updated 2026-11-12: tickets 01 and 02 done.
+Last updated 2026-11-12: tickets 01–03 done; the person asked to run 03–05 in one go (2026-11-12) and said not to wait for approval, which covers 04 and 05's migrations and the Edge Function deploy.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/48-quiet-ledger-money-screens.md`; the design source is
@@ -16,7 +16,7 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 |---|---|---|---|
 | 01 Insights on the kit | — | done | see git log |
 | 02 Budgets list, detail and sheet | — | done | see git log |
-| 03 Bills list and the bill sheets | — | ready | |
+| 03 Bills list and the bill sheets | — | done | see git log |
 | 04 Bill detail and payment history | 03 | ready | |
 | 05 Bill icons from names | 03 | ready | |
 | 06 Accounts with last 4 | — | ready | |

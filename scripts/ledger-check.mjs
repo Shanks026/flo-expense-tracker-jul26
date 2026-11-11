@@ -21,6 +21,7 @@ import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } fr
 import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
 import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from '../lib/insights.js';
 import { budgetRowStatus } from '../lib/budgetRow.js';
+import { groupBills, billLine } from '../lib/billGroups.js';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -579,6 +580,27 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('budget row', 'a custom budget ending today is still running', custom('2026-11-12', 300).state, 'ok');
   check('budget row', 'a calendar budget never ends', budgetRowStatus({ spent: 1, amount: 10, period_type: 'calendar_week', end_date: '2020-01-01' }, { today }).state, 'ok');
   check('budget row', 'another currency', budgetRowStatus({ spent: 10, amount: 100, period_type: 'calendar_month' }, { today, currency: 'USD' }).rightText, '$90 left');
+}
+
+// --- Bills list groups (spec 48, ticket 03) ---
+{
+  const today = new Date(2026, 10, 12);
+  const bill = (name, next_due_date, extra = {}) => ({ id: name, name, next_due_date, cadence: 'monthly', is_active: true, ...extra });
+  const shape = (bills) => groupBills(bills, today).map((g) => [g.key, g.items.map((b) => b.name)]);
+  check('bills', 'overdue yesterday', shape([bill('A', '2026-11-11')]), [['overdue', ['A']]]);
+  check('bills', 'due today is this week', shape([bill('A', '2026-11-12')]), [['week', ['A']]]);
+  check('bills', 'due in 6 days is this week', shape([bill('A', '2026-11-18')]), [['week', ['A']]]);
+  check('bills', 'due in 7 days is later', shape([bill('A', '2026-11-19')]), [['later', ['A']]]);
+  check('bills', 'paused with a past date is paused, not overdue', shape([bill('A', '2026-10-01', { is_active: false })]), [['paused', ['A']]]);
+  check('bills', 'groups in order, empty ones left out, sorted by date then name',
+    shape([bill('Rent', '2026-12-01'), bill('Jio', '2026-11-14'), bill('Airtel', '2026-11-14'), bill('Gym', '2026-11-01', { is_active: false }), bill('Netflix', '2026-11-07')]),
+    [['overdue', ['Netflix']], ['week', ['Airtel', 'Jio']], ['later', ['Rent']], ['paused', ['Gym']]]);
+  check('bills', 'group titles', groupBills([bill('A', '2026-11-11'), bill('B', '2026-11-12'), bill('C', '2026-12-12'), bill('D', '2026-11-12', { is_active: false })], today).map((g) => g.title), ['Overdue', 'This week', 'Later', 'Paused']);
+  check('bills', 'line: due', billLine(bill('A', '2026-11-14'), today), { sub: 'Monthly · Due 14 Nov', tone: null });
+  check('bills', 'line: due today', billLine(bill('A', '2026-11-12', { cadence: 'weekly' }), today), { sub: 'Weekly · Due today', tone: null });
+  check('bills', 'line: overdue', billLine(bill('A', '2026-11-07'), today), { sub: 'Overdue since 7 Nov', tone: 'danger' });
+  check('bills', 'line: paused', billLine(bill('A', '2026-11-07', { is_active: false, cadence: 'yearly' }), today), { sub: 'Yearly · Paused', tone: 'muted' });
+  check('bills', 'line: next year shows the year', billLine(bill('A', '2027-01-05', { cadence: 'yearly' }), today).sub, 'Yearly · Due 5 Jan 2027');
 }
 
 // --- Report ---
