@@ -43,3 +43,4 @@ Spec: .claude/features/47-quiet-ledger-onboarding.md
   - The free-plan cap toast, because billing is off.
   - The `budget` step event, because consent is off for new accounts.
 - Seen, not caused here: the first-expense step opened the Add sheet when Not now was tapped once (ticket 09 rebuilds that step).
+- 2026-11-11 (later, during ticket 08): Back from the card question to the limit and Next again kept ₹700 and wrote no second budget (DB), which closes the Back check above. The active-account move is still covered only by the check script.

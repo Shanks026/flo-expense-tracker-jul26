@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: tickets 01, 04, 07, 08 and 09 done; 05 next (its migration needs the person's yes), or 02/03.
+Last updated 2026-11-11: tickets 01, 04, 07, 08 and 09 done (one session); **05 next**, and its migration needs the person's yes first.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -16,16 +16,17 @@ there all apply here and aren't repeated.
 | 01 Account and budget writes move into lib | done | 5fdefd5 |
 | 02 Opener carousel | ready | |
 | 03 Sign up and sign in on the kit | ready | |
-| 04 Question shell and "Where does your money live?" | done | (this commit) |
+| 04 Question shell and "Where does your money live?" | done | 83a3497 |
 | 05 Salary-day month | ready (migration needs the person's yes) | |
-| 06 "When does your month start?" | blocked by 04, 05 | |
-| 07 "Want a monthly spending limit?" | done | this commit |
-| 08 "Pick your card" | done | this commit |
-| 09 First expense and the reminder ask on the kit | done | this commit |
-| 10 First Home coach mark and the full-flow check | blocked by 02–09 | |
+| 06 "When does your month start?" | blocked by 05 | |
+| 07 "Want a monthly spending limit?" | done | 9ba37d1 |
+| 08 "Pick your card" | done | 4c281c0 |
+| 09 First expense and the reminder ask on the kit | done | a67ff15 |
+| 10 First Home coach mark and the full-flow check | blocked by 02, 03, 05, 06 | |
 
-Suggested order: **01**, then 04, 05, 06, 07, 08 (the questions, in flow
-order), with 02, 03 and 09 whenever; 10 last.
+Suggested order: **05** (ask the person before applying its migration),
+then 06, then 02 and 03 in either order; 10 last. If the person isn't
+around to approve the migration, do 02 or 03 first.
 
 ## Decisions (2026-11-11, with the person, while writing spec 47)
 
@@ -41,6 +42,29 @@ order), with 02, 03 and 09 whenever; 10 last.
 - The tickets live in their own effort (this folder), not as quiet-ledger
   13–22.
 
+## Decisions made while building (2026-11-11)
+
+- **The limit** is ₹1 up to what `numeric(12,2)` holds, rounded to paise
+  (`cleanLimitAmount`). It's found again by name "Monthly limit", overall,
+  `calendar_month`. A resubmit updates the row the draft saved
+  (`draft.budgetSaved`), moving it if question 1 changed the active account.
+- **Free-plan caps in onboarding show a toast, not the upsell sheet** (no
+  sales pitch mid set-up; Skip is right there).
+- **The card grid** is the themes Personalize lists, ordered Day, seasonal,
+  then catalog order (`cardChoices`). The preview is Home's
+  `AccountCardCarousel` with the active account. Skip after an earlier Next
+  keeps the saved card.
+- **"You can change these in Settings"** shows on whichever question is
+  last (card, or budget with `FLAGS.themes` off), from the shell.
+- **The first expense opens with quick add on.** A first expense entered
+  through quick add records `expense_logged` with source
+  `quick_local`/`quick_ai` and `transactions.source` `quick_add`/`voice`,
+  not `onboarding`; the fields path still records `onboarding`. The funnel
+  views don't filter on source.
+- **The reminder ask keeps Settings' PM-only rule** for the evening time;
+  only a granted Allow saves it. Reminder-time helpers live in
+  `lib/reminderTime.js`, which Settings uses too.
+
 ## Test accounts
 
 - Set-up answers write real rows (accounts, `reset_period`, a budget, the
@@ -48,7 +72,8 @@ order), with 02, 03 and 09 whenever; 10 last.
   (random email, link check skipped: the standing rule). Add each one's email
   to `.env.test.local`; never print a password.
 - The shared test account (its email is already in `.env.test.local`) stays
-  as it is: Appearance Light, card Dusk, Personal active. Ticket 05's
+  as it is: Appearance Light, Personal active. Its stored card is `day`,
+  not Dusk as earlier notes said; left as found. Ticket 05's
   Settings check changes its summary period; put it back to Monthly.
 - To see onboarding again on the same phone, sign out (or clear app data for
   the opener): `OnboardingGate` sends any account without `onboarded_at` to
@@ -73,15 +98,45 @@ order), with 02, 03 and 09 whenever; 10 last.
   budget in `STEPS`.
 - Reminder times go through `lib/reminderTime.js` (Settings and the
   reminder ask).
-- The emulator is signed in as the ticket 04 account (`FLO_ONB04_*`),
-  onboarded with SBI, Cash, a ₹700 limit, Dusk, one ₹120 expense and
-  daily reminders on at 20:30. The skip account (`FLO_ONB04_SKIP_*`) is
-  onboarded with HDFC, ₹6000, the default card and reminders off. To
-  rerun the flow, set `profiles.onboarded_at` to null. To get the
-  Android 16 notification prompt again: `adb shell pm revoke
-  com.anonymous.flo android.permission.POST_NOTIFICATIONS`, then
-  `pm clear-permission-flags ... user-set user-fixed`. Sign out to
-  reuse the shared account.
+- Month start (06) goes between accounts and budget in `STEPS`; its
+  progress is already "2 of 4" in `setupProgress`.
+
+## Gotchas
+
+- A cold start shows Home for about 5 s before `OnboardingGate` redirects
+  into onboarding (existed before this effort; ticket 10's full-flow check
+  should look at it).
+- After a refused permission or Maybe later, Home takes a few seconds: the
+  gate waits for the profile refetch. Not a hang.
+- The first-expense sheet opens over that step's own screen, not over Home
+  (story 34 wants Home behind it; nobody has built that).
+- In dark mode the Ink card is near-black on the near-black canvas, both in
+  the card preview and on Home (Home's outline only applies when no card is
+  chosen). A Home fix, not onboarding's.
+- Taps at the top of Home (y≈600) open the account switcher; dismiss the
+  coach mark by tapping lower or waiting.
+- The analytics step events can't be checked on new accounts: consent is
+  off for them. Set `profiles.analytics_consent` through SQL if a ticket
+  needs the `events` rows.
+
+## State left behind
+
+- Two onboarding test accounts, in `.env.test.local` (passwords there,
+  never printed):
+  - `FLO_ONB04_*`: onboarded; SBI (active) and Cash, a ₹700 "Monthly
+    limit", card Dusk, one ₹120 Food expense, daily reminders on at 20:30.
+    The emulator is signed in as this one, on Settings.
+  - `FLO_ONB04_SKIP_*`: onboarded; HDFC, a ₹6000 limit, the default card,
+    reminders off, one push token.
+- To run the flow again on either, set its `profiles.onboarded_at` to null;
+  the gate sends it to question 1 with its saved answers seeded.
+- To get the Android 16 notification prompt again: `adb shell pm revoke
+  com.anonymous.flo android.permission.POST_NOTIFICATIONS`, then `adb shell
+  pm clear-permission-flags com.anonymous.flo
+  android.permission.POST_NOTIFICATIONS user-set user-fixed`. The app's
+  permission is granted right now.
+- No migrations applied this session. `day-themes/` and
+  `design-inspirations/` are untracked on purpose.
 
 ## How the work is done
 
