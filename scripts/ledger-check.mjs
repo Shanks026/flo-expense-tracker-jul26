@@ -18,7 +18,7 @@ import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activit
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 import { timeOnToday, timeOnTodayFromString, toTimeColumn, isEveningTime } from '../lib/reminderTime.js';
 import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } from '../lib/periods.js';
-import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
+import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
 const failures = [];
@@ -444,6 +444,20 @@ check('progress', 'a step that is not a question has no progress', setupProgress
   check('salary day', 'the profile columns read across', periodFromProfile({ reset_period: 'salary_day', reset_custom_start: null, reset_month_day: 25 }), { resetPeriod: 'salary_day', customStart: null, monthDay: 25 });
   check('salary day', 'ordinals', [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 25, 31].map(ordinalDay), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '25th', '31st']);
 }
+
+// --- Month start question (spec 47, onboarding ticket 06) ---
+check('month start', 'two answers', MONTH_START_CHOICES.map((o) => o.value), ['first', 'salary_day']);
+check('month start', 'the 1st is the calendar month', planMonthStart({ start: 'first', day: null }), { reset_period: 'monthly' });
+check('month start', 'the 1st ignores a day left over', planMonthStart({ start: 'first', day: 25 }), { reset_period: 'monthly' });
+check('month start', 'salary day 25 is the salary-day patch', planMonthStart({ start: 'salary_day', day: 25 }), { reset_period: 'salary_day', reset_month_day: 25 });
+check('month start', 'salary day 31 is allowed', planMonthStart({ start: 'salary_day', day: 31 }), { reset_period: 'salary_day', reset_month_day: 31 });
+check('month start', 'salary day with no day is invalid', planMonthStart({ start: 'salary_day', day: null }), null);
+check('month start', 'a day out of range is invalid', planMonthStart({ start: 'salary_day', day: 32 }), null);
+check('month start', 'no answer is invalid', planMonthStart(), null);
+check('month start', 'a new profile starts on the 1st', monthStartFromProfile({ reset_period: 'monthly', reset_month_day: null }), { start: 'first', day: null });
+check('month start', 'a saved salary day reads back', monthStartFromProfile({ reset_period: 'salary_day', reset_month_day: 25 }), { start: 'salary_day', day: 25 });
+check('month start', 'quarterly shows the 1st', monthStartFromProfile({ reset_period: 'quarterly', reset_month_day: 25 }), { start: 'first', day: null });
+check('month start', 'no profile yet shows the 1st', monthStartFromProfile(null), { start: 'first', day: null });
 
 // --- Report ---
 for (const f of failures) {

@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: tickets 01, 04, 05, 07, 08 and 09 done; **06 next**.
+Last updated 2026-11-11: tickets 01, 04–09 done; **02 or 03 next**, then 10.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -18,13 +18,13 @@ there all apply here and aren't repeated.
 | 03 Sign up and sign in on the kit | ready | |
 | 04 Question shell and "Where does your money live?" | done | 83a3497 |
 | 05 Salary-day month | done (migration applied) | see git log |
-| 06 "When does your month start?" | ready | |
+| 06 "When does your month start?" | done | see git log |
 | 07 "Want a monthly spending limit?" | done | 9ba37d1 |
 | 08 "Pick your card" | done | 4c281c0 |
 | 09 First expense and the reminder ask on the kit | done | a67ff15 |
 | 10 First Home coach mark and the full-flow check | blocked by 02, 03, 05, 06 | |
 
-Suggested order: **06**, then 02 and 03 in either order; 10 last.
+Suggested order: 02 and 03 in either order; 10 last.
 
 ## Decisions (2026-11-11, with the person, while writing spec 47)
 
@@ -35,7 +35,7 @@ Suggested order: **06**, then 02 and 03 in either order; 10 last.
 - **The first bank or wallet picked renames the seeded "Personal" account**;
   more picks are added. Personal stays only when the question is skipped.
 - **Testing keeps spec 46's two seams**: pure rules in `lib/` checked by
-  `scripts/ledger-check.mjs` (151 cases at the start of this effort, 250 after ticket 05), and an
+  `scripts/ledger-check.mjs` (151 cases at the start of this effort, 262 after ticket 06), and an
   emulator check per ticket. No new test runner.
 - The tickets live in their own effort (this folder), not as quiet-ledger
   13–22.
