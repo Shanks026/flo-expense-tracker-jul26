@@ -11,16 +11,20 @@ Spec: .claude/features/47-quiet-ledger-onboarding.md
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The check script covers each password rule, an empty password and a passing one, plus email shapes (valid, missing @, spaces, empty)
-- [ ] Sign-up: the ticks follow typing, and the CTA enables only when everything is valid
-- [ ] A new account signs up and lands in onboarding; an existing account signs in and lands on Home
-- [ ] A wrong password shows the one-line error
-- [ ] Emulator check in light and dark
+- [x] The check script covers each password rule, an empty password and a passing one, plus email shapes (valid, missing @, spaces, empty)
+- [x] Sign-up: the ticks follow typing, and the CTA enables only when everything is valid
+- [x] A new account signs up and lands in onboarding; an existing account signs in and lands on Home
+- [x] A wrong password shows the one-line error
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-11: built and checked on Pixel_API_36, light and dark. Supabase Auth on this project was read from the server's own `weak_password` reply: it rejects under 6 characters and has no character-class rule (7 lowercase letters were accepted). The form asks for 8 or more characters (`lib/authRules.js`), stricter than the server, so Create account never enables for a password the server turns down. On the emulator: the tick and the button follow typing; an email without @ keeps the button off; a wrong password shows "That email and password don't match"; signing up with a taken email shows "That email already has an account. Sign in instead"; a new account (`FLO_ONB03_*` in `.env.test.local`) lands on "Where does your money live?"; ONB04 signs in to Home, including through the keyboard's Next and Go. The check script adds 24 cases (286 pass). Review (two agents): no hard violations; fixed the Google slot comment (kept, as the spec says), a ref guard against a double submit from Go, iOS keyboard avoidance, an unreachable weak-password line, and a reused rule check. Not checked: iOS. The terms line names no linked documents because none are published yet (`PRIVACY_POLICY_URL` is null). The mode can still change when an account whose saved Appearance differs from the device's signs in (the accent can't, since the ledger palette has none), as on the old screen. Seen once and not reproduced in four later tries: after clearing app data, the first sign-in stayed on sign-in with `useProfile` holding `profile: null, loading: false` (the first profile read came back empty and nothing re-read it); a reload went to Home. That's in `useProfile` and `OnboardingGate`, not this screen, and it's worth a look before ticket 10's full-flow check. A probe sign-up made while reading the Auth rules left one throwaway user, `flo_probe_2938115231@example.com`; deleting it was declined, so it's still in Auth.

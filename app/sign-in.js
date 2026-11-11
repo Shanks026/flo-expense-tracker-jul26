@@ -1,364 +1,304 @@
-import { useState, useMemo, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
-import Svg, { Path } from 'react-native-svg';
-import Button from '../components/Button';
-import ArrowMark from '../components/ArrowMark';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { resolveColors, DEFAULT_ACCENT_ID } from '../theme/themes';
-import { useTheme } from '../theme/ThemeContext';
+import { Eye, EyeOff, Check, Circle } from 'lucide-react-native';
+import PinnedFooter from '../components/ledger/PinnedFooter';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, ledgerSize } from '../theme/ledger';
 import { useAuth } from '../lib/AuthContext';
 import { trackStepViewed } from '../lib/track';
+import { passwordRules, passwordPasses, looksLikeEmail, authErrorLine } from '../lib/authRules';
+import useKeyboardVisible from '../hooks/useKeyboardVisible';
+import useAndroidKeyboardHeight from '../hooks/useAndroidKeyboardHeight';
 
-// Sign-in, and sign-up behind the opener's "Other options" (?mode=signup,
-// 35-onboarding-v3.md). Sign-up leads with Google; email sign-up asks for
-// email and password only — no name, since the intro no longer asks for one
-// and nothing needs it to set the account up.
+// Sign-in, and sign-up (?mode=signup, from the opener's Create account), on
+// the ledger kit (spec 47): a left-aligned title, labelled fields, a
+// show/hide control, sign-up's live password rules, the terms line above a
+// pinned button, and the link that switches modes.
+//
+// Fixed look: the ledger palette has no accent, so nothing here repaints
+// into the account's colours when the session lands (spec 37's rule). Only
+// the mode can change, and it follows the active Appearance like the rest
+// of onboarding.
+//
+// Google sign-in stays parked (2026-10-27), its slot marked above the email
+// field. Forgot password stays out until spec 42.
 export default function SignIn() {
-  // Pinned to the fixed default brand palette, NOT the active theme
-  // (useTheme). This is a pre-auth screen: the moment sign-in succeeds,
-  // ThemeProfileSync applies the account's own accent/mode to the active
-  // ThemeContext — and because this screen is still the visible one for a
-  // beat before navigation to Home completes, reading the active theme here
-  // made the whole sign-in screen visibly repaint into the account's colors
-  // before Home ever appeared (the reported "the login screen theme changes"
-  // flash). A fixed palette means sign-in never re-themes; the account's
-  // theme lands on Home, where it belongs. (The shared <Button> still uses
-  // the active accent for its fill — a single element, brief, acceptable.)
-  // Since spec 37 the accent is fixed, so only the mode can differ: sign-in
-  // follows the active Appearance (System by default) like onboarding and
-  // the status bar, and keeps the fixed accent.
-  const { modeId } = useTheme();
-  const colors = useMemo(() => resolveColors(DEFAULT_ACCENT_ID, modeId), [modeId]);
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const insets = useSafeAreaInsets();
+  const keyboardUp = useKeyboardVisible();
+  const keyboardHeight = useAndroidKeyboardHeight();
+  const { signIn, signUp } = useAuth();
   const params = useLocalSearchParams();
   const [mode, setMode] = useState(params.mode === 'signup' ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Disables BOTH entry points while either is in flight — without this,
-  // tapping "Sign In" while the Google browser sheet is still open (or vice
-  // versa) could kick off two concurrent auth attempts racing each other.
-  const busy = loading || googleLoading;
+  const passwordRef = useRef(null);
+  // The keyboard's Go and the button can both fire before `loading` renders.
+  const submitting = useRef(false);
 
   const isSignUp = mode === 'signup';
+  const rules = passwordRules(password);
+  // Sign-in only needs something typed: an older account may predate the
+  // sign-up rules, and the server judges the rest.
+  const canSubmit = looksLikeEmail(email) && (isSignUp ? passwordPasses(password) : password.length > 0);
 
   // The funnel's auth step (35-onboarding-v3.md): sign-up mode only.
   useEffect(() => {
     if (isSignUp) trackStepViewed('auth');
   }, [isSignUp]);
-  const canSubmit = email && password;
 
   async function handleSubmit() {
+    if (!canSubmit || submitting.current) return;
+    submitting.current = true;
     setError(null);
     setLoading(true);
     try {
-      if (isSignUp) {
-        await signUp(email.trim(), password);
-      } else {
-        await signIn(email.trim(), password);
-      }
+      if (isSignUp) await signUp(email.trim(), password);
+      else await signIn(email.trim(), password);
     } catch (err) {
-      setError(err.message);
+      setError(authErrorLine(err));
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
-  // A non-'success' result (user backed out of the browser sheet, or the OS
-  // dismissed it) is a silent cancel, not a failure — AuthContext's
-  // signInWithGoogle already returns normally in that case instead of
-  // throwing, so there's nothing to catch or show an error for here.
-  async function handleGoogleSignIn() {
+  function switchMode() {
     setError(null);
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGoogleLoading(false);
-    }
+    setMode(isSignUp ? 'signin' : 'signup');
   }
 
-  const divider = (
-    <View style={styles.dividerRow}>
-      <View style={styles.dividerLine} />
-      <Text style={styles.dividerText}>or</Text>
-      <View style={styles.dividerLine} />
-    </View>
-  );
-
-  // Sign-up leads with it (above the email form); sign-in keeps email first.
-  const googleButton = (
-    <Pressable
-      onPress={handleGoogleSignIn}
-      disabled={busy}
-      style={({ pressed }) => [
-        styles.googleButton,
-        busy && styles.googleButtonDisabled,
-        pressed && !busy && styles.googleButtonPressed,
-      ]}
+  return (
+    // Android 16 is edge-to-edge, so the window doesn't resize for the
+    // keyboard; pad by its height so the button rides on top of it. iOS
+    // gets the same from KeyboardAvoidingView (the Android height is 0 there).
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.root, { paddingTop: insets.top, paddingBottom: keyboardHeight }]}
     >
-      {googleLoading ? (
-        <ActivityIndicator color={colors.ink} />
-      ) : (
-        <>
-          <GoogleIcon />
-          <Text style={styles.googleText}>Continue with Google</Text>
-        </>
-      )}
-    </Pressable>
-  );
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.title} accessibilityRole="header">
+          {isSignUp ? 'Create your account' : 'Welcome back'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {isSignUp ? 'An email and a password, nothing else' : 'Sign in to pick up where you left off'}
+        </Text>
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.spacerTop} />
+        {/* Google's slot (parked 2026-10-27): "Continue with Google" and an
+            "or" rule go here, sign-up only. The button and icon are in git
+            history before spec 47. */}
 
-          <View style={styles.brandRow}>
-            <ArrowMark size={52} color={colors.ink} />
-          </View>
+        <Text style={styles.label} nativeID="emailLabel">
+          Email
+        </Text>
+        <TextInput
+          value={email}
+          onChangeText={(v) => {
+            setEmail(v);
+            setError(null);
+          }}
+          placeholder="you@example.com"
+          placeholderTextColor={c.muted}
+          autoCapitalize="none"
+          autoComplete="email"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          returnKeyType="next"
+          onSubmitEditing={() => passwordRef.current?.focus()}
+          accessibilityLabelledBy="emailLabel"
+          accessibilityLabel="Email"
+          style={styles.field}
+        />
 
-          <View style={{ height: 20 }} />
-          <Text style={styles.title}>{isSignUp ? 'Create account' : 'Welcome back'}</Text>
-          <Text style={styles.subtitle}>Know where your money flows.</Text>
-
-          <View style={{ height: 40 }} />
-
-          {/* Google sign-in parked 2026-10-27: email only for now.
-          {isSignUp && (
-            <>
-              {googleButton}
-              {divider}
-            </>
-          )} */}
-
-          <Text style={styles.label}>Email</Text>
-          <View style={styles.inputRow}>
-            <Mail size={18} color={colors.mutedMid} strokeWidth={2} />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@email.com"
-              placeholderTextColor={colors.mutedLight}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              style={styles.input}
-            />
-          </View>
-
-          <View style={{ height: 16 }} />
-          <Text style={styles.label}>Password</Text>
-          <View style={styles.inputRow}>
-            <Lock size={18} color={colors.mutedMid} strokeWidth={2} />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor={colors.mutedLight}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              style={[styles.input, { letterSpacing: showPassword ? 0 : 3 }]}
-            />
-            <Pressable onPress={() => setShowPassword((v) => !v)}>
-              {showPassword ? (
-                <EyeOff size={18} color={colors.mutedMid} strokeWidth={2} />
-              ) : (
-                <Eye size={18} color={colors.mutedMid} strokeWidth={2} />
-              )}
-            </Pressable>
-          </View>
-
-          {/* "Forgot password?" removed until the forgot-password spec ships
-              (32-safe-closed-test-build.md) — it was a dead link. */}
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
-
-          <View style={{ height: isSignUp ? 24 : 28 }} />
-          {/* Force the button fill to this screen's FIXED default brand
-              (colors.brand here is the default-palette lime, since `colors`
-              is resolveColors(DEFAULT_ACCENT_ID, …) above) — the shared Button
-              otherwise reads the ACTIVE theme's accent, which after a logout is
-              still the last account's color (we intentionally don't reset the
-              theme on logout, to avoid the outgoing-screen flash). Overriding
-              it here keeps the whole auth screen on the default brand
-              regardless of who was last signed in. `style` is applied last in
-              Button, so it wins over the variant's own backgroundColor. */}
-          <Button
-            title={isSignUp ? 'Create Account' : 'Sign In'}
-            onPress={handleSubmit}
-            loading={loading}
-            disabled={!canSubmit || busy}
-            style={{ backgroundColor: colors.brand }}
-          />
-
-          {/* Google sign-in parked 2026-10-27.
-          {!isSignUp && (
-            <>
-              {divider}
-              {googleButton}
-            </>
-          )} */}
-
-          <View style={{ flex: 1 }} />
-          <Pressable
-            style={styles.switchRow}
-            onPress={() => {
+        <Text style={[styles.label, styles.labelGap]} nativeID="passwordLabel">
+          Password
+        </Text>
+        <View style={styles.passwordRow}>
+          <TextInput
+            ref={passwordRef}
+            value={password}
+            onChangeText={(v) => {
+              setPassword(v);
               setError(null);
-              setMode(isSignUp ? 'signin' : 'signup');
             }}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete={isSignUp ? 'new-password' : 'current-password'}
+            textContentType={isSignUp ? 'newPassword' : 'password'}
+            returnKeyType="go"
+            onSubmitEditing={handleSubmit}
+            accessibilityLabelledBy="passwordLabel"
+            accessibilityLabel="Password"
+            style={[styles.field, styles.passwordField]}
+          />
+          <Pressable
+            onPress={() => setShowPassword((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            style={styles.eye}
           >
-            <Text style={styles.switchText}>
-              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-              <Text style={styles.switchTextBold}>{isSignUp ? 'Sign In' : 'Sign Up'}</Text>
-            </Text>
+            {showPassword ? (
+              <EyeOff size={20} color={c.muted} strokeWidth={1.75} />
+            ) : (
+              <Eye size={20} color={c.muted} strokeWidth={1.75} />
+            )}
           </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </View>
+
+        {isSignUp && (
+          <View style={styles.rules}>
+            {rules.map((rule) => (
+              <View
+                key={rule.key}
+                style={styles.rule}
+                accessible
+                accessibilityLabel={`${rule.label}, ${rule.met ? 'met' : 'not yet'}`}
+              >
+                {rule.met ? (
+                  <Check size={16} color={c.positive} strokeWidth={2.25} />
+                ) : (
+                  <Circle size={16} color={c.muted} strokeWidth={1.75} />
+                )}
+                <Text style={[styles.ruleText, { color: rule.met ? c.ink : c.muted }]}>{rule.label}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {!!error && (
+          <Text style={styles.error} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        )}
+      </ScrollView>
+
+      {isSignUp && (
+        <Text style={styles.terms}>By creating an account, you agree to FLO's terms and privacy policy.</Text>
+      )}
+      <PinnedFooter
+        primary={{
+          title: isSignUp ? 'Create account' : 'Sign in',
+          onPress: handleSubmit,
+          loading,
+          disabled: !canSubmit,
+        }}
+        keyboardUp={keyboardUp}
+        style={styles.footer}
+      />
+      <Pressable
+        onPress={switchMode}
+        accessibilityRole="button"
+        style={[styles.switchRow, { paddingBottom: keyboardUp ? ledgerSpace.sm : insets.bottom + ledgerSpace.sm }]}
+      >
+        <Text style={styles.switchText}>
+          {isSignUp ? 'Already have an account? ' : 'New to FLO? '}
+          <Text style={styles.switchLink}>{isSignUp ? 'Sign in' : 'Create account'}</Text>
+        </Text>
+      </Pressable>
+    </KeyboardAvoidingView>
   );
 }
 
-function GoogleIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24">
-      <Path fill="#4285F4" d="M22.5 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.9a5 5 0 0 1-2.2 3.3v2.7h3.5c2-1.9 3.3-4.7 3.3-7.9Z" />
-      <Path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.5-2.7c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.3-1.9-6.2-4.6H2.2v2.8A11 11 0 0 0 12 23Z" />
-      <Path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.2a11 11 0 0 0 0 9.8l3.6-2.8Z" />
-      <Path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.2 1.6l3.1-3.1A11 11 0 0 0 2.2 7.1l3.6 2.8C6.7 7.3 9.1 5.4 12 5.4Z" />
-    </Svg>
-  );
-}
-
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xxl,
-  },
-  spacerTop: {
-    height: 32,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  title: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.hero,
-    letterSpacing: -0.4,
-    lineHeight: 34,
-    color: colors.ink,
-  },
-  subtitle: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.xl,
-    color: colors.muted,
-    marginTop: spacing.xs,
-  },
-  label: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.mutedDarker,
-    marginBottom: spacing.sm,
-  },
-  inputRow: {
-    height: 56,
-    borderRadius: radii.buttonSm,
-    backgroundColor: colors.inputBg,
-    borderWidth: 1.5,
-    borderColor: colors.inputBorder,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    gap: 10,
-  },
-  input: {
-    flex: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-    height: '100%',
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.danger,
-    marginTop: spacing.md,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginVertical: spacing.xxl,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.mutedLight,
-  },
-  googleButton: {
-    height: 56,
-    borderRadius: radii.button,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  googleButtonDisabled: {
-    opacity: 0.45,
-  },
-  googleButtonPressed: {
-    opacity: 0.7,
-  },
-  googleText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  switchRow: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  switchText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.lg,
-    color: colors.muted,
-  },
-  switchTextBold: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.ink,
-  },
+    root: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.section * 2,
+      paddingBottom: ledgerSpace.lg,
+    },
+    title: {
+      ...ledgerType.display,
+      color: c.ink,
+    },
+    subtitle: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginTop: ledgerSpace.sm,
+      marginBottom: ledgerSpace.section,
+    },
+    label: {
+      ...ledgerType.rowTitle,
+      color: c.ink,
+      marginBottom: ledgerSpace.sm,
+    },
+    labelGap: {
+      marginTop: ledgerSpace.lg,
+    },
+    field: {
+      height: ledgerSize.hit,
+      paddingHorizontal: ledgerSpace.md,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+    },
+    passwordRow: {
+      justifyContent: 'center',
+    },
+    passwordField: {
+      // Room for the show/hide target on the right.
+      paddingRight: ledgerSize.hit,
+    },
+    eye: {
+      position: 'absolute',
+      right: 0,
+      width: ledgerSize.hit,
+      height: ledgerSize.hit,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rules: {
+      marginTop: ledgerSpace.md,
+      gap: ledgerSpace.xs,
+    },
+    rule: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ledgerSpace.sm,
+    },
+    ruleText: {
+      ...ledgerType.caption,
+    },
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.lg,
+    },
+    terms: {
+      ...ledgerType.caption,
+      color: c.muted,
+      paddingHorizontal: ledgerSpace.gutter,
+    },
+    footer: {
+      paddingBottom: ledgerSpace.xs,
+    },
+    switchRow: {
+      alignItems: 'center',
+      paddingTop: ledgerSpace.sm,
+      minHeight: ledgerSize.hit,
+      justifyContent: 'center',
+    },
+    switchText: {
+      ...ledgerType.body,
+      color: c.muted,
+    },
+    switchLink: {
+      fontFamily: ledgerType.button.fontFamily,
+      color: c.ink,
+      textDecorationLine: 'underline',
+    },
   });
 }

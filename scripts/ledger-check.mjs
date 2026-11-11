@@ -18,6 +18,7 @@ import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activit
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
 import { timeOnToday, timeOnTodayFromString, toTimeColumn, isEveningTime } from '../lib/reminderTime.js';
 import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } from '../lib/periods.js';
+import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -458,6 +459,35 @@ check('month start', 'a new profile starts on the 1st', monthStartFromProfile({ 
 check('month start', 'a saved salary day reads back', monthStartFromProfile({ reset_period: 'salary_day', reset_month_day: 25 }), { start: 'salary_day', day: 25 });
 check('month start', 'quarterly shows the 1st', monthStartFromProfile({ reset_period: 'quarterly', reset_month_day: 25 }), { start: 'first', day: null });
 check('month start', 'no profile yet shows the 1st', monthStartFromProfile(null), { start: 'first', day: null });
+
+// --- Sign-up rules (spec 47, onboarding ticket 03) ---
+// Supabase Auth on this project rejects under 6 characters and has no
+// character-class rule (read 2026-11-11); the app asks for 8, so the button
+// never enables for a password the server turns down.
+check('sign-up', 'the length rule is 8', PASSWORD_MIN, 8);
+check('sign-up', 'an empty password meets nothing', passwordRules('').map((r) => r.met), [false]);
+check('sign-up', 'the rule reads as shown', passwordRules('').map((r) => r.label), ['8 or more characters']);
+check('sign-up', '7 characters fails length', passwordRules('abcdefg').map((r) => r.met), [false]);
+check('sign-up', '8 characters passes length', passwordRules('abcdefgh').map((r) => r.met), [true]);
+check('sign-up', 'spaces count as characters', passwordRules('ab cd ef').map((r) => r.met), [true]);
+check('sign-up', 'empty does not pass', passwordPasses(''), false);
+check('sign-up', 'a short one does not pass', passwordPasses('short'), false);
+check('sign-up', 'a passing one passes', passwordPasses('quiet ledger 9'), true);
+check('sign-up', 'no password at all', passwordPasses(undefined), false);
+check('sign-up', 'a valid email', looksLikeEmail('asha@example.com'), true);
+check('sign-up', 'surrounding spaces are trimmed', looksLikeEmail('  asha@example.in  '), true);
+check('sign-up', 'a subdomain', looksLikeEmail('a.b+flo@mail.example.co.in'), true);
+check('sign-up', 'missing @', looksLikeEmail('asha.example.com'), false);
+check('sign-up', 'a space inside', looksLikeEmail('asha @example.com'), false);
+check('sign-up', 'empty', looksLikeEmail(''), false);
+check('sign-up', 'no dot in the domain', looksLikeEmail('asha@example'), false);
+check('sign-up', 'nothing before @', looksLikeEmail('@example.com'), false);
+check('sign-up', 'two @', looksLikeEmail('a@b@example.com'), false);
+check('sign-up', 'not a string', looksLikeEmail(null), false);
+check('auth error', 'a wrong password reads plainly', authErrorLine({ code: 'invalid_credentials', message: 'Invalid login credentials' }), "That email and password don't match");
+check('auth error', 'a taken email says sign in', authErrorLine({ code: 'user_already_exists', message: 'User already registered' }), 'That email already has an account. Sign in instead');
+check('auth error', 'an unknown code shows the message', authErrorLine({ code: 'x', message: 'Network down' }), 'Network down');
+check('auth error', 'no error, no line', authErrorLine(null), null);
 
 // --- Report ---
 for (const f of failures) {
