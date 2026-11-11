@@ -16,7 +16,7 @@ import { sourceLabel, buildHistory } from '../lib/entryDetail.js';
 import { progressState } from '../lib/progressState.js';
 import { filterActivity, summarizeActivity, pairTransfers, groupEntries, activityRange, rangeLabel, transferTitle, DEFAULT_FILTERS, isDefaultFilters, ymd, dateFromYmd, fullDayLabel } from '../lib/activity.js';
 import { ledgerPalettes } from '../theme/ledgerPalettes.js';
-import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME } from '../lib/setupPlan.js';
+import { planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
 const failures = [];
@@ -369,6 +369,20 @@ check('limit', 'a non-string is no limit', cleanLimitAmount(undefined), null);
   check('limit', 'a category budget is not the limit', planLimit({ amount: 5000, budgets: [{ ...limit, category_id: 'food' }] }), { create: fields(5000) });
   check('limit', 'a weekly budget is not the limit', planLimit({ amount: 5000, budgets: [{ ...limit, period_type: 'calendar_week' }] }), { create: fields(5000) });
   check('limit', 'an overall budget with another name is not the limit', planLimit({ amount: 5000, budgets: [{ ...limit, name: 'Monthly' }] }), { create: fields(5000) });
+}
+
+// --- Set-up planner, card (spec 47, onboarding ticket 08) ---
+{
+  const t = (id, tier) => ({ id, tier });
+  const ids = (list) => list.map((x) => x.id);
+  check('card', 'Day first, seasonal next, then catalog order', ids(cardChoices([t('ink-classic', 'free'), t('dusk', 'common'), t('christmas', 'seasonal'), t('day', 'free'), t('diwali', 'seasonal')])), ['day', 'christmas', 'diwali', 'ink-classic', 'dusk']);
+  check('card', 'no seasonal skins: Day then the rest', ids(cardChoices([t('ink-classic', 'free'), t('day', 'free'), t('dusk', 'common')])), ['day', 'ink-classic', 'dusk']);
+  check('card', 'the legacy Ink is never offered', ids(cardChoices([t('day', 'free'), { id: 'ink', tier: 'free', legacy: true }, t('ink-classic', 'free')])), ['day', 'ink-classic']);
+  check('card', 'an empty catalog is empty', cardChoices([]), []);
+  const real = ids(cardChoices(CARD_THEMES));
+  check('card', 'the real catalog starts with Day', real[0], 'day');
+  check('card', 'the real catalog offers Ink as ink-classic and Dusk', real.includes('ink-classic') && real.includes('dusk') && !real.includes('ink'), true);
+  check('card', 'the real catalog keeps every listed theme', real.length, CARD_THEMES.length);
 }
 
 // --- Set-up progress (spec 47, onboarding ticket 04) ---

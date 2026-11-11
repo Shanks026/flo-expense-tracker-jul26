@@ -18,12 +18,18 @@ import useAndroidKeyboardHeight from '../../hooks/useAndroidKeyboardHeight';
 // `onNext` writes the step's answer and resolves to true when it saved; the
 // shell then moves on. A failed write is the screen's to report (a toast), and
 // the shell stays put. Skip writes nothing and moves on.
-export default function SetupQuestion({ stepKey, title, note, footerNote, nextDisabled = false, onNext, children }) {
+//
+// `pinned` (optional) sits under the question and stays put while `children`
+// scroll below it, as the card preview does over the card grid.
+export default function SetupQuestion({ stepKey, title, note, footerNote, pinned, nextDisabled = false, onNext, children }) {
   const { c } = useLedger();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const keyboardHeight = useAndroidKeyboardHeight();
   const progress = setupProgress(stepKey, { themes: FLAGS.themes });
+  // The last question (card, or budget with themes off) says none of it is final.
+  const isLastQuestion = !SETUP_QUESTIONS.includes(nextStep(stepKey)?.key);
+  const bottomNote = footerNote ?? (isLastQuestion ? 'You can change these in Settings' : null);
 
   useEffect(() => {
     trackStepViewed(stepKey);
@@ -50,6 +56,15 @@ export default function SetupQuestion({ stepKey, title, note, footerNote, nextDi
     if (saved) goNext();
   }
 
+  const question = (
+    <>
+      <Text style={[ledgerType.title, styles.title, { color: c.ink }]} accessibilityRole="header">
+        {title}
+      </Text>
+      {!!note && <Text style={[ledgerType.body, styles.note, { color: c.muted }]}>{note}</Text>}
+    </>
+  );
+
   return (
     // Android 16 is edge-to-edge, so the window doesn't resize for the
     // keyboard; pad by its height so the footer rides on top of it.
@@ -61,14 +76,21 @@ export default function SetupQuestion({ stepKey, title, note, footerNote, nextDi
           <Text style={[ledgerType.caption, { color: c.muted }]}>{progress.label}</Text>
         </View>
       )}
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[ledgerType.title, styles.title, { color: c.ink }]} accessibilityRole="header">
-          {title}
-        </Text>
-        {!!note && <Text style={[ledgerType.body, styles.note, { color: c.muted }]}>{note}</Text>}
-        {children}
-      </ScrollView>
-      {!!footerNote && <Text style={[ledgerType.caption, styles.footerNote, { color: c.muted }]}>{footerNote}</Text>}
+      {pinned ? (
+        <>
+          <View style={styles.pinned}>
+            {question}
+            {pinned}
+          </View>
+          <ScrollView contentContainerStyle={styles.pinnedContent} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+        </>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {question}
+          {children}
+        </ScrollView>
+      )}
+      {!!bottomNote && <Text style={[ledgerType.caption, styles.footerNote, { color: c.muted }]}>{bottomNote}</Text>}
       <PinnedFooter
         keyboardUp={keyboardHeight > 0 || undefined}
         secondary={{ title: 'Skip for now', onPress: goNext, disabled: saving }}
@@ -96,6 +118,14 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: ledgerSpace.gutter,
     paddingTop: ledgerSpace.section,
+    paddingBottom: ledgerSpace.section,
+  },
+  pinned: {
+    paddingHorizontal: ledgerSpace.gutter,
+    paddingTop: ledgerSpace.section,
+  },
+  pinnedContent: {
+    paddingHorizontal: ledgerSpace.gutter,
     paddingBottom: ledgerSpace.section,
   },
   title: {

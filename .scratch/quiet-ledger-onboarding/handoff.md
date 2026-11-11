@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: tickets 01, 04 and 07 done; 08 next, or 05 (its migration needs the person's yes).
+Last updated 2026-11-11: tickets 01, 04, 07 and 08 done; 05 next (its migration needs the person's yes), or 09.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -20,7 +20,7 @@ there all apply here and aren't repeated.
 | 05 Salary-day month | ready (migration needs the person's yes) | |
 | 06 "When does your month start?" | blocked by 04, 05 | |
 | 07 "Want a monthly spending limit?" | done | this commit |
-| 08 "Pick your card" | ready | |
+| 08 "Pick your card" | done | this commit |
 | 09 First expense and the reminder ask on the kit | ready | |
 | 10 First Home coach mark and the full-flow check | blocked by 02–09 | |
 
@@ -67,13 +67,15 @@ order), with 02, 03 and 09 whenever; 10 last.
 - A question that writes one row keeps the row Next saved in the draft
   (as budget does with `draft.budgetSaved`), so a resubmit after Back
   updates it even when question 1 changed the active account.
-- Budget's Next replaces into the first expense until 08 exists, so Back
-  from it can't be tried yet; once 08 is in, recheck "Back then Next" on
-  the limit, including after changing picks on question 1.
-- The emulator is signed in as the ticket 04 account (`FLO_ONB04_*`),
-  mid-flow on the first expense, with SBI, Cash and a ₹700 limit. The
-  ticket 04 skip account (`FLO_ONB04_SKIP_*`) is onboarded with HDFC and
-  a ₹6000 limit. Sign out to reuse the shared account.
+- `SetupQuestion` takes `pinned` (stays put above the scrolling answer, as
+  the card preview does) and shows "You can change these in Settings" on
+  whichever question is last. Month start (06) goes between accounts and
+  budget in `STEPS`.
+- The emulator is signed in as the ticket 04 skip account
+  (`FLO_ONB04_SKIP_*`), onboarded with HDFC, a ₹6000 limit and the default
+  card. The ticket 04 account (`FLO_ONB04_*`) is onboarded with SBI, Cash,
+  a ₹700 limit and Dusk. To rerun the flow on either, set its
+  `profiles.onboarded_at` to null. Sign out to reuse the shared account.
 
 ## How the work is done
 
