@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 3, Onboarding (spec 47): handoff
 
-Last updated 2026-11-11: tickets 01–09 done; **10 next**.
+Last updated 2026-11-11: all ten tickets done; Phase 3 onboarding is built and checked end to end.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/47-quiet-ledger-onboarding.md`; the design source is
@@ -22,9 +22,9 @@ there all apply here and aren't repeated.
 | 07 "Want a monthly spending limit?" | done | 9ba37d1 |
 | 08 "Pick your card" | done | 4c281c0 |
 | 09 First expense and the reminder ask on the kit | done | a67ff15 |
-| 10 First Home coach mark and the full-flow check | blocked by 02, 03, 05, 06 | |
+| 10 First Home coach mark and the full-flow check | done | |
 
-Suggested order: 10. The one-off stuck sign-in from ticket 03 is fixed (useProfile retries a failed or empty read).
+Nothing left in this effort. The one-off stuck sign-in from ticket 03 is fixed (useProfile retries a failed or empty read).
 
 ## Decisions (2026-11-11, with the person, while writing spec 47)
 

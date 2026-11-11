@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from '../theme/ThemeContext';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { useAuth } from '../lib/AuthContext';
 import useProfile from '../hooks/useProfile';
 import { useRewardBurst } from './RewardBurst';
@@ -13,6 +12,10 @@ import { useAnyMomentActive } from '../lib/momentQueue';
 // says one line, and goes away on a tap — shown once per mark, per user, and
 // only to users who finished onboarding after these shipped (anyone earlier
 // already knows the app). They wait while any celebration is on screen.
+//
+// On the ledger kit (spec 47): the kit's scrim, an accent ring (round: the
+// one mark left points at the round + button), and a surface bubble. The
+// streak-chip mark is gone; the first Home shows only the +.
 //
 // Seen-state lives on the phone, keyed per user, and is shared through a small
 // cache so one mark can wait for another (`after`).
@@ -65,8 +68,8 @@ function useSeen(userId, id) {
 // `active`: the owning screen's own condition (e.g. "on Home", "has logged").
 // `after`: another mark's id that must be seen first.
 export default function CoachMark({ id, targetRef, text, active = true, after = null }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { width: screenWidth } = useWindowDimensions();
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -128,8 +131,8 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
   // The bubble sits on whichever side of the target has more room.
   const below = ring.top + ring.height / 2 < frameHeight / 2;
   const bubblePosition = below
-    ? { top: ring.top + ring.height + spacing.md }
-    : { bottom: frameHeight - ring.top + spacing.md };
+    ? { top: ring.top + ring.height + ledgerSpace.md }
+    : { bottom: frameHeight - ring.top + ledgerSpace.md };
 
   return (
     <Modal visible transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => markSeen(userId, id)}>
@@ -142,7 +145,7 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
       >
         {frame ? <View style={[styles.ring, ring]} pointerEvents="none" /> : null}
         {frame ? (
-          <View style={[styles.bubble, bubblePosition, { maxWidth: screenWidth - spacing.lg * 2 }]}>
+          <View style={[styles.bubble, bubblePosition, { maxWidth: screenWidth - ledgerSpace.gutter * 2 }]}>
             <View style={styles.bubbleBody}>
               <Text style={styles.text}>{text}</Text>
               <Text style={styles.hint}>Tap anywhere to continue</Text>
@@ -154,40 +157,37 @@ export default function CoachMark({ id, targetRef, text, active = true, after = 
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
     backdrop: {
       flex: 1,
-      // Same scrim as DueBillsModal / FreezePrompt; the themes have no token for it.
-      backgroundColor: 'rgba(0,0,0,0.55)',
+      backgroundColor: c.scrim,
     },
     ring: {
       position: 'absolute',
-      borderRadius: radii.card,
+      borderRadius: ledgerRadius.full,
       borderWidth: 3,
-      borderColor: colors.brand,
+      borderColor: c.accent,
     },
     bubble: {
       position: 'absolute',
-      left: spacing.lg,
-      right: spacing.lg,
-      backgroundColor: colors.surface,
-      borderRadius: radii.card,
-      padding: spacing.lg,
+      left: ledgerSpace.gutter,
+      right: ledgerSpace.gutter,
+      backgroundColor: c.surface,
+      borderRadius: ledgerRadius.card,
+      padding: ledgerSpace.lg,
     },
     bubbleBody: {
       flex: 1,
     },
     text: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.lg,
-      color: colors.ink,
+      ...ledgerType.rowTitle,
+      color: c.ink,
     },
     hint: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.muted,
-      marginTop: 4,
+      ...ledgerType.caption,
+      color: c.muted,
+      marginTop: ledgerSpace.xs,
     },
   });
 }
