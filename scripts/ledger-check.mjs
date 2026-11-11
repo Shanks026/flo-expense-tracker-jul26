@@ -20,6 +20,7 @@ import { timeOnToday, timeOnTodayFromString, toTimeColumn, isEveningTime } from 
 import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } from '../lib/periods.js';
 import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
 import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from '../lib/insights.js';
+import { budgetRowStatus } from '../lib/budgetRow.js';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -561,6 +562,23 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('prior range', 'a week compares with the week before', r(d(2026, 10, 9), d(2026, 10, 15)), [d(2026, 10, 2).toDateString(), d(2026, 10, 8).toDateString()]);
   check('prior range', 'a custom range compares with the same days before', r(d(2026, 10, 5), d(2026, 10, 11)), [d(2026, 9, 29).toDateString(), d(2026, 10, 4).toDateString()]);
   check('prior range', 'a range not on month edges stays day-for-day', r(d(2026, 10, 2), d(2026, 10, 30)), [d(2026, 9, 4).toDateString(), d(2026, 10, 1).toDateString()]);
+}
+
+// --- Budgets list rows (spec 48, ticket 02) ---
+{
+  const today = new Date(2026, 10, 12);
+  const month = (spent, amount) => budgetRowStatus({ spent, amount, period_type: 'calendar_month' }, { today });
+  check('budget row', 'under 80 % is fine', month(4000, 10000), { state: 'ok', ratio: 0.4, caption: null, captionTone: null, rightText: '₹6,000 left', rightTone: 'ink' });
+  check('budget row', 'exactly 80 % is still fine', month(8000, 10000).state, 'ok');
+  check('budget row', 'past 80 % is almost out', month(8500, 10000), { state: 'warn', ratio: 0.85, caption: 'Almost out', captionTone: 'warn', rightText: '₹1,500 left', rightTone: 'ink' });
+  check('budget row', 'exactly 100 % is used up, in red', month(2000, 2000), { state: 'over', ratio: 1, caption: 'Used up', captionTone: 'danger', rightText: '₹0 left', rightTone: 'danger' });
+  check('budget row', 'past 100 % is over, and the amount says so', month(2104.5, 2000), { state: 'over', ratio: 1.05225, caption: null, captionTone: null, rightText: '₹104.50 over', rightTone: 'danger' });
+  check('budget row', 'no limit reads as fine', month(50, 0).state, 'ok');
+  const custom = (end, spent) => budgetRowStatus({ spent, amount: 1000, period_type: 'custom', start_date: '2026-10-01', end_date: end }, { today });
+  check('budget row', 'an ended custom budget says Ended, keeps its final tone', custom('2026-11-11', 1200), { state: 'ended', ratio: 1.2, caption: 'Ended', captionTone: 'muted', rightText: '₹200 over', rightTone: 'danger' });
+  check('budget row', 'a custom budget ending today is still running', custom('2026-11-12', 300).state, 'ok');
+  check('budget row', 'a calendar budget never ends', budgetRowStatus({ spent: 1, amount: 10, period_type: 'calendar_week', end_date: '2020-01-01' }, { today }).state, 'ok');
+  check('budget row', 'another currency', budgetRowStatus({ spent: 10, amount: 100, period_type: 'calendar_month' }, { today, currency: 'USD' }).rightText, '$90 left');
 }
 
 // --- Report ---

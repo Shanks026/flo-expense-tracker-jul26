@@ -1,359 +1,263 @@
 import { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Animated, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Pencil, Wallet } from 'lucide-react-native';
-import { format, parseISO } from 'date-fns';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import ProgressBar from '../../components/ProgressBar';
-import AmountText from '../../components/AmountText';
-import Pill from '../../components/Pill';
+import { Pencil, Wallet, TrendingUp, Check } from 'lucide-react-native';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../../components/ledger/ScreenHeader';
+import SectionHeader from '../../components/ledger/SectionHeader';
+import ProgressBar from '../../components/ledger/ProgressBar';
+import AmountText from '../../components/ledger/AmountText';
+import Callout from '../../components/ledger/Callout';
+import Button from '../../components/ledger/Button';
+import TransactionRow from '../../components/ledger/TransactionRow';
+import { toneColors } from '../../components/ledger/ListRow';
 import CategoryIcon from '../../components/CategoryIcon';
-// Static palette (theme/tokens) only for text on the dark summary card.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, ledgerSize } from '../../theme/ledger';
 import useBudgetDetail from '../../hooks/useBudgetDetail';
-import { budgetStatus } from '../../hooks/useBudgets';
-import { formatPeriodLabel, isBudgetEnded, daysLeftInPeriod, computeBudgetPace } from '../../lib/budgets';
+import { useAccount } from '../../lib/AccountContext';
+import { formatPeriodLabel, daysLeftInPeriod, computeBudgetPace } from '../../lib/budgets';
+import { budgetRowStatus } from '../../lib/budgetRow';
+import { amountParts, DEFAULT_CURRENCY } from '../../lib/currency';
+import { groupEntries } from '../../lib/activity';
+import { dateGroupLabel } from '../../lib/dateLabels';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAddBudgetSheet } from '../../components/AddBudgetSheet';
-import { formatMoney } from '../../lib/currency';
-import useCurrency from '../../hooks/useCurrency';
 
-// Same vocabulary as computePlanPace's (00-index.md) — a budget is a spending
+// Same vocabulary as computePlanPace's (00-index.md): a budget is a spending
 // cap, so "ahead"/"behind" would read ambiguously.
 const PACE_COPY = {
-  on_track: { text: 'On track for this period', tone: 'income' },
-  over_pace: { text: 'Spending too fast to last the period', tone: 'danger' },
-  under_pace: { text: 'Comfortably under pace', tone: 'income' },
+  on_track: { text: 'On track for this period', tone: 'info', icon: Check },
+  over_pace: { text: 'Spending too fast to last the period', tone: 'warn', icon: TrendingUp },
+  under_pace: { text: 'Comfortably under pace', tone: 'info', icon: Check },
 };
 
+// A budget on the ledger kit (spec 48, ticket 02): a sunk band leading with
+// "₹2,104.50 of ₹2,000" and the bar, what's left (or over) and the days
+// left, a pace callout, then the period's entries date-grouped like Home and
+// Activity. An entry opens its Transaction detail; editing the budget is the
+// pencil in the header.
 export default function BudgetDetail() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c, modeId } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { scrollY, onScroll } = useHeaderScroll();
   const { budget, transactions, loading } = useBudgetDetail(id);
+  const { accounts } = useAccount();
   const { openAdd } = useAddTransactionSheet();
   const { openAddBudget } = useAddBudgetSheet();
-  const currency = useCurrency();
 
-  // Deleting the budget from the edit sheet leaves this screen pointing at a
-  // dead id — the refetch returns nothing, and we'd otherwise sit on an empty
-  // shell. Same guard as Plan Detail.
+  // Deleting the budget from the edit sheet leaves this screen on a dead id;
+  // go back rather than sit on an empty shell (same guard as Plan detail).
   useEffect(() => {
     if (!loading && !budget) router.back();
   }, [loading, budget]);
 
-  // Real bug, not just a missing polish pass: this used to fall straight
-  // through to `if (!budget) return null`, rendering a BLANK screen for the
-  // whole time useBudgetDetail's fetch was in flight — worse than a wrong
-  // value flash, since there was nothing on screen at all. A centred spinner
-  // (matching streak.js's own loading branch) at least shows something is
-  // happening.
-  if (loading) {
+  const groups = useMemo(() => groupEntries(transactions.map((tx) => ({ key: tx.id, tx }))), [transactions]);
+
+  if (loading || !budget) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.screen}>
+        <ScreenHeader />
         <View style={styles.loading}>
-          <ActivityIndicator color={colors.ink} />
+          <ActivityIndicator color={c.ink} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  if (!budget) return null;
-
-  const status = budgetStatus(budget.spent, budget.amount);
-  const progress = budget.amount > 0 ? budget.spent / budget.amount : 0;
-  const ended = isBudgetEnded(budget);
+  const currency = accounts.find((a) => a.id === budget.account_id)?.currency ?? DEFAULT_CURRENCY;
+  const row = budgetRowStatus(budget, { currency });
   const daysLeft = daysLeftInPeriod(budget);
   const pace = computeBudgetPace(budget);
-  const isOver = status === 'over';
+  const left = budget.amount - budget.spent;
+  const tint = toneColors(budget.category_color, c, modeId);
+  const what = budget.category_name ?? 'Overall';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <View style={styles.nameRow}>
-              <Text style={styles.budgetName} numberOfLines={1}>
-                {budget.name}
-              </Text>
-              {ended && <Pill label="Ended" tone="completed" />}
+    <View style={styles.screen}>
+      <ScreenHeader
+        title={budget.name}
+        scrollY={scrollY}
+        actions={[{ icon: Pencil, onPress: () => openAddBudget(budget), accessibilityLabel: 'Edit budget' }]}
+      />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title={budget.name} scrollY={scrollY} />
+
+        <View style={styles.band}>
+          <View style={styles.bandTop}>
+            {/* Canvas unless the category has a colour: a sunk circle would vanish on the sunk band. */}
+            <View style={[styles.circle, { backgroundColor: budget.category_color ? tint.bg : c.canvas }]}>
+              {budget.category_id ? (
+                <CategoryIcon icon={budget.category_icon} size={18} color={tint.fg} strokeWidth={1.75} />
+              ) : (
+                <Wallet size={18} color={c.ink} strokeWidth={1.75} />
+              )}
             </View>
-            <Text style={styles.periodLabel}>{formatPeriodLabel(budget)}</Text>
+            <Text style={styles.bandSub} numberOfLines={1}>
+              {what === budget.name ? formatPeriodLabel(budget) : `${what} · ${formatPeriodLabel(budget)}`}
+            </Text>
+          </View>
+
+          <Text
+            accessibilityLabel={`${amountParts(budget.spent, { currency }).text} spent of ${amountParts(budget.amount, { currency }).text}`}
+          >
+            <AmountText value={budget.spent} size="display" currency={currency} color={row.rightTone === 'danger' ? c.danger : c.ink} />
+            <Text style={styles.of}> of {amountParts(budget.amount, { currency }).text}</Text>
+          </Text>
+
+          {/* The usual sunk track would vanish on the sunk band; canvas shows it. */}
+          <ProgressBar value={row.ratio} accessibilityLabel={`${budget.name} budget`} style={[styles.bar, { backgroundColor: c.canvas }]} />
+
+          <View style={styles.bandFoot}>
+            <Text style={[styles.left, left < 0 && { color: c.danger }]}>
+              {left < 0 ? 'Over budget by ' : 'Left to spend '}
+              <Text style={[styles.leftAmount, row.rightTone === 'danger' && { color: c.danger }]}>{amountParts(Math.abs(left), { currency }).text}</Text>
+            </Text>
+            <Text style={styles.days}>
+              {row.state === 'ended' ? 'Period ended' : daysLeft === 1 ? '1 day left' : `${daysLeft} days left`}
+            </Text>
           </View>
         </View>
-        <Pressable style={styles.editButton} onPress={() => openAddBudget(budget)}>
-          <Pencil size={16} color={colors.ink} strokeWidth={2} />
-        </Pressable>
-      </View>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Card dark style={styles.summaryCard}>
-          <View style={styles.summaryTop}>
-            {/* A LIGHT tile, deliberately, even on this dark card: the category
-                palette includes charcoal and navy, which would vanish against a
-                dark tile. On a light tile every swatch reads — which is exactly
-                why the Budgets tab tints its icons the same way. */}
-            <IconTile tone="neutral" size={44} radius={14}>
-              {budget.category_icon ? (
-                <CategoryIcon
-                  icon={budget.category_icon}
-                  size={20}
-                  color={budget.category_color ?? colors.ink}
-                />
-              ) : (
-                <Wallet size={20} color={colors.ink} strokeWidth={2} />
-              )}
-            </IconTile>
-            <Text style={styles.summaryCategory}>{budget.category_name ?? 'Overall'}</Text>
-          </View>
-
-          <Text style={styles.summaryLabel}>{isOver ? 'Over budget by' : 'Left to spend'}</Text>
-          <AmountText value={budget.remaining} type="neutral" dark size={40} muteCurrency currency={currency} />
-
-          <View style={styles.progressWrap}>
-            <ProgressBar progress={progress} dark status={status} />
-          </View>
-
-          <View style={styles.rowBetween}>
-            <Text style={styles.spentText}>
-              {formatMoney(budget.spent, currency)} spent of{' '}
-              {formatMoney(budget.amount, currency)}
-            </Text>
-            <Text style={styles.daysText}>
-              {ended ? 'Period ended' : daysLeft === 1 ? '1 day left' : `${daysLeft} days left`}
-            </Text>
-          </View>
-        </Card>
 
         {pace && (
-          <Card style={[styles.paceCard, pace === 'over_pace' && styles.paceCardOver]}>
-            <Text
-              style={[
-                styles.paceText,
-                { color: PACE_COPY[pace].tone === 'danger' ? colors.danger : colors.income },
-              ]}
-            >
-              {PACE_COPY[pace].text}
-            </Text>
-          </Card>
+          <Callout tone={PACE_COPY[pace].tone} icon={PACE_COPY[pace].icon} text={PACE_COPY[pace].text} style={styles.callout} />
         )}
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Transactions</Text>
-          <Text style={styles.sectionCount}>
-            {transactions.length} {transactions.length === 1 ? 'item' : 'items'}
-          </Text>
-        </View>
+        <SectionHeader
+          title="Entries"
+          right={<Text style={styles.count}>{transactions.length === 1 ? '1 entry' : `${transactions.length} entries`}</Text>}
+          style={styles.section}
+        />
 
         {transactions.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyText}>
-              Nothing spent in this period yet.
-            </Text>
-          </Card>
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>Nothing spent in this period yet.</Text>
+            <Button
+              title="Add expense"
+              variant="secondary"
+              compact
+              onPress={() => openAdd({ type: 'expense', categoryId: budget.category_id ?? undefined, accountId: budget.account_id })}
+            />
+          </View>
         ) : (
-          <Card style={styles.listCard}>
-            {transactions.map((tx, idx) => (
-              <Pressable
-                key={tx.id}
-                style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
-                onPress={() => openAdd(tx)}
-              >
-                <IconTile tone="neutral">
-                  <CategoryIcon icon={tx.category?.icon} size={20} color={colors.ink} />
-                </IconTile>
-                <View style={styles.rowMid}>
-                  <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
-                  <Text style={styles.rowSub}>
-                    {format(parseISO(tx.occurred_at), 'd MMM')}
-                    {tx.note ? ` · ${tx.note}` : ''}
-                  </Text>
-                </View>
-                <AmountText value={tx.amount} type="expense" signed currency={currency} />
-              </Pressable>
-            ))}
-          </Card>
+          groups.map((g) => (
+            <View key={g.key}>
+              <Text style={styles.groupLabel}>{dateGroupLabel(g.date)}</Text>
+              {g.items.map((entry, i) => (
+                <TransactionRow
+                  key={entry.key}
+                  tx={entry.tx}
+                  accounts={accounts}
+                  divider={i < g.items.length - 1}
+                  onPress={() => router.push(`/transaction/${entry.tx.id}`)}
+                />
+              ))}
+            </View>
+          ))
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    flex: 1,
-    paddingRight: spacing.md,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  budgetName: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    flexShrink: 1,
-  },
-  periodLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-  },
-  scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 60,
-  },
-  summaryCard: {
-    borderRadius: radii.cardLg,
-    padding: 22,
-    marginBottom: spacing.lg,
-  },
-  summaryTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  summaryCategory: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    // Sits on Card's `dark` prop — pinned.
-    color: staticColors.mutedOnDark,
-  },
-  summaryLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: staticColors.mutedOnDark,
-  },
-  progressWrap: {
-    marginVertical: spacing.lg,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  spentText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: staticColors.mutedOnDark,
-  },
-  daysText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: staticColors.surface,
-  },
-  paceCard: {
-    paddingVertical: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  paceCardOver: {
-    borderColor: colors.dangerBorder,
-  },
-  paceText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    textAlign: 'center',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  sectionCount: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
-  },
-  listCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 13,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  rowSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    loading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.section * 3,
+    },
+    band: {
+      marginTop: ledgerSpace.md,
+      padding: ledgerSpace.gutter,
+      borderRadius: ledgerRadius.card,
+      backgroundColor: c.surfaceSunk,
+    },
+    bandTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ledgerSpace.md,
+      marginBottom: ledgerSpace.lg,
+    },
+    circle: {
+      width: ledgerSize.iconCircle,
+      height: ledgerSize.iconCircle,
+      borderRadius: ledgerRadius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bandSub: {
+      ...ledgerType.body,
+      color: c.muted,
+      flex: 1,
+    },
+    of: {
+      ...ledgerType.body,
+      fontVariant: ['tabular-nums'],
+      color: c.muted,
+    },
+    bar: {
+      marginTop: ledgerSpace.md,
+    },
+    bandFoot: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      marginTop: ledgerSpace.md,
+    },
+    left: {
+      ...ledgerType.body,
+      color: c.muted,
+    },
+    leftAmount: {
+      ...ledgerType.rowTitle,
+      fontVariant: ['tabular-nums'],
+      color: c.ink,
+    },
+    days: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    callout: {
+      marginTop: ledgerSpace.md,
+    },
+    section: {
+      marginTop: ledgerSpace.section,
+    },
+    count: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    groupLabel: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginTop: ledgerSpace.md,
+    },
+    empty: {
+      alignItems: 'flex-start',
+      gap: ledgerSpace.md,
+      marginTop: ledgerSpace.md,
+    },
+    emptyText: {
+      ...ledgerType.body,
+      color: c.muted,
+    },
   });
 }

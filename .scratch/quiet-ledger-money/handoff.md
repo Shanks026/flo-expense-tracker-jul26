@@ -1,6 +1,6 @@
 # Quiet Ledger Phase 4, Money screens (spec 48): handoff
 
-Last updated 2026-11-12: ticket 01 done.
+Last updated 2026-11-12: tickets 01 and 02 done.
 
 Read this, then the ticket you're starting. The spec is
 `.claude/features/48-quiet-ledger-money-screens.md`; the design source is
@@ -15,7 +15,7 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 | Ticket | Blocked by | State | Commit |
 |---|---|---|---|
 | 01 Insights on the kit | — | done | see git log |
-| 02 Budgets list, detail and sheet | — | ready | |
+| 02 Budgets list, detail and sheet | — | done | see git log |
 | 03 Bills list and the bill sheets | — | ready | |
 | 04 Bill detail and payment history | 03 | ready | |
 | 05 Bill icons from names | 03 | ready | |
@@ -58,6 +58,12 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
   (02) can reuse it.
 - **Budget periods in a range:** only count periods wholly inside the
   fetched span (Insights does this; Budgets detail should too).
+- **Money rows (ticket 02):** a row's money is a node (ledger rowTitle,
+  semibold, tabular; danger when over), never a plain `right` string, which
+  ListRow draws muted. "₹X over" needs no caption; captions are for
+  "Almost out", "Used up", "Ended".
+- **Bars on a sunk band** pass a canvas track (`style={{ backgroundColor:
+  c.canvas }}`); icon circles there fall back to canvas too.
 - The emulator was signed in as a fresh onboarding account; ticket 01 signed
   in as the shared test account and left it there (Light, Personal active).
 
