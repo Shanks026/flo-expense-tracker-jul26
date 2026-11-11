@@ -9,16 +9,20 @@ Spec: .claude/features/47-quiet-ledger-onboarding.md
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A fresh install (or cleared app data) opens the opener; swiping and the dots move between three slides
-- [ ] Create account opens sign-up; I have an account opens sign-in
-- [ ] After signing out, the phone goes straight to sign-in, not the opener
-- [ ] No analytics switch on any slide
-- [ ] Emulator check in light and dark
+- [x] A fresh install (or cleared app data) opens the opener; swiping and the dots move between three slides
+- [x] Create account opens sign-up; I have an account opens sign-in
+- [x] After signing out, the phone goes straight to sign-in, not the opener
+- [x] No analytics switch on any slide
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-11: built and checked on Pixel_API_36. A cleared install opens the opener; swiping moves through the three slides and the dots follow (light and dark). Create account opens sign-up, I have an account opens sign-in; a relaunch after either, and a log-out after signing in, go straight to sign-in. The pager is a paged horizontal ScrollView (no new dependency); the dots are a new kit `PageDots` (in the gallery), which Home's card carousel now uses too (checked on Home); each line holds two lines' height so the object doesn't jump between slides. Not checked: the opener's `onboarding_step_viewed` row (consent is off before sign-in). Sign-up and sign-in still have the old look until ticket 03. Review (two agents): no hard violations or spec gaps; fixed the shared dots, a tap guard that could stick if saving the flag failed, and two names. The emulator was left signed in as `FLO_ONB04_*` (app data was cleared for the check, so its local settings, such as voice language, are back to defaults).

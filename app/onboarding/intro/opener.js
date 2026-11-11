@@ -1,157 +1,120 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import OnboardingScreen from '../../../components/OnboardingScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Illustration from '../../../components/ledger/Illustration';
-import { useToast } from '../../../components/Toast';
-import { fontFamily, fontSize, spacing } from '../../../theme/tokens';
-import { useTheme } from '../../../theme/ThemeContext';
-import { useAuth } from '../../../lib/AuthContext';
+import PinnedFooter from '../../../components/ledger/PinnedFooter';
+import PageDots from '../../../components/ledger/PageDots';
+import { useLedger, ledgerType, ledgerSpace } from '../../../theme/ledger';
 import { setIntroSeen } from '../../../lib/onboardingDraft';
-import { track, trackStepViewed } from '../../../lib/track';
+import { track } from '../../../lib/track';
 import useAnalyticsConsent from '../../../hooks/useAnalyticsConsent';
 
-
-// The opener (35-onboarding-v3.md) — the whole pre-auth intro now. One object, one
-// line of value, and Continue with Google; email sign-up sits behind "Other
-// options", and "I have an account" goes to sign-in. No questions: the
-// account, INR, categories and weekly report are set up at sign-up, and the
-// gate takes a new account straight on to the post-auth steps.
+// The opener (spec 47): the whole pre-auth intro. Three slides, one object
+// and one line each, swiped with page dots under them; Create account and
+// I have an account stay pinned on every slide. Both set the intro-seen flag,
+// so after a sign-out RootNavigator goes straight to sign-in.
 //
-// It also carries the analytics opt-in (33-product-analytics.md), unticked by
-// default. Signed out, the choice is held on the phone and the events it lets
-// through wait in the queue; the first sign-in copies it to a new account's
-// profile (lib/track.js).
-export default function Opener() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const router = useRouter();
-  const { showToast } = useToast();
-  // Google sign-in parked 2026-10-27: email only for now. Uncomment this,
-  // handleGoogle and the Google primary below to bring it back.
-  // const { signInWithGoogle } = useAuth();
-  const { consent, setConsent } = useAnalyticsConsent();
-  const [googleLoading, setGoogleLoading] = useState(false);
+// No analytics switch (spec 33: the opt-in left the opener; it lives in
+// Settings → Data & export). The view is still counted only with consent on.
+// Google stays parked (2026-10-27): email sign-up is the primary.
+const SLIDES = [
+  { key: 'one-place', illustration: 'coins', line: 'Every rupee, in one quiet place' },
+  { key: 'quick-add', illustration: 'spark', line: 'Log in 3 taps, or just say it' },
+  { key: 'where-it-went', illustration: 'receipt', line: 'See where it went' },
+];
 
-  // Counted once per visit: on arrival if consent is already on, otherwise
-  // the moment the switch is turned on. Turning it off drops the queued
-  // event, so turning it back on counts the view again.
+export default function Opener() {
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { consent } = useAnalyticsConsent();
+  const [page, setPage] = useState(0);
+  // A second tap while the flag saves would replace twice.
+  const leaving = useRef(false);
+
+  // Counted once per visit, and only with consent on.
   const viewTracked = useRef(false);
   useEffect(() => {
-    if (!consent) {
-      viewTracked.current = false;
-      return;
-    }
-    if (viewTracked.current) return;
+    if (!consent || viewTracked.current) return;
     viewTracked.current = true;
     track('onboarding_step_viewed', { step: 'opener' });
   }, [consent]);
 
-  // A backed-out browser sheet returns normally (AuthContext), so only a real
-  // failure shows. On success there's nothing to do here: the session lands,
-  // RootNavigator marks the intro seen, and OnboardingGate routes the user.
-  // async function handleGoogle() {
-  //   setGoogleLoading(true);
-  //   trackStepViewed('auth');
-  //   try {
-  //     await signInWithGoogle();
-  //   } catch (err) {
-  //     showToast({ message: err.message, variant: 'error' });
-  //   } finally {
-  //     setGoogleLoading(false);
-  //   }
-  // }
+  function handleScrollEnd(e) {
+    setPage(Math.round(e.nativeEvent.contentOffset.x / width));
+  }
 
-  async function goToSignIn(mode) {
-    await setIntroSeen();
-    router.replace(mode === 'signup' ? '/sign-in?mode=signup' : '/sign-in');
+  // `route` is sign-in, or sign-in in sign-up mode.
+  async function leaveFor(route) {
+    if (leaving.current) return;
+    leaving.current = true;
+    try {
+      await setIntroSeen();
+      router.replace(route);
+    } finally {
+      leaving.current = false;
+    }
   }
 
   return (
-    <OnboardingScreen
-      bg="light"
-      hero={
-        <View style={styles.heroWrap}>
-          <Illustration name="coins" size="large" style={styles.heroObject} />
-          <Text style={styles.value}>Know where your money goes, a few seconds a day.</Text>
-        </View>
-      }
-      // Google parked: email sign-up is the main button.
-      // primaryLabel="Continue with Google"
-      // onPrimary={handleGoogle}
-      // primaryLoading={googleLoading}
-      // secondaryLabel="Other options"
-      // onSecondary={() => goToSignIn('signup')}
-      primaryLabel="Create account"
-      onPrimary={() => goToSignIn('signup')}
-      footerNote={
-        <Pressable style={styles.link} onPress={() => goToSignIn('signin')} disabled={googleLoading}>
-          <Text style={styles.linkText}>
-            Already have an account? <Text style={styles.linkBold}>Sign in</Text>
-          </Text>
-        </Pressable>
-      }
-    >
-      {/* Analytics opt-in removed from the opener 2026-10-27: it felt like a
-          hurdle before sign-up. The choice lives in Settings → Data & export.
-      <View style={styles.consentRow}>
-        <Text style={styles.consentText}>Share anonymous usage to help improve FLO</Text>
-        <Switch
-          value={consent}
-          onValueChange={setConsent}
-          // Themed like the rest of onboarding (System by default, spec 37).
-          trackColor={{ false: colors.mutedLight, true: colors.brand }}
-          thumbColor={colors.surface}
-          accessibilityLabel="Share anonymous usage to help improve FLO"
-        />
-      </View> */}
-    </OnboardingScreen>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScrollEnd}
+        style={styles.pager}
+      >
+        {SLIDES.map((slide, i) => (
+          <View
+            key={slide.key}
+            style={[styles.slide, { width }]}
+            accessible
+            accessibilityLabel={`${slide.line}. Slide ${i + 1} of ${SLIDES.length}`}
+          >
+            <Illustration name={slide.illustration} size="large" />
+            <Text style={styles.line}>{slide.line}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <PageDots count={SLIDES.length} index={page} style={styles.dots} />
+      <PinnedFooter
+        secondary={{ title: 'I have an account', onPress: () => leaveFor('/sign-in') }}
+        primary={{ title: 'Create account', onPress: () => leaveFor('/sign-in?mode=signup') }}
+      />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  // `alignSelf: 'stretch'` overrides OnboardingScreen's hero box (which
-  // shrink-wraps to content via `alignItems: 'flex-start'`) so this group
-  // centres against the FULL screen width, not just against its own children.
-  heroWrap: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-  },
-  heroObject: {
-    marginBottom: spacing.lg,
-  },
-  value: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 26,
-    lineHeight: 33,
-    letterSpacing: -0.5,
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  consentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    gap: spacing.md,
-  },
-  consentText: {
-    flex: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.mutedDarker,
-  },
-  link: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  linkText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  linkBold: {
-    fontFamily: fontFamily.extrabold,
-  },
+    root: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    pager: {
+      flex: 1,
+    },
+    slide: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: ledgerSpace.gutter * 2,
+      gap: ledgerSpace.section,
+    },
+    line: {
+      ...ledgerType.display,
+      color: c.ink,
+      textAlign: 'center',
+      // Two lines held on every slide, so the object doesn't jump between
+      // a one-line and a two-line slide.
+      minHeight: ledgerType.display.lineHeight * 2,
+    },
+    dots: {
+      marginBottom: ledgerSpace.lg,
+    },
   });
 }

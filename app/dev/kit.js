@@ -17,6 +17,7 @@ import Chip from '../../components/ledger/Chip';
 import TransactionRow from '../../components/ledger/TransactionRow';
 import Timeline from '../../components/ledger/Timeline';
 import DayOfMonthPicker from '../../components/ledger/DayOfMonthPicker';
+import PageDots from '../../components/ledger/PageDots';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
 
 // Developer → Kit (spec 46, ticket 06): every ledger component in its states,
@@ -146,6 +147,10 @@ function KitGallery() {
               <AmountText value={-2500.5} size="title" />
             </Labeled>
           </View>
+        </Section>
+
+        <Section title="PageDots">
+          <PageDots count={3} index={1} />
         </Section>
 
         <Section title="DayOfMonthPicker">

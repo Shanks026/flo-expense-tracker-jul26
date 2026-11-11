@@ -5,6 +5,7 @@ import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-
 import { scheduleOnRN } from 'react-native-worklets';
 import { ChevronDown } from 'lucide-react-native';
 import CardThemeSurface from '../CardThemeSurface';
+import PageDots from './PageDots';
 import { getTheme } from '../../lib/cardThemes';
 import { useLedger, ledgerRadius, ledgerSpace } from '../../theme/ledger';
 import { inter as fontFamily } from '../../theme/ledger';
@@ -87,7 +88,7 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
     return (
       <View>
         <View style={[styles.skeleton, { aspectRatio: CARD_ASPECT }]} />
-        <View style={styles.dotsRow} />
+        <PageDots count={0} index={0} />
       </View>
     );
   }
@@ -127,12 +128,7 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
           </ReAnimated.View>
         </GestureDetector>
       </View>
-      <View style={styles.dotsRow}>
-        {slideCount > 1 &&
-          accounts.map((a, i) => (
-            <View key={a.id} style={[styles.dot, { backgroundColor: i === visualIndex ? c.ink : c.hairline }]} />
-          ))}
-      </View>
+      <PageDots count={slideCount} index={visualIndex} />
     </View>
   );
 }
@@ -175,18 +171,6 @@ function makeStyles(c) {
       fontSize: 12,
       letterSpacing: 1,
       opacity: 0.8,
-    },
-    dotsRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 6,
-      height: 20,
-    },
-    dot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
     },
   });
 }
