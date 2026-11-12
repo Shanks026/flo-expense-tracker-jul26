@@ -23,6 +23,8 @@ import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from 
 import { budgetRowStatus } from '../lib/budgetRow.js';
 import { groupBills, billLine, billTerms } from '../lib/billGroups.js';
 import { billTimeline } from '../lib/billTimeline.js';
+import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.js';
+import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
 let passed = 0;
@@ -633,6 +635,45 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   const capped = billTimeline(bill(), many, today);
   check('bill timeline', 'twelve payments, then a pointer to Activity', [capped.filter((s) => s.kind === 'payment').length, capped[capped.length - 2].title], [12, 'Earlier payments are in Activity']);
   check('bill timeline', 'another year shows the year', billTimeline(bill({ next_due_date: '2027-01-05', created_at: '2025-03-02T10:00:00Z' }), [], today).map((s) => s.title === 'Added' ? s.sub : s.title), ['Due 5 Jan 2027', '2 Mar 2025']);
+}
+
+// --- Bill icons from names (spec 48, ticket 05) ---
+{
+  const cases = [
+    ['Netflix', 'entertainment'], ['Prime', 'entertainment'], ['Amazon Prime Video', 'entertainment'], ['Hotstar', 'entertainment'], ['Spotify', 'entertainment'], ['JioCinema', 'entertainment'],
+    ['Electricity', 'utilities'], ['BESCOM', 'utilities'], ['TNEB bill', 'utilities'], ['Power', 'utilities'],
+    ['Rent', 'home'], ['House rent', 'home'], ['Society maintenance', 'home'],
+    ['Jio', 'phone'], ['Airtel postpaid', 'phone'], ['AIRTEL', 'phone'], ['Vi recharge', 'phone'], ['Mobile recharge', 'phone'],
+    ['Airtel DTH', 'tv'], ['Tata Play', 'tv'], ['Dish TV', 'tv'], ['Dish', 'tv'],
+    ['Jio Fiber', 'wifi'], ['ACT Fibernet', 'wifi'], ['ACT', 'wifi'], ['Broadband', 'wifi'], ['Wi-Fi', 'wifi'],
+    ['Water bill', 'water'], ['BWSSB', 'water'],
+    ['Indane gas', 'gas'], ['LPG cylinder', 'gas'],
+    ['LIC', 'insurance'], ['Health insurance premium', 'insurance'],
+    ['SIP', 'investment'], ['Mutual fund', 'investment'], ['PPF', 'investment'],
+    ['Car EMI', 'business'], ['Home loan', 'business'],
+    ['School fees', 'education'], ['Tuition', 'education'],
+    ['Gym', 'fitness'], ['Cult.fit', 'fitness'],
+    ['HDFC credit card', 'bills'],
+  ];
+  for (const [name, key] of cases) check('bill icons', name, iconForBillName(name), key);
+  check('bill icons', 'a word that merely contains a name does not match', iconForBillName('Fairtel'), null);
+  check('bill icons', 'a short key needs the whole word', iconForBillName('Vivek'), null);
+  check('bill icons', 'nothing known', iconForBillName('Aunty tiffin'), null);
+  check('bill icons', 'a loose word is not a bill family', iconForBillName('Flat 4B'), null);
+  check('bill icons', 'a word that starts with a short key does not match', iconForBillName('Acting class'), null);
+  check('bill icons', 'empty', iconForBillName(''), null);
+  check('bill icons', 'not a string', iconForBillName(null), null);
+  check('bill icons', 'display: the stored icon wins', billIconKey({ icon: 'wifi', category: { icon: 'bills' } }), 'wifi');
+  check('bill icons', 'display: then the category icon', billIconKey({ icon: null, category: { icon: 'home' } }), 'home');
+  check('bill icons', 'display: then a receipt', billIconKey({ icon: null, category: null }), 'bills');
+  check('bill icons', 'display: an unknown stored key falls back', billIconKey({ icon: 'rocket', category: { icon: 'home' } }), 'home');
+  const mapped = [...new Set(cases.map(([, k]) => k))];
+  check('bill icons', 'every mapped key is in the set', mapped.filter((k) => !BILL_ICON_KEYS.includes(k)), []);
+  const iconFile = readFileSync(new URL('../components/CategoryIcon.js', import.meta.url), 'utf8');
+  check('bill icons', 'every key draws an icon', BILL_ICON_KEYS.filter((k) => !new RegExp(`^\\s+${k}:`, 'm').test(iconFile)), []);
+  const fn = readFileSync(new URL('../supabase/functions/ai-assistant/billIcon.ts', import.meta.url), 'utf8');
+  const fnKeys = JSON.parse(fn.match(/BILL_ICON_KEYS = (\[[^\]]*\])/)[1].replace(/'/g, '"'));
+  check('bill icons', 'the Edge Function lists the same keys', fnKeys, BILL_ICON_KEYS);
 }
 
 // --- Report ---

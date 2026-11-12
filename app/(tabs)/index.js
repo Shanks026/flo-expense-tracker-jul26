@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, RefreshControl, Modal, StyleSheet } 
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
-import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, Receipt, CalendarCheck, ChartColumn, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Bell, Sparkles, Flame, Plus, ArrowLeftRight, CalendarCheck, ChartColumn, TrendingUp, TrendingDown } from 'lucide-react-native';
 import AmountText from '../../components/ledger/AmountText';
 import ListRow from '../../components/ledger/ListRow';
 import TransactionRow from '../../components/ledger/TransactionRow';
@@ -14,6 +14,7 @@ import QuickActions from '../../components/ledger/QuickActions';
 import AccountCardCarousel from '../../components/ledger/AccountCardCarousel';
 import EmptyState from '../../components/ledger/EmptyState';
 import CategoryIcon from '../../components/CategoryIcon';
+import { billIconKey } from '../../lib/billIcons';
 import { useToast } from '../../components/Toast';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccountSwitcherSheet } from '../../components/AccountSwitcherSheet';
@@ -297,7 +298,6 @@ export default function Home() {
             <SectionHeader title="Upcoming bills" actionLabel="See all" onAction={() => router.push('/bills')} />
             {dueBills.slice(0, MAX_BILLS).map((bill, i, arr) => {
               const overdue = billStatus(bill.next_due_date) === 'overdue';
-              const icon = bill.category?.icon;
               return (
                 <ListRow
                   key={bill.id}
@@ -305,13 +305,7 @@ export default function Home() {
                   onPress={() => router.push(`/bill/${bill.id}`)}
                   iconColor={overdue ? c.danger : undefined}
                   tone={overdue ? c.danger : bill.category?.color}
-                  renderIcon={(tint) =>
-                    icon ? (
-                      <CategoryIcon icon={icon} size={18} color={tint} strokeWidth={1.75} />
-                    ) : (
-                      <Receipt size={18} color={tint} strokeWidth={1.75} />
-                    )
-                  }
+                  renderIcon={(tint) => <CategoryIcon icon={billIconKey(bill)} size={18} color={tint} strokeWidth={1.75} />}
                   title={bill.name}
                   sub={`Due ${format(parseISO(bill.next_due_date), 'd MMM')}`}
                   right={<AmountText value={bill.amount} currency={bill.currency ?? currency} />}

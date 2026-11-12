@@ -12,7 +12,6 @@ import ListRow from './ledger/ListRow';
 import Button from './ledger/Button';
 import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular, inter } from '../theme/ledger';
 import { currencySymbol, DEFAULT_CURRENCY, sanitizeAmountInput } from '../lib/currency';
-import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
 import useCategories from '../hooks/useCategories';
@@ -21,6 +20,9 @@ import useProfile from '../hooks/useProfile';
 import CurrencyPicker from './CurrencyPicker';
 import { destructiveHaptic } from '../lib/haptics';
 import { FLAGS } from '../lib/flags';
+import IconPicker from './ledger/IconPicker';
+import { iconForBillName, billIconKey } from '../lib/billIcons';
+import { fillBillIconFromAi, saveBill, deleteBill } from '../lib/bills';
 
 const AddBillSheetContext = createContext(null);
 
@@ -68,6 +70,15 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
   const [isActive, setIsActive] = useState(true);
+  // Bill icons (spec 48): `pickedIcon` is set only by the picker and sticks
+  // through renames. `stored` is the saved bill's automatic icon and the name
+  // it was found for, kept while the name is unchanged (Ask FLO's pick isn't
+  // in the keyword map, so it can't be recomputed here).
+  const [pickedIcon, setPickedIcon] = useState(null);
+  const [stored, setStored] = useState(null);
+  // The name as opened, so Ask FLO is asked only for a new bill or a rename.
+  const [openedName, setOpenedName] = useState('');
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -89,6 +100,10 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     open(bill) {
       setError(null);
       setShowDatePicker(false);
+      setShowIconPicker(false);
+      setPickedIcon(bill?.id && bill.icon_picked ? bill.icon : null);
+      setStored(bill?.id && !bill.icon_picked && bill.icon ? { icon: bill.icon, name: bill.name } : null);
+      setOpenedName(bill?.id ? bill.name : '');
       onDoneRef.current = bill?.onDone ?? null;
       savedRef.current = false;
       if (bill && !bill.id) {
@@ -140,6 +155,20 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     }
   }
 
+  // What the bill will show: the picked icon, else the name's keyword match,
+  // else the saved automatic icon while the name is unchanged, else the
+  // category's icon, else a receipt. `autoIcon` is what gets stored unpicked.
+  const nameMatch = iconForBillName(name);
+  const autoIcon = nameMatch ?? (stored && stored.name === name.trim() ? stored.icon : null);
+  const previewIcon = billIconKey({ icon: pickedIcon ?? autoIcon, category: selectedCategory });
+  function iconSource() {
+    if (pickedIcon) return 'Picked by you';
+    if (nameMatch) return 'From the name';
+    if (autoIcon) return 'Picked by Ask FLO';
+    if (FLAGS.ai && name.trim()) return 'Ask FLO picks one after saving';
+    return selectedCategory ? 'From the category' : 'Default';
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       setError('Enter a bill name');
@@ -161,11 +190,11 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
       next_due_date: format(nextDueDate, 'yyyy-MM-dd'),
       category_id: categoryId,
       is_active: isActive,
+      icon: pickedIcon ?? autoIcon,
+      icon_picked: !!pickedIcon,
     };
 
-    const { error: saveError } = editingId
-      ? await supabase.from('bills').update(payload).eq('id', editingId)
-      : await supabase.from('bills').insert(payload);
+    const { id: savedId, error: saveError } = await saveBill(payload, editingId);
 
     setSaving(false);
     if (saveError) {
@@ -174,6 +203,15 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     }
     if (!editingId) savedRef.current = true;
     notifyChanged();
+    // A new or renamed bill with no pick and nothing automatic: ask Ask FLO
+    // once, after the save and without waiting for it. The write is skipped
+    // if the person picks an icon or renames the bill meanwhile.
+    const renamed = !editingId || payload.name !== openedName;
+    if (FLAGS.ai && !payload.icon && renamed && savedId) {
+      fillBillIconFromAi(savedId, payload.name).then(({ icon }) => {
+        if (icon) notifyChanged();
+      });
+    }
     modalRef.current?.dismiss();
     showToast({ message: editingId ? 'Bill updated' : 'Bill created', variant: 'success' });
   }
@@ -189,7 +227,7 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
     if (!editingId) return;
     destructiveHaptic();
     setSaving(true);
-    const { error: deleteError } = await supabase.from('bills').delete().eq('id', editingId);
+    const { error: deleteError } = await deleteBill(editingId);
     setSaving(false);
     if (deleteError) {
       showToast({ message: deleteError.message, variant: 'error' });
@@ -220,8 +258,33 @@ const AddBillSheet = forwardRef(function AddBillSheet(_props, ref) {
         cursorColor={c.accent}
         selectionColor={c.accent}
         accessibilityLabel="Bill name"
+        maxLength={80}
         style={styles.field}
       />
+
+      <View style={styles.block}>
+        <ListRow
+          tone={selectedCategory?.color ?? undefined}
+          renderIcon={(tint) => <CategoryIcon icon={previewIcon} size={18} color={tint} strokeWidth={1.75} />}
+          title="Icon"
+          sub={iconSource()}
+          right={showIconPicker ? 'Done' : 'Change'}
+          onPress={() => setShowIconPicker((v) => !v)}
+          divider={false}
+        />
+        {showIconPicker && (
+          <View>
+            <IconPicker
+              value={pickedIcon}
+              onChange={(key) => setPickedIcon(key === pickedIcon ? null : key)}
+              accessibilityLabel="Bill icon"
+            />
+            {pickedIcon && (
+              <Button title="Use the automatic icon" variant="quiet" onPress={() => setPickedIcon(null)} style={styles.autoIcon} />
+            )}
+          </View>
+        )}
+      </View>
 
       {/* The amount, centred and large, with a muted symbol. */}
       <View style={styles.amountWrap}>
@@ -409,6 +472,10 @@ function makeStyles(c) {
     },
     delete: {
       marginTop: ledgerSpace.lg,
+    },
+    autoIcon: {
+      alignSelf: 'center',
+      marginTop: ledgerSpace.sm,
     },
   });
 }

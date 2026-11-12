@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { View, Text, Animated, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pencil, Receipt } from 'lucide-react-native';
+import { Pencil } from 'lucide-react-native';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../../components/ledger/ScreenHeader';
 import SectionHeader from '../../components/ledger/SectionHeader';
 import AmountText from '../../components/ledger/AmountText';
@@ -9,6 +9,7 @@ import Timeline from '../../components/ledger/Timeline';
 import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../../components/ledger/PinnedFooter';
 import { toneColors } from '../../components/ledger/ListRow';
 import CategoryIcon from '../../components/CategoryIcon';
+import { billIconKey } from '../../lib/billIcons';
 import { useLedger, ledgerType, ledgerSpace, ledgerRadius, ledgerSize } from '../../theme/ledger';
 import useBillDetail from '../../hooks/useBillDetail';
 import { useAddBillSheet } from '../../components/AddBillSheet';
@@ -78,11 +79,7 @@ export default function BillDetail() {
 
         <View style={styles.band}>
           <View style={[styles.circle, { backgroundColor: tint.bg }]}>
-            {bill.category?.icon ? (
-              <CategoryIcon icon={bill.category.icon} size={20} color={tint.fg} strokeWidth={1.75} />
-            ) : (
-              <Receipt size={20} color={tint.fg} strokeWidth={1.75} />
-            )}
+            <CategoryIcon icon={billIconKey(bill)} size={20} color={tint.fg} strokeWidth={1.75} />
           </View>
           <AmountText value={bill.amount} size="display" currency={bill.currency} />
           <Text style={[styles.line, terms.tone === 'danger' && { color: c.danger }]}>{terms.text}</Text>

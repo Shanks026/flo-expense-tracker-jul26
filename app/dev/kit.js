@@ -17,6 +17,7 @@ import Chip from '../../components/ledger/Chip';
 import TransactionRow from '../../components/ledger/TransactionRow';
 import Timeline from '../../components/ledger/Timeline';
 import DayOfMonthPicker from '../../components/ledger/DayOfMonthPicker';
+import IconPicker from '../../components/ledger/IconPicker';
 import PageDots from '../../components/ledger/PageDots';
 import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
@@ -58,6 +59,7 @@ function KitGallery() {
   const [segment3, setSegment3] = useState('system');
   const [switchOn, setSwitchOn] = useState(true);
   const [monthDay, setMonthDay] = useState(25);
+  const [iconKey, setIconKey] = useState('entertainment');
 
   return (
     <View style={styles.screen}>
@@ -166,6 +168,10 @@ function KitGallery() {
 
         <Section title="DayOfMonthPicker">
           <DayOfMonthPicker value={monthDay} onChange={setMonthDay} />
+        </Section>
+
+        <Section title="IconPicker">
+          <IconPicker value={iconKey} onChange={setIconKey} />
         </Section>
 
         <Section title="Segmented">

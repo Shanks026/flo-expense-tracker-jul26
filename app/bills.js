@@ -1,13 +1,14 @@
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { View, Text, Animated, Pressable, RefreshControl, StyleSheet } from 'react-native';
-import { Receipt, Check } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
 import SectionHeader from '../components/ledger/SectionHeader';
 import ListRow, { toneColors } from '../components/ledger/ListRow';
 import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
 import EmptyState from '../components/ledger/EmptyState';
 import CategoryIcon from '../components/CategoryIcon';
+import { billIconKey } from '../lib/billIcons';
 import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 import useBills from '../hooks/useBills';
 import usePullToRefresh from '../hooks/usePullToRefresh';
@@ -77,8 +78,7 @@ export default function Bills() {
                     // An overdue bill's circle washes in danger; otherwise its
                     // category's colour.
                     tone={overdue ? c.danger : bill.category?.color ?? undefined}
-                    icon={bill.category?.icon ? undefined : Receipt}
-                    renderIcon={bill.category?.icon ? (tint) => <CategoryIcon icon={bill.category.icon} size={18} color={tint} strokeWidth={1.75} /> : undefined}
+                    renderIcon={(tint) => <CategoryIcon icon={billIconKey(bill)} size={18} color={tint} strokeWidth={1.75} />}
                     title={bill.name}
                     sub={line.sub}
                     subColor={subColor[line.tone]}

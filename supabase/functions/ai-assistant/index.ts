@@ -15,6 +15,9 @@
 //   Read-only chat (phase 3, see chat.ts). account_id is the app's active
 //   account, the one Insights shows by default.
 //
+//   POST { mode: 'bill_icon', name } → { icon: key | null }
+//   One key from FLO's icon set for a bill's name (billIcon.ts, spec 48).
+//
 // The phase 1 test screen (app/dev/ai-eval.js, ticket 03) adds
 //   eval: { accounts: [{ id, name }], categories: [{ id, name, type }] }
 //   model: 'default' | 'challenger'
@@ -35,10 +38,11 @@
 // Save in the app, and the app's own mutation writes the row.
 //
 // Secrets: OPENROUTER_API_KEY, AI_MODEL_QUICK, AI_MODEL_FALLBACK,
-// AI_DAILY_QUICK (default 200).
+// AI_DAILY_QUICK (default 200), AI_DAILY_BILL_ICON (default 50).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { CORS_HEADERS, OPENROUTER_URL, json, isYmd } from './shared.ts';
 import { handleChat } from './chat.ts';
+import { handleBillIcon } from './billIcon.ts';
 
 const QUICK_TIMEOUT_MS = 8000;
 const MAX_TEXT = 200;
@@ -186,6 +190,7 @@ Deno.serve(async (req) => {
     return json({ error: 'bad_request' }, 400);
   }
   if (body.mode === 'chat') return handleChat(supabase, body);
+  if (body.mode === 'bill_icon') return handleBillIcon(supabase, body);
   if (body.mode !== 'quick_add') return json({ error: 'unknown_mode' }, 400);
 
   const text = typeof body.text === 'string' ? body.text.trim() : '';

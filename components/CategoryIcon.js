@@ -25,6 +25,10 @@ import {
   Zap,
   Landmark,
   TrendingUp,
+  Wifi,
+  Droplet,
+  Flame,
+  Tv,
 } from 'lucide-react-native';
 
 const ICONS = {
@@ -54,6 +58,11 @@ const ICONS = {
   utilities: Zap,
   business: Landmark,
   investment: TrendingUp,
+  // Bill icons (spec 48, ticket 05; lib/billIcons.js): broadband, water, gas, DTH.
+  wifi: Wifi,
+  water: Droplet,
+  gas: Flame,
+  tv: Tv,
 };
 
 export const CATEGORY_ICON_KEYS = Object.keys(ICONS);
