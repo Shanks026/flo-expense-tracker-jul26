@@ -14,17 +14,20 @@ Spec: .claude/features/48-quiet-ledger-money-screens.md
 
 **Blocked by:** None (can start immediately; the migration needs the person's yes first)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The check script covers blank, "4821", " 48 21 ", "482", "48211", letters, and maskedLast4/accountSub with and without a description
-- [ ] Migration applied with the person's yes; '12345' and '12a4' rejected, '4821' and null accepted (rolled back)
-- [ ] Add, edit and clear last 4 through the sheet; 1–3 digits show the error and don't save
-- [ ] "•••• 4821" shows on the Home card, switcher and Accounts list; accounts without it look as before
-- [ ] The ⋯ menu's Edit and Transfer work; tapping a row switches the active account
-- [ ] Emulator check in light and dark (put Personal back as active and clear any test last 4)
+- [x] The check script covers blank, "4821", " 48 21 ", "482", "48211", letters, and maskedLast4/accountSub with and without a description
+- [x] Migration applied with the person's yes; '12345' and '12a4' rejected, '4821' and null accepted (rolled back)
+- [x] Add, edit and clear last 4 through the sheet; 1–3 digits show the error and don't save
+- [x] "•••• 4821" shows on the Home card, switcher and Accounts list; accounts without it look as before
+- [x] The ⋯ menu's Edit and Transfer work; tapping a row switches the active account
+- [x] Emulator check in light and dark (put Personal back as active and clear any test last 4)
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+- 2026-11-12 (resolved): migration `quiet_ledger_money_account_last4` applied on the person's yes (recorded in 00-index.md; '12345'/'12a4' rejected, '4821'/null accepted, rolled back). Built `lib/accountLast4.js`, `OverflowMenu` (kit + gallery), `AccountRow` shared by the Accounts screen and the switcher, the account sheet on `Sheet` with the last-4 field, and `accountSub` in the Activity/Insights account filter. Checked on Pixel_API_36: 3 digits show the error and don't save; 4821 saves and shows on the list, switcher, Activity filter and Home card; clearing removes it (DB null); ⋯ Edit and Transfer work; a row tap switches; light and dark. Personal is active again, no last 4 left, Light. The switcher's ⋯ menu has Edit only (its provider sits outside the Add sheet's, so no Transfer there). The menu sheet uses `stackBehavior="push"`: without it, a menu opened inside the switcher closed both. Mid-ticket, at the person's ask: the Home card's name and last 4 are bigger, in a tint of the card's own colour (`cardTextColor`, 7:1 where it can, never less readable than before) with a soft same-hue shadow (`cardTextShadow`), both checked in the script. Not checked: a dark-text card theme on the device (the script covers its contrast).

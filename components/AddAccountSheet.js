@@ -1,12 +1,11 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Trash2 } from 'lucide-react-native';
-import Button from './Button';
+import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import Sheet from './ledger/Sheet';
+import Button from './ledger/Button';
 import { CATEGORY_COLORS } from './CategoryIcon';
 import CurrencyPicker from './CurrencyPicker';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { supabase } from '../lib/supabase';
 import { createAccount, updateAccount } from '../lib/accounts';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -17,6 +16,7 @@ import useProfile from '../hooks/useProfile';
 import { DEFAULT_CURRENCY } from '../lib/currency';
 import { destructiveHaptic } from '../lib/haptics';
 import { FLAGS } from '../lib/flags';
+import { cleanLast4 } from '../lib/accountLast4';
 
 const AddAccountSheetContext = createContext(null);
 
@@ -39,8 +39,8 @@ export function useAddAccountSheet() {
 }
 
 const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -51,6 +51,9 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  // Optional last 4 (spec 48 ticket 06): digits only, at most four.
+  const [last4, setLast4] = useState('');
+  const [last4Error, setLast4Error] = useState(null);
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   // An account's currency is immutable once it has transactions (15-currency-
@@ -67,6 +70,8 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
   useImperativeHandle(ref, () => ({
     async open(account) {
       setError(null);
+      setLast4Error(null);
+      setLast4(account?.last4 ?? '');
       if (account) {
         setEditingId(account.id);
         setName(account.name);
@@ -98,10 +103,16 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
       setError('Enter an account name');
       return;
     }
+    const cleaned = cleanLast4(last4);
+    if (cleaned.error) {
+      setLast4Error(cleaned.error);
+      return;
+    }
     setSaving(true);
     setError(null);
+    setLast4Error(null);
 
-    const payload = { name: name.trim(), description: description.trim() || null, color, currency };
+    const payload = { name: name.trim(), description: description.trim() || null, last4: cleaned.value, color, currency };
 
     const { data, error: saveError } = editingId
       ? await updateAccount(editingId, payload)
@@ -175,167 +186,142 @@ const AddAccountSheet = forwardRef(function AddAccountSheet(_props, ref) {
     ]);
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit account' : 'New account'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: editingId ? 'Save' : 'Create account', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Account' : 'New Account'}</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <Text style={styles.label}>Name</Text>
+      <BottomSheetTextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. HDFC savings"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Account name"
+        style={styles.field}
+      />
 
-        <Text style={styles.fieldLabel}>Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g. Business"
-          placeholderTextColor={colors.mutedDarker}
-          style={styles.textInput}
+      <Text style={styles.label}>Last 4 digits (optional)</Text>
+      <BottomSheetTextInput
+        value={last4}
+        onChangeText={(v) => {
+          setLast4(v.replace(/\D/g, '').slice(0, 4));
+          setLast4Error(null);
+        }}
+        placeholder="e.g. 4821"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        keyboardType="number-pad"
+        maxLength={4}
+        accessibilityLabel="Last 4 digits"
+        style={[styles.field, styles.fieldTight, last4Error && { borderWidth: 1, borderColor: c.danger }]}
+      />
+      {last4Error && <Text style={[styles.hint, styles.hintError, { color: c.danger }]}>{last4Error}</Text>}
+      <Text style={styles.hint}>Only the last 4, to tell your cards apart. FLO never asks for a full card number.</Text>
+
+      <Text style={styles.label}>Description (optional)</Text>
+      <BottomSheetTextInput
+        value={description}
+        onChangeText={setDescription}
+        placeholder="What's this account for?"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Description"
+        style={styles.field}
+      />
+
+      <Text style={styles.label}>Colour</Text>
+      <View style={styles.colorGrid} accessibilityRole="radiogroup" accessibilityLabel="Colour">
+        {CATEGORY_COLORS.map((swatch, i) => {
+          const selected = swatch === color;
+          return (
+            <Pressable
+              key={swatch}
+              hitSlop={4}
+              accessibilityRole="radio"
+              accessibilityLabel={`Colour ${i + 1} of ${CATEGORY_COLORS.length}`}
+              accessibilityState={{ selected }}
+              style={[styles.colorOption, { backgroundColor: swatch }, selected && { borderWidth: 3, borderColor: c.ink }]}
+              onPress={() => setColor(swatch)}
+            />
+          );
+        })}
+      </View>
+
+      {FLAGS.currencyPicker && (
+        <CurrencyPicker
+          value={currency}
+          onChange={setCurrency}
+          disabled={currencyLocked}
+          disabledReason="Currency can't change once an account has transactions — create a new account instead"
+          style={styles.block}
         />
+      )}
 
-        <Text style={styles.fieldLabel}>Description (optional)</Text>
-        <TextInput
-          value={description}
-          onChangeText={setDescription}
-          placeholder="What's this account for?"
-          placeholderTextColor={colors.mutedDarker}
-          style={styles.textInput}
-        />
+      {error && <Text style={styles.error}>{error}</Text>}
 
-        <Text style={styles.fieldLabel}>Color</Text>
-        <View style={styles.colorGrid}>
-          {CATEGORY_COLORS.map((swatch) => {
-            const selected = swatch === color;
-            return (
-              <Pressable
-                key={swatch}
-                style={[styles.colorOption, { backgroundColor: swatch }, selected && styles.colorOptionSelected]}
-                onPress={() => setColor(swatch)}
-              />
-            );
-          })}
-        </View>
-
-        {FLAGS.currencyPicker && (
-          <CurrencyPicker
-            value={currency}
-            onChange={setCurrency}
-            disabled={currencyLocked}
-            disabledReason="Currency can't change once an account has transactions — create a new account instead"
-            style={{ marginTop: spacing.md }}
-          />
-        )}
-
-        {error && <Text style={styles.errorText}>{error}</Text>}
-
-        <Button
-          title={editingId ? 'Save Account' : 'Create Account'}
-          variant="primary"
-          onPress={handleSave}
-          loading={saving}
-          style={{ marginTop: spacing.lg }}
-        />
-        {editingId && (
-          <Pressable style={styles.deleteRow} onPress={confirmDelete} disabled={saving}>
-            <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-            <Text style={styles.deleteText}>Delete Account</Text>
-          </Pressable>
-        )}
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      {editingId && <Button title="Delete account" variant="danger" onPress={confirmDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  colorOption: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-  },
-  colorOptionSelected: {
-    borderWidth: 3,
-    borderColor: colors.ink,
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-    textAlign: 'center',
-    marginTop: spacing.md,
-  },
-  deleteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  deleteText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-  },
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
+    },
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.lg,
+    },
+    fieldTight: {
+      marginBottom: ledgerSpace.xs,
+    },
+    hintError: {
+      marginBottom: ledgerSpace.xs,
+    },
+    hint: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginBottom: ledgerSpace.lg,
+      paddingHorizontal: ledgerSpace.lg,
+    },
+    colorGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.md,
+      marginBottom: ledgerSpace.lg,
+    },
+    colorOption: {
+      width: 40,
+      height: 40,
+      borderRadius: ledgerRadius.full,
+    },
+    block: {
+      marginBottom: ledgerSpace.lg,
+    },
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
+    },
+    delete: {
+      marginTop: ledgerSpace.lg,
+    },
   });
 }

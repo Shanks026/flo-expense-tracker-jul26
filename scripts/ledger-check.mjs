@@ -7,7 +7,7 @@
 
 import { amountParts } from '../lib/currency.js';
 import { dayPeriod, DAY_THEMES } from '../lib/dayScenes.js';
-import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes.js';
+import { CARD_THEMES, resolveEquippedTheme, getTheme, cardTextColor, cardBaseColors, cardTextShadow } from '../lib/cardThemes.js';
 import { dateGroupKey, dateGroupLabel } from '../lib/dateLabels.js';
 import { contrastRatio, AA_TEXT, AA_UI } from '../lib/contrast.js';
 import { weekChange } from '../lib/weekChange.js';
@@ -24,6 +24,7 @@ import { budgetRowStatus } from '../lib/budgetRow.js';
 import { groupBills, billLine, billTerms } from '../lib/billGroups.js';
 import { billTimeline } from '../lib/billTimeline.js';
 import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.js';
+import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/accountLast4.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -674,6 +675,49 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   const fn = readFileSync(new URL('../supabase/functions/ai-assistant/billIcon.ts', import.meta.url), 'utf8');
   const fnKeys = JSON.parse(fn.match(/BILL_ICON_KEYS = (\[[^\]]*\])/)[1].replace(/'/g, '"'));
   check('bill icons', 'the Edge Function lists the same keys', fnKeys, BILL_ICON_KEYS);
+}
+
+// --- Account last 4 (spec 48, ticket 06; spec 45 Phase 1) ---
+{
+  const ok = (value) => ({ value, error: null });
+  const bad = { value: null, error: LAST4_ERROR };
+  check('last 4', 'blank is none', cleanLast4(''), ok(null));
+  check('last 4', 'spaces only is none', cleanLast4('   '), ok(null));
+  check('last 4', 'null is none', cleanLast4(null), ok(null));
+  check('last 4', 'four digits', cleanLast4('4821'), ok('4821'));
+  check('last 4', 'spaces are stripped', cleanLast4(' 48 21 '), ok('4821'));
+  check('last 4', 'three digits', cleanLast4('482'), bad);
+  check('last 4', 'five digits', cleanLast4('48211'), bad);
+  check('last 4', 'letters are stripped, leaving too few', cleanLast4('48a1'), bad);
+  check('last 4', 'letters only is none', cleanLast4('abcd'), ok(null));
+  check('last 4', 'the error text', LAST4_ERROR, 'Enter all 4 digits or leave it blank');
+  check('last 4', 'masked', maskedLast4({ last4: '4821' }), '•••• 4821');
+  check('last 4', 'masked: none set', maskedLast4({ last4: null }), null);
+  check('last 4', 'masked: a bad stored value shows nothing', maskedLast4({ last4: '48' }), null);
+  check('last 4', 'sub: description and last 4', accountSub({ description: 'Salary card', last4: '4821' }), 'Salary card · •••• 4821');
+  check('last 4', 'sub: last 4 only', accountSub({ description: null, last4: '4821' }), '•••• 4821');
+  check('last 4', 'sub: description only', accountSub({ description: 'Cash', last4: null }), 'Cash');
+  check('last 4', 'sub: a blank description is none', accountSub({ description: '  ', last4: null }), null);
+  check('last 4', 'sub: neither', accountSub({}), null);
+}
+
+// --- Card text tint (the person's ask, 2026-11-12) ---
+{
+  const all = [...CARD_THEMES, ...Object.values(DAY_THEMES)];
+  const worst = (t, color) => Math.min(...cardBaseColors(t).map((b) => contrastRatio(color, b)));
+  const worse = all.filter((t) => cardBaseColors(t).length && /^#[0-9a-f]{6}$/i.test(t.textColor) && worst(t, cardTextColor(t)) < Math.min(4.5, worst(t, t.textColor)));
+  check('card text', 'never less readable than the theme text, never under 4.5 where it was', worse.map((t) => t.id), []);
+  const night = cardTextColor(DAY_THEMES.night);
+  check('card text', 'night (white text): a light tint of its navy at 7:1', [night !== '#FFFFFF' && night !== '#ffffff', worst(DAY_THEMES.night, night) >= 7], [true, true]);
+  const morning = cardTextColor(DAY_THEMES.morning);
+  check('card text', 'morning (dark text): a dark tint of its sky at 7:1', [morning !== DAY_THEMES.morning.textColor, worst(DAY_THEMES.morning, morning) >= 7], [true, true]);
+  check('card text', 'ink: a tint, not plain white', cardTextColor(getTheme('ink-classic')).toLowerCase() !== '#ffffff', true);
+  check('card text', 'no colour to work from keeps the theme text', cardTextColor({ textColor: '#FFFFFF', background: { type: 'solid', color: 'rgba(0,0,0,0.5)' } }), '#FFFFFF');
+  check('card text', 'missing theme', cardTextColor(undefined), '#FFFFFF');
+  check('card text', 'gradient: checked against every stop', cardBaseColors({ background: { type: 'linear', angle: 90, colors: ['#112233', '#445566'] } }), ['#112233', '#445566']);
+  check('card text', 'shadow under light text is a deep shade of the hue', cardTextShadow(DAY_THEMES.night).textShadowColor, 'rgba(3, 10, 30, 0.6)');
+  check('card text', 'shadow under dark text is a pale shade of the hue', cardTextShadow(DAY_THEMES.morning).textShadowColor, 'rgba(217, 238, 254, 0.6)');
+  check('card text', 'no colour, no shadow', cardTextShadow({ textColor: '#FFFFFF', background: { type: 'solid', color: 'rgba(0,0,0,0.5)' } }), null);
 }
 
 // --- Report ---

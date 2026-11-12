@@ -16,7 +16,9 @@ import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../../theme/le
 //
 // The ref exposes `present()` and `dismiss()` (the modal's own; nothing else).
 // `footer` is PinnedFooter's { primary, secondary? }, or nothing.
-const Sheet = forwardRef(function Sheet({ title, footer, onChange, onDismiss, children }, ref) {
+// `stackBehavior` 'push' keeps the sheet underneath open (OverflowMenu's
+// menu inside the account switcher); the library default replaces it.
+const Sheet = forwardRef(function Sheet({ title, footer, onChange, onDismiss, stackBehavior, children }, ref) {
   const { c, modeId } = useLedger();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -52,6 +54,7 @@ const Sheet = forwardRef(function Sheet({ title, footer, onChange, onDismiss, ch
       ref={modalRef}
       onChange={onChange}
       onDismiss={onDismiss}
+      stackBehavior={stackBehavior}
       topInset={insets.top}
       enableDynamicSizing
       maxDynamicContentSize={Math.round(height * 0.92)}

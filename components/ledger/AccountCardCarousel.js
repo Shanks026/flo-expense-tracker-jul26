@@ -6,7 +6,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { ChevronDown } from 'lucide-react-native';
 import CardThemeSurface from '../CardThemeSurface';
 import PageDots from './PageDots';
-import { getTheme } from '../../lib/cardThemes';
+import { getTheme, cardTextColor, cardTextShadow } from '../../lib/cardThemes';
 import { useLedger, ledgerRadius, ledgerSpace } from '../../theme/ledger';
 import { inter as fontFamily } from '../../theme/ledger';
 
@@ -37,6 +37,11 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
       ? { ...getTheme('ink'), background: { type: 'solid', color: c.surfaceSunk } }
       : getTheme('ink'));
   const outlined = !cardTheme && modeId === 'dark';
+  // Text in a shade of the card's own colour, not plain white or black, with
+  // a soft shadow in the same hue so it stands off the art (the person's ask,
+  // 2026-11-12). Both come from lib/cardThemes.js.
+  const ink = cardTextColor(theme);
+  const textShadow = cardTextShadow(theme);
 
   const slideCount = accounts.length;
   const activeIndex = Math.max(
@@ -111,15 +116,17 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
                     style={[styles.card, { aspectRatio: CARD_ASPECT }, outlined && styles.outlined]}
                   >
                     <View style={styles.nameRow}>
-                      <Text style={[styles.name, { color: theme.textColor }]} numberOfLines={1}>
+                      <Text style={[styles.name, { color: ink }, textShadow]} numberOfLines={1}>
                         {account.name}
                       </Text>
-                      <ChevronDown size={16} color={theme.textColor} strokeWidth={2} style={{ opacity: 0.7 }} />
+                      <ChevronDown size={18} color={ink} strokeWidth={2.25} />
                     </View>
-                    {/* Optional last four digits, to tell which card or bank
-                        account this is. No column yet; shows once one exists. */}
+                    {/* Optional last four digits (accounts.last4, spec 48
+                        ticket 06), to tell which card or bank account this is. */}
                     {!!account.last4 && (
-                      <Text style={[styles.last4, { color: theme.textColor }]}>•••• {account.last4}</Text>
+                      <Text style={[styles.last4, { color: ink }, textShadow]} accessibilityLabel={`Ending ${account.last4.split('').join(' ')}`}>
+                        •••• {account.last4}
+                      </Text>
                     )}
                   </CardThemeSurface>
                 </Pressable>
@@ -159,18 +166,19 @@ function makeStyles(c) {
     },
     name: {
       fontFamily: fontFamily.semibold,
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: 16,
+      lineHeight: 22,
       flexShrink: 1,
     },
     last4: {
       position: 'absolute',
       left: ledgerSpace.gutter,
       bottom: 16,
-      fontFamily: fontFamily.medium,
-      fontSize: 12,
-      letterSpacing: 1,
-      opacity: 0.8,
+      fontFamily: fontFamily.semibold,
+      fontSize: 20,
+      lineHeight: 26,
+      letterSpacing: 2,
+      fontVariant: ['tabular-nums'],
     },
   });
 }

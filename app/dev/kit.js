@@ -18,6 +18,7 @@ import TransactionRow from '../../components/ledger/TransactionRow';
 import Timeline from '../../components/ledger/Timeline';
 import DayOfMonthPicker from '../../components/ledger/DayOfMonthPicker';
 import IconPicker from '../../components/ledger/IconPicker';
+import OverflowMenu from '../../components/ledger/OverflowMenu';
 import PageDots from '../../components/ledger/PageDots';
 import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
@@ -168,6 +169,16 @@ function KitGallery() {
 
         <Section title="DayOfMonthPicker">
           <DayOfMonthPicker value={monthDay} onChange={setMonthDay} />
+        </Section>
+
+        <Section title="OverflowMenu">
+          <ListRow
+            icon={Wallet}
+            title="A row with a menu"
+            sub="Opens a sheet of actions"
+            trailing={<OverflowMenu title="Kit row" actions={[{ key: 'a', title: 'Edit', icon: Bell, onPress: noop }, { key: 'b', title: 'Delete', icon: Trash2, onPress: noop, danger: true }]} />}
+            divider={false}
+          />
         </Section>
 
         <Section title="IconPicker">

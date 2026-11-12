@@ -10,6 +10,7 @@ import CategoryIcon from './CategoryIcon';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import { RANGE_PRESETS, activityRange, ymd, dateFromYmd, fullDayLabel } from '../lib/activity';
+import { accountSub } from '../lib/accountLast4';
 import { useLedger, ledgerSpace, ledgerRadius } from '../theme/ledger';
 
 // One sheet for Activity's four filter chips (spec 46, ticket 10). `kind`
@@ -136,7 +137,8 @@ const ActivityFilterSheet = forwardRef(function ActivityFilterSheet(
             key={a.id}
             {...pick(selected === a.id, Wallet, a.name)}
             title={a.name}
-            sub={a.id === activeAccountId ? 'Active account' : undefined}
+            // Description and last 4 tell same-bank cards apart (spec 48).
+            sub={[a.id === activeAccountId ? 'Active account' : null, accountSub(a)].filter(Boolean).join(' · ') || undefined}
             right={money(balanceOf(a), a.currency)}
             rightSub="In hand"
             // The active account is the default, stored as null so it

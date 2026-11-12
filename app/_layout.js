@@ -557,7 +557,7 @@ function RootNavigator() {
                                       }}
                                     >
                                       <Stack.Screen name="settings" options={{ headerShown: false }} />
-                                      <Stack.Screen name="accounts" options={{ headerShown: true, title: 'Accounts' }} />
+                                      <Stack.Screen name="accounts" options={{ headerShown: false }} />
                                       <Stack.Screen name="streak" options={{ headerShown: true, title: 'Streak' }} />
                                       <Stack.Screen name="dev/ai-eval" options={{ headerShown: true, title: 'AI test set' }} />
                                       <Stack.Screen name="dev/kit" options={{ headerShown: false }} />
