@@ -18,14 +18,14 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 | 02 Budgets list, detail and sheet | — | done | `8942e20` |
 | 03 Bills list and the bill sheets | — | done | `e5762d6` |
 | 04 Bill detail and payment history | 03 | done (dark mode of bill detail not checked) | `7b55760` |
-| **05 Bill icons from names** | 03 | **built; Ask FLO step waits on the `ai-assistant` deploy** (see the ticket's last comment) | see git log |
+| **05 Bill icons from names** | 03 | done (`ai-assistant` deployed with `bill_icon`) | see git log |
 | 06 Accounts with last 4 | — | ready | |
 | 07 Splits list and detail | 06 | ready | |
 | 08 Split sheets and "Add from my transactions" | — | ready | |
 | 09 Categories | — | ready | |
 | 10 Plans restyle (flag off) | 07 | ready (droppable to Phase 5) | |
 
-**Suggested order:** **05** (finish), then 06, 07, 08, 09, 10. 06, 08 and 09 are unblocked; 07 needs 06's `OverflowMenu`.
+**Suggested order:** 06, 07, 08, 09, 10. 06, 08 and 09 are unblocked; 07 needs 06's `OverflowMenu`.
 
 **Review done (2026-11-12)** over `8942e20..` with 05. Left for later, from tickets 03–04: bill detail calls `router.back()` on any fetch error (a network blip looks like a deleted bill) and never leaves loading without an id; the due wording is worked out three times (`billLine`, `billTerms`, `billTimeline`); `billIcon.ts` copies quick_add's usage/cap/fetch scaffolding; the detail band shows no name (it's in the large title). **Old note:** tickets 03 and 04 were committed without the two-agent review (the person asked for speed); run `/mattpocock-skills:code-review` over `8942e20..HEAD` together with 05 before closing 05.
 
