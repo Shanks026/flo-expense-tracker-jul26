@@ -25,6 +25,7 @@ import { groupBills, billLine, billTerms } from '../lib/billGroups.js';
 import { billTimeline } from '../lib/billTimeline.js';
 import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.js';
 import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/accountLast4.js';
+import { splitNetText } from '../lib/splitNet.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -718,6 +719,18 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('card text', 'shadow under light text is a deep shade of the hue', cardTextShadow(DAY_THEMES.night).textShadowColor, 'rgba(3, 10, 30, 0.6)');
   check('card text', 'shadow under dark text is a pale shade of the hue', cardTextShadow(DAY_THEMES.morning).textShadowColor, 'rgba(217, 238, 254, 0.6)');
   check('card text', 'no colour, no shadow', cardTextShadow({ textColor: '#FFFFFF', background: { type: 'solid', color: 'rgba(0,0,0,0.5)' } }), null);
+}
+
+// --- Split net text (spec 48, ticket 07) ---
+{
+  check('split net', 'owed', splitNetText({ myNet: 600, myPays: 0, entryCount: 3 }), { text: "You're owed ₹600", tone: 'positive' });
+  check('split net', 'owe leads with what you pay', splitNetText({ myNet: 150, myPays: 200, entryCount: 3 }), { text: 'You owe ₹200', tone: 'ink' });
+  check('split net', 'owe with paise', splitNetText({ myNet: -1333.6, myPays: 1333.6, entryCount: 2 }), { text: 'You owe ₹1,333.60', tone: 'ink' });
+  check('split net', 'square', splitNetText({ myNet: 0, myPays: 0, entryCount: 2 }), { text: 'Settled up', tone: 'muted' });
+  check('split net', 'a sub-paisa residue is square', splitNetText({ myNet: 0.004, myPays: 0.003, entryCount: 2 }), { text: 'Settled up', tone: 'muted' });
+  check('split net', 'nothing added yet', splitNetText({ entryCount: 0 }), { text: 'Nothing added yet', tone: 'muted' });
+  check('split net', 'closed and empty', splitNetText({ entryCount: 0 }, { closed: true }), { text: 'Nothing was added', tone: 'muted' });
+  check('split net', 'currency', splitNetText({ myNet: 12, myPays: 0, entryCount: 1 }, { currency: 'USD' }).text, "You're owed $12");
 }
 
 // --- Report ---

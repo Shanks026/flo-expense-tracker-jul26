@@ -1,58 +1,52 @@
 import { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, Animated, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { track } from '../lib/track';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Check } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
-import Card from '../components/Card';
-import IconTile from '../components/IconTile';
-import CategoryIcon from '../components/CategoryIcon';
-import Pill from '../components/Pill';
-import Button from '../components/Button';
-import Skeleton from '../components/Skeleton';
-import FadeIn from '../components/FadeIn';
-import { fontFamily, fontSize, spacing } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import ListRow from '../components/ledger/ListRow';
+import AvatarStack from '../components/ledger/AvatarStack';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import EmptyState from '../components/ledger/EmptyState';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 import useSplits from '../hooks/useSplits';
+import usePullToRefresh from '../hooks/usePullToRefresh';
 import { useAddSplitSheet } from '../components/AddSplitSheet';
 import { supabase } from '../lib/supabase';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
-import { formatMoney } from '../lib/currency';
 import useCurrency from '../hooks/useCurrency';
-import EmptyState from '../components/EmptyState';
+import { splitNetText } from '../lib/splitNet';
+import { track } from '../lib/track';
 
-// Pushed from the Menu sheet, same shape as Plans/Bills/Settings — its own back
-// button and SafeAreaView, no tab slot (the skill's navigation rule: new global
-// destinations go in the menu, not a 6th tab).
+// Splits on the ledger kit (spec 48, ticket 07): open splits, then a muted
+// Closed group. Each row: the members' AvatarStack, the name, the date and
+// head count, and the person's position ("You're owed ₹600", "You owe ₹200",
+// "Settled up") from lib/splitNet.js, worked out by useSplits with no query
+// per split. New split is pinned, behind the free gate as before.
 export default function Splits() {
-  const { colors } = useTheme();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   // Which secondary features earn their place (38-home-insights-more.md).
   useEffect(() => {
     track('feature_opened', { feature: 'splits' });
   }, []);
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { scrollY, onScroll } = useHeaderScroll();
+  const { refreshing, onRefresh } = usePullToRefresh();
   const { openSplits, closedSplits, loading } = useSplits();
   const { openAddSplit } = useAddSplitSheet();
   const { hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const currency = useCurrency();
+  const toneColor = { positive: c.positive, ink: c.ink, muted: c.muted };
 
-  // Create-time gate only, per the standing Pro rule — never access-time, never
-  // a data-model change. The limit counts OPEN splits, not splits ever created:
-  // a Free user can run trip after trip by closing each one first, so the gate
-  // caps concurrency rather than usage. Same count-then-gate shape as
-  // plans.js's own handleNewPlan.
+  // Create-time gate only, per the standing Pro rule. The limit counts OPEN
+  // splits, so a Free user can run trip after trip by closing each one first.
   async function handleNewSplit() {
     if (!hasPro) {
-      const { count } = await supabase
-        .from('splits')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'open');
+      const { count } = await supabase.from('splits').select('id', { count: 'exact', head: true }).eq('status', 'open');
       if ((count ?? 0) >= FREE_LIMITS.splits) {
         openProUpsell('Free includes 1 open split');
         return;
@@ -61,217 +55,92 @@ export default function Splits() {
     openAddSplit();
   }
 
-  // Leads with what you PAY, exactly like the detail hero — the actionable
-  // number, and the only way the list and the detail can't show two different
-  // figures for one split. A net is deliberately NOT the headline here: you may
-  // not owe that figure to anyone (you might owe one person more while two
-  // others owe you back), which is what made "You owe ₹1,333.60" misleading.
-  function positionLabel({ myPays, myNet }) {
-    if (myPays > 0) return { text: `You pay ${formatMoney(myPays, currency)}`, color: colors.danger };
-    if (myNet > 0) return { text: `You're owed ${formatMoney(myNet, currency)}`, color: colors.income };
-    return { text: 'Settled up', color: colors.mutedMid };
-  }
-
-  function renderSplit(split, { closed }) {
-    const position = positionLabel(split);
-    // A split with no entries is not "settled up" — there's nothing to settle.
-    // Saying so in the big position type was actively misleading on a split
-    // that had just been created.
-    const isEmpty = split.entryCount === 0;
+  function row(split, i, list, closed) {
+    const net = splitNetText(split, { closed, currency: split.currency ?? currency });
     return (
-      <Pressable key={split.id} onPress={() => router.push(`/split/${split.id}`)}>
-        <Card variant={closed ? 'completed' : 'default'} style={styles.splitCard}>
-          <View style={styles.rowBetween}>
-            <View style={styles.rowLeft}>
-              <IconTile tone={closed ? 'completed' : 'brandSolid'} size={44} radius={13}>
-                {closed ? (
-                  <Check size={21} color={colors.muted} strokeWidth={2} />
-                ) : (
-                  <CategoryIcon icon={split.icon ?? 'travel'} size={21} color={colors.brandText} strokeWidth={2} />
-                )}
-              </IconTile>
-              <View style={{ flex: 1 }}>
-                <Text style={closed ? styles.splitNameMuted : styles.splitName} numberOfLines={1}>
-                  {split.name}
-                </Text>
-                <Text style={styles.splitSub}>
-                  {format(parseISO(split.occurredOn), 'd MMM')} · {split.memberCount} people
-                  {isEmpty ? '' : ` · ${formatMoney(split.total, currency)}`}
-                </Text>
-              </View>
-            </View>
-            {closed && <Pill label="Closed" tone="completed" />}
-          </View>
-
-          <View style={styles.positionRow}>
-            {isEmpty ? (
-              <Text style={styles.emptyPosition}>
-                {closed ? 'Nothing was added' : 'Nothing added yet'}
-              </Text>
-            ) : (
-              <Text style={[styles.positionText, { color: position.color }]}>{position.text}</Text>
-            )}
-          </View>
-        </Card>
-      </Pressable>
+      <ListRow
+        key={split.id}
+        renderIcon={() => <AvatarStack members={split.members} max={3} size={18} ring={c.surfaceSunk} />}
+        title={split.name}
+        sub={`${format(parseISO(split.occurredOn), 'd MMM')} · ${split.memberCount} ${split.memberCount === 1 ? 'person' : 'people'}`}
+        right={<Text style={[styles.net, { color: closed ? c.muted : toneColor[net.tone] }]}>{net.text}</Text>}
+        trailing="chevron"
+        onPress={() => router.push(`/split/${split.id}`)}
+        divider={i < list.length - 1}
+      />
     );
   }
 
+  const empty = !loading && openSplits.length === 0 && closedSplits.length === 0;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.title}>Splits</Text>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader title="Splits" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink} colors={[c.ink]} />}
+      >
+        <LargeTitle title="Splits" scrollY={scrollY} />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <>
-            {[0, 1].map((i) => (
-              <Card key={i} style={styles.splitCard}>
-                <View style={styles.rowLeft}>
-                  <Skeleton width={44} height={44} radius={13} />
-                  <View>
-                    <Skeleton width={130} height={18} radius={6} style={{ marginBottom: 6 }} />
-                    <Skeleton width={90} height={12} radius={6} />
-                  </View>
-                </View>
-                <View style={{ marginTop: spacing.lg }}>
-                  <Skeleton width={120} height={14} radius={6} />
-                </View>
-              </Card>
-            ))}
-          </>
-        ) : openSplits.length === 0 && closedSplits.length === 0 ? (
-          <FadeIn>
-            <EmptyState
-              pose="hello"
-              title="Split something"
-              body="A trip, a dinner, rent. Add who was there and what each thing cost, and FLO works out who owes whom. Nothing touches your ledger until you settle up."
-              style={{ marginTop: spacing.lg }}
-            />
-          </FadeIn>
+          [0, 1].map((i) => <View key={i} style={styles.rowSkeleton} />)
+        ) : empty ? (
+          <EmptyState
+            illustration="receipt"
+            title="Split something"
+            body="Add who was there and what it cost; FLO works out who owes whom."
+            actionTitle="New split"
+            onAction={handleNewSplit}
+          />
         ) : (
-          <FadeIn>
-            {openSplits.map((s) => renderSplit(s, { closed: false }))}
-
+          <>
+            {openSplits.map((s, i, list) => row(s, i, list, false))}
             {closedSplits.length > 0 && (
-              <>
-                <Text style={styles.sectionLabel}>Closed</Text>
-                {closedSplits.map((s) => renderSplit(s, { closed: true }))}
-              </>
+              <View style={styles.group}>
+                <SectionHeader title="Closed" titleColor={c.muted} />
+                {closedSplits.map((s, i, list) => row(s, i, list, true))}
+              </View>
             )}
-          </FadeIn>
+          </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
-      {/* Bottom, thumb-reachable, clearing the device gesture bar — same
-          formula plans.js uses (no tab bar on a pushed screen). */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-        <Button title="New Split" onPress={handleNewSplit} />
-      </View>
-    </SafeAreaView>
+      <PinnedFooter primary={{ title: 'New split', onPress: handleNewSplit }} />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    safe: {
+    screen: {
       flex: 1,
-      backgroundColor: colors.bg,
+      backgroundColor: c.canvas,
     },
-    header: {
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
-      paddingHorizontal: spacing.xl,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    title: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.display,
-      letterSpacing: -0.3,
-      color: colors.ink,
+    flex: {
+      flex: 1,
     },
     scroll: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.lg,
-      paddingBottom: 60,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
     },
-    footer: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.md,
+    group: {
+      marginTop: ledgerSpace.lg,
     },
-    splitCard: {
-      marginBottom: spacing.md,
+    // One line on the right (the handoff's row rule): the position as the money.
+    net: {
+      ...ledgerType.rowTitle,
+      fontFamily: inter.semibold,
+      fontVariant: ['tabular-nums'],
     },
-    rowBetween: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.sm,
-    },
-    rowLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 11,
-      flex: 1,
-    },
-    splitName: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xxl,
-      color: colors.ink,
-    },
-    splitNameMuted: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xxl,
-      color: colors.mutedDarker,
-    },
-    splitSub: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginTop: 1,
-    },
-    positionRow: {
-      marginTop: spacing.lg,
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
-    },
-    positionText: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.heading,
-      letterSpacing: -0.2,
-    },
-    // Deliberately quiet and normal-weight: an empty split has no number worth
-    // shouting, so it shouldn't borrow the position type's emphasis.
-    emptyPosition: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.mutedMid,
-    },
-    sectionLabel: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginTop: spacing.lg,
-      marginBottom: spacing.md,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
+    rowSkeleton: {
+      height: 64,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      marginTop: ledgerSpace.md,
     },
   });
 }

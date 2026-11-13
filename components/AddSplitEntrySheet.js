@@ -1,14 +1,17 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Switch, Alert } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Trash2 } from 'lucide-react-native';
+import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { ScrollView } from 'react-native-gesture-handler';
+import { CalendarDays, Wallet, Tag } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, parseISO, startOfDay } from 'date-fns';
-import Button from './Button';
+import Sheet from './ledger/Sheet';
+import Button from './ledger/Button';
+import Segmented from './ledger/Segmented';
+import ListRow from './ledger/ListRow';
 import CategoryIcon from './CategoryIcon';
 import SplitMemberChip from './SplitMemberChip';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular, inter } from '../theme/ledger';
 import { currencySymbol, sanitizeAmountInput, formatMoney } from '../lib/currency';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
@@ -41,8 +44,8 @@ export function useAddSplitEntrySheet() {
 }
 
 const AddSplitEntrySheet = forwardRef(function AddSplitEntrySheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -291,500 +294,332 @@ const AddSplitEntrySheet = forwardRef(function AddSplitEntrySheet(_props, ref) {
     );
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   const perHead = participantIds.length ? numericAmount / participantIds.length : 0;
 
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit entry' : 'Add entry'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: editingId ? 'Save' : 'Add entry', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetView style={styles.sheet}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Entry' : 'Add Entry'}</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <Text style={styles.label}>What for</Text>
+      <BottomSheetTextInput
+        value={description}
+        onChangeText={setDescription}
+        placeholder="Lunch"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="What for"
+        style={styles.field}
+        maxLength={80}
+      />
 
-        <BottomSheetScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <Text style={styles.fieldLabel}>What for</Text>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Lunch"
-            placeholderTextColor={colors.mutedDarker}
-            style={styles.input}
-            maxLength={80}
+      {/* The amount, centred and large, with a muted symbol (the Add sheet's). */}
+      <View style={styles.amountWrap}>
+        <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
+        <BottomSheetTextInput
+          value={amount}
+          selection={{ start: amount.length, end: amount.length }}
+          onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
+          placeholder="0"
+          placeholderTextColor={c.inkFaint}
+          cursorColor={c.accent}
+          selectionColor={c.accent}
+          keyboardType="decimal-pad"
+          accessibilityLabel="Amount"
+          style={[styles.amountInput, tabular]}
+        />
+      </View>
+
+      <ListRow icon={CalendarDays} title="Date" right={format(date, 'd MMM yyyy')} trailing="chevron" onPress={() => setShowPicker(true)} divider={false} />
+
+      {showPicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={(_event, selected) => {
+            setShowPicker(false);
+            if (selected) setDate(startOfDay(selected));
+          }}
+        />
+      )}
+
+      {/* One payer per entry, deliberately: two people paying for one thing
+          is two entries. */}
+      <Text style={[styles.label, styles.spaced]}>Paid by</Text>
+      <View style={styles.chipWrap}>
+        {ctx.members.map((m) => (
+          <SplitMemberChip key={m.id} member={m} selected={payerMemberId === m.id} onPress={() => setPayerMemberId(m.id)} />
+        ))}
+      </View>
+
+      {/* Per-entry participants: four of five people sharing a ticket is
+          normal on a real trip. */}
+      <Text style={[styles.label, styles.spaced]}>Split between</Text>
+      <View style={styles.chipWrap}>
+        {ctx.members.map((m) => (
+          <SplitMemberChip
+            key={m.id}
+            member={m}
+            selected={participantIds.includes(m.id)}
+            showCheck
+            dimmed={!participantIds.includes(m.id)}
+            onPress={() => toggleParticipant(m.id)}
           />
+        ))}
+      </View>
 
-          <Text style={styles.fieldLabel}>Amount</Text>
-          <View style={styles.amountBox}>
-            <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
-            <TextInput
-              value={amount}
-              onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
-              placeholder="0"
-              placeholderTextColor={colors.mutedDarker}
-              keyboardType="decimal-pad"
-              style={styles.amountInput}
-            />
-          </View>
+      <Segmented
+        accessibilityLabel="How to split"
+        options={[
+          { value: 'equal', label: 'Equally' },
+          { value: 'exact', label: 'Exact amounts' },
+        ]}
+        value={strategy}
+        onChange={handleSelectStrategy}
+        style={styles.spacedSmall}
+      />
 
-          <Pressable style={styles.row} onPress={() => setShowPicker(true)}>
-            <Text style={styles.fieldLabelInline}>Date</Text>
-            <Text style={styles.rowValue}>{format(date, 'd MMM yyyy')}</Text>
-          </Pressable>
-
-          {showPicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={(_event, selected) => {
-                setShowPicker(false);
-                if (selected) setDate(startOfDay(selected));
-              }}
-            />
-          )}
-
-          {/* One payer per entry, deliberately. Two people paying for one thing
-              is two entries — which is what two autos for five people actually
-              was on the trip this feature was built for. */}
-          <Text style={styles.fieldLabel}>Paid by</Text>
-          <View style={styles.chipWrap}>
-            {ctx.members.map((m) => (
-              <SplitMemberChip
-                key={m.id}
-                member={m}
-                selected={payerMemberId === m.id}
-                onPress={() => setPayerMemberId(m.id)}
-              />
-            ))}
-          </View>
-
-          {/* Per-entry participants. The ticket only four of you used splits
-              four ways, not five — without this the feature is wrong for real
-              trips. */}
-          <Text style={styles.fieldLabel}>Split between</Text>
-          <View style={styles.chipWrap}>
-            {ctx.members.map((m) => (
-              <SplitMemberChip
-                key={m.id}
-                member={m}
-                selected={participantIds.includes(m.id)}
-                showCheck
-                dimmed={!participantIds.includes(m.id)}
-                onPress={() => toggleParticipant(m.id)}
-              />
-            ))}
-          </View>
-
-          <View style={styles.segmentWrap}>
-            {[
-              ['equal', 'Equally'],
-              ['exact', 'Exact amounts'],
-            ].map(([value, label]) => (
-              <Pressable
-                key={value}
-                style={[styles.segment, strategy === value && styles.segmentActive]}
-                onPress={() => handleSelectStrategy(value)}
-              >
-                <Text style={[styles.segmentText, strategy === value && styles.segmentTextActive]}>{label}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {strategy === 'equal' ? (
-            <Text style={styles.perHeadText}>
-              {participantIds.length
-                ? `${formatMoney(perHead, currency)} each · ${participantIds.length} ${
-                    participantIds.length === 1 ? 'person' : 'people'
-                  }`
-                : 'Pick who this splits between'}
-            </Text>
-          ) : (
-            <View style={styles.exactWrap}>
-              {participantIds.map((id) => {
-                const m = ctx.members.find((mm) => mm.id === id);
-                return (
-                  <View key={id} style={styles.exactRow}>
-                    <Text style={styles.exactName} numberOfLines={1}>
-                      {m?.name ?? 'Unknown'}
-                    </Text>
-                    <View style={styles.exactInputBox}>
-                      <Text style={styles.exactCurrency}>{currencySymbol(currency)}</Text>
-                      <TextInput
-                        value={exactShares[id] ?? ''}
-                        onChangeText={(v) =>
-                          setExactShares((prev) => ({ ...prev, [id]: sanitizeAmountInput(v) }))
-                        }
-                        placeholder="0"
-                        placeholderTextColor={colors.mutedDarker}
-                        keyboardType="decimal-pad"
-                        style={styles.exactInput}
-                      />
-                    </View>
-                  </View>
-                );
-              })}
-              <Text style={[styles.remainingText, balanced && styles.remainingTextOk]}>
-                {balanced
-                  ? 'Adds up exactly'
-                  : remaining > 0
-                    ? `${formatMoney(remaining, currency)} left to assign`
-                    : `${formatMoney(Math.abs(remaining), currency)} over the total`}
-              </Text>
-            </View>
-          )}
-
-          {/* The Abishek case. Default OFF: the user's rule is that nothing
-              enters the ledger until a settlement, which is exactly right when
-              you paid nothing — and progressively wrong the more you fronted.
-              Only offered on a NEW entry you paid for, because Phase 1 has
-              nowhere to store the link (see the doc's 1.6), so an edit can't
-              tell whether it already logged one. */}
-          {!editingId && payerIsMe && (
-            <View style={styles.pocketBlock}>
-              <View style={styles.pocketRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pocketTitle}>I paid this from my pocket</Text>
-                  <Text style={styles.pocketSub}>
-                    Logs the full {formatMoney(numericAmount, currency)} as an expense now. Leave it off if
-                    you'll settle up later.
-                  </Text>
+      {strategy === 'equal' ? (
+        <Text style={styles.help}>
+          {participantIds.length
+            ? `${formatMoney(perHead, currency)} each · ${participantIds.length} ${participantIds.length === 1 ? 'person' : 'people'}`
+            : 'Pick who this splits between'}
+        </Text>
+      ) : (
+        <View style={styles.exactWrap}>
+          {participantIds.map((id) => {
+            const m = ctx.members.find((mm) => mm.id === id);
+            return (
+              <View key={id} style={styles.exactRow}>
+                <Text style={styles.exactName} numberOfLines={1}>
+                  {m?.name ?? 'Unknown'}
+                </Text>
+                <View style={styles.exactField}>
+                  <Text style={styles.exactCurrency}>{currencySymbol(currency)}</Text>
+                  <BottomSheetTextInput
+                    value={exactShares[id] ?? ''}
+                    onChangeText={(v) => setExactShares((prev) => ({ ...prev, [id]: sanitizeAmountInput(v) }))}
+                    placeholder="0"
+                    placeholderTextColor={c.muted}
+                    cursorColor={c.accent}
+                    selectionColor={c.accent}
+                    keyboardType="decimal-pad"
+                    accessibilityLabel={`${m?.name ?? 'Their'} share`}
+                    style={[styles.exactInput, tabular]}
+                  />
                 </View>
-                <Switch
-                  value={fromPocket}
-                  onValueChange={setFromPocket}
-                  trackColor={{ true: colors.brand, false: colors.chipBg }}
-                  thumbColor={colors.surface}
-                />
               </View>
+            );
+          })}
+          <Text style={[styles.help, { color: balanced ? c.positive : c.danger }]}>
+            {balanced
+              ? 'Adds up exactly'
+              : remaining > 0
+                ? `${formatMoney(remaining, currency)} left to assign`
+                : `${formatMoney(Math.abs(remaining), currency)} over the total`}
+          </Text>
+        </View>
+      )}
 
-              {fromPocket && (
-                <>
-                  <Pressable style={styles.row} onPress={() => setPocketPickerOpen((v) => !v)}>
-                    <Text style={styles.fieldLabelInline}>Category</Text>
-                    <Text style={styles.rowValue}>
-                      {expenseCategories.find((c) => c.id === pocketCategoryId)?.name ?? 'Pick one'}
-                    </Text>
-                  </Pressable>
-                  {pocketPickerOpen && (
-                    <View style={styles.chipGrid}>
-                      {expenseCategories.map((cat) => (
-                        <Pressable
-                          key={cat.id}
-                          style={styles.catChip}
-                          onPress={() => {
-                            setPocketCategoryId(cat.id);
-                            setPocketPickerOpen(false);
-                          }}
-                        >
-                          <View style={[styles.catIcon, cat.id === pocketCategoryId && styles.catIconSelected]}>
-                            <CategoryIcon
-                              icon={cat.icon}
-                              size={20}
-                              color={cat.id === pocketCategoryId ? colors.brandText : colors.ink}
-                              strokeWidth={2}
-                            />
-                          </View>
-                          <Text style={styles.catLabel} numberOfLines={1}>
-                            {cat.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </>
-              )}
-            </View>
-          )}
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
-
-          <Button
-            title={editingId ? 'Save Entry' : 'Add Entry'}
-            variant="primary"
-            onPress={handleSave}
-            loading={saving}
-            style={{ marginTop: spacing.lg }}
+      {/* Default off: nothing enters the ledger until a settlement, unless
+          you fronted the money. Only on a NEW entry you paid for. */}
+      {!editingId && payerIsMe && (
+        <>
+          <ListRow
+            icon={Wallet}
+            title="I paid this from my pocket"
+            sub={`Logs the full ${formatMoney(numericAmount, currency)} as an expense now. Leave it off if you'll settle up later.`}
+            subLines={3}
+            switchValue={fromPocket}
+            onSwitchChange={setFromPocket}
+            divider={fromPocket}
           />
-          {editingId && (
-            <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-              <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-              <Text style={styles.deleteText}>Delete Entry</Text>
-            </Pressable>
+          {fromPocket && (
+            <>
+              <ListRow
+                icon={Tag}
+                title="Category"
+                right={expenseCategories.find((cat) => cat.id === pocketCategoryId)?.name ?? 'Pick one'}
+                trailing="chevron"
+                onPress={() => setPocketPickerOpen((v) => !v)}
+                divider={false}
+              />
+              {pocketPickerOpen && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.chipScroll}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {expenseCategories.map((cat) => {
+                    const selected = cat.id === pocketCategoryId;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        style={styles.chip}
+                        accessibilityRole="button"
+                        accessibilityLabel={cat.name}
+                        accessibilityState={{ selected }}
+                        onPress={() => {
+                          setPocketCategoryId(cat.id);
+                          setPocketPickerOpen(false);
+                        }}
+                      >
+                        <View style={[styles.chipCircle, selected && { backgroundColor: c.ink }]}>
+                          <CategoryIcon icon={cat.icon} size={20} color={selected ? c.inkOnInk : c.ink} strokeWidth={1.75} />
+                        </View>
+                        <Text style={[styles.chipLabel, selected && { color: c.ink, fontFamily: inter.medium }]} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </>
           )}
-        </BottomSheetScrollView>
-      </BottomSheetView>
-    </BottomSheetModal>
+        </>
+      )}
+
+      {error && <Text style={styles.error}>{error}</Text>}
+
+      {editingId && <Button title="Delete entry" variant="danger" onPress={handleDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    sheet: {
-      flex: 1,
-      paddingHorizontal: spacing.xl,
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
     },
-    scroll: {
-      paddingBottom: spacing.xxl,
+    spaced: {
+      marginTop: ledgerSpace.lg,
     },
-    headerRow: {
+    spacedSmall: {
+      marginTop: ledgerSpace.md,
+    },
+    help: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginTop: ledgerSpace.sm,
+      marginBottom: ledgerSpace.md,
+    },
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.lg,
+    },
+    amountWrap: {
       flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.lg,
-    },
-    headerTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-    },
-    closeButton: {
-      width: 32,
-      height: 32,
-      borderRadius: radii.pill,
-      backgroundColor: colors.chipBg,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    fieldLabel: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginBottom: spacing.sm,
-    },
-    fieldLabelInline: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.base,
-      color: colors.mutedMid,
-    },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-      marginBottom: spacing.lg,
-    },
-    amountBox: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
       gap: 4,
-      marginBottom: spacing.lg,
+      marginBottom: ledgerSpace.md,
     },
     amountCurrency: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.title,
-      color: colors.mutedDarker,
+      ...ledgerType.title,
+      fontSize: 28,
+      lineHeight: 34,
+      color: c.muted,
     },
     amountInput: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: 26,
-      letterSpacing: -0.3,
-      color: colors.ink,
-      flex: 1,
-    },
-    row: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    rowValue: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.base,
-      color: colors.ink,
+      ...ledgerType.display,
+      fontSize: 44,
+      lineHeight: 52,
+      color: c.ink,
+      minWidth: 60,
+      textAlign: 'center',
+      padding: 0,
     },
     chipWrap: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: spacing.sm,
-      marginBottom: spacing.lg,
-    },
-    segmentWrap: {
-      flexDirection: 'row',
-      backgroundColor: colors.chipBg,
-      borderRadius: 12,
-      padding: 4,
-      marginBottom: spacing.sm,
-    },
-    segment: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 9,
-      borderRadius: 9,
-    },
-    segmentActive: {
-      backgroundColor: colors.brand,
-    },
-    segmentText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.mutedMid,
-    },
-    segmentTextActive: {
-      fontFamily: fontFamily.extrabold,
-      color: colors.brandText,
-    },
-    perHeadText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.mutedMid,
-      textAlign: 'center',
-      marginBottom: spacing.md,
+      gap: ledgerSpace.sm,
     },
     exactWrap: {
-      marginTop: spacing.md,
-      marginBottom: spacing.md,
-      gap: spacing.sm,
+      marginTop: ledgerSpace.md,
+      gap: ledgerSpace.sm,
     },
     exactRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.md,
+      gap: ledgerSpace.md,
     },
     exactName: {
+      ...ledgerType.rowTitle,
+      color: c.ink,
       flex: 1,
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.md,
-      color: colors.ink,
     },
-    exactInputBox: {
-      width: 120,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+    exactField: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 3,
+      height: 48,
+      minWidth: 120,
+      paddingHorizontal: ledgerSpace.lg,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
     },
     exactCurrency: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.md,
-      color: colors.mutedDarker,
+      ...ledgerType.body,
+      color: c.muted,
+      marginRight: 4,
     },
     exactInput: {
+      ...ledgerType.body,
+      color: c.ink,
       flex: 1,
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
       padding: 0,
+      textAlign: 'right',
     },
-    remainingText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
-      textAlign: 'center',
-      marginTop: spacing.xs,
+    // Bleeds to the sheet's edges (the bill sheet's category row).
+    chipScroll: {
+      marginHorizontal: -ledgerSpace.gutter,
     },
-    remainingTextOk: {
-      color: colors.income,
-    },
-    pocketBlock: {
-      marginTop: spacing.md,
-      paddingTop: spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: colors.borderSoft,
-    },
-    pocketRow: {
+    chipRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      marginBottom: spacing.md,
+      gap: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.sm,
     },
-    pocketTitle: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.md,
-      color: colors.ink,
-    },
-    pocketSub: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginTop: 2,
-    },
-    chipGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 14,
-      marginBottom: spacing.md,
-    },
-    catChip: {
+    chip: {
       alignItems: 'center',
       gap: 6,
-      width: 56,
+      width: 60,
     },
-    catIcon: {
+    chipCircle: {
       width: 48,
       height: 48,
-      borderRadius: 15,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.surfaceSunk,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    catIconSelected: {
-      backgroundColor: colors.brand,
-      borderWidth: 0,
-    },
-    catLabel: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.xs,
-      color: colors.mutedMid,
+    chipLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
       textAlign: 'center',
     },
-    errorText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
-      textAlign: 'center',
-      marginTop: spacing.sm,
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
     },
-    deleteRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: spacing.lg,
-      paddingVertical: spacing.sm,
-    },
-    deleteText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
+    delete: {
+      marginTop: ledgerSpace.lg,
     },
   });
 }

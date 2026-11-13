@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, Keyboard } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop, BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
@@ -18,15 +18,78 @@ import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../../theme/le
 // `footer` is PinnedFooter's { primary, secondary? }, or nothing.
 // `stackBehavior` 'push' keeps the sheet underneath open (OverflowMenu's
 // menu inside the account switcher); the library default replaces it.
+// How long the sheet's keyboard restore takes to settle before a close.
+const RESTORE_MS = 300;
+// The longest a close waits for keyboardDidHide before going anyway.
+const KEYBOARD_WAIT_MS = 400;
+// How long present() waits for the sheet to report itself open.
+const PRESENT_RETRY_MS = 500;
+
 const Sheet = forwardRef(function Sheet({ title, footer, onChange, onDismiss, stackBehavior, children }, ref) {
   const { c, modeId } = useLedger();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const keyboardUp = useKeyboardVisible();
   const modalRef = useRef(null);
+  // Whether the modal says it's open (its onChange index), for present().
+  const openRef = useRef(false);
+  // A close asked for since the last present(), and the timers in flight.
+  const closingRef = useRef(false);
+  const timersRef = useRef([]);
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
+  const later = (fn, ms) => timersRef.current.push(setTimeout(fn, ms));
+  const handleChange = useCallback(
+    (index) => {
+      openRef.current = index >= 0;
+      onChange?.(index);
+    },
+    [onChange]
+  );
+
   useImperativeHandle(ref, () => ({
-    present: (...args) => modalRef.current?.present(...args),
-    dismiss: (...args) => modalRef.current?.dismiss(...args),
+    // After a close that raced the keyboard, the library can swallow the next
+    // present() (it only finishes the old close); seen on device with the
+    // person sheet, 2026-11-12. If the sheet hasn't opened shortly after, ask
+    // once more; a present() on an open sheet does nothing.
+    // A present() also cancels a close still waiting on the keyboard, so a
+    // quick reopen isn't shut by the old close.
+    present: (...args) => {
+      clearTimers();
+      closingRef.current = false;
+      modalRef.current?.present(...args);
+      later(() => {
+        if (!openRef.current && !closingRef.current) modalRef.current?.present(...args);
+      }, PRESENT_RETRY_MS);
+    },
+    // With the keyboard up, the keyboard goes first and the sheet closes once
+    // it has: closing both at once let the sheet's keyboard "restore" fight
+    // the close, leaving the modal half-dismissed so the next present() did
+    // nothing (the person sheet, on device, 2026-11-12).
+    dismiss: (...args) => {
+      clearTimers();
+      closingRef.current = true;
+      if (!Keyboard.isVisible()) {
+        modalRef.current?.dismiss(...args);
+        return;
+      }
+      // keyboardDidHide fires before the sheet's own restore animation has
+      // run, so the close waits a beat more (RESTORE_MS) after it.
+      let done = false;
+      const close = () => {
+        if (done) return;
+        done = true;
+        sub.remove();
+        later(() => {
+          if (closingRef.current) modalRef.current?.dismiss(...args);
+        }, RESTORE_MS);
+      };
+      const sub = Keyboard.addListener('keyboardDidHide', close);
+      later(close, KEYBOARD_WAIT_MS);
+      Keyboard.dismiss();
+    },
   }));
 
   const renderBackdrop = useCallback(
@@ -52,7 +115,7 @@ const Sheet = forwardRef(function Sheet({ title, footer, onChange, onDismiss, st
   return (
     <BottomSheetModal
       ref={modalRef}
-      onChange={onChange}
+      onChange={handleChange}
       onDismiss={onDismiss}
       stackBehavior={stackBehavior}
       topInset={insets.top}

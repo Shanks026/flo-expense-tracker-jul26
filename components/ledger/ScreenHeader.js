@@ -19,6 +19,7 @@ import { useLedger, ledgerType, ledgerSpace, ledgerSize } from '../../theme/ledg
 // Without `scrollY` the title sits in the bar from the start.
 //
 // `actions` is [{ icon, onPress, accessibilityLabel, dot? }], at most two.
+// `trailing` is a node after them, such as an OverflowMenu (split detail).
 // Back goes back, or to Home when the screen was opened by a deep link with
 // nothing behind it; `onBack` overrides. `showBack={false}` leaves it out
 // (the first onboarding question), keeping the bar's height.
@@ -36,7 +37,7 @@ export function useHeaderScroll() {
   return { scrollY, onScroll };
 }
 
-export default function ScreenHeader({ title, scrollY, actions = [], onBack, showBack = true }) {
+export default function ScreenHeader({ title, scrollY, actions = [], trailing, onBack, showBack = true }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { c } = useLedger();
@@ -76,6 +77,7 @@ export default function ScreenHeader({ title, scrollY, actions = [], onBack, sho
           {actions.slice(0, 2).map((a) => (
             <HeaderIconButton key={a.accessibilityLabel} icon={a.icon} onPress={a.onPress} accessibilityLabel={a.accessibilityLabel} dot={a.dot} />
           ))}
+          {trailing}
         </View>
       </View>
       <Animated.View style={[styles.line, { backgroundColor: c.hairline, opacity: lineOpacity }]} />

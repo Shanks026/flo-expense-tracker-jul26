@@ -1,13 +1,14 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Switch } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, ArrowRight } from 'lucide-react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { ScrollView } from 'react-native-gesture-handler';
+import { ArrowRight, CalendarDays, BookOpen, Tag } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, startOfDay } from 'date-fns';
-import Button from './Button';
+import Sheet from './ledger/Sheet';
+import ListRow from './ledger/ListRow';
 import CategoryIcon from './CategoryIcon';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular, inter } from '../theme/ledger';
 import { currencySymbol, sanitizeAmountInput, formatMoney } from '../lib/currency';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
@@ -39,8 +40,8 @@ export function useSettleUpSheet() {
 }
 
 const SettleUpSheet = forwardRef(function SettleUpSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -147,327 +148,236 @@ const SettleUpSheet = forwardRef(function SettleUpSheet(_props, ref) {
     showToast({ message: 'Settled', variant: 'success' });
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title="Settle up"
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['86%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: 'Record settlement', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetView style={styles.sheet}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Settle Up</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <View style={styles.parties}>
+        <Text style={styles.party} numberOfLines={1}>
+          {ctx.from?.name ?? '—'}
+        </Text>
+        <ArrowRight size={18} color={c.muted} strokeWidth={1.75} />
+        <Text style={styles.party} numberOfLines={1}>
+          {ctx.to?.name ?? '—'}
+        </Text>
+      </View>
 
-        <BottomSheetScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <View style={styles.partiesRow}>
-            <Text style={styles.partyName}>{ctx.from?.name ?? '—'}</Text>
-            <ArrowRight size={18} color={colors.mutedMid} strokeWidth={2.4} />
-            <Text style={styles.partyName}>{ctx.to?.name ?? '—'}</Text>
-          </View>
+      {/* The amount, centred and large, with a muted symbol (the Add sheet's). */}
+      <View style={styles.amountWrap}>
+        <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
+        <BottomSheetTextInput
+          value={amount}
+          selection={{ start: amount.length, end: amount.length }}
+          onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
+          placeholder="0"
+          placeholderTextColor={c.inkFaint}
+          cursorColor={c.accent}
+          selectionColor={c.accent}
+          keyboardType="decimal-pad"
+          accessibilityLabel="Amount"
+          style={[styles.amountInput, tabular]}
+        />
+      </View>
+      <Text style={styles.help}>Pay less than the full amount and the rest stays outstanding.</Text>
 
-          <Text style={styles.fieldLabel}>Amount</Text>
-          <View style={styles.amountBox}>
-            <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
-            <TextInput
-              value={amount}
-              onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
-              placeholder="0"
-              placeholderTextColor={colors.mutedDarker}
-              keyboardType="decimal-pad"
-              style={styles.amountInput}
-            />
-          </View>
-          <Text style={styles.helpText}>
-            Pay less than the full amount and the rest stays outstanding.
-          </Text>
+      <ListRow icon={CalendarDays} title="Date" right={format(date, 'd MMM yyyy')} trailing="chevron" onPress={() => setShowPicker(true)} divider={false} />
 
-          <Pressable style={styles.row} onPress={() => setShowPicker(true)}>
-            <Text style={styles.fieldLabelInline}>Date</Text>
-            <Text style={styles.rowValue}>{format(date, 'd MMM yyyy')}</Text>
-          </Pressable>
+      {showPicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={(_event, selected) => {
+            setShowPicker(false);
+            if (selected) setDate(startOfDay(selected));
+          }}
+        />
+      )}
 
-          {showPicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={(_event, selected) => {
-                setShowPicker(false);
-                if (selected) setDate(startOfDay(selected));
-              }}
-            />
-          )}
+      <Text style={[styles.label, styles.spaced]}>Note (optional)</Text>
+      <BottomSheetTextInput
+        value={note}
+        onChangeText={setNote}
+        placeholder="UPI, cash…"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Note"
+        style={styles.field}
+        maxLength={80}
+      />
 
-          <Text style={styles.fieldLabel}>Note (optional)</Text>
-          <TextInput
-            value={note}
-            onChangeText={setNote}
-            placeholder="UPI, cash…"
-            placeholderTextColor={colors.mutedDarker}
-            style={styles.input}
-            maxLength={80}
+      {involvesMe ? (
+        <>
+          <ListRow
+            icon={BookOpen}
+            title="Also record in FLO"
+            sub={
+              iAmPayer
+                ? `Adds ${formatMoney(numericAmount, currency)} as an expense in ${accountName}.`
+                : `Adds ${formatMoney(numericAmount, currency)} to ${accountName}. Not counted as income: it's money you fronted coming back.`
+            }
+            subLines={3}
+            switchValue={recordInFlo}
+            onSwitchChange={setRecordInFlo}
+            divider={recordInFlo && iAmPayer}
           />
 
-          {involvesMe ? (
-            <View style={styles.ledgerBlock}>
-              <View style={styles.ledgerRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ledgerTitle}>Also record in FLO</Text>
-                  <Text style={styles.ledgerSub}>
-                    {iAmPayer
-                      ? `Adds ${formatMoney(numericAmount, currency)} as an expense in ${accountName}.`
-                      : `Adds ${formatMoney(numericAmount, currency)} to ${accountName}. Not counted as income — it's money you fronted coming back.`}
-                  </Text>
-                </View>
-                <Switch
-                  value={recordInFlo}
-                  onValueChange={setRecordInFlo}
-                  trackColor={{ true: colors.brand, false: colors.chipBg }}
-                  thumbColor={colors.surface}
-                />
-              </View>
-
-              {recordInFlo && iAmPayer && (
-                <>
-                  <Pressable style={styles.row} onPress={() => setPickerOpen((v) => !v)}>
-                    <Text style={styles.fieldLabelInline}>Category (optional)</Text>
-                    <Text style={styles.rowValue}>
-                      {categories.find((c) => c.id === categoryId)?.name ?? 'None'}
-                    </Text>
-                  </Pressable>
-                  {pickerOpen && (
-                    <View style={styles.chipGrid}>
-                      {categories.map((cat) => (
-                        <Pressable
-                          key={cat.id}
-                          style={styles.catChip}
-                          onPress={() => {
-                            setCategoryId(cat.id === categoryId ? null : cat.id);
-                            setPickerOpen(false);
-                          }}
-                        >
-                          <View style={[styles.catIcon, cat.id === categoryId && styles.catIconSelected]}>
-                            <CategoryIcon
-                              icon={cat.icon}
-                              size={20}
-                              color={cat.id === categoryId ? colors.brandText : colors.ink}
-                              strokeWidth={2}
-                            />
-                          </View>
-                          <Text style={styles.catLabel} numberOfLines={1}>
-                            {cat.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </>
+          {recordInFlo && iAmPayer && (
+            <>
+              <ListRow
+                icon={Tag}
+                title="Category (optional)"
+                right={categories.find((cat) => cat.id === categoryId)?.name ?? 'None'}
+                trailing="chevron"
+                onPress={() => setPickerOpen((v) => !v)}
+                divider={false}
+              />
+              {pickerOpen && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.chipScroll}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {categories.map((cat) => {
+                    const selected = cat.id === categoryId;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        style={styles.chip}
+                        accessibilityRole="button"
+                        accessibilityLabel={cat.name}
+                        accessibilityState={{ selected }}
+                        onPress={() => {
+                          setCategoryId(selected ? null : cat.id);
+                          setPickerOpen(false);
+                        }}
+                      >
+                        <View style={[styles.chipCircle, selected && { backgroundColor: c.ink }]}>
+                          <CategoryIcon icon={cat.icon} size={20} color={selected ? c.inkOnInk : c.ink} strokeWidth={1.75} />
+                        </View>
+                        <Text style={[styles.chipLabel, selected && { color: c.ink, fontFamily: inter.medium }]} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               )}
-            </View>
-          ) : (
-            <Text style={styles.helpText}>
-              This is between {ctx.from?.name} and {ctx.to?.name}, so nothing is added to your own
-              transactions — it just updates who owes what here.
-            </Text>
+            </>
           )}
+        </>
+      ) : (
+        <Text style={styles.help}>
+          This is between {ctx.from?.name} and {ctx.to?.name}, so nothing is added to your own transactions; it just updates who owes
+          what here.
+        </Text>
+      )}
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
-
-          <Button
-            title="Record Settlement"
-            variant="primary"
-            onPress={handleSave}
-            loading={saving}
-            style={{ marginTop: spacing.lg }}
-          />
-        </BottomSheetScrollView>
-      </BottomSheetView>
-    </BottomSheetModal>
+      {error && <Text style={styles.error}>{error}</Text>}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    sheet: {
-      flex: 1,
-      paddingHorizontal: spacing.xl,
-    },
-    scroll: {
-      paddingBottom: spacing.xxl,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.lg,
-    },
-    headerTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-    },
-    closeButton: {
-      width: 32,
-      height: 32,
-      borderRadius: radii.pill,
-      backgroundColor: colors.chipBg,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    partiesRow: {
+    parties: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: spacing.md,
-      marginBottom: spacing.lg,
+      gap: ledgerSpace.sm,
+      marginBottom: ledgerSpace.md,
     },
-    partyName: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.heading,
-      color: colors.ink,
+    party: {
+      ...ledgerType.rowTitle,
+      fontFamily: inter.semibold,
+      color: c.ink,
+      flexShrink: 1,
     },
-    fieldLabel: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginBottom: spacing.sm,
-    },
-    fieldLabelInline: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.base,
-      color: colors.mutedMid,
-    },
-    helpText: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginBottom: spacing.md,
-    },
-    amountBox: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
+    amountWrap: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: 4,
-      marginBottom: spacing.sm,
+      marginBottom: ledgerSpace.xs,
     },
     amountCurrency: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.title,
-      color: colors.mutedDarker,
+      ...ledgerType.title,
+      fontSize: 28,
+      lineHeight: 34,
+      color: c.muted,
     },
     amountInput: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: 26,
-      letterSpacing: -0.3,
-      color: colors.ink,
-      flex: 1,
+      ...ledgerType.display,
+      fontSize: 44,
+      lineHeight: 52,
+      color: c.ink,
+      minWidth: 60,
+      textAlign: 'center',
+      padding: 0,
     },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-      marginBottom: spacing.lg,
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
     },
-    row: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
+    spaced: {
+      marginTop: ledgerSpace.md,
+    },
+    help: {
+      ...ledgerType.caption,
+      color: c.muted,
+      textAlign: 'center',
+      marginBottom: ledgerSpace.md,
+    },
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.md,
+    },
+    // Bleeds to the sheet's edges (the bill sheet's category row).
+    chipScroll: {
+      marginHorizontal: -ledgerSpace.gutter,
+    },
+    chipRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
+      gap: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.sm,
     },
-    rowValue: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.base,
-      color: colors.ink,
-    },
-    ledgerBlock: {
-      marginTop: spacing.sm,
-      paddingTop: spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: colors.borderSoft,
-    },
-    ledgerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      marginBottom: spacing.md,
-    },
-    ledgerTitle: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.md,
-      color: colors.ink,
-    },
-    ledgerSub: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginTop: 2,
-    },
-    chipGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 14,
-      marginBottom: spacing.md,
-    },
-    catChip: {
+    chip: {
       alignItems: 'center',
       gap: 6,
-      width: 56,
+      width: 60,
     },
-    catIcon: {
+    chipCircle: {
       width: 48,
       height: 48,
-      borderRadius: 15,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.surfaceSunk,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    catIconSelected: {
-      backgroundColor: colors.brand,
-      borderWidth: 0,
-    },
-    catLabel: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.xs,
-      color: colors.mutedMid,
+    chipLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
       textAlign: 'center',
     },
-    errorText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
-      textAlign: 'center',
-      marginTop: spacing.sm,
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
     },
   });
 }

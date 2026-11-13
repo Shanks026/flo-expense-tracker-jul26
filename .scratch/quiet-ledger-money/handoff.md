@@ -20,12 +20,14 @@ the kit rules, the emulator recipe and the gotchas there all apply here.
 | 04 Bill detail and payment history | 03 | done (dark mode of bill detail not checked) | `7b55760` |
 | **05 Bill icons from names** | 03 | done (`ai-assistant` deployed with `bill_icon`) | see git log |
 | 06 Accounts with last 4 | — | done (`OverflowMenu` built; menu sheets use `stackBehavior="push"`) | see git log |
-| 07 Splits list and detail | 06 | ready | |
-| 08 Split sheets and "Add from my transactions" | — | ready | |
-| 09 Categories | — | ready | |
-| 10 Plans restyle (flag off) | 07 | ready (droppable to Phase 5) | |
+| 07 Splits list and detail | 06 | done | see git log |
+| 08 Split sheets and "Add from my transactions" | — | done | see git log |
+| 09 Categories | — | done | see git log |
+| 10 Plans restyle (flag off) | 07 | done | see git log |
 
-**Suggested order:** 07, 08, 09, 10. All are unblocked (06 built `OverflowMenu` for 07).
+**Phase 4 is done (2026-11-13).** Next is spec 48's Phase 5 planning.
+
+**Old note, suggested order:** 07, 08, 09, 10. All are unblocked (06 built `OverflowMenu` for 07).
 
 **Review done (2026-11-12)** over `8942e20..` with 05. Left for later, from tickets 03–04: bill detail calls `router.back()` on any fetch error (a network blip looks like a deleted bill) and never leaves loading without an id; the due wording is worked out three times (`billLine`, `billTerms`, `billTimeline`); `billIcon.ts` copies quick_add's usage/cap/fetch scaffolding; the detail band shows no name (it's in the large title). **Old note:** tickets 03 and 04 were committed without the two-agent review (the person asked for speed); run `/mattpocock-skills:code-review` over `8942e20..HEAD` together with 05 before closing 05.
 
@@ -103,3 +105,11 @@ start `quiet-ledger-money/NN`.
 - **A syntax error shows only a black screen** after a force-stop relaunch. Fetch the bundle to read it: `curl -s "http://localhost:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true&minify=false"` returns a 500 with the message.
 - Restoring data by SQL bypasses `notifyChanged`, so open lists stay stale until a pull-to-refresh.
 - Long inline `python - <<'EOF'` heredocs sometimes fail in Git Bash with "unexpected EOF while looking for matching `'`"; write the script to the scratchpad and run it from there.
+
+## Decisions made while building (2026-11-13, tickets 07–10)
+
+- **Sheet:** `Sheet` passes `stackBehavior` through (menus and the person sheet use `push`), drops the keyboard before closing, cancels a pending close on `present()`, and presents once more if the sheet hasn't opened after 500 ms. Without this, a sheet closed with the keyboard up swallowed the next open.
+- **ScreenHeader** takes a `trailing` node (the split detail's ⋯ menu).
+- **Split position wording:** "You owe ₹X" leads with what the person pays (the old screen's rule), on the list and the band alike. Spec 48 says "net"; left as is for the person to decide.
+- **Category sheet** has an edit mode now; type is chosen only when creating.
+- **Emulator taps:** half-size screenshots (450 wide) map ×2.4, not ×1.2. Dump bounds are in device pixels; prefer them.

@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Check } from 'lucide-react-native';
+import { Check, Square, SquareCheck } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, parseISO, subDays, startOfDay, isBefore } from 'date-fns';
-import IconTile from '../../../components/IconTile';
+import ScreenHeader from '../../../components/ledger/ScreenHeader';
+import ListRow from '../../../components/ledger/ListRow';
+import Chip from '../../../components/ledger/Chip';
+import AmountText from '../../../components/ledger/AmountText';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../../../components/ledger/PinnedFooter';
 import CategoryIcon from '../../../components/CategoryIcon';
-import AmountText from '../../../components/AmountText';
-import Button from '../../../components/Button';
-import { fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
-import { useTheme } from '../../../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../../../theme/ledger';
 import { formatMoney } from '../../../lib/currency';
 import useSplit from '../../../hooks/useSplit';
 import useCurrency from '../../../hooks/useCurrency';
@@ -29,12 +29,13 @@ import { useToast } from '../../../components/Toast';
 // CREATES split entries from those transactions — the transactions themselves
 // are never modified. A split entry is a different object living beside the
 // ledger, not a tag on it.
+// On the ledger kit (spec 48, ticket 08): date fields, category Chips, a
+// select-all row, rows with a check, and a pinned footer naming what happens.
 export default function SplitHistory() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { split, entries, loading: splitLoading } = useSplit(id);
@@ -136,49 +137,40 @@ export default function SplitHistory() {
 
   if (splitLoading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.screen}>
+        <ScreenHeader title="" />
         <View style={styles.loading}>
-          <ActivityIndicator color={colors.ink} />
+          <ActivityIndicator color={c.ink} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!split) return null;
 
+  // Category chips draw the category's own icon through the Chip's `icon` slot.
+  const categoryIcon = (key) => (props) => <CategoryIcon icon={key} {...props} />;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          Add to {split.name}
-        </Text>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader title={`Add to ${split.name}`} />
 
       <View style={styles.filters}>
         <View style={styles.dateRow}>
-          <Pressable style={styles.dateField} onPress={() => setShowPicker('start')}>
+          <Pressable style={styles.dateField} onPress={() => setShowPicker('start')} accessibilityRole="button" accessibilityLabel={`From ${format(from, 'd MMMM yyyy')}`}>
             <Text style={styles.dateLabel}>From</Text>
             <Text style={styles.dateValue}>{format(from, 'd MMM yyyy')}</Text>
           </Pressable>
-          <Pressable style={styles.dateField} onPress={() => setShowPicker('end')}>
+          <Pressable style={styles.dateField} onPress={() => setShowPicker('end')} accessibilityRole="button" accessibilityLabel={`To ${format(to, 'd MMMM yyyy')}`}>
             <Text style={styles.dateLabel}>To</Text>
             <Text style={styles.dateValue}>{format(to, 'd MMM yyyy')}</Text>
           </Pressable>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          <CategoryChip label="All" active={categoryId === null} onPress={() => setCategoryId(null)} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
+          <Chip label="All" selected={categoryId === null} onPress={() => setCategoryId(null)} />
           {expenseCategories.map((cat) => (
-            <CategoryChip
-              key={cat.id}
-              label={cat.name}
-              icon={cat.icon}
-              active={categoryId === cat.id}
-              onPress={() => setCategoryId(cat.id)}
-            />
+            <Chip key={cat.id} label={cat.name} icon={categoryIcon(cat.icon)} selected={categoryId === cat.id} onPress={() => setCategoryId(cat.id)} />
           ))}
         </ScrollView>
       </View>
@@ -206,240 +198,130 @@ export default function SplitHistory() {
       <FlatList
         data={transactions}
         keyExtractor={(item) => item.id}
-        style={{ flex: 1 }}
+        style={styles.flex}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           transactions.length > 0 ? (
-            <Pressable style={styles.selectAllRow} onPress={toggleAll}>
-              <Text style={styles.selectAllText}>
-                {allVisibleSelected ? 'Clear all' : 'Select all'} · {transactions.length}{' '}
-                {transactions.length === 1 ? 'result' : 'results'}
-              </Text>
-            </Pressable>
+            <ListRow
+              icon={allVisibleSelected ? SquareCheck : Square}
+              title={allVisibleSelected ? 'Clear all' : 'Select all'}
+              right={`${transactions.length} ${transactions.length === 1 ? 'result' : 'results'}`}
+              onPress={toggleAll}
+            />
           ) : null
         }
-        ListEmptyComponent={
-          loading ? null : <Text style={styles.emptyText}>No expenses left to add in this range.</Text>
-        }
-        renderItem={({ item }) => {
+        ListEmptyComponent={loading ? null : <Text style={styles.empty}>No expenses left to add in this range.</Text>}
+        ListFooterComponent={selectedCount > 0 ? <Text style={styles.note}>Added as entries you paid, split equally. Editable after.</Text> : null}
+        renderItem={({ item, index }) => {
           const isSelected = !!selected[item.id];
           return (
-            <Pressable style={styles.row} onPress={() => toggle(item)}>
-              <IconTile tone="neutral">
-                <CategoryIcon icon={item.category?.icon} size={20} color={colors.ink} />
-              </IconTile>
-              <View style={styles.rowMid}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {item.note?.trim() || item.category?.name || 'Uncategorized'}
-                </Text>
-                <Text style={styles.rowSub} numberOfLines={1}>
-                  {format(parseISO(item.occurred_at), 'd MMM')}
-                  {item.note?.trim() && item.category?.name ? ` · ${item.category.name}` : ''}
-                </Text>
-              </View>
-              <AmountText value={item.amount} type="neutral" currency={currency} />
-              <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                {isSelected && <Check size={15} color={colors.brandText} strokeWidth={3} />}
-              </View>
-            </Pressable>
+            <ListRow
+              tone={item.category?.color}
+              renderIcon={(tint) => <CategoryIcon icon={item.category?.icon} size={18} color={tint} strokeWidth={1.75} />}
+              title={item.note?.trim() || item.category?.name || 'Uncategorized'}
+              sub={`${format(parseISO(item.occurred_at), 'd MMM')}${item.note?.trim() && item.category?.name ? ` · ${item.category.name}` : ''}`}
+              right={<AmountText value={item.amount} currency={currency} />}
+              trailing={
+                <View style={[styles.check, isSelected ? { backgroundColor: c.ink, borderColor: c.ink } : { borderColor: c.hairline }]}>
+                  {isSelected && <Check size={14} color={c.inkOnInk} strokeWidth={2.5} />}
+                </View>
+              }
+              onPress={() => toggle(item)}
+              accessibilityLabel={`${item.note?.trim() || item.category?.name || 'Uncategorized'}${isSelected ? ', selected' : ''}`}
+              divider={index < transactions.length - 1}
+            />
           );
         }}
       />
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        {/* Says plainly that these become entries you paid for — the defaults
-            createEntriesFromTransactions applies — so the split-equally,
-            you-are-the-payer assumption isn't a surprise afterwards. */}
-        {selectedCount > 0 && (
-          <Text style={styles.footerNote}>
-            Added as entries you paid, split equally. Editable after.
-          </Text>
-        )}
-        <Button
-          title={
-            selectedCount === 0
-              ? 'Select transactions'
-              : `Add ${selectedCount} ${selectedCount === 1 ? 'entry' : 'entries'} · ${formatMoney(selectedTotal, currency)}`
-          }
-          onPress={handleSave}
-          disabled={selectedCount === 0}
-          loading={saving}
-        />
-      </View>
-    </SafeAreaView>
+      <PinnedFooter
+        primary={{
+          title: selectedCount === 0
+            ? 'Select transactions'
+            : `Add ${selectedCount} ${selectedCount === 1 ? 'entry' : 'entries'} · ${formatMoney(selectedTotal, currency)}`,
+          onPress: handleSave,
+          disabled: selectedCount === 0,
+          loading: saving,
+        }}
+      />
+    </View>
   );
 }
 
-function CategoryChip({ label, icon, active, onPress }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
-      {icon && (
-        <CategoryIcon icon={icon} size={15} color={active ? colors.brandText : colors.mutedDarker} strokeWidth={2} />
-      )}
-      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    safe: {
+    screen: {
       flex: 1,
-      backgroundColor: colors.bg,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
     },
     loading: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    header: {
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
-      paddingHorizontal: spacing.xl,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.display,
-      letterSpacing: -0.3,
-      color: colors.ink,
-      flexShrink: 1,
-    },
     filters: {
-      paddingHorizontal: spacing.xl,
-      gap: spacing.md,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.sm,
+      gap: ledgerSpace.md,
     },
     dateRow: {
       flexDirection: 'row',
-      gap: spacing.md,
+      gap: ledgerSpace.md,
     },
     dateField: {
       flex: 1,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      gap: spacing.xs,
+      minHeight: 48,
+      justifyContent: 'center',
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: ledgerSpace.sm,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
     },
     dateLabel: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
+      ...ledgerType.caption,
+      color: c.muted,
     },
     dateValue: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.md,
-      color: colors.ink,
+      ...ledgerType.rowTitle,
+      color: c.ink,
+    },
+    // Bleeds to the screen's edges so the chips scroll edge to edge.
+    chipScroll: {
+      marginHorizontal: -ledgerSpace.gutter,
     },
     chipRow: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      paddingBottom: spacing.sm,
-    },
-    chip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: radii.pill,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    chipActive: {
-      backgroundColor: colors.brand,
-      borderColor: colors.brand,
-    },
-    chipLabel: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.mutedDarker,
-    },
-    chipLabelActive: {
-      color: colors.brandText,
+      gap: ledgerSpace.sm,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.sm,
     },
     listContent: {
-      paddingHorizontal: spacing.xl,
-      paddingBottom: spacing.xl,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
     },
-    selectAllRow: {
-      paddingVertical: spacing.md,
-    },
-    selectAllText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.mutedDarker,
-    },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderSoft,
-    },
-    rowMid: {
-      flex: 1,
-    },
-    rowTitle: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.md,
-      color: colors.ink,
-    },
-    rowSub: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.xs,
-      color: colors.mutedMid,
-      marginTop: 1,
-    },
-    checkbox: {
+    check: {
       width: 24,
       height: 24,
-      borderRadius: 8,
+      borderRadius: 12,
       borderWidth: 1.5,
-      borderColor: colors.chevron,
       alignItems: 'center',
       justifyContent: 'center',
+      marginLeft: ledgerSpace.md,
     },
-    checkboxOn: {
-      backgroundColor: colors.brand,
-      borderColor: colors.brand,
-    },
-    emptyText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.muted,
+    empty: {
+      ...ledgerType.body,
+      color: c.muted,
       textAlign: 'center',
-      marginTop: spacing.xxl,
+      marginTop: ledgerSpace.section,
     },
-    footer: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.md,
-      gap: spacing.sm,
-    },
-    footerNote: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
+    note: {
+      ...ledgerType.caption,
+      color: c.muted,
       textAlign: 'center',
+      marginTop: ledgerSpace.lg,
     },
   });
 }

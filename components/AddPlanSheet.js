@@ -1,12 +1,13 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { View, Text, StyleSheet } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { X, Trash2 } from 'lucide-react-native';
+import { CalendarDays, CalendarCheck, Inbox } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Button from './Button';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import Sheet from './ledger/Sheet';
+import Button from './ledger/Button';
+import ListRow from './ledger/ListRow';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular } from '../theme/ledger';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -14,7 +15,6 @@ import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useCollectingPlan from '../hooks/useCollectingPlan';
-import Switch from './Switch';
 import useCurrency from '../hooks/useCurrency';
 import { destructiveHaptic } from '../lib/haptics';
 
@@ -39,8 +39,8 @@ export function useAddPlanSheet() {
 }
 
 const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -150,240 +150,120 @@ const AddPlanSheet = forwardRef(function AddPlanSheet(_props, ref) {
     showToast({ message: 'Plan deleted', variant: 'success' });
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit plan' : 'New plan'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: editingId ? 'Save' : 'Create plan', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Plan' : 'New Plan'}</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <Text style={styles.label}>Name</Text>
+      <BottomSheetTextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. Goa Trip"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Plan name"
+        style={styles.field}
+      />
 
-        <Text style={styles.fieldLabel}>Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g. Goa Trip"
-          placeholderTextColor={colors.mutedDarker}
-          style={styles.textInput}
+      <Text style={styles.label}>Target amount (optional)</Text>
+      <View style={styles.amountWrap}>
+        <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
+        <BottomSheetTextInput
+          value={targetAmount}
+          onChangeText={(v) => setTargetAmount(sanitizeAmountInput(v))}
+          placeholder="No target"
+          placeholderTextColor={c.inkFaint}
+          cursorColor={c.accent}
+          selectionColor={c.accent}
+          keyboardType="number-pad"
+          accessibilityLabel="Target amount"
+          style={[styles.amountInput, tabular]}
         />
+      </View>
 
-        <Text style={styles.fieldLabel}>Target amount (optional)</Text>
-        <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
-          <TextInput
-            value={targetAmount}
-            onChangeText={(v) => setTargetAmount(sanitizeAmountInput(v))}
-            placeholder="No target"
-            placeholderTextColor={colors.mutedDarker}
-            keyboardType="number-pad"
-            style={styles.amountInput}
-          />
-        </View>
+      <ListRow icon={CalendarDays} title="Start date" right={startDate ? format(startDate, 'd MMM yyyy') : 'None'} trailing="chevron" onPress={() => setDatePickerFor('start')} />
+      <ListRow icon={CalendarCheck} title="End date" right={endDate ? format(endDate, 'd MMM yyyy') : 'None'} trailing="chevron" onPress={() => setDatePickerFor('end')} />
 
-        <View style={styles.dateRowWrap}>
-          <Pressable style={styles.dateRow} onPress={() => setDatePickerFor('start')}>
-            <Text style={styles.fieldLabelInline}>Start date</Text>
-            <Text style={styles.dateValue}>{startDate ? format(startDate, 'd MMM yyyy') : 'None'}</Text>
-          </Pressable>
-          <Pressable style={styles.dateRow} onPress={() => setDatePickerFor('end')}>
-            <Text style={styles.fieldLabelInline}>End date</Text>
-            <Text style={styles.dateValue}>{endDate ? format(endDate, 'd MMM yyyy') : 'None'}</Text>
-          </Pressable>
-        </View>
-
-        {datePickerFor && (
-          <DateTimePicker
-            value={(datePickerFor === 'start' ? startDate : endDate) ?? new Date()}
-            mode="date"
-            display="default"
-            onChange={(_event, selected) => {
-              setDatePickerFor(null);
-              if (!selected) return;
-              if (datePickerFor === 'start') setStartDate(selected);
-              else setEndDate(selected);
-            }}
-          />
-        )}
-
-        <View style={styles.collectRow}>
-          <View style={styles.collectText}>
-            <Text style={styles.collectTitle}>Collect new transactions</Text>
-            <Text style={styles.collectSub}>New expenses default into this plan until you turn it off</Text>
-          </View>
-          <Switch value={isCollecting} onValueChange={setIsCollecting} />
-        </View>
-
-        {error && <Text style={styles.errorText}>{error}</Text>}
-
-        <Button
-          title={editingId ? 'Save Plan' : 'Create Plan'}
-          variant="primary"
-          onPress={handleSave}
-          loading={saving}
-          style={{ marginTop: spacing.lg }}
+      {datePickerFor && (
+        <DateTimePicker
+          value={(datePickerFor === 'start' ? startDate : endDate) ?? new Date()}
+          mode="date"
+          display="default"
+          onChange={(_event, selected) => {
+            setDatePickerFor(null);
+            if (!selected) return;
+            if (datePickerFor === 'start') setStartDate(selected);
+            else setEndDate(selected);
+          }}
         />
-        {editingId && (
-          <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-            <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-            <Text style={styles.deleteText}>Delete Plan</Text>
-          </Pressable>
-        )}
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      )}
+
+      <ListRow
+        icon={Inbox}
+        title="Collect new transactions"
+        sub="New expenses default into this plan until you turn it off"
+        subLines={2}
+        switchValue={isCollecting}
+        onSwitchChange={setIsCollecting}
+        divider={false}
+      />
+
+      {error && <Text style={styles.error}>{error}</Text>}
+
+      {editingId && <Button title="Delete plan" variant="danger" onPress={handleDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  amountBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  amountCurrency: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.title,
-    color: colors.mutedDarker,
-  },
-  amountInput: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 22,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    flex: 1,
-  },
-  dateRowWrap: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  dateRow: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  fieldLabelInline: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-  },
-  dateValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-    marginTop: 2,
-  },
-  collectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginTop: spacing.lg,
-  },
-  collectText: {
-    flex: 1,
-  },
-  collectTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  collectSub: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-    marginTop: 2,
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-    textAlign: 'center',
-    marginTop: spacing.md,
-  },
-  deleteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  deleteText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-  },
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
+    },
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.lg,
+    },
+    amountWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      marginBottom: ledgerSpace.md,
+    },
+    amountCurrency: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginRight: 4,
+    },
+    amountInput: {
+      ...ledgerType.body,
+      color: c.ink,
+      flex: 1,
+      padding: 0,
+    },
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
+    },
+    delete: {
+      marginTop: ledgerSpace.lg,
+    },
   });
 }

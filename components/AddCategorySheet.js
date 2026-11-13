@@ -1,21 +1,26 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X } from 'lucide-react-native';
-import Button from './Button';
-import CategoryIcon, { CATEGORY_ICON_KEYS, CATEGORY_COLORS } from './CategoryIcon';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
-import { supabase } from '../lib/supabase';
+import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import Sheet from './ledger/Sheet';
+import Segmented from './ledger/Segmented';
+import Button from './ledger/Button';
+import IconPicker from './ledger/IconPicker';
+import { CATEGORY_ICON_KEYS, CATEGORY_COLORS } from './CategoryIcon';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
+import { createCategory, updateCategory, categoryUsage, deleteCategory } from '../lib/categories';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
+import { destructiveHaptic } from '../lib/haptics';
 
 const AddCategorySheetContext = createContext(null);
 
+// openAddCategory('expense' | 'income') opens a new category of that type;
+// openAddCategory(categoryRow) opens that category for editing (spec 48,
+// ticket 09), where Delete lives.
 export function AddCategorySheetProvider({ children }) {
   const sheetRef = useRef(null);
-  const openAddCategory = useCallback((defaultType) => sheetRef.current?.open(defaultType ?? 'expense'), []);
+  const openAddCategory = useCallback((arg) => sheetRef.current?.open(arg ?? 'expense'), []);
 
   return (
     <AddCategorySheetContext.Provider value={{ openAddCategory }}>
@@ -31,14 +36,20 @@ export function useAddCategorySheet() {
   return ctx;
 }
 
+const TYPES = [
+  { value: 'expense', label: 'Expense' },
+  { value: 'income', label: 'Income' },
+];
+
 const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
 
+  const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [type, setType] = useState('expense');
   const [icon, setIcon] = useState(CATEGORY_ICON_KEYS[0]);
@@ -47,12 +58,21 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
   const [error, setError] = useState(null);
 
   useImperativeHandle(ref, () => ({
-    open(defaultType) {
+    open(arg) {
       setError(null);
-      setName('');
-      setType(defaultType ?? 'expense');
-      setIcon(CATEGORY_ICON_KEYS[0]);
-      setColor(CATEGORY_COLORS[0]);
+      if (arg && typeof arg === 'object') {
+        setEditingId(arg.id);
+        setName(arg.name ?? '');
+        setType(arg.type ?? 'expense');
+        setIcon(arg.icon ?? CATEGORY_ICON_KEYS[0]);
+        setColor(arg.color ?? CATEGORY_COLORS[0]);
+      } else {
+        setEditingId(null);
+        setName('');
+        setType(arg === 'income' ? 'income' : 'expense');
+        setIcon(CATEGORY_ICON_KEYS[0]);
+        setColor(CATEGORY_COLORS[0]);
+      }
       modalRef.current?.present();
     },
   }));
@@ -64,216 +84,159 @@ const AddCategorySheet = forwardRef(function AddCategorySheet(_props, ref) {
     }
     setSaving(true);
     setError(null);
-
-    const { error: saveError } = await supabase.from('categories').insert({
-      name: name.trim(),
-      type,
-      icon,
-      color,
-      is_default: false,
-    });
-
+    const fields = { name: name.trim(), type, icon, color };
+    const { error: saveError } = editingId ? await updateCategory(editingId, fields) : await createCategory(fields);
     setSaving(false);
     if (saveError) {
       // 23505 = unique_violation — categories_user_id_name_type_key
       // (categories_unique_and_stop_auto_seed migration, 00-index.md). A
-      // friendly message here instead of the raw Postgres text, which reads
-      // as a bug ("duplicate key value violates constraint...") rather than
-      // the simple "you already have this" it actually is.
+      // friendly message instead of the raw Postgres text.
       const message =
-        saveError.code === '23505'
-          ? `You already have a ${type} category named "${name.trim()}"`
-          : saveError.message;
+        saveError.code === '23505' ? `You already have a ${type} category named "${fields.name}"` : saveError.message;
       showToast({ message, variant: 'error' });
       return;
     }
     notifyChanged();
     modalRef.current?.dismiss();
-    showToast({ message: 'Category created', variant: 'success' });
+    showToast({ message: editingId ? 'Category updated' : 'Category created', variant: 'success' });
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
+  // The in-use guard and its message are unchanged from the old row bin.
+  async function handleDelete() {
+    setSaving(true);
+    const usage = await categoryUsage(editingId);
+    if (usage.transactions > 0 || usage.budgets > 0) {
+      setSaving(false);
+      Alert.alert(
+        'Category in use',
+        `"${name}" is used by ${usage.transactions} transaction(s) and ${usage.budgets} budget(s). Remove those first.`
+      );
+      return;
+    }
+    const { error: deleteError } = await deleteCategory(editingId);
+    setSaving(false);
+    if (deleteError) {
+      showToast({ message: deleteError.message, variant: 'error' });
+      return;
+    }
+    notifyChanged();
+    modalRef.current?.dismiss();
+    showToast({ message: 'Category deleted', variant: 'success' });
+  }
+
+  function confirmDelete() {
+    Alert.alert('Delete category', `Delete "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          destructiveHaptic();
+          handleDelete();
+        },
+      },
+    ]);
+  }
 
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit category' : 'New category'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: editingId ? 'Save' : 'Create category', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>New Category</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <Text style={styles.label}>Name</Text>
+      <BottomSheetTextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. Subscriptions"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Category name"
+        style={styles.field}
+      />
 
-        <Text style={styles.fieldLabel}>Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g. Subscriptions"
-          placeholderTextColor={colors.mutedDarker}
-          style={styles.textInput}
-        />
+      {/* Type only for a new category: switching one in use would leave its
+          transactions and budgets under the wrong type. */}
+      {!editingId && (
+        <>
+          <Text style={styles.label}>Type</Text>
+          <View style={styles.block}>
+            <Segmented accessibilityLabel="Type" options={TYPES} value={type} onChange={setType} />
+          </View>
+        </>
+      )}
 
-        <Text style={styles.fieldLabel}>Type</Text>
-        <View style={styles.segmentWrap}>
-          <Pressable style={[styles.segment, type === 'expense' && styles.segmentActive]} onPress={() => setType('expense')}>
-            <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
-          </Pressable>
-          <Pressable style={[styles.segment, type === 'income' && styles.segmentActive]} onPress={() => setType('income')}>
-            <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
-          </Pressable>
-        </View>
+      <Text style={styles.label}>Icon</Text>
+      <View style={styles.block}>
+        <IconPicker value={icon} onChange={setIcon} keys={CATEGORY_ICON_KEYS} accessibilityLabel="Category icon" />
+      </View>
 
-        <Text style={styles.fieldLabel}>Icon</Text>
-        <View style={styles.iconGrid}>
-          {CATEGORY_ICON_KEYS.map((key) => {
-            const selected = key === icon;
-            return (
-              <Pressable key={key} style={[styles.iconOption, selected && styles.iconOptionSelected]} onPress={() => setIcon(key)}>
-                <CategoryIcon icon={key} size={20} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
-              </Pressable>
-            );
-          })}
-        </View>
+      <Text style={styles.label}>Colour</Text>
+      <View style={styles.colorGrid} accessibilityRole="radiogroup" accessibilityLabel="Colour">
+        {CATEGORY_COLORS.map((swatch, i) => {
+          const selected = swatch === color;
+          return (
+            <Pressable
+              key={swatch}
+              hitSlop={4}
+              accessibilityRole="radio"
+              accessibilityLabel={`Colour ${i + 1} of ${CATEGORY_COLORS.length}`}
+              accessibilityState={{ selected }}
+              style={[styles.colorOption, { backgroundColor: swatch }, selected && { borderWidth: 3, borderColor: c.ink }]}
+              onPress={() => setColor(swatch)}
+            />
+          );
+        })}
+      </View>
 
-        <Text style={styles.fieldLabel}>Color</Text>
-        <View style={styles.colorGrid}>
-          {CATEGORY_COLORS.map((swatch) => {
-            const selected = swatch === color;
-            return (
-              <Pressable
-                key={swatch}
-                style={[styles.colorOption, { backgroundColor: swatch }, selected && styles.colorOptionSelected]}
-                onPress={() => setColor(swatch)}
-              />
-            );
-          })}
-        </View>
+      {error && <Text style={styles.error}>{error}</Text>}
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
-
-        <Button title="Create Category" variant="primary" onPress={handleSave} loading={saving} style={{ marginTop: spacing.lg }} />
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      {editingId && <Button title="Delete category" variant="danger" onPress={confirmDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  segmentWrap: {
-    flexDirection: 'row',
-    backgroundColor: colors.chipBg,
-    borderRadius: 12,
-    padding: 4,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 9,
-  },
-  segmentActive: {
-    backgroundColor: colors.brand,
-  },
-  segmentText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-  },
-  segmentTextActive: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.brandText,
-  },
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  iconOption: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconOptionSelected: {
-    backgroundColor: colors.brand,
-    borderWidth: 0,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  colorOption: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-  },
-  colorOptionSelected: {
-    borderWidth: 3,
-    borderColor: colors.ink,
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-    textAlign: 'center',
-    marginTop: spacing.md,
-  },
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
+    },
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.lg,
+    },
+    block: {
+      marginBottom: ledgerSpace.lg,
+    },
+    colorGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.md,
+      marginBottom: ledgerSpace.lg,
+    },
+    colorOption: {
+      width: 40,
+      height: 40,
+      borderRadius: ledgerRadius.full,
+    },
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
+    },
+    delete: {
+      marginTop: ledgerSpace.lg,
+    },
   });
 }

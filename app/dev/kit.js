@@ -19,6 +19,7 @@ import Timeline from '../../components/ledger/Timeline';
 import DayOfMonthPicker from '../../components/ledger/DayOfMonthPicker';
 import IconPicker from '../../components/ledger/IconPicker';
 import OverflowMenu from '../../components/ledger/OverflowMenu';
+import AvatarStack from '../../components/ledger/AvatarStack';
 import PageDots from '../../components/ledger/PageDots';
 import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
@@ -178,6 +179,19 @@ function KitGallery() {
             sub="Opens a sheet of actions"
             trailing={<OverflowMenu title="Kit row" actions={[{ key: 'a', title: 'Edit', icon: Bell, onPress: noop }, { key: 'b', title: 'Delete', icon: Trash2, onPress: noop, danger: true }]} />}
             divider={false}
+          />
+        </Section>
+
+        <Section title="AvatarStack">
+          <AvatarStack
+            members={[
+              { id: 'a', name: 'Asha', color: '#E8785A' },
+              { id: 'b', name: 'Ravi', color: '#2F8F82' },
+              { id: 'c', name: 'Meera', color: '#8A5FBF' },
+              { id: 'd', name: 'Kiran', color: '#3B6FA0' },
+              { id: 'e', name: 'Dev', color: '#E8A317' },
+            ]}
+            size={32}
           />
         </Section>
 

@@ -9,14 +9,17 @@ Spec: .claude/features/48-quiet-ledger-money-screens.md
 
 **Blocked by:** 02, 07
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] With the flag flipped on locally (never committed flipped), the list, detail, add-from-history and sheet work as before on the kit
-- [ ] With the flag off, no plan surface appears anywhere
-- [ ] Emulator check in light and dark
+- [x] With the flag flipped on locally (never committed flipped), the list, detail, add-from-history and sheet work as before on the kit
+- [x] With the flag off, no plan surface appears anywhere
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+- 2026-11-13 (resolved): Plans list, detail, add-from-history and the plan sheet on the kit (rows with `ProgressBar`, a sunk band, `PinnedFooter`, `Sheet`). The flag stayed off in every commit; checked with it flipped on locally: empty list, create a plan with a target, detail band and Collecting row, add-from-history, delete; then flipped back. The donut is gone from the detail ("Where it went" is rows). Not checked on device: the flag-off redirects (unchanged code).

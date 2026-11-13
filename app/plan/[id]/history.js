@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Check } from 'lucide-react-native';
+import { Check, Square, SquareCheck } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, parseISO, subDays, startOfDay, isBefore } from 'date-fns';
-import Card from '../../../components/Card';
-import IconTile from '../../../components/IconTile';
+import ScreenHeader from '../../../components/ledger/ScreenHeader';
+import ListRow from '../../../components/ledger/ListRow';
+import Chip from '../../../components/ledger/Chip';
+import AmountText from '../../../components/ledger/AmountText';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../../../components/ledger/PinnedFooter';
 import CategoryIcon from '../../../components/CategoryIcon';
-import AmountText from '../../../components/AmountText';
-import Pill from '../../../components/Pill';
-import Button from '../../../components/Button';
-import { fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
-import { useTheme } from '../../../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../../../theme/ledger';
 import { formatMoney } from '../../../lib/currency';
 import { usePlan } from '../../../hooks/usePlans';
 import useCurrency from '../../../hooks/useCurrency';
@@ -24,17 +22,18 @@ import { useDataRefresh } from '../../../lib/DataRefreshContext';
 import { useToast } from '../../../components/Toast';
 
 // Plans flagged off (lib/flags.js): a deep link here lands on Home.
+// On the ledger kit (spec 48, ticket 10; Plans stay flagged off): the same
+// shape as a split's "Add from my transactions".
 export default function PlanHistory() {
   if (!FLAGS.plans) return <Redirect href="/" />;
   return <PlanHistoryScreen />;
 }
 
 function PlanHistoryScreen() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { plan, loading: planLoading } = usePlan(id);
@@ -111,53 +110,40 @@ function PlanHistoryScreen() {
   // straight through to `if (!plan) return null` with no loading branch.
   if (planLoading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.screen}>
+        <ScreenHeader title="" />
         <View style={styles.loading}>
-          <ActivityIndicator color={colors.ink} />
+          <ActivityIndicator color={c.ink} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!plan) return null;
 
+  // Category chips draw the category's own icon through the Chip's `icon` slot.
+  const categoryIcon = (key) => (props) => <CategoryIcon icon={key} {...props} />;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          Add to {plan?.name ?? 'plan'}
-        </Text>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader title={`Add to ${plan.name}`} />
 
       <View style={styles.filters}>
         <View style={styles.dateRow}>
-          <Pressable style={styles.dateField} onPress={() => setShowPicker('start')}>
+          <Pressable style={styles.dateField} onPress={() => setShowPicker('start')} accessibilityRole="button" accessibilityLabel={`From ${format(from, 'd MMMM yyyy')}`}>
             <Text style={styles.dateLabel}>From</Text>
             <Text style={styles.dateValue}>{format(from, 'd MMM yyyy')}</Text>
           </Pressable>
-          <Pressable style={styles.dateField} onPress={() => setShowPicker('end')}>
+          <Pressable style={styles.dateField} onPress={() => setShowPicker('end')} accessibilityRole="button" accessibilityLabel={`To ${format(to, 'd MMMM yyyy')}`}>
             <Text style={styles.dateLabel}>To</Text>
             <Text style={styles.dateValue}>{format(to, 'd MMM yyyy')}</Text>
           </Pressable>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          <CategoryChip label="All" active={categoryId === null} onPress={() => setCategoryId(null)} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
+          <Chip label="All" selected={categoryId === null} onPress={() => setCategoryId(null)} />
           {expenseCategories.map((cat) => (
-            <CategoryChip
-              key={cat.id}
-              label={cat.name}
-              icon={cat.icon}
-              active={categoryId === cat.id}
-              onPress={() => setCategoryId(cat.id)}
-            />
+            <Chip key={cat.id} label={cat.name} icon={categoryIcon(cat.icon)} selected={categoryId === cat.id} onPress={() => setCategoryId(cat.id)} />
           ))}
         </ScrollView>
       </View>
@@ -185,244 +171,123 @@ function PlanHistoryScreen() {
       <FlatList
         data={transactions}
         keyExtractor={(item) => item.id}
-        style={{ flex: 1 }}
+        style={styles.flex}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           transactions.length > 0 ? (
-            <Pressable style={styles.selectAllRow} onPress={toggleAll}>
-              <Text style={styles.selectAllText}>
-                {allVisibleSelected ? 'Clear all' : 'Select all'} · {transactions.length}{' '}
-                {transactions.length === 1 ? 'result' : 'results'}
-              </Text>
-            </Pressable>
+            <ListRow
+              icon={allVisibleSelected ? SquareCheck : Square}
+              title={allVisibleSelected ? 'Clear all' : 'Select all'}
+              right={`${transactions.length} ${transactions.length === 1 ? 'result' : 'results'}`}
+              onPress={toggleAll}
+            />
           ) : null
         }
-        ListEmptyComponent={
-          loading ? null : (
-            <Text style={styles.emptyText}>No expenses in this range.</Text>
-          )
-        }
-        renderItem={({ item }) => {
+        ListEmptyComponent={loading ? null : <Text style={styles.empty}>No expenses in this range.</Text>}
+        renderItem={({ item, index }) => {
           const isSelected = !!selected[item.id];
-          const otherPlan = item.plan && item.plan.id !== plan?.id ? item.plan : null;
           return (
-            <Pressable style={styles.row} onPress={() => toggle(item)}>
-              <IconTile tone="neutral">
-                <CategoryIcon icon={item.category?.icon} size={20} color={colors.ink} />
-              </IconTile>
-              <View style={styles.rowMid}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {item.category?.name ?? 'Uncategorized'}
-                </Text>
-                <View style={styles.rowSubRow}>
-                  <Text style={styles.rowSub}>{format(parseISO(item.occurred_at), 'd MMM')}</Text>
-                  {item.note ? (
-                    <Text style={styles.rowSub} numberOfLines={1}>
-                      · {item.note}
-                    </Text>
-                  ) : null}
+            <ListRow
+              tone={item.category?.color}
+              renderIcon={(tint) => <CategoryIcon icon={item.category?.icon} size={18} color={tint} strokeWidth={1.75} />}
+              title={item.note?.trim() || item.category?.name || 'Uncategorized'}
+              sub={`${format(parseISO(item.occurred_at), 'd MMM')}${item.note?.trim() && item.category?.name ? ` · ${item.category.name}` : ''}`}
+              right={<AmountText value={item.amount} currency={currency} />}
+              trailing={
+                <View style={[styles.check, isSelected ? { backgroundColor: c.ink, borderColor: c.ink } : { borderColor: c.hairline }]}>
+                  {isSelected && <Check size={14} color={c.inkOnInk} strokeWidth={2.5} />}
                 </View>
-                {otherPlan && <Pill label={otherPlan.name} tone="completed" style={styles.otherPlanPill} />}
-              </View>
-              <AmountText value={item.amount} type="neutral" currency={currency} />
-              <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                {isSelected && <Check size={15} color={colors.brandText} strokeWidth={3} />}
-              </View>
-            </Pressable>
+              }
+              onPress={() => toggle(item)}
+              accessibilityLabel={`${item.note?.trim() || item.category?.name || 'Uncategorized'}${isSelected ? ', selected' : ''}`}
+              divider={index < transactions.length - 1}
+            />
           );
         }}
       />
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <Button
-          title={
-            selectedCount === 0
-              ? 'Select transactions'
-              : `Add ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'} · ${formatMoney(selectedTotal, currency)}`
-          }
-          onPress={handleSave}
-          disabled={selectedCount === 0}
-          loading={saving}
-        />
-      </View>
-    </SafeAreaView>
+      <PinnedFooter
+        primary={{
+          title: selectedCount === 0
+            ? 'Select transactions'
+            : `Add ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'} · ${formatMoney(selectedTotal, currency)}`,
+          onPress: handleSave,
+          disabled: selectedCount === 0,
+          loading: saving,
+        }}
+      />
+    </View>
   );
 }
 
-function CategoryChip({ label, icon, active, onPress }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
-      {icon && (
-        <CategoryIcon icon={icon} size={15} color={active ? colors.brandText : colors.mutedDarker} strokeWidth={2} />
-      )}
-      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    flex: 1,
-  },
-  filters: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  dateField: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
-  },
-  dateLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-  },
-  dateValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  chipRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.xl,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-  },
-  chipActive: {
-    backgroundColor: colors.brand,
-  },
-  chipLabel: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.mutedDarker,
-  },
-  chipLabelActive: {
-    // Sits on the theme-accent chip bg — colors.brandText picks legible
-    // dark/light text per-accent (theme/themes.js).
-    color: colors.brandText,
-  },
-  listContent: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-  },
-  selectAllRow: {
-    paddingVertical: spacing.md,
-  },
-  selectAllText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.mutedDarker,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  rowSubRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 1,
-  },
-  rowSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    flexShrink: 1,
-  },
-  otherPlanPill: {
-    marginTop: 6,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxOn: {
-    backgroundColor: colors.brand,
-    borderColor: colors.brand,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.xl,
-  },
-  footer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    loading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filters: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.sm,
+      gap: ledgerSpace.md,
+    },
+    dateRow: {
+      flexDirection: 'row',
+      gap: ledgerSpace.md,
+    },
+    dateField: {
+      flex: 1,
+      minHeight: 48,
+      justifyContent: 'center',
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: ledgerSpace.sm,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+    },
+    dateLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    dateValue: {
+      ...ledgerType.rowTitle,
+      color: c.ink,
+    },
+    // Bleeds to the screen's edges so the chips scroll edge to edge.
+    chipScroll: {
+      marginHorizontal: -ledgerSpace.gutter,
+    },
+    chipRow: {
+      gap: ledgerSpace.sm,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.sm,
+    },
+    listContent: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
+    },
+    check: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: ledgerSpace.md,
+    },
+    empty: {
+      ...ledgerType.body,
+      color: c.muted,
+      textAlign: 'center',
+      marginTop: ledgerSpace.section,
+    },
   });
 }

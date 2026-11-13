@@ -1,21 +1,16 @@
 import { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, Redirect } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Pencil } from 'lucide-react-native';
+import { Pencil, ListPlus, Check, RotateCcw, Inbox } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Card from '../../../components/Card';
-import IconTile from '../../../components/IconTile';
-import ProgressBar from '../../../components/ProgressBar';
-import AmountText from '../../../components/AmountText';
-import Pill from '../../../components/Pill';
-import Button from '../../../components/Button';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../../../components/ledger/ScreenHeader';
+import SectionHeader from '../../../components/ledger/SectionHeader';
+import ListRow from '../../../components/ledger/ListRow';
+import AmountText from '../../../components/ledger/AmountText';
+import ProgressBar from '../../../components/ledger/ProgressBar';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../../../components/ledger/PinnedFooter';
 import CategoryIcon from '../../../components/CategoryIcon';
-import Switch from '../../../components/Switch';
-import DonutChart from '../../../components/DonutChart';
-// Static palette (theme/tokens) only for text on the dark summary card.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../../theme/tokens';
-import { useTheme } from '../../../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../../../theme/ledger';
 import { usePlan } from '../../../hooks/usePlans';
 import useTransactions from '../../../hooks/useTransactions';
 import useCollectingPlan from '../../../hooks/useCollectingPlan';
@@ -44,9 +39,14 @@ export default function PlanDetail() {
   return <PlanDetailScreen />;
 }
 
+// A plan on the ledger kit (spec 48, ticket 10; still behind FLAGS.plans): the
+// Budget detail pattern. A sunk band with the total (and the target's bar),
+// Collecting as a switch row, where it went, the linked expenses, and Add
+// expense pinned with Add from history beside it.
 function PlanDetailScreen() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { plan, loading } = usePlan(id);
@@ -65,10 +65,6 @@ function PlanDetailScreen() {
   // `if (!plan) return null` guard below — it doesn't depend on `plan` anyway,
   // only on `transactions`.
   const categoryBreakdown = useMemo(() => computeCategoryBreakdown(transactions, 'expense'), [transactions]);
-  const donutSegments = useMemo(
-    () => categoryBreakdown.map((entry) => ({ pct: entry.pct, color: getCategoryColor(entry.category) ?? colors.mutedLight })),
-    [categoryBreakdown]
-  );
 
   useEffect(() => {
     if (!loading && !plan) {
@@ -82,11 +78,12 @@ function PlanDetailScreen() {
   // spinner instead, matching streak.js's own loading branch.
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.screen}>
+        <ScreenHeader title="" />
         <View style={styles.loading}>
-          <ActivityIndicator color={colors.ink} />
+          <ActivityIndicator color={c.ink} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -116,352 +113,155 @@ function PlanDetailScreen() {
     notifyChanged();
   }
 
+  const dates = dateRangeLabel(plan);
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <View style={styles.nameRow}>
-              <Text style={styles.planName} numberOfLines={1}>
-                {plan.name}
-              </Text>
-              <Pill label={isCompleted ? 'Completed' : 'Active'} tone={isCompleted ? 'completed' : 'income'} />
-            </View>
-            {dateRangeLabel(plan) && <Text style={styles.planDate}>{dateRangeLabel(plan)}</Text>}
-          </View>
-        </View>
-        <Pressable style={styles.editButton} onPress={() => openAddPlan(plan)}>
-          <Pencil size={16} color={colors.ink} strokeWidth={2} />
-        </Pressable>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader
+        title={plan.name}
+        scrollY={scrollY}
+        actions={[{ icon: Pencil, onPress: () => openAddPlan(plan), accessibilityLabel: 'Edit plan' }]}
+      />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title={plan.name} scrollY={scrollY} />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {!isCompleted && (
-          <View style={styles.collectRow}>
-            <View style={styles.collectText}>
-              <Text style={styles.collectTitle}>Collecting</Text>
-              <Text style={styles.collectSub}>New transactions default into this plan</Text>
-            </View>
-            <Switch value={isCollecting} onValueChange={handleToggleCollecting} />
-          </View>
-        )}
-
-        <Card dark style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Total spent</Text>
-          <View style={styles.summaryAmountRow}>
-            <AmountText value={plan.total_spent} type="neutral" dark size={40} currency={currency} />
-            {hasTarget && <Text style={styles.targetText}> / {formatMoney(plan.target_amount, currency)}</Text>}
-          </View>
+        <View style={styles.band}>
+          <Text style={styles.bandLabel}>Total spent</Text>
+          <AmountText value={plan.total_spent} size="display" currency={currency} />
+          <Text style={styles.bandSub}>
+            {[isCompleted ? 'Completed' : 'Active', hasTarget ? `of ${formatMoney(plan.target_amount, currency)}` : 'No target', dates].filter(Boolean).join(' · ')}
+          </Text>
           {hasTarget && (
             <>
-              <View style={styles.progressWrap}>
-                <ProgressBar progress={progress} dark status="healthy" />
-              </View>
-              <View style={styles.rowBetween}>
-                <Text style={styles.progressPercent}>{Math.round(progress * 100)}% of target</Text>
-                <Text style={styles.remainingText}>{formatMoney(plan.remaining, currency)} remaining</Text>
-              </View>
+              <ProgressBar value={progress} accessibilityLabel={`${plan.name} plan`} style={styles.bar} />
+              <Text style={styles.bandSub}>
+                {Math.round(progress * 100)}% of target · {formatMoney(plan.remaining, currency)} remaining
+              </Text>
             </>
           )}
-        </Card>
+        </View>
+
+        {!isCompleted && (
+          <ListRow
+            icon={Inbox}
+            title="Collecting"
+            sub="New transactions default into this plan"
+            switchValue={isCollecting}
+            onSwitchChange={handleToggleCollecting}
+            divider={false}
+          />
+        )}
 
         {showBreakdown && (
           <>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Where it went</Text>
-            </View>
-            <Card style={styles.chartCard}>
-              <DonutChart segments={donutSegments} total={plan.total_spent} currency={currency} />
-            </Card>
-            <Card style={styles.breakdownCard}>
-              {categoryBreakdown.map((entry, idx) => (
-                <View
-                  key={entry.category?.id ?? 'uncategorized'}
-                  style={[styles.breakdownRow, idx < categoryBreakdown.length - 1 && styles.rowBorder]}
-                >
-                  <View style={[styles.colorDot, { backgroundColor: getCategoryColor(entry.category) ?? colors.mutedLight }]} />
-                  <View style={styles.rowMid}>
-                    <Text style={styles.rowTitle}>{entry.category?.name ?? 'Uncategorized'}</Text>
-                    <Text style={styles.rowSub}>{entry.pct.toFixed(0)}% of total</Text>
-                  </View>
-                  <AmountText value={entry.amount} type="neutral" currency={currency} />
-                </View>
-              ))}
-            </Card>
+            <SectionHeader title="Where it went" style={styles.section} />
+            {categoryBreakdown.map((entry, idx) => (
+              <ListRow
+                key={entry.category?.id ?? 'uncategorized'}
+                tone={getCategoryColor(entry.category) ?? undefined}
+                renderIcon={(tint) => <CategoryIcon icon={entry.category?.icon} size={18} color={tint} strokeWidth={1.75} />}
+                title={entry.category?.name ?? 'Uncategorized'}
+                sub={`${entry.pct.toFixed(0)}% of total`}
+                right={<AmountText value={entry.amount} currency={currency} />}
+                divider={idx < categoryBreakdown.length - 1}
+              />
+            ))}
           </>
         )}
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Expenses</Text>
-          <Text style={styles.sectionCount}>{transactions.length} items</Text>
-        </View>
-
+        <SectionHeader title="Expenses" right={<Text style={styles.count}>{transactions.length} items</Text>} style={styles.section} />
+        {!isCompleted && (
+          <ListRow icon={ListPlus} title="Add from history" trailing="chevron" onPress={() => router.push(`/plan/${plan.id}/history`)} divider={transactions.length > 0} />
+        )}
         {transactions.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyText}>No expenses linked yet.</Text>
-          </Card>
+          <Text style={styles.empty}>No expenses linked yet.</Text>
         ) : (
-          <Card style={styles.listCard}>
-            {transactions.map((tx, idx) => (
-              <Pressable
-                key={tx.id}
-                style={[styles.row, idx < transactions.length - 1 && styles.rowBorder]}
-                onPress={() => openAdd(tx)}
-              >
-                <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'}>
-                  <CategoryIcon icon={tx.category?.icon} size={20} color={tx.type === 'income' ? colors.incomeAccent : colors.ink} />
-                </IconTile>
-                <View style={styles.rowMid}>
-                  <Text style={styles.rowTitle}>{tx.category?.name ?? 'Uncategorized'}</Text>
-                  <Text style={styles.rowSub}>{format(new Date(tx.occurred_at), 'd MMM')}</Text>
-                </View>
-                <AmountText value={tx.amount} type={tx.type} signed currency={currency} />
-              </Pressable>
-            ))}
-          </Card>
+          transactions.map((tx, idx) => (
+            <ListRow
+              key={tx.id}
+              tone={tx.category?.color}
+              renderIcon={(tint) => <CategoryIcon icon={tx.category?.icon} size={18} color={tint} strokeWidth={1.75} />}
+              title={tx.category?.name ?? 'Uncategorized'}
+              sub={format(new Date(tx.occurred_at), 'd MMM')}
+              right={<AmountText value={tx.amount} type={tx.type} signed currency={currency} />}
+              onPress={() => openAdd(tx)}
+              divider={idx < transactions.length - 1}
+            />
+          ))
         )}
 
-        <View style={styles.actionRow}>
-          <Button
-            title="Add Expense"
-            onPress={() => openAdd({ plan_id: plan.id })}
-            style={styles.actionButton}
-          />
-          <Button
-            title="Add from history"
-            variant="outline"
-            onPress={() => router.push(`/plan/${plan.id}/history`)}
-            style={styles.actionButton}
-          />
-        </View>
+        <ListRow
+          icon={isCompleted ? RotateCcw : Check}
+          title={isCompleted ? 'Reactivate plan' : 'Mark as complete'}
+          onPress={toggleStatus}
+          divider={false}
+        />
+      </Animated.ScrollView>
 
-        <Pressable style={styles.toggleStatusRow} onPress={toggleStatus}>
-          <Text style={styles.toggleStatusText}>{isCompleted ? 'Reactivate Plan' : 'Mark as Complete'}</Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+      {!isCompleted && <PinnedFooter primary={{ title: 'Add expense', onPress: () => openAdd({ plan_id: plan.id }) }} />}
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    flex: 1,
-    paddingRight: spacing.md,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  planName: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    flexShrink: 1,
-  },
-  planDate: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-  },
-  scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 60,
-  },
-  summaryCard: {
-    borderRadius: radii.cardLg,
-    padding: 22,
-    marginBottom: spacing.xl,
-  },
-  summaryLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    // Sits on Card's `dark` prop — pinned.
-    color: staticColors.mutedOnDark,
-  },
-  summaryAmountRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    marginTop: 2,
-  },
-  targetText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.lg,
-    color: staticColors.mutedOnDarkDarker,
-  },
-  progressWrap: {
-    marginVertical: spacing.lg,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  progressPercent: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: staticColors.mutedOnDark,
-  },
-  remainingText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.brand,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  sectionCount: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
-  },
-  listCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-  },
-  chartCard: {
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  breakdownCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 14,
-  },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: radii.pill,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 13,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  rowSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
-  actionRow: {
-    marginTop: spacing.lg,
-    gap: spacing.md,
-  },
-  actionButton: {
-    width: '100%',
-  },
-  collectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  collectText: {
-    flex: 1,
-  },
-  collectTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  collectSub: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 2,
-  },
-  toggleStatusRow: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-  },
-  toggleStatusText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    loading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
+    },
+    band: {
+      backgroundColor: c.surfaceSunk,
+      borderRadius: ledgerRadius.card,
+      padding: ledgerSpace.lg,
+      alignItems: 'center',
+      gap: ledgerSpace.xs,
+      marginTop: ledgerSpace.sm,
+      marginBottom: ledgerSpace.md,
+    },
+    bandLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    bandSub: {
+      ...ledgerType.caption,
+      color: c.muted,
+      textAlign: 'center',
+    },
+    // Bars on a sunk band take a canvas track (handoff rule).
+    bar: {
+      alignSelf: 'stretch',
+      marginTop: ledgerSpace.sm,
+      backgroundColor: c.canvas,
+    },
+    section: {
+      marginTop: ledgerSpace.section,
+    },
+    count: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    empty: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginTop: ledgerSpace.md,
+    },
   });
 }
