@@ -110,6 +110,6 @@ start `quiet-ledger-money/NN`.
 
 - **Sheet:** `Sheet` passes `stackBehavior` through (menus and the person sheet use `push`), drops the keyboard before closing, cancels a pending close on `present()`, and presents once more if the sheet hasn't opened after 500 ms. Without this, a sheet closed with the keyboard up swallowed the next open.
 - **ScreenHeader** takes a `trailing` node (the split detail's ⋯ menu).
-- **Split position wording:** "You owe ₹X" leads with what the person pays (the old screen's rule), on the list and the band alike. Spec 48 says "net"; left as is for the person to decide.
+- **Split position wording:** "You owe ₹X" leads with what the person pays (the old screen's rule), on the list and the band alike. Spec 48 says "net"; the person chose to keep what they pay (2026-11-13).
 - **Category sheet** has an edit mode now; type is chosen only when creating.
 - **Emulator taps:** half-size screenshots (450 wide) map ×2.4, not ×1.2. Dump bounds are in device pixels; prefer them.
