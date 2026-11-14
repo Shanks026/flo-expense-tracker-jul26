@@ -1,6 +1,6 @@
 # Handoff: Quiet Ledger Phase 5 (Moments and the rest)
 
-**Last updated:** 2026-11-14, after tickets 01–09 and the Ask FLO bubble revert. Next session: ticket 10 (Pro and upsell, flag off).
+**Last updated:** 2026-11-14, after tickets 01–10 and the Ask FLO bubble revert. Next session: ticket 11 (cleanup).
 
 Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision in the spec 46–48 handoffs still holds (`.scratch/quiet-ledger/`, `.scratch/quiet-ledger-onboarding/`, `.scratch/quiet-ledger-money/`).
 
@@ -14,9 +14,9 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 | 06 Streak screen | 01 | done (a lit count not seen on device) | `9a94a2f` |
 | 07 Ask FLO chat and Past chats | — | done; bubble revert done (voice not checked) | `e6f931c`, `f2d54f9` |
 | 08 Cards (was Personalize) | — | done | `bc3a3ee` |
-| 09 You tab | 08 | done | see git log |
-| 10 Pro and upsell (flag off) | — | ready | |
-| 11 Cleanup | 01–10 | blocked by 08, 09, 10 | |
+| 09 You tab | 08 | done | `0c8e34d` |
+| 10 Pro and upsell (flag off) | — | done (checked with billing flipped on locally) | see git log |
+| 11 Cleanup | 01–10 | ready | |
 
 **Suggested order:**
 1. ~~The Ask FLO bubble revert~~ done (`f2d54f9`: radius 20, bottom-right 8).
@@ -59,6 +59,11 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 
 - **Already gone:** `BreakdownTable` (deleted in 07), and the More tab's `Row`/`RowGroup` use (09; check whether `components/Row.js` still has importers).
 - **Duplicated in 09:** the You tab (`app/(tabs)/more.js`) has its own `Group` helper, a near copy of the one in `app/settings.js` (Settings' also skips `Callout`). It could become one kit component.
+- **Found in 10:**
+  - `ProBenefits` is already deleted, and `ProBadge` lost its unused overlay variant.
+  - Pro's plan `Radio` (`app/pro.js`) repeats the ink "selected" disc that `ActivityFilterSheet` draws inline. It could become one kit mark.
+  - The crown sits in a pill ("Pro" beside it), not a bare circle. The colours follow the spec (ink on `surfaceSunk`).
+  - The plan subs are `PRO_PRICING`'s own (Monthly "per month", Lifetime "one-time"); only Annual shows a per-month figure.
 - **Now without importers, to check and delete:**
   - `components/StreakDays.js` and `components/StreakFlameIcon.js` (old flame cells);
   - `Confetti`;

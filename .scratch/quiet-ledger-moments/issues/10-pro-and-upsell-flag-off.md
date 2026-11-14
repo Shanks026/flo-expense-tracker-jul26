@@ -11,15 +11,15 @@ Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] With billing flipped on locally: Pro shows the checklist and plan rows, picking a plan updates the button, the placeholder behaviour runs
-- [ ] The upsell opens from a free-limit gate and its button opens Pro
-- [ ] With the flag off (committed state), Pro redirects and no upsell appears
-- [ ] Emulator check in light and dark
+- [x] With billing flipped on locally: Pro shows the checklist and plan rows, picking a plan updates the button, the placeholder behaviour runs
+- [x] The upsell opens from a free-limit gate and its button opens Pro
+- [x] With the flag off (committed state), Pro redirects and no upsell appears
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal

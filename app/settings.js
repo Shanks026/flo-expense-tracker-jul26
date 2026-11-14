@@ -542,7 +542,7 @@ export default function Settings() {
             }
             title={fullName || 'Add your name'}
             sub={session?.user?.email}
-            right={isPro ? <ProBadge variant="pill" /> : null}
+            right={isPro ? <ProBadge /> : null}
             trailing="chevron"
             onPress={openEditProfile}
             divider={false}
@@ -763,7 +763,7 @@ export default function Settings() {
             title="Export all transactions"
             sub="A CSV of every account"
             onPress={handleExportAll}
-            trailing={exportingAll ? <ActivityIndicator size="small" color={c.ink} /> : !hasPro ? <ProBadge variant="pill" /> : 'chevron'}
+            trailing={exportingAll ? <ActivityIndicator size="small" color={c.ink} /> : !hasPro ? <ProBadge /> : 'chevron'}
             disabled={exportingAll}
           />
           <ListRow
