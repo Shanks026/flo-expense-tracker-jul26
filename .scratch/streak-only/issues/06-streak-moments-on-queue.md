@@ -1,6 +1,6 @@
 # 06: Streak celebrations go through the queue
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** Streak moments are rare, calm and never in the way.
 - The day-1 "streak started" moment and the 7/30/100/365 milestones become celebration moments on the queue, each shown once. No spin wheel follows.

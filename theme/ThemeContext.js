@@ -67,7 +67,10 @@ export function ThemeProvider({ children }) {
 
   // A dark-only accent (Ash, Cream) falls back to lime while the phone is in
   // light mode, and comes back with dark.
-  const accentId = FLAGS.themes && accentSupportsMode(storedAccentId, modeId) ? storedAccentId : DEFAULT_ACCENT_ID;
+  // FLAGS.accents off (spec 46) pins it to the default too; the stored choice
+  // is kept untouched for when the picker comes back.
+  const accentId =
+    FLAGS.themes && FLAGS.accents && accentSupportsMode(storedAccentId, modeId) ? storedAccentId : DEFAULT_ACCENT_ID;
 
   // Memoized on modeId specifically — resolveColors() builds a fresh object
   // every call, so without this, ANY re-render of ThemeProvider would hand

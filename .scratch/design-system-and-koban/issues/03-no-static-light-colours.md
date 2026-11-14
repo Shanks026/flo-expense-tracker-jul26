@@ -1,6 +1,6 @@
 # 03: No static light-mode colours in screens
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Dark mode is right everywhere, because no screen or component paints with the fixed light palette any more.
 - Every screen and component that imports the static light-mode colours (about 40 files) reads colours from the theme instead.

@@ -1,11 +1,9 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, Pencil, ArrowLeftRight } from 'lucide-react-native';
-import Button from '../components/Button';
-import { RowGroup } from '../components/Row';
-import { fontFamily, spacing, type, hitTarget } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { View, Animated, StyleSheet } from 'react-native';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import AccountRow from '../components/AccountRow';
+import { useLedger, ledgerSpace } from '../theme/ledger';
 import { useAccount } from '../lib/AccountContext';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import useEntitlement from '../hooks/useEntitlement';
@@ -14,18 +12,18 @@ import { useAddTransactionSheet } from '../components/AddTransactionSheet';
 import { useProUpsellSheet } from '../components/ProUpsellSheet';
 import { useToast } from '../components/Toast';
 import { FREE_LIMITS } from '../lib/pro';
-import { formatMoney } from '../lib/currency';
 
-// Accounts (38-home-insights-more.md), reached from More. Tap an account to
-// make it the active one; each account's actions are Edit and, only with a
-// second account to move money to, Transfer — the one home transfers have
-// now that they've left the Add sheet.
+// Accounts on the ledger kit (spec 48, ticket 06), reached from More. One
+// flat row per account (AccountRow): its colour, name, description and last
+// 4, and its in-hand balance. Tap an account to make it the active one; Edit
+// and, with a second account to move money to, Transfer sit in each row's ⋯
+// menu. New account is pinned, behind the free-plan gate as before.
 export default function Accounts() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
-  const { summaries } = useAllAccountSummaries();
+  const { summaries, loading } = useAllAccountSummaries();
   const { hasPro } = useEntitlement();
   const { openAddAccount } = useAddAccountSheet();
   const { openAdd } = useAddTransactionSheet();
@@ -48,128 +46,48 @@ export default function Accounts() {
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[styles.scroll, { paddingBottom: spacing.xxl + insets.bottom }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <RowGroup title="Your accounts" style={styles.firstGroup}>
-        {accounts.map((account) => {
-          const active = account.id === activeAccountId;
-          const balance = summaries[account.id]?.in_hand_balance ?? 0;
-          return (
-            <View key={account.id} style={styles.account}>
-              <Pressable
-                style={styles.accountMain}
-                onPress={() => handleSelect(account)}
-                accessibilityRole="button"
-                accessibilityLabel={`${account.name}, ${balance < 0 ? 'minus ' : ''}${formatMoney(Math.abs(balance), account.currency)} in hand${active ? ', active' : ''}`}
-                accessibilityState={{ selected: active }}
-              >
-                <View style={[styles.dot, { backgroundColor: account.color }]} />
-                <View style={styles.accountText}>
-                  <Text style={styles.accountName} numberOfLines={1}>
-                    {account.name}
-                  </Text>
-                  <Text style={styles.accountBalance}>
-                    {balance < 0 ? '−' : ''}
-                    {formatMoney(Math.abs(balance), account.currency)} in hand
-                  </Text>
-                </View>
-                {active && <Check size={18} color={colors.ink} strokeWidth={2.6} />}
-              </Pressable>
-              <View style={styles.actions}>
-                <Pressable
-                  style={styles.action}
-                  onPress={() => openAddAccount(account)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit ${account.name}`}
-                >
-                  <Pencil size={14} color={colors.ink} strokeWidth={2.4} />
-                  <Text style={styles.actionText}>Edit</Text>
-                </Pressable>
-                {canTransfer && (
-                  <Pressable
-                    style={styles.action}
-                    onPress={() => openAdd({ type: 'transfer', fromAccountId: account.id })}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Transfer from ${account.name}`}
-                  >
-                    <ArrowLeftRight size={14} color={colors.ink} strokeWidth={2.4} />
-                    <Text style={styles.actionText}>Transfer</Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          );
-        })}
-      </RowGroup>
+    <View style={styles.screen}>
+      <ScreenHeader title="Accounts" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="Accounts" scrollY={scrollY} />
+        {accounts.map((account, i) => (
+          <AccountRow
+            key={account.id}
+            account={account}
+            balance={Number(summaries[account.id]?.in_hand_balance ?? 0)}
+            loading={loading}
+            active={account.id === activeAccountId}
+            onPress={() => handleSelect(account)}
+            onEdit={() => openAddAccount(account)}
+            onTransfer={canTransfer ? () => openAdd({ type: 'transfer', fromAccountId: account.id }) : undefined}
+            divider={i < accounts.length - 1}
+          />
+        ))}
+      </Animated.ScrollView>
 
-      <Button title="New account" variant="primary" onPress={handleNewAccount} style={styles.newButton} />
-    </ScrollView>
+      <PinnedFooter primary={{ title: 'New account', onPress: handleNewAccount }} />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: colors.bg,
+      backgroundColor: c.canvas,
     },
-    scroll: {
-      paddingHorizontal: spacing.xl,
-    },
-    firstGroup: {
-      marginTop: spacing.sm,
-    },
-    account: {
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-    },
-    accountMain: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      minHeight: hitTarget,
-    },
-    dot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-    },
-    accountText: {
+    flex: {
       flex: 1,
     },
-    accountName: {
-      fontFamily: fontFamily.bold,
-      fontSize: type.bodyLg,
-      color: colors.ink,
-    },
-    accountBalance: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      color: colors.mutedDarker,
-      marginTop: 2,
-    },
-    actions: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      marginLeft: 12 + spacing.md,
-    },
-    action: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      minHeight: hitTarget,
-      paddingHorizontal: spacing.md,
-    },
-    actionText: {
-      fontFamily: fontFamily.bold,
-      fontSize: type.body,
-      color: colors.ink,
-    },
-    newButton: {
-      marginTop: spacing.xl,
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
     },
   });
 }

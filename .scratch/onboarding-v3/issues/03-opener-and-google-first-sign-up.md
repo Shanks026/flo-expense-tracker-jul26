@@ -1,6 +1,6 @@
 # 03: The short path (2b): new opener and Google-first sign-up
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** Subticket 2b of "the short path". The opener becomes the whole pre-auth intro. It shows:
 - Koban (today's hello image; spec 37 swaps in the component);

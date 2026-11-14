@@ -1,6 +1,6 @@
 # 02: Split invites and currency picker flagged off
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** Two new build-time flags.
 

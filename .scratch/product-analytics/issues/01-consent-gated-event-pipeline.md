@@ -1,6 +1,6 @@
 # 01: Consent-gated event pipeline with app_open
 
-Spec: .claude/features/33-product-analytics.md
+Spec: .claude/features/archive/33-product-analytics.md
 
 **What to build:** A signed-in user can turn "Share anonymous usage to help improve FLO" on or off in Settings, in a new **Data & export** section. The switch is off by default. While it's on, every app open writes one `app_open` event to a first-party `events` table in Supabase. While it's off, nothing is written. This ticket cuts the whole path:
 - **Schema:** the `events` table as the spec defines it (user id defaulting to the signed-in user, cascade on account delete, name, small props, client and server times, app version, session id), indexed on name + time and on user + time.

@@ -42,3 +42,6 @@ yarn-error.*
 
 # secrets
 .mcp.json
+
+# Supabase CLI local state (linked project, version cache)
+supabase/.temp/

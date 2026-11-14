@@ -2,6 +2,8 @@ import { View, StyleSheet } from 'react-native';
 import { radii } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
+// The old bar, kept for the economy (RewardsHistorySheet); budgets use
+// components/ledger/ProgressBar.
 export default function ProgressBar({ progress = 0, status = 'healthy', dark = false, height = 9 }) {
   const { colors } = useTheme();
 
@@ -12,8 +14,7 @@ export default function ProgressBar({ progress = 0, status = 'healthy', dark = f
   const FILL_BY_STATUS = {
     healthy: colors.brand,
     warn: colors.warnStrong,
-    // 'over' is what budgetStatus() actually returns; 'danger' is the older name
-    // used elsewhere. Both map to red.
+    // 'over' and 'danger' both map to red.
     over: colors.dangerStrong,
     danger: colors.dangerStrong,
     completed: colors.mutedLight,

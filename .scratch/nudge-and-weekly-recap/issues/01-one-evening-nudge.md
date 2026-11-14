@@ -1,6 +1,6 @@
 # 01: One evening nudge, the morning and report pushes gone
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:**
 - **At most one push a day.** `send-push` stops sending the morning nudge and the report-ready push. This replaces the "Your weekly report is ready" push that Settings can no longer switch off.

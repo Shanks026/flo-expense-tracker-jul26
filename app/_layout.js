@@ -14,6 +14,10 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
+// Inter backs the Quiet Ledger redesign (theme/ledger.js). Manrope stays
+// while theme/tokens.js uses it: the economy screens (left as they are,
+// 2026-11-14) and the few old-token screens not yet rebuilt.
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { ThemeProvider, useTheme, MODE_PREFERENCES, DEFAULT_MODE_PREFERENCE } from '../theme/ThemeContext';
 import { DEFAULT_ACCENT_ID } from '../theme/themes';
@@ -138,7 +142,7 @@ function DetectedTransactionHandler() {
     if (!pending.length) return;
 
     const [first, ...rest] = pending;
-    openAdd({ amount: first.amount, type: first.type });
+    openAdd({ amount: first.amount, type: first.type, origin: 'auto_detect' });
     if (rest.length) {
       showToast({ message: `${rest.length} more detected — add them manually`, variant: 'info' });
     }
@@ -394,7 +398,8 @@ function ThemeProfileSync() {
     // The accent is a choice again (spec 43); setAccent ignores unknown ids,
     // and ThemeContext keeps it on lime while FLAGS.themes is off.
     // Compared first, like the mode, so a profile refetch doesn't rewrite it.
-    if (profile?.theme_accent && profile.theme_accent !== accentPreference) setAccent(profile.theme_accent);
+    // FLAGS.accents off (spec 46): theme_accent isn't read at all.
+    if (FLAGS.accents && profile?.theme_accent && profile.theme_accent !== accentPreference) setAccent(profile.theme_accent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, setModePreference, setAccent]);
 
@@ -552,10 +557,14 @@ function RootNavigator() {
                                         headerShadowVisible: false,
                                       }}
                                     >
-                                      <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
-                                      <Stack.Screen name="accounts" options={{ headerShown: true, title: 'Accounts' }} />
-                                      <Stack.Screen name="streak" options={{ headerShown: true, title: 'Streak' }} />
-                                      <Stack.Screen name="dev/koban" options={{ headerShown: true, title: 'Koban gallery' }} />
+                                      <Stack.Screen name="settings" options={{ headerShown: false }} />
+                                      <Stack.Screen name="accounts" options={{ headerShown: false }} />
+                                      <Stack.Screen name="streak" options={{ headerShown: false }} />
+                                      <Stack.Screen name="dev/ai-eval" options={{ headerShown: true, title: 'AI test set' }} />
+                                      <Stack.Screen name="dev/kit" options={{ headerShown: false }} />
+                                      <Stack.Screen name="transaction/[id]" options={{ headerShown: false }} />
+                                      <Stack.Screen name="assistant" options={{ headerShown: false }} />
+                                      <Stack.Screen name="assistant/history" options={{ headerShown: false }} />
                                     </Stack>
                                   </AlertsSheetProvider>
                                 </RewardsHistorySheetProvider>
@@ -589,6 +598,10 @@ export default function RootLayout() {
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   const [ready, setReady] = useState(false);

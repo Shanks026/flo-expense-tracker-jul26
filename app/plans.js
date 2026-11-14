@@ -1,19 +1,15 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, Animated, StyleSheet } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Flag, Check } from 'lucide-react-native';
+import { Flag, Check } from 'lucide-react-native';
 import { format } from 'date-fns';
-import Card from '../components/Card';
-import IconTile from '../components/IconTile';
-import ProgressBar from '../components/ProgressBar';
-import Pill from '../components/Pill';
-import Button from '../components/Button';
-import Skeleton from '../components/Skeleton';
-import FadeIn from '../components/FadeIn';
-// Static palette (theme/tokens) only for text on the dark plan card.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import ListRow from '../components/ledger/ListRow';
+import ProgressBar from '../components/ledger/ProgressBar';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import EmptyState from '../components/ledger/EmptyState';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 import usePlans from '../hooks/usePlans';
 import useCollectingPlan from '../hooks/useCollectingPlan';
 import { useAddPlanSheet } from '../components/AddPlanSheet';
@@ -39,10 +35,13 @@ export default function Plans() {
   return <PlansScreen />;
 }
 
+// Plans on the ledger kit (spec 48, ticket 10), still behind FLAGS.plans: the
+// Budgets pattern. Active plans as rows (a ProgressBar under those with a
+// target), then a muted Done group. New plan is pinned, gated as before.
 function PlansScreen() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const router = useRouter();
   const { plans, loading } = usePlans();
   const { plan: collectingPlan } = useCollectingPlan();
@@ -62,271 +61,94 @@ function PlansScreen() {
     openAddPlan();
   }
 
-  return (
-    // Pushed from the Menu sheet now, not a tab (2026-07-14) — so it needs its
-    // own back button and SafeAreaView, the same shape as Bills/Settings/Analytics.
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.title}>Plans</Text>
-      </View>
+  const active = plans.filter((p) => p.status !== 'completed');
+  const done = plans.filter((p) => p.status === 'completed');
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <>
-            {[0, 1].map((i) => (
-              <Card key={i} style={styles.planCard}>
-                <View style={styles.rowBetween}>
-                  <View style={styles.rowLeft}>
-                    <Skeleton width={44} height={44} radius={13} />
-                    <View>
-                      <Skeleton width={120} height={18} radius={6} style={{ marginBottom: 6 }} />
-                      <Skeleton width={80} height={12} radius={6} />
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.progressWrap}>
-                  <Skeleton height={9} radius={radii.pill} />
-                </View>
-              </Card>
-            ))}
-          </>
-        ) : plans.length === 0 ? (
-          <FadeIn>
-            <Card style={{ marginTop: spacing.lg }}>
-              <Text style={styles.emptyText}>No plans yet. Tap "+" to start one.</Text>
-            </Card>
-          </FadeIn>
-        ) : (
-          <FadeIn>
-          {plans.map((plan) => {
-            const isCompleted = plan.status === 'completed';
-            const hasTarget = plan.target_amount != null;
-            const progress = hasTarget && plan.target_amount > 0 ? plan.total_spent / plan.target_amount : 0;
-            const dateLabel = dateRangeLabel(plan);
-            const isCollecting = plan.id === collectingPlan?.id;
-
-            if (isCompleted) {
-              return (
-                <Pressable key={plan.id} onPress={() => router.push(`/plan/${plan.id}`)}>
-                  <Card variant="completed" style={styles.planCard}>
-                    <View style={styles.rowBetween}>
-                      <View style={styles.rowLeft}>
-                        <IconTile tone="completed" size={44} radius={13}>
-                          <Check size={21} color={colors.muted} strokeWidth={2} />
-                        </IconTile>
-                        <View>
-                          <Text style={styles.planNameMuted}>{plan.name}</Text>
-                          <Text style={styles.planSub}>Completed{dateLabel ? ` · ${dateLabel}` : ''}</Text>
-                        </View>
-                      </View>
-                      <Pill label="Done" tone="completed" />
-                    </View>
-                    <View style={styles.progressWrap}>
-                      <ProgressBar progress={1} status="completed" />
-                    </View>
-                    <Text style={styles.completedSpent}>
-                      Spent <Text style={styles.completedSpentValue}>{formatMoney(plan.total_spent, currency)}</Text>
-                      {hasTarget ? ` of ${formatMoney(plan.target_amount, currency)}` : ''}
-                    </Text>
-                  </Card>
-                </Pressable>
-              );
-            }
-
-            if (!hasTarget) {
-              return (
-                <Pressable key={plan.id} onPress={() => router.push(`/plan/${plan.id}`)}>
-                  <Card style={styles.planCard}>
-                    <View style={styles.rowBetween}>
-                      <View style={styles.rowLeft}>
-                        <IconTile tone="brandSolid" size={44} radius={13}>
-                          <Flag size={21} color={colors.brandText} fill={colors.brandText} strokeWidth={2} />
-                        </IconTile>
-                        <View>
-                          <Text style={styles.planName}>{plan.name}</Text>
-                          <Text style={styles.planSub}>No target · Ongoing</Text>
-                        </View>
-                      </View>
-                      {isCollecting && <Pill label="Collecting" tone="brand" />}
-                    </View>
-                    <View style={styles.noTargetRow}>
-                      <Text style={styles.planSub}>Total spent</Text>
-                      <Text style={styles.noTargetAmount}>{formatMoney(plan.total_spent, currency)}</Text>
-                    </View>
-                  </Card>
-                </Pressable>
-              );
-            }
-
-            return (
-              <Pressable key={plan.id} onPress={() => router.push(`/plan/${plan.id}`)}>
-                <Card dark style={styles.planCard}>
-                  <View style={styles.rowBetween}>
-                    <View style={styles.rowLeft}>
-                      <IconTile tone="brandSolid" size={44} radius={13}>
-                        <Flag size={21} color={colors.brandText} fill={colors.brandText} strokeWidth={2} />
-                      </IconTile>
-                      <View>
-                        <Text style={styles.planNameDark}>{plan.name}</Text>
-                        {dateLabel && <Text style={styles.planSubDark}>{dateLabel}</Text>}
-                      </View>
-                    </View>
-                    <Pill label={isCollecting ? 'Collecting' : 'Active'} tone="brand" />
-                  </View>
-                  <View style={styles.progressWrap}>
-                    <ProgressBar progress={progress} dark status="healthy" />
-                  </View>
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.planSubDark}>
-                      Spent <Text style={styles.spentValueDark}>{formatMoney(plan.total_spent, currency)}</Text> of{' '}
-                      {formatMoney(plan.target_amount, currency)}
-                    </Text>
-                    <Text style={styles.remainingDark}>{formatMoney(plan.remaining, currency)} left</Text>
-                  </View>
-                </Card>
-              </Pressable>
-            );
-          })}
-          </FadeIn>
+  function row(plan, i, list) {
+    const completed = plan.status === 'completed';
+    const hasTarget = plan.target_amount != null;
+    const dateLabel = dateRangeLabel(plan);
+    const collecting = plan.id === collectingPlan?.id;
+    const sub = [completed ? 'Completed' : collecting ? 'Collecting' : hasTarget ? null : 'No target', dateLabel].filter(Boolean).join(' · ');
+    return (
+      <ListRow
+        key={plan.id}
+        icon={completed ? Check : Flag}
+        title={plan.name}
+        sub={sub || undefined}
+        right={<Text style={[styles.money, completed && { color: c.muted }]}>{formatMoney(plan.total_spent, currency)}</Text>}
+        rightSub={hasTarget ? (completed ? `of ${formatMoney(plan.target_amount, currency)}` : `${formatMoney(plan.remaining, currency)} left`) : undefined}
+        trailing="chevron"
+        onPress={() => router.push(`/plan/${plan.id}`)}
+        divider={i < list.length - 1}
+      >
+        {hasTarget && !completed && (
+          <ProgressBar value={plan.target_amount > 0 ? plan.total_spent / plan.target_amount : 0} accessibilityLabel={`${plan.name} plan`} />
         )}
-      </ScrollView>
+      </ListRow>
+    );
+  }
 
-      {/* Fixed at the bottom, thumb-reachable — was a small header chip
-          before, which meant reaching across the top of the screen. No tab
-          bar here (Plans is a pushed screen), so the bottom safe area is
-          handled explicitly — extra spacing.lg beyond the raw inset so it
-          doesn't sit flush against the device's gesture bar. */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-        <Button title="New Plan" onPress={handleNewPlan} />
-      </View>
-    </SafeAreaView>
+  return (
+    <View style={styles.screen}>
+      <ScreenHeader title="Plans" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="Plans" scrollY={scrollY} />
+        {loading ? (
+          [0, 1].map((i) => <View key={i} style={styles.rowSkeleton} />)
+        ) : plans.length === 0 ? (
+          <EmptyState illustration="calendar" title="No plans yet" body="Group the spending for a trip or an event and see it add up." actionTitle="New plan" onAction={handleNewPlan} />
+        ) : (
+          <>
+            {active.map((p, i, list) => row(p, i, list))}
+            {done.length > 0 && (
+              <View style={styles.group}>
+                <SectionHeader title="Done" titleColor={c.muted} />
+                {done.map((p, i, list) => row(p, i, list))}
+              </View>
+            )}
+          </>
+        )}
+      </Animated.ScrollView>
+
+      <PinnedFooter primary={{ title: 'New plan', onPress: handleNewPlan }} />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  footer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.display,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
-  scroll: {
-    // Screen used to supply the horizontal padding; a bare SafeAreaView
-    // doesn't (same migration note as bills.js's own).
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: 60,
-    gap: spacing.md,
-  },
-  emptyText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-    textAlign: 'center',
-  },
-  planCard: {
-    marginBottom: spacing.md,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-  },
-  planName: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xxl,
-    color: colors.ink,
-  },
-  planNameMuted: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xxl,
-    color: colors.mutedDarker,
-  },
-  planNameDark: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xxl,
-    // Sits on Card's `dark` prop — pinned.
-    color: staticColors.surface,
-  },
-  planSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
-  planSubDark: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: staticColors.mutedOnDark,
-    marginTop: 1,
-  },
-  progressWrap: {
-    marginVertical: spacing.lg,
-  },
-  noTargetRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-  },
-  noTargetAmount: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.display,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
-  spentValueDark: {
-    fontFamily: fontFamily.extrabold,
-    color: staticColors.surface,
-  },
-  remainingDark: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.brand,
-  },
-  completedSpent: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.muted,
-  },
-  completedSpentValue: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.mutedDarker,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section,
+    },
+    group: {
+      marginTop: ledgerSpace.lg,
+    },
+    money: {
+      ...ledgerType.rowTitle,
+      fontFamily: inter.semibold,
+      fontVariant: ['tabular-nums'],
+      color: c.ink,
+    },
+    rowSkeleton: {
+      height: 64,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      marginTop: ledgerSpace.md,
+    },
   });
 }

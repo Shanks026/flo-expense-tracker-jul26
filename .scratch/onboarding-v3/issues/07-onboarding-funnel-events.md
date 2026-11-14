@@ -1,6 +1,6 @@
 # 07: Onboarding funnel events
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** The onboarding funnel becomes measurable for users who opted in.
 - `onboarding_step_viewed` is tracked for `auth`, `first_expense` and `reminder_ask`. The opener's is already in.

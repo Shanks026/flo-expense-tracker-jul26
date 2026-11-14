@@ -1,11 +1,10 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Trash2 } from 'lucide-react-native';
-import Button from './Button';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import Sheet from './ledger/Sheet';
+import Button from './ledger/Button';
 import { CATEGORY_COLORS } from './CategoryIcon';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from './Toast';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
@@ -33,8 +32,8 @@ export function useAddSplitPersonSheet() {
 }
 
 const AddSplitPersonSheet = forwardRef(function AddSplitPersonSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -110,174 +109,109 @@ const AddSplitPersonSheet = forwardRef(function AddSplitPersonSheet(_props, ref)
     showToast({ message: 'Person removed', variant: 'success' });
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   return (
-    <BottomSheetModal
+    // The one sheet opened on top of another (New split's "Add person"):
+    // `push` keeps the split sheet presented underneath with its half-filled
+    // form intact; the default `switch` minimised it and on device it never
+    // came back.
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit person' : 'Add person'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['62%'], [])}
-      // This is the one sheet in the app opened from ON TOP of another one
-      // (AddSplitSheet's "Add person"), so it's the only one that needs a
-      // stack behavior. gorhom's default is `switch`, which MINIMIZES the sheet
-      // underneath and relies on restoring it afterwards — on device that
-      // restore didn't happen, so adding a person silently threw away a
-      // half-filled New Split form. `push` mounts this one on top and leaves
-      // the split sheet presented underneath, state intact, so dismissing here
-      // lands straight back on it with the new person already ticked.
       stackBehavior="push"
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: editingId ? 'Save' : 'Add person', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetView style={styles.sheet}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Person' : 'Add Person'}</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <Text style={styles.label}>Name</Text>
+      <BottomSheetTextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="Abishek"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Name"
+        style={styles.field}
+        autoFocus
+        maxLength={60}
+      />
 
-        <Text style={styles.fieldLabel}>Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Abishek"
-          placeholderTextColor={colors.mutedDarker}
-          style={styles.input}
-          autoFocus
-          maxLength={60}
-        />
+      {/* Optional, and nothing reads it yet: it's what a reminder or a UPI
+          link will need later, and why FLO never asks for your own number. */}
+      <Text style={styles.label}>Phone (optional)</Text>
+      <BottomSheetTextInput
+        value={phone}
+        onChangeText={setPhone}
+        placeholder="For a reminder later"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Phone"
+        style={styles.field}
+        keyboardType="phone-pad"
+        maxLength={20}
+      />
 
-        {/* Optional, and nothing reads it yet. It's captured now because it's
-            the natural moment to have it, and it's what a WhatsApp nudge or a
-            UPI deep link will need later (see the doc's Out of Scope). This is
-            also why FLO does not ask for a phone number at signup — the number
-            that matters for a split is your friend's, not your own. */}
-        <Text style={styles.fieldLabel}>Phone (optional)</Text>
-        <TextInput
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="For a reminder later"
-          placeholderTextColor={colors.mutedDarker}
-          style={styles.input}
-          keyboardType="phone-pad"
-          maxLength={20}
-        />
-
-        <Text style={styles.fieldLabel}>Colour</Text>
-        <View style={styles.swatchGrid}>
-          {CATEGORY_COLORS.map((c) => (
+      <Text style={styles.label}>Colour</Text>
+      <View style={styles.colorGrid} accessibilityRole="radiogroup" accessibilityLabel="Colour">
+        {CATEGORY_COLORS.map((swatch, i) => {
+          const selected = color === swatch;
+          return (
             <Pressable
-              key={c}
-              onPress={() => setColor(c)}
-              style={[styles.swatch, { backgroundColor: c }, color === c && styles.swatchSelected]}
+              key={swatch}
+              hitSlop={4}
+              accessibilityRole="radio"
+              accessibilityLabel={`Colour ${i + 1} of ${CATEGORY_COLORS.length}`}
+              accessibilityState={{ selected }}
+              onPress={() => setColor(swatch)}
+              style={[styles.colorOption, { backgroundColor: swatch }, selected && { borderWidth: 3, borderColor: c.ink }]}
             />
-          ))}
-        </View>
+          );
+        })}
+      </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.error}>{error}</Text>}
 
-        <Button
-          title={editingId ? 'Save Person' : 'Add Person'}
-          variant="primary"
-          onPress={handleSave}
-          loading={saving}
-          style={{ marginTop: spacing.lg }}
-        />
-        {editingId && (
-          <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-            <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-            <Text style={styles.deleteText}>Remove Person</Text>
-          </Pressable>
-        )}
-      </BottomSheetView>
-    </BottomSheetModal>
+      {editingId && <Button title="Remove person" variant="danger" onPress={handleDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    sheet: {
-      flex: 1,
-      paddingHorizontal: spacing.xl,
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
     },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.lg,
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.lg,
     },
-    headerTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-    },
-    closeButton: {
-      width: 32,
-      height: 32,
-      borderRadius: radii.pill,
-      backgroundColor: colors.chipBg,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    fieldLabel: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginBottom: spacing.sm,
-    },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-      marginBottom: spacing.lg,
-    },
-    swatchGrid: {
+    colorGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 10,
-      marginBottom: spacing.sm,
+      gap: ledgerSpace.md,
+      marginBottom: ledgerSpace.lg,
     },
-    swatch: {
-      width: 34,
-      height: 34,
-      borderRadius: radii.pill,
-      borderWidth: 3,
-      borderColor: 'transparent',
+    colorOption: {
+      width: 40,
+      height: 40,
+      borderRadius: ledgerRadius.full,
     },
-    swatchSelected: {
-      borderColor: colors.ink,
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
     },
-    errorText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
-      textAlign: 'center',
-      marginTop: spacing.sm,
-    },
-    deleteRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: spacing.lg,
-      paddingVertical: spacing.sm,
-    },
-    deleteText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
+    delete: {
+      marginTop: ledgerSpace.lg,
     },
   });
 }

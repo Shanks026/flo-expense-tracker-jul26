@@ -1,6 +1,6 @@
 # 07: On-device check of the push pipeline
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:** nothing new. This ticket proves on a real device that users get the right pushes at the right time, and that tapping each one goes to the right place. Run on a release build with a push token registered.
 

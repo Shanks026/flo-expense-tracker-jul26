@@ -1,6 +1,6 @@
 # 01: Smart default category and the 4×2 grid
 
-Spec: .claude/features/36-add-sheet-3-tap.md
+Spec: .claude/features/archive/36-add-sheet-3-tap.md
 
 **What to build:** When the Add sheet opens for a new expense, the category most likely to be right is already selected, and the user's top 8 categories sit in a 4×2 grid directly under the amount. Nothing is hidden in a sideways scroll any more. A 9th **More** tile opens the full category list, picker-style.
 

@@ -1,6 +1,6 @@
 # 01: Build flags module with `billing` off, and Pro gates that always pass
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md
 
 **What to build:** Add a single build-time flags module in `lib/` (static booleans, no remote flags) with one flag, `billing`, set to off. Later specs add their flags to the same module. While `billing` is off, every create-time Pro gate passes, for accounts, budgets, plans and splits, including the entitlement and limit checks behind the upsell sheet. A tester can create as many as they need and the upsell sheet never opens. The entitlement read path stays as it is, so turning the flag on later brings the gates back unchanged.
 

@@ -1,3 +1,3 @@
 # Safe closed-test build
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md

@@ -1,6 +1,6 @@
 # 10: Recap card on Home and recap summary in Insights
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:**
 - **Home:** shows the weekly recap card after the 7-day chart, Monday to Sunday of the recap's week. It opens the recap screen.
@@ -8,7 +8,7 @@ Spec: .claude/features/38-home-insights-more.md
 
 The recap's content and push belong to spec 39. This ticket only places them.
 
-**Blocked by:** 07 (Insights: Analytics with Reports folded in), 08 (Home body). Also blocked by spec 39's recap data (`.claude/features/39-nudge-and-weekly-recap.md`), which is outside this feature and has no tickets yet.
+**Blocked by:** 07 (Insights: Analytics with Reports folded in), 08 (Home body). Also blocked by spec 39's recap data (`.claude/features/archive/39-nudge-and-weekly-recap.md`), which is outside this feature and has no tickets yet.
 
 **Status:** ready-for-agent
 

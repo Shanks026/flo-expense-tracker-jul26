@@ -1,22 +1,23 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useRouter, Redirect } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Crown, Check } from 'lucide-react-native';
-// Static palette (theme/tokens) a permanently dark screen.
-import { colors as staticColors, radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
-import { PRO_PRICING } from '../lib/pro';
+import { View, Text, Animated, StyleSheet } from 'react-native';
+import { Redirect } from 'expo-router';
+import { Check } from 'lucide-react-native';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import ListRow from '../components/ledger/ListRow';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import { Radio } from '../components/ledger/SelectMark';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
+import { PRO_PRICING, PRO_BENEFITS } from '../lib/pro';
 import useEntitlement from '../hooks/useEntitlement';
-import ProBenefits from '../components/ProBenefits';
 import { useToast } from '../components/Toast';
 import { FLAGS } from '../lib/flags';
 
 const PLAN_ORDER = ['monthly', 'annual', 'lifetime'];
 
 // Doubles as the paywall placeholder (no payment integrated yet — see
-// 14-subscription-pro.md). Reached from the menu's "Upgrade to Pro" row and
-// from ProUpsellSheet's "Level up" button.
+// 14-subscription-pro.md); on the ledger kit since spec 49, ticket 10.
+// Reached from the You tab's FLO Pro row and the upsell sheet's button.
 //
 // While billing is flagged off (lib/flags.js) the route itself is closed:
 // every entry point is already hidden, and a stray deep link lands on Home
@@ -27,13 +28,15 @@ export default function ProRoute() {
 }
 
 function Pro() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const router = useRouter();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const { isPro } = useEntitlement();
   const { showToast } = useToast();
   const [selectedPlan, setSelectedPlan] = useState('annual');
+  const chosen = PRO_PRICING[selectedPlan];
 
+  // The placeholder: no payment yet.
   function handleUpgrade() {
     showToast({
       message: "Payments aren't live yet. You'll be the first to know when Pro launches.",
@@ -43,211 +46,110 @@ function Pro() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={staticColors.surface} strokeWidth={2.4} />
-        </Pressable>
-      </View>
+    <View style={styles.screen}>
+      <ScreenHeader title="FLO Pro" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.scroll, isPro && styles.scrollNoFooter]}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="FLO Pro" scrollY={scrollY} />
+        <Text style={styles.lede}>{isPro ? "You're on Pro. Thanks for being here early." : 'More room for every account, budget and split.'}</Text>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <View style={styles.crownTile}>
-            <Crown size={28} color={colors.brandText} strokeWidth={2.2} fill={colors.brandText} />
-          </View>
-          {isPro ? (
-            <>
-              <Text style={styles.title}>You're on Pro 👑</Text>
-              <Text style={styles.subtitle}>Thanks for being here early.</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.title}>Meet FLO Pro</Text>
-              <Text style={styles.subtitle}>Unlock the full potential of the app and yourself.</Text>
-            </>
-          )}
+        <View style={styles.benefits}>
+          {PRO_BENEFITS.map((b) => (
+            <View key={b.title} style={styles.benefit}>
+              <Check size={18} color={c.ink} strokeWidth={2.25} style={styles.check} />
+              <View style={styles.flex}>
+                <Text style={styles.benefitTitle}>{b.title}</Text>
+                <Text style={styles.benefitBody}>{b.body}</Text>
+              </View>
+            </View>
+          ))}
         </View>
 
-        <ProBenefits dark style={styles.benefits} />
-
         {!isPro && (
-          <>
-            <View style={styles.plans}>
-              {PLAN_ORDER.map((key) => {
-                const plan = PRO_PRICING[key];
-                const selected = selectedPlan === key;
-                return (
-                  <Pressable
-                    key={key}
-                    style={[styles.planCard, selected && styles.planCardSelected]}
-                    onPress={() => setSelectedPlan(key)}
-                  >
-                    <View style={styles.planLeft}>
-                      <View style={[styles.radio, selected && styles.radioSelected]}>
-                        {selected && <Check size={12} color={colors.brandText} strokeWidth={3} />}
-                      </View>
-                      <View>
-                        <Text style={styles.planLabel}>{plan.label}</Text>
-                        <Text style={styles.planSub}>{plan.sub}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.planPriceWrap}>
-                      {plan.badge && (
-                        <View style={styles.savingsBadge}>
-                          <Text style={styles.savingsBadgeText}>{plan.badge}</Text>
-                        </View>
-                      )}
-                      <Text style={styles.planPrice}>{plan.price}</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Pressable style={styles.cta} onPress={handleUpgrade}>
-              <Text style={styles.ctaText}>Upgrade to Pro</Text>
-            </Pressable>
-          </>
+          <View style={styles.section}>
+            <SectionHeader title="Choose a plan" />
+            {PLAN_ORDER.map((key, i) => {
+              const plan = PRO_PRICING[key];
+              const selected = selectedPlan === key;
+              return (
+                <ListRow
+                  key={key}
+                  title={plan.label}
+                  sub={plan.sub}
+                  right={plan.price}
+                  rightSub={plan.badge}
+                  trailing={<View style={styles.radioGap}><Radio selected={selected} /></View>}
+                  onPress={() => setSelectedPlan(key)}
+                  divider={i < PLAN_ORDER.length - 1}
+                  accessibilityLabel={`${plan.label}, ${plan.price}, ${plan.sub}${plan.badge ? `, ${plan.badge}` : ''}${selected ? ', selected' : ''}`}
+                />
+              );
+            })}
+          </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </Animated.ScrollView>
+
+      {!isPro && <PinnedFooter primary={{ title: `Get ${chosen.label} for ${chosen.price}`, onPress: handleUpgrade }} />}
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: staticColors.ink,
-  },
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: staticColors.inkCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  hero: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.xxl,
-  },
-  crownTile: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.pill,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  title: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.hero,
-    letterSpacing: -0.3,
-    color: staticColors.surface,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.md,
-    color: staticColors.mutedOnDark,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 20,
-  },
-  benefits: {
-    marginBottom: spacing.xxl,
-  },
-  plans: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: radii.card,
-    borderWidth: 1.5,
-    borderColor: staticColors.inkCard,
-    backgroundColor: staticColors.inkCard,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  planCardSelected: {
-    borderColor: colors.brand,
-  },
-  planLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    borderColor: staticColors.mutedOnDarkDarker,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioSelected: {
-    backgroundColor: colors.brand,
-    borderColor: colors.brand,
-  },
-  planLabel: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: staticColors.surface,
-  },
-  planSub: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: staticColors.mutedOnDark,
-    marginTop: 1,
-  },
-  planPriceWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  planPrice: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: staticColors.surface,
-  },
-  savingsBadge: {
-    backgroundColor: colors.brand,
-    borderRadius: radii.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  savingsBadgeText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.xs,
-    color: colors.brandText,
-  },
-  cta: {
-    height: 56,
-    borderRadius: radii.button,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.brandText,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section * 2,
+    },
+    scrollNoFooter: {
+      paddingBottom: ledgerSpace.section * 2,
+    },
+    lede: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginBottom: ledgerSpace.lg,
+    },
+    // The benefits as a checklist in one surface card with a hairline.
+    benefits: {
+      backgroundColor: c.surface,
+      borderRadius: ledgerRadius.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.hairline,
+      padding: ledgerSpace.lg,
+      gap: ledgerSpace.md,
+    },
+    benefit: {
+      flexDirection: 'row',
+      gap: ledgerSpace.md,
+    },
+    check: {
+      marginTop: 1,
+    },
+    benefitTitle: {
+      ...ledgerType.rowTitle,
+      color: c.ink,
+    },
+    benefitBody: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginTop: 2,
+    },
+    section: {
+      marginTop: ledgerSpace.section,
+    },
+    radioGap: {
+      marginLeft: ledgerSpace.sm,
+    },
   });
 }

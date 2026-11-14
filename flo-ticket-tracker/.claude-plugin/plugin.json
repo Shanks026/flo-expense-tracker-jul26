@@ -1,0 +1,6 @@
+{
+  "name": "flo-ticket-tracker",
+  "version": "0.1.0",
+  "description": "FLO's ticket tracker: cards for the local markdown tickets in .scratch/<feature>/issues/*.md, with their Status, Blocked by and Tracer checklist, plus live ticks from edits, reviews, commits and pushes.",
+  "types": "./types/index.d.ts"
+}

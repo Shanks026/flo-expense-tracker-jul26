@@ -1,189 +1,81 @@
-import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Plus, Trash2 } from 'lucide-react-native';
-import Card from '../components/Card';
-import IconTile from '../components/IconTile';
+import { useMemo } from 'react';
+import { View, Animated, StyleSheet } from 'react-native';
+import { Plus } from 'lucide-react-native';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import ListRow from '../components/ledger/ListRow';
+import HeaderIconButton from '../components/ledger/HeaderIconButton';
 import CategoryIcon from '../components/CategoryIcon';
-// Static palette (theme/tokens) only for the white plus on the always-dark add button.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
-import { supabase } from '../lib/supabase';
-import { useDataRefresh } from '../lib/DataRefreshContext';
+import { useLedger, ledgerSpace } from '../theme/ledger';
 import useCategories from '../hooks/useCategories';
 import { useAddCategorySheet } from '../components/AddCategorySheet';
-import { useToast } from '../components/Toast';
-import { destructiveHaptic } from '../lib/haptics';
 
+// Categories on the ledger kit (spec 48, ticket 09): Expense and Income, each
+// with a + in its header that opens the sheet for that type. Every category
+// is a row with its tinted circle; a tap opens it for editing, where Delete
+// now lives (no row bin, no swipe).
 export default function ManageCategories() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const router = useRouter();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const { expenseCategories, incomeCategories } = useCategories();
   const { openAddCategory } = useAddCategorySheet();
-  const { notifyChanged } = useDataRefresh();
-  const { showToast } = useToast();
-  const [deletingId, setDeletingId] = useState(null);
 
-  async function handleDelete(category) {
-    setDeletingId(category.id);
-
-    const [{ count: txCount }, { count: budgetCount }] = await Promise.all([
-      supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('category_id', category.id),
-      supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('category_id', category.id),
-    ]);
-
-    if ((txCount ?? 0) > 0 || (budgetCount ?? 0) > 0) {
-      setDeletingId(null);
-      Alert.alert('Category in use', `"${category.name}" is used by ${txCount ?? 0} transaction(s) and ${budgetCount ?? 0} budget(s). Remove those first.`);
-      return;
-    }
-
-    const { error } = await supabase.from('categories').delete().eq('id', category.id);
-    setDeletingId(null);
-    if (error) {
-      showToast({ message: error.message, variant: 'error' });
-      return;
-    }
-    notifyChanged();
-    showToast({ message: 'Category deleted', variant: 'success' });
-  }
-
-  function confirmDelete(category) {
-    Alert.alert('Delete category', `Delete "${category.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          destructiveHaptic();
-          handleDelete(category);
-        },
-      },
-    ]);
-  }
-
-  function renderSection(title, categories, defaultType) {
+  function section(title, categories, type) {
     return (
-      <View>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Pressable style={styles.addButton} onPress={() => openAddCategory(defaultType)}>
-            <Plus size={14} color={staticColors.surface} strokeWidth={3} />
-          </Pressable>
-        </View>
-        <Card style={styles.listCard}>
-          {categories.map((cat, idx) => (
-            <View key={cat.id} style={[styles.row, idx < categories.length - 1 && styles.rowBorder]}>
-              <IconTile>
-                <CategoryIcon icon={cat.icon} size={19} color={colors.ink} />
-              </IconTile>
-              <Text style={styles.rowTitle}>{cat.name}</Text>
-              <Pressable onPress={() => confirmDelete(cat)} disabled={deletingId === cat.id} style={styles.deleteButton}>
-                <Trash2 size={17} color={colors.danger} strokeWidth={2} />
-              </Pressable>
-            </View>
-          ))}
-        </Card>
+      <View style={styles.section}>
+        <SectionHeader
+          title={title}
+          right={<HeaderIconButton icon={Plus} onPress={() => openAddCategory(type)} accessibilityLabel={`New ${type} category`} />}
+        />
+        {categories.map((cat, i) => (
+          <ListRow
+            key={cat.id}
+            tone={cat.color}
+            renderIcon={(tint) => <CategoryIcon icon={cat.icon} size={18} color={tint} strokeWidth={1.75} />}
+            title={cat.name}
+            trailing="chevron"
+            onPress={() => openAddCategory(cat)}
+            divider={i < categories.length - 1}
+          />
+        ))}
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Manage Categories</Text>
-      </View>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {renderSection('Expense', expenseCategories, 'expense')}
-        {renderSection('Income', incomeCategories, 'income')}
-      </ScrollView>
-    </SafeAreaView>
+    <View style={styles.screen}>
+      <ScreenHeader title="Categories" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="Categories" scrollY={scrollY} />
+        {section('Expense', expenseCategories, 'expense')}
+        {section('Income', incomeCategories, 'income')}
+      </Animated.ScrollView>
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
-  scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 60,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  addButton: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.pill,
-    // Permanently-emphasized chip (same role as Card's `dark` prop).
-    backgroundColor: colors.emphasisBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 13,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  rowTitle: {
-    flex: 1,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  deleteButton: {
-    padding: spacing.xs,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.section * 2,
+    },
+    section: {
+      marginTop: ledgerSpace.md,
+    },
   });
 }

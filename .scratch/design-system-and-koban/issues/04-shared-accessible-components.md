@@ -1,6 +1,6 @@
 # 04: Shared accessible components, with Settings as the first user
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Accessibility comes built into the shared pieces, and Settings shows the new calm, grouped-list look.
 - Scale tokens are added alongside the old ones (no app-wide sweep):

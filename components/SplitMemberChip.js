@@ -1,8 +1,7 @@
-import { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { toneColors } from './ledger/ListRow';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 
 // One person in a split: a coloured initial + their name. Used as a plain badge
 // on the detail screen and as a selectable chip in the entry sheet (payer
@@ -22,6 +21,9 @@ export function memberInitial(member) {
   return String(source).trim().charAt(0).toUpperCase() || '?';
 }
 
+// Ledger look (spec 48, ticket 08): a capsule like the kit's Chip, with the
+// person's initial on a wash of their colour (ListRow's toneColors). Selected
+// is the Chip's own "ink = selected": an ink capsule with on-ink text.
 export default function SplitMemberChip({
   member,
   selected = false,
@@ -30,78 +32,71 @@ export default function SplitMemberChip({
   showCheck = false,
   dimmed = false,
 }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const swatch = member.color ?? colors.brand;
+  const { c, modeId } = useLedger();
+  const tint = toneColors(member.color, c, modeId);
   const initial = memberInitial(member);
-
+  const fg = selected ? c.inkOnInk : c.ink;
   const body = (
-    <View
-      style={[
-        styles.chip,
-        selected && { borderColor: colors.brand, backgroundColor: colors.brandBg },
-        dimmed && { opacity: 0.45 },
-      ]}
-    >
-      <View style={[styles.avatar, { backgroundColor: swatch }]}>
-        <Text style={styles.avatarText}>{initial}</Text>
+    <View style={[styles.chip, { backgroundColor: selected ? c.ink : c.surfaceSunk }, dimmed && styles.dimmed]}>
+      <View style={[styles.avatar, { backgroundColor: c.canvas }]}>
+        <View style={[StyleSheet.absoluteFill, styles.wash, { backgroundColor: tint.bg }]} />
+        <Text style={[styles.avatarText, { color: tint.fg }]}>{initial}</Text>
       </View>
-      <Text style={styles.name} numberOfLines={1}>
+      <Text style={[styles.name, { color: fg }]} numberOfLines={1}>
         {member.name}
       </Text>
-      {/* brandStrong, not `brandText`. brandText is the contrast colour
-          computed for text sitting ON a solid `brand` fill — but this check sits
-          on `brandBg`, a pale tint, where a brand colour reads as "selected";
-          brandStrong is the one legible on it (lime itself is a fill only). */}
-      {showCheck && selected && <Check size={13} color={colors.brandStrong} strokeWidth={3} />}
+      {showCheck && selected && <Check size={14} color={fg} strokeWidth={2.5} />}
     </View>
   );
-
   if (!onPress && !onLongPress) return body;
   return (
-    <Pressable onPress={onPress} onLongPress={onLongPress}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      hitSlop={4}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityState={{ selected }}
+      accessibilityLabel={member.name}
+    >
       {body}
     </Pressable>
   );
 }
 
-function makeStyles(colors) {
-  return StyleSheet.create({
-    chip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 7,
-      paddingLeft: 4,
-      paddingRight: 11,
-      paddingVertical: 4,
-      borderRadius: radii.pill,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-    },
-    avatar: {
-      width: 24,
-      height: 24,
-      borderRadius: radii.pill,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    avatarText: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xs,
-      // Sits on an arbitrary person colour from CATEGORY_COLORS, several of
-      // which are dark (charcoal, navy, forest) — a light glyph is the only
-      // one that stays readable across all fourteen.
-      color: '#FFFFFF',
-    },
-    name: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.ink,
-      // Room for "Chris (You)" without truncating — the suffix costs ~6 chars.
-      maxWidth: 140,
-    },
-  });
-}
+const styles = StyleSheet.create({
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ledgerSpace.sm,
+    minHeight: 40,
+    paddingLeft: 6,
+    paddingRight: ledgerSpace.md,
+    borderRadius: ledgerRadius.full,
+  },
+  dimmed: {
+    opacity: 0.45,
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wash: {
+    borderRadius: 14,
+  },
+  avatarText: {
+    fontFamily: inter.semibold,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  name: {
+    ...ledgerType.rowTitle,
+    // Room for "Chris (You)" without truncating.
+    maxWidth: 160,
+  },
+});
 
-export const splitChipSpacing = spacing.sm;
+export const splitChipSpacing = ledgerSpace.sm;

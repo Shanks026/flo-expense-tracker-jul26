@@ -1,353 +1,263 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Snowflake, Flag, Flame } from 'lucide-react-native';
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isSameMonth,
-  isToday,
-  isAfter,
-} from 'date-fns';
-import Card from '../components/Card';
-import Koban from '../components/koban/Koban';
-import IconTile from '../components/IconTile';
-import { StreakFlame } from '../components/StreakDays';
+import { View, Text, Animated, StyleSheet } from 'react-native';
+import { Flame } from 'lucide-react-native';
+import { format, parseISO } from 'date-fns';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import StreakMark, { STREAK_MARK_LABELS } from '../components/ledger/StreakMark';
 import useStreak from '../hooks/useStreak';
 import { streakHeadline } from '../lib/koban';
-import { MILESTONES, MAX_FREEZES } from '../lib/streak';
+import { MAX_FREEZES } from '../lib/streak';
+import { streakCalendar, nextMilestone } from '../lib/streakCalendar';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 
-import { fontFamily, fontSize, spacing } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
-
-
-// Koban stands at the hero card's right edge (37-design-system-and-koban.md),
-// beside the day count — never on a money figure. His width; the card is
-// tall enough that only the ground shadow is cropped.
-const HERO_CARD_MIN_HEIGHT = 132;
-const HERO_KOBAN_SIZE = 92;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const LEGEND = ['logged', 'nospend', 'frozen'];
+const MARK_SIZE = 32;
 
-// The streak's own screen — the destination behind Home's header flame.
-//
-// 34-streak-only.md cut it down to what the streak alone needs: the current
-// count, the freezes held (earned and spent automatically, so there's nothing
-// to press), the next milestone, and a month calendar that marks each covered
-// day as logged, no-spend or frozen. The Milestones tab, its badge wall and
-// reward sheet, and the manual "use a freeze" card went with the economy.
-export default function StreakScreen() {
-  const { colors, modeId } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+// The streak's own screen, behind Home's header flame (34-streak-only.md; on
+// the ledger kit since spec 49, ticket 06): the count, two quiet stats (the
+// freezes held, spent automatically, and the next milestone), and the
+// month's calendar marking each covered day as logged, no-spend or frozen.
+// No cards. lib/streakCalendar.js builds the weeks.
+export default function Streak() {
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
   const { current, loggedToday, isNewStreak, history, freezesHeld, loading } = useStreak();
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={[]}>
-        <View style={styles.loading}>
-          <ActivityIndicator color={colors.ink} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const lit = current > 0;
-  // null past the last milestone (365): there's nothing further to aim at.
-  const nextMilestone = MILESTONES.find((d) => current < d) ?? null;
-  const daysToGo = nextMilestone ? nextMilestone - current : 0;
-
-  // history is a flat list of { date: 'yyyy-MM-dd', logged, covered, type }
-  // for the last 42 days. Indexed by date so the calendar can ask about a
-  // given day directly; a day outside that window is `undefined`, i.e.
-  // "we don't know", not "not logged".
-  const typeByDate = new Map(history.map((d) => [d.date, d.type]));
-
   const today = new Date();
-  const monthStart = startOfMonth(today);
-  const gridDays = eachDayOfInterval({
-    start: startOfWeek(monthStart, { weekStartsOn: 1 }),
-    end: endOfWeek(endOfMonth(today), { weekStartsOn: 1 }),
-  });
+  const todayKey = format(today, 'yyyy-MM-dd');
+  const weeks = useMemo(() => streakCalendar(history, new Date()), [history, todayKey]);
+
+  // The flame burns only once today counts (as on Home's chip); a streak
+  // still alive from yesterday shows its count in ink beside an unlit flame.
+  const lit = current > 0 && loggedToday;
+  const next = nextMilestone(current);
 
   return (
-    <SafeAreaView style={styles.safe} edges={[]}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Count and label left; Koban on the right, happy once today is
-            logged, curious while the streak waits for today, asleep at 0. */}
-        <Card style={styles.hero}>
-          <View style={styles.heroText}>
-            <View style={styles.heroCountRow}>
-              <Flame size={36} color={lit ? colors.streak : colors.mutedLight} fill={lit ? colors.streak : 'transparent'} strokeWidth={2.2} />
-              <Text style={[styles.count, !lit && styles.countEmpty]}>{current}</Text>
-            </View>
-            {/* "day streak" regardless of count: "days streak" is not English. */}
-            <Text style={[styles.caption, !lit && styles.captionEmpty]}>day streak!</Text>
-          </View>
-          <Koban
-            size={HERO_KOBAN_SIZE}
-            mood={loggedToday ? 'happy' : lit ? 'curious' : 'sleepy'}
-            surface={modeId}
-            style={styles.heroKoban}
-          />
-        </Card>
+    <View style={styles.screen}>
+      <ScreenHeader title="Streak" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="Streak" scrollY={scrollY} />
 
-        <Text style={styles.headline}>{streakHeadline({ current, loggedToday, isNewStreak })}</Text>
-
-        <View style={styles.statsRow}>
-          <Card style={styles.statCard}>
-            <IconTile tone="neutral" size={38} radius={12}>
-              <Snowflake size={18} color={colors.iceBlue} strokeWidth={2.2} />
-            </IconTile>
-            <View>
-              <Text style={styles.statValue}>
-                {freezesHeld}/{MAX_FREEZES}
-              </Text>
-              <Text style={styles.statLabel}>Freezes</Text>
+        {loading ? (
+          <>
+            <View style={[styles.skeleton, { height: 96 }]} />
+            <View style={[styles.skeleton, { height: 320, marginTop: ledgerSpace.section }]} />
+          </>
+        ) : (
+          <>
+            <View style={styles.hero}>
+              <View style={styles.countRow}>
+                <Flame size={30} color={lit ? c.streak : c.muted} fill={lit ? c.streak : 'transparent'} strokeWidth={1.75} />
+                <Text style={[styles.count, current === 0 && { color: c.muted }]}>{current}</Text>
+              </View>
+              {/* "day streak" whatever the count: "days streak" isn't English. */}
+              <Text style={styles.caption}>day streak</Text>
+              <Text style={styles.headline}>{streakHeadline({ current, loggedToday, isNewStreak })}</Text>
             </View>
-          </Card>
-          <Card style={styles.statCard}>
-            <IconTile tone="streak" size={38} radius={12}>
-              <Flag size={18} color={colors.streakDeep} strokeWidth={2.2} />
-            </IconTile>
-            <View>
-              <Text style={styles.statValue}>{nextMilestone ?? '—'}</Text>
-              <Text style={styles.statLabel}>Next milestone</Text>
-              {nextMilestone && (
-                <Text style={styles.statSub}>
-                  {daysToGo} day{daysToGo === 1 ? '' : 's'} to go
+
+            <View style={styles.stats}>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>Freezes</Text>
+                <Text style={styles.statValue}>
+                  {freezesHeld} of {MAX_FREEZES}
                 </Text>
-              )}
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>Next milestone</Text>
+                {next ? (
+                  <>
+                    <Text style={styles.statValue}>{next.days}</Text>
+                    <Text style={styles.statSub}>
+                      {next.toGo} day{next.toGo === 1 ? '' : 's'} to go
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.statValue}>All milestones reached</Text>
+                )}
+              </View>
             </View>
-          </Card>
-        </View>
 
-        <Card style={styles.calendarCard}>
-          <Text style={styles.monthLabel}>{format(today, 'MMMM yyyy')}</Text>
-
-          <View style={styles.weekdayRow}>
-            {WEEKDAYS.map((d, i) => (
-              <Text key={i} style={styles.weekday}>
-                {d}
-              </Text>
-            ))}
-          </View>
-
-          <View style={styles.grid}>
-            {gridDays.map((day) => {
-              const key = format(day, 'yyyy-MM-dd');
-              const inMonth = isSameMonth(day, today);
-              const future = isAfter(day, today);
-              const type = typeByDate.get(key);
-
-              return (
-                <View key={key} style={styles.gridCell}>
-                  <StreakFlame type={type} size={34} dimmed={!inMonth || future} />
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      isToday(day) && styles.dayNumberToday,
-                      (!inMonth || future) && styles.dayNumberDim,
-                    ]}
-                  >
-                    {format(day, 'd')}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          <View style={styles.legendRow}>
-            {LEGEND.map(([type, label]) => (
-              <View key={type} style={styles.legendItem}>
-                <StreakFlame type={type} size={18} />
-                <Text style={styles.legendText}>{label}</Text>
+            <SectionHeader title={format(today, 'MMMM yyyy')} style={styles.section} />
+            <View style={styles.weekRow}>
+              {WEEKDAYS.map((d, i) => (
+                <Text key={i} style={styles.weekday}>
+                  {d}
+                </Text>
+              ))}
+            </View>
+            {/* One row per week, seven flex cells each (lib/streakCalendar.js). */}
+            {weeks.map((week) => (
+              <View key={week[0].key} style={styles.weekRow}>
+                {week.map((d) => (
+                  <View key={d.key} style={styles.cell}>
+                    <StreakMark type={d.mark} size={MARK_SIZE} dimmed={!d.inMonth || d.future} accessibilityLabel={dayLabel(d)} />
+                    {/* Today's date on an ink pill, so it stands out even with no mark. */}
+                    <View style={d.isToday && styles.todayPill}>
+                      <Text style={[styles.dayNumber, (!d.inMonth || d.future) && styles.dim, d.isToday && styles.today]}>{d.day}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
-          </View>
-        </Card>
 
-        <Text style={styles.footnote}>
-          A day counts when you log something or mark it no-spend. Every 7 days in a row earns a freeze (you can hold{' '}
-          {MAX_FREEZES}), and a freeze covers a missed day for you.
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+            <View style={styles.legend}>
+              {LEGEND.map((type) => (
+                <View key={type} style={styles.legendItem}>
+                  <StreakMark type={type} size={14} />
+                  <Text style={styles.legendText}>{STREAK_MARK_LABELS[type]}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.footnote}>
+              A day counts when you log something or mark it no-spend. Every 7 days in a row earns a freeze (you can hold{' '}
+              {MAX_FREEZES}), and a freeze covers a missed day for you.
+            </Text>
+          </>
+        )}
+      </Animated.ScrollView>
+    </View>
   );
 }
 
-const LEGEND = [
-  ['logged', 'Logged'],
-  ['nospend', 'No spend'],
-  ['frozen', 'Frozen'],
-];
+// What TalkBack says for a day: a mark when there is one; "Not logged" only
+// for a past day of this month (a future day, or one outside the month,
+// isn't known to be missed).
+function dayLabel(d) {
+  const date = format(parseISO(d.key), 'd MMMM');
+  const prefix = d.isToday ? `Today, ${date}` : date;
+  if (d.mark) return `${prefix}: ${STREAK_MARK_LABELS[d.mark]}`;
+  if (d.future || !d.inMonth) return prefix;
+  return `${prefix}: Not logged`;
+}
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scroll: {
-    // The native header sits above; this is the gap below it.
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 60,
-  },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    marginBottom: spacing.lg,
-    minHeight: HERO_CARD_MIN_HEIGHT,
-    // Crops Koban's ground shadow at the card's rounded bottom edge.
-    overflow: 'hidden',
-  },
-  heroText: {
-    flex: 1,
-    // Koban is absolutely positioned (out of flow), so the text keeps clear
-    // of him.
-    paddingRight: HERO_KOBAN_SIZE,
-  },
-  heroCountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  heroKoban: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: -10,
-  },
-  count: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.amountLg,
-    letterSpacing: -1.2,
-    // The deep orange reads on white, which the brand lime never did — the
-    // count no longer has to compromise on a colour it isn't.
-    color: colors.streakDeep,
-  },
-  countEmpty: {
-    color: colors.mutedLight,
-  },
-  caption: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.streakDeep,
-    marginTop: -2,
-  },
-  captionEmpty: {
-    color: colors.mutedMid,
-  },
-  headline: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.heading,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    marginBottom: spacing.lg,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.lg,
-  },
-  statValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.display,
-    letterSpacing: -0.5,
-    color: colors.ink,
-  },
-  statLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 2,
-  },
-  calendarCard: {
-    paddingVertical: spacing.lg,
-  },
-  monthLabel: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-    marginBottom: spacing.md,
-  },
-  weekdayRow: {
-    flexDirection: 'row',
-    marginBottom: spacing.sm,
-  },
-  weekday: {
-    width: `${100 / 7}%`,
-    textAlign: 'center',
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.xs,
-    color: colors.mutedLight,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  gridCell: {
-    width: `${100 / 7}%`,
-    alignItems: 'center',
-    paddingVertical: 5,
-    gap: 2,
-  },
-  dayNumber: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedDarker,
-  },
-  dayNumberToday: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.ink,
-  },
-  dayNumberDim: {
-    color: colors.mutedLight,
-  },
-  statSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedLight,
-    marginTop: 1,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    marginTop: spacing.md,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-  },
-  footnote: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    lineHeight: 18,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.section * 2,
+    },
+    hero: {
+      marginTop: ledgerSpace.md,
+    },
+    countRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ledgerSpace.sm,
+    },
+    count: {
+      ...ledgerType.display,
+      fontVariant: ['tabular-nums'],
+      color: c.ink,
+    },
+    caption: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    headline: {
+      ...ledgerType.body,
+      color: c.ink,
+      marginTop: ledgerSpace.md,
+    },
+    stats: {
+      flexDirection: 'row',
+      gap: ledgerSpace.lg,
+      marginTop: ledgerSpace.section,
+    },
+    stat: {
+      flex: 1,
+    },
+    statLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginBottom: ledgerSpace.xs,
+    },
+    statValue: {
+      ...ledgerType.rowTitle,
+      fontFamily: inter.semibold,
+      fontVariant: ['tabular-nums'],
+      color: c.ink,
+    },
+    statSub: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    section: {
+      marginTop: ledgerSpace.section,
+      marginBottom: ledgerSpace.sm,
+    },
+    weekRow: {
+      flexDirection: 'row',
+      marginBottom: ledgerSpace.sm,
+    },
+    weekday: {
+      flex: 1,
+      ...ledgerType.caption,
+      color: c.muted,
+      textAlign: 'center',
+    },
+    cell: {
+      flex: 1,
+      alignItems: 'center',
+      gap: ledgerSpace.xs,
+    },
+    dayNumber: {
+      ...ledgerType.caption,
+      color: c.muted,
+      fontVariant: ['tabular-nums'],
+    },
+    dim: {
+      opacity: 0.45,
+    },
+    todayPill: {
+      paddingHorizontal: 6,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.ink,
+    },
+    today: {
+      fontFamily: inter.semibold,
+      color: c.inkOnInk,
+      opacity: 1,
+    },
+    legend: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.lg,
+      marginTop: ledgerSpace.md,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ledgerSpace.xs,
+    },
+    legendText: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    footnote: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginTop: ledgerSpace.lg,
+    },
+    skeleton: {
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      marginTop: ledgerSpace.md,
+    },
   });
 }

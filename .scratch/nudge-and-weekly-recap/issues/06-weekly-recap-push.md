@@ -1,6 +1,6 @@
 # 06: Weekly recap push
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:**
 - **A Monday-morning recap push.** `send-push` gets a `weekly_recap` trigger at 09:00 local on Mondays. It's a new trigger inside the existing function, not a new function.

@@ -1,6 +1,6 @@
 # 04: Dashboard views and the 13-month retention job
 
-Spec: .claude/features/33-product-analytics.md
+Spec: .claude/features/archive/33-product-analytics.md
 
 **What to build:** The person running FLO opens the Supabase dashboard and reads the key numbers from ready-made views, with no separate tool. Seven `security_invoker` views over `events`:
 - **activation:** a first `expense_logged` within 24 hours of `signup_completed`;

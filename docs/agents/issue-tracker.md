@@ -10,7 +10,9 @@ Tickets and wayfinder maps for this repo live as markdown files in `.scratch/`.
   `.claude/features/00-index.md`. There is no `.scratch/<feature>/spec.md`.
 - That file satisfies the flo-feature rule (planning doc before feature code).
 - When a skill says "read the spec", read the `.claude/features/` file the
-  ticket links to.
+  ticket links to. Once a spec is fully built it moves to
+  `.claude/features/archive/` (and its index row's path changes with it);
+  `00-index.md` stays the one main doc.
 - `/to-tickets` also writes `.scratch/<feature-slug>/spec.md` as a **pointer
   stub** only, so the tracer board (below) finds the feature and its title:
 
@@ -51,7 +53,7 @@ implementation ticket with:
 FLO has no lint, build or test script and no web target. Here, tick
 `Verified` only when the app has been rebuilt (`npx expo run:android`, or a
 `lite-preview` build) and the changed screens/flows check out on the
-**Medium_Phone_API_29** emulator with the `flotest@gmail.com` account; for a
+**Pixel_API_36** emulator (Android 16) with the test account; for a
 Supabase-only change, when the migration's effect is verified via the
 Supabase MCP. Everything else in the mod's rules stands: start only tickets
 whose blockers have their green signal, tick `Code implementation` when the

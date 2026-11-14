@@ -1,59 +1,147 @@
 import { useMemo } from 'react';
-import { Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Wallet, Receipt, Users, Landmark, Grid2x2, Settings, Crown } from 'lucide-react-native';
-import Screen from '../../components/Screen';
-import Row, { RowGroup } from '../../components/Row';
-import { fontFamily, fontSize, spacing } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
+import { Wallet, Receipt, Users, Landmark, Grid2x2, Settings, Crown, Sparkles, Palette } from 'lucide-react-native';
+import { LargeTitle } from '../../components/ledger/ScreenHeader';
+import ListRow from '../../components/ledger/ListRow';
+import ListGroup from '../../components/ledger/ListGroup';
+import { useEditProfileSheet } from '../../components/EditProfileSheet';
+import { useAuth } from '../../lib/AuthContext';
+import useProfile from '../../hooks/useProfile';
+import { profileInitial, profileLines } from '../../lib/profileHeader';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../../theme/ledger';
 import { FLAGS } from '../../lib/flags';
 
-// The More tab (38-home-insights-more.md): the secondary features, one tap
-// from anywhere, so Home stays about this month. Replaces the old Menu sheet.
-export default function More() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+const AVATAR = 56;
+
+// The You tab (38-home-insights-more.md; on the ledger kit since spec 49,
+// ticket 09): the person's photo or initial, name and email (a tap edits
+// them), then flat rows to everything that isn't Home, Activity or
+// Insights. Cards leads, as the signature feature. Routes are unchanged.
+export default function You() {
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
+  const { session } = useAuth();
+  const { profile, avatarUrl } = useProfile();
+  const { openEditProfile } = useEditProfileSheet();
+
+  const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
+  const email = session?.user?.email ?? '';
+  const initial = profileInitial({ fullName, email });
+  const { title, caption } = profileLines({ fullName, email });
 
   return (
-    <Screen>
-      <Text style={styles.title} accessibilityRole="header">
-        More
-      </Text>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <RowGroup title="Money">
-          <Row icon={Wallet} title="Budgets" onPress={() => router.push('/budgets')} />
-          <Row icon={Receipt} title="Bills" onPress={() => router.push('/bills')} />
-          <Row icon={Users} title="Splits" onPress={() => router.push('/splits')} />
-        </RowGroup>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <LargeTitle title="You" />
 
-        <RowGroup title="Set up">
-          <Row icon={Landmark} title="Accounts" onPress={() => router.push('/accounts')} />
-          <Row icon={Grid2x2} title="Categories" onPress={() => router.push('/manage-categories')} />
-        </RowGroup>
+        <Pressable
+          style={({ pressed }) => [styles.header, pressed && styles.pressed]}
+          onPress={openEditProfile}
+          accessibilityRole="button"
+          accessibilityLabel={[title, caption].filter(Boolean).join(', ') || 'Your profile'}
+          accessibilityHint="Edit your profile"
+        >
+          <View style={styles.avatar}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.initial}>{initial}</Text>
+            )}
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.name} numberOfLines={1}>
+              {title}
+            </Text>
+            {!!caption && (
+              <Text style={styles.email} numberOfLines={1}>
+                {caption}
+              </Text>
+            )}
+          </View>
+        </Pressable>
 
-        <RowGroup>
+        <ListGroup>
+          {FLAGS.themes && <ListRow icon={Palette} title="Cards" trailing="chevron" onPress={() => router.push('/personalize')} />}
+          {/* Ask FLO (44-ai-assistant.md), hidden with the AI flag. */}
+          {FLAGS.ai && <ListRow icon={Sparkles} title="Ask FLO" trailing="chevron" onPress={() => router.push('/assistant')} />}
+        </ListGroup>
+
+        <ListGroup title="Money">
+          <ListRow icon={Wallet} title="Budgets" trailing="chevron" onPress={() => router.push('/budgets')} />
+          <ListRow icon={Receipt} title="Bills" trailing="chevron" onPress={() => router.push('/bills')} />
+          <ListRow icon={Users} title="Splits" trailing="chevron" onPress={() => router.push('/splits')} />
+        </ListGroup>
+
+        <ListGroup title="Set up">
+          <ListRow icon={Landmark} title="Accounts" trailing="chevron" onPress={() => router.push('/accounts')} />
+          <ListRow icon={Grid2x2} title="Categories" trailing="chevron" onPress={() => router.push('/manage-categories')} />
+        </ListGroup>
+
+        <ListGroup>
           {/* Pro only once Play Billing is live (lib/flags.js billing). */}
-          {FLAGS.billing && <Row icon={Crown} title="FLO Pro" onPress={() => router.push('/pro')} />}
-          <Row icon={Settings} title="Settings" onPress={() => router.push('/settings')} />
-        </RowGroup>
+          {FLAGS.billing && <ListRow icon={Crown} title="FLO Pro" trailing="chevron" onPress={() => router.push('/pro')} />}
+          <ListRow icon={Settings} title="Settings" trailing="chevron" onPress={() => router.push('/settings')} />
+        </ListGroup>
       </ScrollView>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    title: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.display,
-      letterSpacing: -0.3,
-      color: colors.ink,
-      paddingTop: spacing.sm,
-      marginBottom: spacing.md,
+    safe: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+      minWidth: 0,
     },
     scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.sm,
+      // Clears the floating tab bar and its ⊕.
       paddingBottom: 120,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ledgerSpace.lg,
+      marginTop: ledgerSpace.md,
+      paddingVertical: ledgerSpace.xs,
+    },
+    pressed: {
+      opacity: 0.7,
+    },
+    avatar: {
+      width: AVATAR,
+      height: AVATAR,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.surfaceSunk,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: AVATAR,
+      height: AVATAR,
+    },
+    initial: {
+      fontFamily: inter.semibold,
+      fontSize: 22,
+      color: c.ink,
+    },
+    name: {
+      ...ledgerType.title,
+      color: c.ink,
+    },
+    email: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginTop: 2,
     },
   });
 }

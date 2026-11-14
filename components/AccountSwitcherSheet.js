@@ -1,11 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { Check, Pencil, X, TrendingUp, TrendingDown } from 'lucide-react-native';
-import Button from './Button';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import Sheet from './ledger/Sheet';
+import AccountRow from './AccountRow';
 import { useAccount } from '../lib/AccountContext';
 import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import { useAddAccountSheet } from './AddAccountSheet';
@@ -14,7 +9,6 @@ import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import { FREE_LIMITS } from '../lib/pro';
-import { formatMoney, formatAmountNumber, currencySymbol } from '../lib/currency';
 
 const AccountSwitcherSheetContext = createContext(null);
 
@@ -36,70 +30,16 @@ export function useAccountSwitcherSheet() {
   return ctx;
 }
 
-function formatAmount(value, currency) {
-  const rounded = Math.round(Math.abs(value));
-  return `${value < 0 ? '−' : ''}${formatMoney(rounded, currency)}`;
-}
-
-function formatBalance(value, currency) {
-  return { sign: value < 0 ? '−' : '', number: formatAmountNumber(value, currency) };
-}
-
-function AccountCard({ account, summary, active, activeIconColor, onSelect, onEdit, styles }) {
-  const { colors } = useTheme();
-  const currency = account.currency ?? 'INR';
-  const balance = formatBalance(summary?.in_hand_balance ?? 0, currency);
-
-  return (
-    <Pressable style={styles.card} onPress={onSelect}>
-      <View style={styles.cardTopRow}>
-        <View style={styles.cardHeading}>
-          <View style={[styles.colorDot, { backgroundColor: account.color }]} />
-          <Text style={styles.cardName} numberOfLines={1}>
-            {account.name}
-          </Text>
-          {active && (
-            <View style={styles.activePill}>
-              <Check size={10} color={activeIconColor} strokeWidth={3} />
-            </View>
-          )}
-        </View>
-        <Pressable style={styles.editButton} onPress={onEdit} hitSlop={8}>
-          <Pencil size={14} color={colors.mutedMid} strokeWidth={2} />
-        </Pressable>
-      </View>
-
-      <Text style={styles.cardLabel}>In Hand</Text>
-      <Text style={styles.cardBalance}>
-        {balance.sign}
-        <Text style={styles.cardBalanceCurrency}>{currencySymbol(currency)}</Text>
-        {balance.number}
-      </Text>
-
-      <View style={styles.cardStatsRow}>
-        <View style={styles.statLine}>
-          <TrendingUp size={12} color={colors.mutedMid} strokeWidth={2.6} />
-          <Text style={styles.statValue}>{formatAmount(summary?.period_income ?? 0, currency)}</Text>
-          <Text style={styles.statLabel}>Income</Text>
-        </View>
-        <View style={styles.statLine}>
-          <TrendingDown size={12} color={colors.mutedMid} strokeWidth={2.6} />
-          <Text style={styles.statValue}>{formatAmount(summary?.period_expense ?? 0, currency)}</Text>
-          <Text style={styles.statLabel}>Expenses</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
+// The account switcher, opened from the Home card (spec 48, ticket 06): the
+// same rows as the Accounts screen (AccountRow), the active account first.
+// A tap switches and closes; each row's ⋯ menu has Edit (Transfer lives on
+// the Accounts screen: this provider sits outside the Add sheet's).
+// New account is pinned, behind the free-plan gate.
 const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
-  const insets = useSafeAreaInsets();
   const { accounts, activeAccountId, setActiveAccount } = useAccount();
-  const { summaries } = useAllAccountSummaries();
+  const { summaries, loading } = useAllAccountSummaries();
   const { openAddAccount } = useAddAccountSheet();
   const { showToast } = useToast();
   const { hasPro } = useEntitlement();
@@ -117,11 +57,6 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
     },
   }));
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   function handleSelect(account) {
     const switching = account.id !== activeAccountId;
     setActiveAccount(account.id);
@@ -129,168 +64,41 @@ const AccountSwitcherSheet = forwardRef(function AccountSwitcherSheet(_props, re
     if (switching) showToast({ message: `Switched to ${account.name}`, variant: 'success' });
   }
 
-  function handleNewAccount() {
+  // Each opens another sheet, so this one closes first.
+  function dismissThen(run) {
     modalRef.current?.dismiss();
-    if (!hasPro && accounts.length >= FREE_LIMITS.accounts) {
-      openProUpsell('Free includes 1 account');
-      return;
-    }
-    openAddAccount();
+    run();
   }
 
-  function handleEdit(account) {
-    modalRef.current?.dismiss();
-    openAddAccount(account);
+  function handleNewAccount() {
+    dismissThen(() => {
+      if (!hasPro && accounts.length >= FREE_LIMITS.accounts) {
+        openProUpsell('Free includes 1 account');
+        return;
+      }
+      openAddAccount();
+    });
   }
 
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title="Accounts"
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['85%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: 'New account', onPress: handleNewAccount } }}
     >
-      <BottomSheetScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[styles.sheet, { paddingBottom: spacing.xxl + insets.bottom }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Accounts</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
-
-        {orderedAccounts.map((account) => (
-          <AccountCard
-            key={account.id}
-            styles={styles}
-            account={account}
-            summary={summaries[account.id]}
-            active={account.id === activeAccountId}
-            activeIconColor={colors.brandText}
-            onSelect={() => handleSelect(account)}
-            onEdit={() => handleEdit(account)}
-          />
-        ))}
-
-        <Button title="New Account" variant="primary" onPress={handleNewAccount} style={{ marginTop: spacing.sm }} />
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      {orderedAccounts.map((account, i) => (
+        <AccountRow
+          key={account.id}
+          account={account}
+          balance={Number(summaries[account.id]?.in_hand_balance ?? 0)}
+          loading={loading}
+          active={account.id === activeAccountId}
+          onPress={() => handleSelect(account)}
+          onEdit={() => dismissThen(() => openAddAccount(account))}
+          divider={i < orderedAccounts.length - 1}
+        />
+      ))}
+    </Sheet>
   );
 });
-
-function makeStyles(colors) {
-  return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.cardLg,
-    padding: spacing.xxl,
-    marginBottom: spacing.md,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  cardHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    flexShrink: 1,
-    paddingRight: spacing.sm,
-  },
-  colorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: radii.pill,
-  },
-  cardName: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    letterSpacing: -0.1,
-    lineHeight: fontSize.lg,
-    color: colors.ink,
-    flexShrink: 1,
-  },
-  activePill: {
-    width: 16,
-    height: 16,
-    borderRadius: radii.pill,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editButton: {
-    width: 26,
-    height: 26,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-  },
-  cardBalance: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.hero,
-    letterSpacing: -0.4,
-    color: colors.ink,
-    marginTop: 0,
-  },
-  cardBalanceCurrency: {
-    color: colors.mutedDarker,
-  },
-  cardStatsRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  statLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  statValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    letterSpacing: -0.2,
-    color: colors.ink,
-  },
-  statLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-  },
-  });
-}

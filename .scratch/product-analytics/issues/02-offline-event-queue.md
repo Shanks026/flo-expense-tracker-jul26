@@ -1,6 +1,6 @@
 # 02: Offline event queue
 
-Spec: .claude/features/33-product-analytics.md
+Spec: .claude/features/archive/33-product-analytics.md
 
 **What to build:** Events are never lost to a bad connection, and tracking never blocks logging. `track` adds consented events to a queue stored on the phone instead of sending them straight away.
 - The queue batch-inserts on a timer and when the app goes to the background.

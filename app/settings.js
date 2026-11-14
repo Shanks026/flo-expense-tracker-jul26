@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator, Linking, AppState, Alert, Platform } from 'react-native';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Image, Modal, ActivityIndicator, Linking, AppState, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { timeOnTodayFromString, toTimeColumn, isEveningTime, MORNING_DEFAULT, EVENING_DEFAULT } from '../lib/reminderTime';
 import {
   CircleDollarSign,
   Palette,
@@ -25,16 +26,21 @@ import {
   ChartColumn,
   CalendarClock,
   CalendarDays,
-  Cat,
+  Sparkles,
+  Mic,
+  Smartphone,
+  Sun,
+  Shapes,
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Row, { RowGroup } from '../components/Row';
-import SegmentedChoice from '../components/SegmentedChoice';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import ListRow from '../components/ledger/ListRow';
+import Segmented from '../components/ledger/Segmented';
+import Callout from '../components/ledger/Callout';
+import ListGroup from '../components/ledger/ListGroup';
+import Button from '../components/ledger/Button';
 import Skeleton from '../components/Skeleton';
-// Static palette (theme/tokens) only for text on the dark profile card and the danger button.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii, type } from '../theme/tokens';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, ledgerSize, inter } from '../theme/ledger';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { useAccount } from '../lib/AccountContext';
@@ -43,7 +49,10 @@ import useProfile from '../hooks/useProfile';
 import useCurrency from '../hooks/useCurrency';
 import useEntitlement from '../hooks/useEntitlement';
 import useAnalyticsConsent from '../hooks/useAnalyticsConsent';
+import useVoiceLanguage from '../hooks/useVoiceLanguage';
+import { voiceSupported, VOICE_LANGUAGES } from '../lib/voice';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
+import { profileInitial } from '../lib/profileHeader';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
 import ProBadge from '../components/ProBadge';
@@ -73,37 +82,22 @@ import {
   WATCHED_APP_LABELS,
 } from '../lib/detect';
 import { getPushTokenStatus, sendTestPush, registerPushToken } from '../lib/pushToken';
-import { RESET_PERIOD_OPTIONS } from '../lib/periods';
-import AppearanceToggle from '../components/AppearanceToggle';
+import { resetPeriodLabel, ordinalDay } from '../lib/periods';
+import SummaryPeriodSheet from '../components/SummaryPeriodSheet';
 import { destructiveHaptic } from '../lib/haptics';
 
 const DAYS_BEFORE_OPTIONS = [1, 2, 3];
 
-// NOT new Date(0, 0, 0, hour, minute) — that resolves to Dec 31, 1899, and
-// India's timezone database applies the *historical* Madras Time offset
-// (+5:21) for pre-1906 dates, not modern IST (+5:30). The JS-side
-// getHours()/getMinutes() still read back correctly within the same
-// environment, but the native Android time picker widget converts the
-// underlying UTC timestamp using the *current* offset when rendering,
-// producing a ~9-minute-ahead display — confirmed via TZ=Asia/Kolkata node
-// repro during debugging (2026-07-12). Building on today's date sidesteps
-// the whole historical-offset class of bug.
-function timeOnToday(hour, minute) {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d;
-}
-
-// profiles.morning_reminder_time/evening_reminder_time come back from
-// Postgres as "HH:MM:SS" strings (the `time` column type) — parsed into a
-// Date the same way DateTimePicker/timeOnToday already expect.
-function timeOnTodayFromString(timeStr, fallbackHour, fallbackMinute) {
-  if (!timeStr) return timeOnToday(fallbackHour, fallbackMinute);
-  const [h, m] = timeStr.split(':').map(Number);
-  return timeOnToday(h, m);
-}
+// Appearance: System follows the phone's light/dark setting and is the default.
+const APPEARANCE_OPTIONS = [
+  { value: 'system', label: 'System', icon: Smartphone, accessibilityLabel: 'System appearance' },
+  { value: 'light', label: 'Light', icon: Sun, accessibilityLabel: 'Light appearance' },
+  { value: 'dark', label: 'Dark', icon: Moon, accessibilityLabel: 'Dark appearance' },
+];
 
 export default function Settings() {
+  const { language: voiceLanguage, setLanguage: setVoiceLanguage } = useVoiceLanguage();
+  const showVoiceLanguage = useMemo(() => voiceSupported(), []);
   const router = useRouter();
   const { session, deleteAccount, signOut } = useAuth();
   const { profile, avatarUrl, updateProfile, loading: profileLoading } = useProfile();
@@ -111,8 +105,11 @@ export default function Settings() {
   const { notifyChanged } = useDataRefresh();
   const currency = useCurrency();
   const { openEditProfile } = useEditProfileSheet();
-  const { colors, modePreference, setModePreference } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { modePreference, setModePreference } = useTheme();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const insets = useSafeAreaInsets();
+  const { scrollY, onScroll } = useHeaderScroll();
   const { isPro, hasPro } = useEntitlement();
   const { openProUpsell } = useProUpsellSheet();
   const { showToast } = useToast();
@@ -177,6 +174,10 @@ export default function Settings() {
   const [showResetDatePicker, setShowResetDatePicker] = useState(false);
   const resetPeriod = profile?.reset_period ?? 'monthly';
   const resetCustomStart = profile?.reset_custom_start ?? null;
+  const resetMonthDay = profile?.reset_month_day ?? null;
+  // Summary period's sheet (SummaryPeriodSheet): 'period' or 'day'.
+  const periodSheetRef = useRef(null);
+  const [periodSheetKind, setPeriodSheetKind] = useState('period');
 
   // Transaction Detection (06-transaction-auto-detect.md). Notification
   // access is granted outside the app (system settings), with no callback —
@@ -196,7 +197,7 @@ export default function Settings() {
   const [sendingTestPush, setSendingTestPush] = useState(false);
 
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
-  const initial = fullName?.[0]?.toUpperCase() ?? '?';
+  const initial = profileInitial({ fullName, email: session?.user?.email });
 
   // Switching INTO Custom for the first time (no anchor set yet) defaults the
   // start date to today, not null — lands on a concrete, immediately-visible
@@ -210,6 +211,29 @@ export default function Settings() {
     } else {
       await updateProfile({ reset_period: value });
     }
+  }
+
+  function openPeriodSheet(kind) {
+    setPeriodSheetKind(kind);
+    periodSheetRef.current?.present();
+  }
+
+  // Salary day writes reset_period and reset_month_day together: with no
+  // day saved yet, the sheet moves on to the day grid and nothing is written
+  // until a day is picked. A day saved earlier (kept when switching away) is
+  // reused.
+  async function handlePeriodPick(value) {
+    if (value === 'salary_day' && !resetMonthDay) {
+      setPeriodSheetKind('day');
+      return;
+    }
+    periodSheetRef.current?.dismiss();
+    if (value !== resetPeriod) await handleResetPeriodChange(value);
+  }
+
+  async function handleSalaryDayPick(day) {
+    periodSheetRef.current?.dismiss();
+    await updateProfile({ reset_period: 'salary_day', reset_month_day: day });
   }
 
   function handleResetCustomStartChange(_event, selected) {
@@ -403,20 +427,17 @@ export default function Settings() {
     // "must be before/after the other" — so the two can never collide (a
     // user could otherwise set both to the same time, or "morning" later in
     // the day than "evening") without needing a second cross-field check.
-    const hours = selected.getHours();
-    if (field === 'morning' && hours >= 12) {
+    if (field === 'morning' && isEveningTime(selected)) {
       showToast({ message: 'Morning reminder must be before 12 PM', variant: 'error' });
       return;
     }
-    if (field === 'evening' && hours < 12) {
+    if (field === 'evening' && !isEveningTime(selected)) {
       showToast({ message: 'Evening reminder must be after 12 PM', variant: 'error' });
       return;
     }
 
-    const hh = String(hours).padStart(2, '0');
-    const mm = String(selected.getMinutes()).padStart(2, '0');
     const column = field === 'morning' ? 'morning_reminder_time' : 'evening_reminder_time';
-    await updateProfile({ [column]: `${hh}:${mm}:00` }, { silent: true });
+    await updateProfile({ [column]: toTimeColumn(selected) }, { silent: true });
   }
 
   // No local reschedule needed — setBillReminderSettings mirrors to
@@ -472,109 +493,111 @@ export default function Settings() {
     }
   }
 
+  const dailyOn = profile?.reminders_enabled ?? true;
+  const remindersOn = notifEnabled && dailyOn;
+
   return (
-    <SafeAreaView style={styles.safe} edges={[]}>
-      {/* Flat grouped lists built from the shared Row/RowGroup
-          (37-design-system-and-koban.md): 48dp+ targets, a role and label on
-          every control, pressed feedback. The profile card stays the one
-          emphasis surface. */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Pressable
-          onPress={openEditProfile}
-          accessibilityRole="button"
-          accessibilityLabel={`${fullName || 'Add your name'}, ${session?.user?.email ?? ''}`}
-          accessibilityHint="Edit your profile"
-          style={({ pressed }) => pressed && styles.pressedDim}
-        >
-          <Card dark style={styles.profileCard}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
+    <View style={styles.screen}>
+      <ScreenHeader title="Settings" scrollY={scrollY} />
+      {/* Flat grouped rows on the canvas under sentence-case section headers
+          (spec 46). Sections in a fixed order: profile, Account, Appearance,
+          Notifications, Preferences, Transaction detection, Data and export,
+          About, Developer (dev builds only), then Delete account above Log
+          out at the bottom. */}
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="Settings" scrollY={scrollY} />
+
+        <View style={styles.profile}>
+          <ListRow
+            renderIcon={() =>
+              avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+              ) : (
                 <Text style={styles.avatarInitial}>{initial}</Text>
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <View style={styles.profileNameRow}>
-                <Text style={styles.profileName} numberOfLines={1}>
-                  {fullName || 'Add your name'}
-                </Text>
-                {isPro && <ProBadge variant="pill" />}
-              </View>
-              <Text style={styles.profileEmail} numberOfLines={1}>
-                {session?.user?.email}
-              </Text>
-            </View>
-          </Card>
-        </Pressable>
+              )
+            }
+            title={fullName || 'Add your name'}
+            sub={session?.user?.email}
+            right={isPro ? <ProBadge /> : null}
+            trailing="chevron"
+            onPress={openEditProfile}
+            divider={false}
+            accessibilityLabel={`${fullName || 'Add your name'}, ${session?.user?.email ?? ''}`}
+            accessibilityHint="Edit your profile"
+          />
+        </View>
 
-        {/* Sections in a fixed order (38-home-insights-more.md): Account,
-            Appearance, Notifications, Preferences, Data & export, About, then
-            Log out on its own at the bottom. */}
-        <RowGroup title="Account">
-          <Row icon={KeyRound} title="Signed in with" value={signInMethods} />
-        </RowGroup>
+        <ListGroup title="Account">
+          <ListRow icon={KeyRound} title="Signed in with" right={signInMethods} />
+        </ListGroup>
 
-        {/* Appearance: System follows the phone's light/dark setting and is the
-            default. Applied straight away and saved to the profile so it
-            follows the account. */}
-        <RowGroup title="Appearance">
-          <Row icon={SunMoon} title="Theme">
-            <AppearanceToggle value={modePreference} onChange={handleAppearanceChange} />
-          </Row>
-          {/* Personalize: card themes and accents (lib/flags.js, spec 43). */}
-          {FLAGS.themes && <Row icon={Palette} title="Personalize" onPress={() => router.push('/personalize')} />}
-        </RowGroup>
+        {/* Applied straight away and saved to the profile so it follows the
+            account. */}
+        <ListGroup title="Appearance">
+          <ListRow icon={SunMoon} title="Theme">
+            <Segmented
+              accessibilityLabel="Appearance"
+              options={APPEARANCE_OPTIONS}
+              value={modePreference}
+              onChange={handleAppearanceChange}
+            />
+          </ListRow>
+          {/* Cards (was Personalize): card themes (lib/flags.js, spec 43). */}
+          {FLAGS.themes && <ListRow icon={Palette} title="Cards" trailing="chevron" onPress={() => router.push('/personalize')} />}
+        </ListGroup>
 
-        <RowGroup title="Notifications">
-          <Row icon={Bell} title="Notifications" switchValue={notifEnabled} onSwitchChange={handleToggleNotifications} />
+        <ListGroup title="Notifications">
+          <ListRow icon={Bell} title="Notifications" switchValue={notifEnabled} onSwitchChange={handleToggleNotifications} />
           {permissionBlocked && (
-            <Row
-              title="Notifications are blocked"
-              hint="Tap to open system settings."
+            <Callout
               tone="danger"
-              onPress={() => Linking.openSettings()}
+              text="Notifications are blocked for FLO."
+              actionLabel="Open system settings"
+              onAction={() => Linking.openSettings()}
+              style={styles.callout}
             />
           )}
-          <Row
-            icon={BatteryWarning}
-            title="Battery settings"
-            hint={'Reminders may be delayed or dropped by your phone\'s battery manager. Set FLO to "Don\'t optimize" here — on Vivo/iQOO also check Settings → Battery → High background power consumption, and Settings → Apps → Autostart.'}
-            onPress={handleOpenBatterySettings}
-          />
-          <Row
+          <ListRow
             icon={SunMedium}
-            title="Daily Reminders"
-            switchValue={profile?.reminders_enabled ?? true}
+            title="Daily reminders"
+            switchValue={dailyOn}
             onSwitchChange={handleToggleDailyReminders}
             disabled={!notifEnabled}
           />
-          {notifEnabled && (profile?.reminders_enabled ?? true) && (
-            <Row
+          {remindersOn && (
+            <ListRow
               icon={Sunrise}
               title="Morning"
-              value={format(timeOnTodayFromString(profile?.morning_reminder_time, 8, 0), 'h:mm a')}
+              right={format(timeOnTodayFromString(profile?.morning_reminder_time, MORNING_DEFAULT.hour, MORNING_DEFAULT.minute), 'h:mm a')}
+              trailing="chevron"
               onPress={() => setTimePickerField('morning')}
             />
           )}
-          {notifEnabled && (profile?.reminders_enabled ?? true) && (
-            <Row
+          {remindersOn && (
+            <ListRow
               icon={Moon}
               title="Evening"
-              value={format(timeOnTodayFromString(profile?.evening_reminder_time, 21, 0), 'h:mm a')}
+              right={format(timeOnTodayFromString(profile?.evening_reminder_time, EVENING_DEFAULT.hour, EVENING_DEFAULT.minute), 'h:mm a')}
+              trailing="chevron"
               onPress={() => setTimePickerField('evening')}
             />
           )}
-          <Row
+          <ListRow
             icon={Receipt}
-            title="Bill Reminders"
+            title="Bill reminders"
             switchValue={billReminders.enabled}
             onSwitchChange={handleToggleBillReminders}
             disabled={!notifEnabled}
           />
           {notifEnabled && billReminders.enabled && (
-            <Row icon={CalendarClock} title="Remind me">
-              <SegmentedChoice
+            <ListRow icon={CalendarClock} title="Remind me">
+              <Segmented
                 accessibilityLabel="Remind me before a bill is due"
                 options={DAYS_BEFORE_OPTIONS.map((d) => ({
                   value: d,
@@ -584,15 +607,28 @@ export default function Settings() {
                 value={billReminders.daysBefore}
                 onChange={handleDaysBeforeChange}
               />
-            </Row>
+            </ListRow>
           )}
-        </RowGroup>
+          {/* Opens Android's Doze list (set FLO to "Don't optimize"). OEM
+              skins such as Vivo/iQOO add their own killer with no public API
+              (see handleOpenBatterySettings); callouts stay one line. */}
+          {Platform.OS === 'android' && (
+            <Callout
+              tone="warn"
+              icon={BatteryWarning}
+              text="Battery saving can delay reminders."
+              actionLabel="Open battery settings"
+              onAction={handleOpenBatterySettings}
+              style={styles.callout}
+            />
+          )}
+        </ListGroup>
         {timePickerField && (
           <DateTimePicker
             value={
               timePickerField === 'morning'
-                ? timeOnTodayFromString(profile?.morning_reminder_time, 8, 0)
-                : timeOnTodayFromString(profile?.evening_reminder_time, 21, 0)
+                ? timeOnTodayFromString(profile?.morning_reminder_time, MORNING_DEFAULT.hour, MORNING_DEFAULT.minute)
+                : timeOnTodayFromString(profile?.evening_reminder_time, EVENING_DEFAULT.hour, EVENING_DEFAULT.minute)
             }
             mode="time"
             display="default"
@@ -600,24 +636,47 @@ export default function Settings() {
           />
         )}
 
-        <RowGroup title="Preferences">
-          <Row icon={CircleDollarSign} title="Summary period" hint="When Home's spent and received totals reset">
-            <SegmentedChoice
-              accessibilityLabel="Summary period"
-              options={RESET_PERIOD_OPTIONS}
-              value={resetPeriod}
-              onChange={handleResetPeriodChange}
+        <ListGroup title="Preferences">
+          <ListRow
+            icon={CircleDollarSign}
+            title="Summary period"
+            sub="When Home's spent and received totals reset"
+            subLines={2}
+            right={resetPeriodLabel(resetPeriod)}
+            trailing="chevron"
+            onPress={() => openPeriodSheet('period')}
+          />
+          {resetPeriod === 'salary_day' && (
+            <ListRow
+              icon={CalendarDays}
+              title="Salary day"
+              right={resetMonthDay ? ordinalDay(resetMonthDay) : 'Pick a day'}
+              trailing="chevron"
+              onPress={() => openPeriodSheet('day')}
             />
-          </Row>
+          )}
           {resetPeriod === 'custom' && (
-            <Row
+            <ListRow
               icon={CalendarDays}
               title="Starts from"
-              value={format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
+              right={format(resetCustomStart ? parseISO(resetCustomStart) : new Date(), 'd MMM yyyy')}
+              trailing="chevron"
               onPress={() => setShowResetDatePicker(true)}
             />
           )}
-          {/* value is the EFFECTIVE display currency (useCurrency →
+          {/* The quick-add mic's language (44-ai-assistant.md, Phase 2),
+              kept on this device. */}
+          {showVoiceLanguage && (
+            <ListRow icon={Mic} title="Voice language" sub="What the quick-add mic listens for">
+              <Segmented
+                accessibilityLabel="Voice language"
+                options={VOICE_LANGUAGES}
+                value={voiceLanguage}
+                onChange={setVoiceLanguage}
+              />
+            </ListRow>
+          )}
+          {/* right is the EFFECTIVE display currency (useCurrency →
               activeAccount.currency), matching what the app actually shows,
               not profiles.currency (which only seeds new accounts). Hidden
               while the currency picker is flagged off (lib/flags.js). */}
@@ -627,18 +686,18 @@ export default function Settings() {
               onChange={handleCurrencyChange}
               variant="dialog"
               renderTrigger={(selected, toggle) => (
-                <Row
+                <ListRow
+                  divider={false}
                   icon={CircleDollarSign}
                   title="Currency"
-                  hint="Shown across the app"
-                  value={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
+                  sub="Shown across the app"
+                  right={profileLoading ? <Skeleton width={54} height={16} radius={6} /> : `${selected.symbol} ${selected.code}`}
                   onPress={toggle}
-                  chevron={false}
                 />
               )}
             />
           )}
-        </RowGroup>
+        </ListGroup>
 
         {showResetDatePicker && (
           <DateTimePicker
@@ -652,107 +711,107 @@ export default function Settings() {
 
         {isAutoDetectVariant() &&
           (!isDetectSupported() ? (
-            <RowGroup title="Transaction Detection">
-              <Row title="Not available" hint="Android only, and needs a development build (not Expo Go)." />
-            </RowGroup>
+            <ListGroup title="Transaction detection">
+              <ListRow icon={Landmark} title="Not available" sub="Android only, and needs a development build (not Expo Go)." subLines={2} />
+            </ListGroup>
           ) : (
-            <RowGroup
-              title="Transaction Detection"
-              footer={
-                detectEnabled
-                  ? `Watches ${Object.values(WATCHED_APP_LABELS).join(', ')} for debit/credit alerts, so FLO can prompt you to log them. Reads only these apps' notifications — nothing else on the device.`
-                  : null
-              }
-            >
-              <Row
+            <ListGroup title="Transaction detection">
+              <ListRow
                 icon={Landmark}
                 title="Notification access"
-                value={detectAccess ? 'Granted' : 'Tap to grant'}
+                right={detectAccess ? 'Granted' : 'Tap to grant'}
+                trailing="chevron"
                 onPress={openNotificationAccessSettings}
               />
-              <Row
+              <ListRow
                 icon={Bell}
                 title="Enable detection"
+                sub={detectEnabled ? `Reads only ${Object.values(WATCHED_APP_LABELS).join(', ')} alerts` : undefined}
+                subLines={2}
                 switchValue={detectEnabled}
                 onSwitchChange={handleToggleDetect}
                 disabled={!detectAccess}
               />
               {/* Dev-only: the detection debug log. */}
-              {__DEV__ && detectEnabled && <Row icon={Receipt} title="What FLO has seen" onPress={handleShowDetectionLog} />}
-            </RowGroup>
+              {__DEV__ && detectEnabled && (
+                <ListRow icon={Receipt} title="What FLO has seen" trailing="chevron" onPress={handleShowDetectionLog} />
+              )}
+            </ListGroup>
           ))}
 
-        <RowGroup title="Data & export">
-          <Row
+        <ListGroup title="Data and export">
+          <ListRow
             icon={Download}
             title="Export all transactions"
-            hint="A CSV of every account"
+            sub="A CSV of every account"
             onPress={handleExportAll}
-            right={exportingAll ? <ActivityIndicator size="small" color={colors.ink} /> : !hasPro ? <ProBadge variant="pill" /> : null}
+            trailing={exportingAll ? <ActivityIndicator size="small" color={c.ink} /> : !hasPro ? <ProBadge /> : 'chevron'}
             disabled={exportingAll}
           />
-          <Row
+          <ListRow
             icon={ChartColumn}
             title="Share anonymous usage"
-            hint="Helps improve FLO. Only which features you use, never amounts, notes or names."
+            sub="Helps improve FLO. Only which features you use, never amounts, notes or names."
+            subLines={2}
             switchValue={analyticsConsent}
             onSwitchChange={handleToggleAnalytics}
           />
-          <Row
-            icon={Trash2}
-            title="Delete Account"
-            tone="danger"
-            chevron={false}
-            onPress={() => {
-              setDeleteError(null);
-              setConfirmVisible(true);
-            }}
-          />
-        </RowGroup>
+        </ListGroup>
 
-        <RowGroup title="About">
-          <Row icon={Info} title="Version" value={APP_VERSION} />
+        <ListGroup title="About">
+          <ListRow icon={Info} title="Version" right={APP_VERSION} />
           {PRIVACY_POLICY_URL && (
-            <Row icon={ShieldCheck} title="Privacy policy" onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} />
+            <ListRow icon={ShieldCheck} title="Privacy policy" trailing="chevron" onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} />
           )}
-        </RowGroup>
+        </ListGroup>
 
         {/* Developer rows render in development builds only
-            (32-safe-closed-test-build.md — no debug UI for testers). */}
+            (32-safe-closed-test-build.md: no debug UI for testers). */}
         {__DEV__ && (
-          <RowGroup title="Developer">
-            <Row icon={Cat} title="Koban gallery" onPress={() => router.push('/dev/koban')} />
+          <ListGroup title="Developer">
+            <ListRow icon={Shapes} title="Kit" sub="Every ledger component, light and dark" trailing="chevron" onPress={() => router.push('/dev/kit')} />
+            {FLAGS.ai && <ListRow icon={Sparkles} title="AI test set" trailing="chevron" onPress={() => router.push('/dev/ai-eval')} />}
             {notifEnabled && (
-              <Row
+              <ListRow
                 icon={Send}
                 title="Push notifications"
-                hint={
+                sub={
                   pushStatus.checking
                     ? 'Checking…'
                     : pushStatus.unsupported
                       ? 'Needs a development build, not Expo Go.'
                       : pushStatus.registered
                         ? 'This device is registered.'
-                        : 'Not registered yet — reopen the app, or check your connection.'
+                        : 'Not registered yet. Reopen the app, or check your connection.'
                 }
-                right={
+                subLines={2}
+                trailing={
                   <Button
                     variant="secondary"
+                    compact
                     title={sendingTestPush ? 'Sending…' : 'Send test'}
                     onPress={handleSendTestPush}
                     disabled={sendingTestPush || !pushStatus.registered}
-                    style={styles.inlineButton}
                   />
                 }
               />
             )}
-          </RowGroup>
+          </ListGroup>
         )}
 
-        <RowGroup>
-          <Row icon={LogOut} title="Log out" chevron={false} onPress={signOut} />
-        </RowGroup>
-      </ScrollView>
+        <ListGroup>
+          <ListRow
+            icon={Trash2}
+            title="Delete account"
+            danger
+            onPress={() => {
+              setDeleteError(null);
+              setConfirmVisible(true);
+            }}
+          />
+          <ListRow icon={LogOut} title="Log out" onPress={signOut} />
+        </ListGroup>
+      </Animated.ScrollView>
 
       <Modal
         visible={confirmVisible}
@@ -763,185 +822,109 @@ export default function Settings() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalIcon}>
-              <TriangleAlert size={26} color={colors.danger} strokeWidth={2.2} />
+              <TriangleAlert size={24} color={c.danger} strokeWidth={1.75} />
             </View>
-            <Text style={styles.modalTitle}>Delete Account?</Text>
+            <Text style={styles.modalTitle}>Delete account?</Text>
             <Text style={styles.modalBody}>
-              This permanently deletes your account and everything in it — all
+              This permanently deletes your account and everything in it: all
               accounts, transactions, budgets, plans and your profile. This
               cannot be undone.
             </Text>
 
             {deleteError && <Text style={styles.modalError}>{deleteError}</Text>}
 
-            <Pressable
-              style={[styles.modalDelete, deleting && styles.modalDeleteDisabled]}
-              accessibilityRole="button"
-              accessibilityLabel="Delete everything"
-              accessibilityState={{ disabled: deleting, busy: deleting }}
-              onPress={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <ActivityIndicator color={staticColors.surface} />
-              ) : (
-                <Text style={styles.modalDeleteText}>Delete Everything</Text>
-              )}
-            </Pressable>
-            <Pressable
-              style={styles.modalCancel}
-              accessibilityRole="button"
+            <Button variant="danger" title="Delete everything" onPress={handleDelete} loading={deleting} style={styles.modalButton} />
+            <Button
+              variant="secondary"
+              title="Cancel"
               onPress={() => setConfirmVisible(false)}
               disabled={deleting}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
+              style={[styles.modalButton, { marginTop: ledgerSpace.sm }]}
+            />
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+
+      <SummaryPeriodSheet
+        ref={periodSheetRef}
+        kind={periodSheetKind}
+        period={resetPeriod}
+        monthDay={resetMonthDay}
+        onPick={handlePeriodPick}
+        onPickDay={handleSalaryDayPick}
+      />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  pressedDim: {
-    opacity: 0.85,
-  },
-  // The dev-only "Send test" text button, sized to sit inside a Row.
-  inlineButton: {
-    height: 40,
-    paddingHorizontal: spacing.md,
-  },
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  scroll: {
-    // The native header sits above; this is the gap below it.
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sectionLg,
-  },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    borderRadius: radii.cardLg,
-    padding: 22,
-    marginBottom: spacing.xl,
-  },
-  avatarImage: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
-  },
-  avatarPlaceholder: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
-    backgroundColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 24,
-    // Sits on the theme-accent avatar bg — colors.brandText picks legible
-    // dark/light text per-accent (theme/themes.js).
-    color: colors.brandText,
-  },
-  profileNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  profileName: {
-    flexShrink: 1,
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.heading,
-    // Sits on Card's `dark` prop (permanently-dark surface) — pinned so it
-    // doesn't invert under Dark theme.
-    color: staticColors.surface,
-  },
-  profileEmail: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.base,
-    color: staticColors.mutedOnDark,
-    marginTop: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  modalCard: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    borderRadius: radii.cardLg,
-    padding: spacing.xl,
-    alignItems: 'center',
-  },
-  modalIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.pill,
-    backgroundColor: colors.dangerBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    color: colors.ink,
-    marginBottom: spacing.sm,
-  },
-  modalBody: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.base,
-    color: colors.muted,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-  },
-  modalError: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  modalDelete: {
-    width: '100%',
-    height: 54,
-    borderRadius: radii.buttonSm + 4,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalDeleteDisabled: {
-    opacity: 0.7,
-  },
-  modalDeleteText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    // Sits on the pinned-red delete button — always white.
-    color: staticColors.surface,
-  },
-  modalCancel: {
-    width: '100%',
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xs,
-  },
-  modalCancelText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+    },
+    profile: {
+      marginTop: ledgerSpace.sm,
+    },
+    avatar: {
+      width: ledgerSize.iconCircle,
+      height: ledgerSize.iconCircle,
+      borderRadius: ledgerRadius.full,
+    },
+    avatarInitial: {
+      fontFamily: inter.semibold,
+      fontSize: 16,
+      color: c.ink,
+    },
+    callout: {
+      marginTop: ledgerSpace.sm,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: c.scrim,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: ledgerSpace.gutter,
+    },
+    modalCard: {
+      width: '100%',
+      backgroundColor: c.surface,
+      borderRadius: ledgerRadius.card,
+      padding: ledgerSpace.gutter + 4,
+      alignItems: 'center',
+    },
+    modalIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.dangerSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: ledgerSpace.lg,
+    },
+    modalTitle: {
+      ...ledgerType.title,
+      color: c.ink,
+      marginBottom: ledgerSpace.sm,
+    },
+    modalBody: {
+      ...ledgerType.body,
+      color: c.muted,
+      textAlign: 'center',
+      marginBottom: ledgerSpace.lg,
+    },
+    modalError: {
+      ...ledgerType.body,
+      fontFamily: inter.semibold,
+      color: c.danger,
+      textAlign: 'center',
+      marginBottom: ledgerSpace.md,
+    },
+    modalButton: {
+      alignSelf: 'stretch',
+    },
   });
 }

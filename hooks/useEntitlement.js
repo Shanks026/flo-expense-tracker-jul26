@@ -6,7 +6,7 @@ import { FLAGS } from '../lib/flags';
 
 // The client's Pro truth. A missing entitlements row reads as Free — this is
 // deliberate (see 14-subscription-pro.md §Data model), not an error state.
-// Real enforcement that costs money (AI) stays server-side; this only gates
+// Real enforcement that costs money stays server-side; this only gates
 // cheap create actions client-side.
 export default function useEntitlement() {
   const { version } = useDataRefresh();

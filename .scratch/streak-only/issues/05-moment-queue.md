@@ -1,6 +1,6 @@
 # 05: Moment queue, with the bills-due modal as its first moment
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** One queue decides every interruption, so users never tap through a stack of popups.
 - A queue provider sits beside the toast provider. Sources call `enqueue({ kind, priority, payload })` instead of rendering their own modals. It replaces `lib/moments.js`.

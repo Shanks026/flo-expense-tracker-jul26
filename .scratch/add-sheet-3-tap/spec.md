@@ -1,6 +1,6 @@
 # Add sheet: 3-tap logging
 
-Spec: .claude/features/36-add-sheet-3-tap.md
+Spec: .claude/features/archive/36-add-sheet-3-tap.md
 
 Decisions made while ticketing (2026-10-26):
 - Transfer leaves the type toggle but stays reachable through a "Transfer between accounts" link in Details, shown with 2+ accounts, until spec 38 gives it a home in Accounts.

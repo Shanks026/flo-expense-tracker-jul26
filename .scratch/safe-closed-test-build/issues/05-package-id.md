@@ -1,6 +1,6 @@
 # 05: Package id `app.floexpense.tracker`, with `.personal` for auto-detect builds
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md
 
 **What to build:** FLO gets its permanent store identity. The app config derives the Android package from the variant: `app.floexpense.tracker.personal` whenever auto-detect is built in, otherwise `app.floexpense.tracker`. The placeholder `com.anonymous.flo` goes away. `google-services.json` is replaced with one file covering both Firebase Android apps, so push keeps working under both ids. The store build and the personal build install side by side on one phone. The native auto-detect module's Kotlin namespace is not renamed, since it only exists in the personal build.
 

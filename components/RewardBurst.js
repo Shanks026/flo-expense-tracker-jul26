@@ -82,7 +82,7 @@ function RewardBurstOverlay({ coins, xp, freezes = 0, onDone }) {
     };
   }, []);
 
-  // Animate-first, snap-on-reduce (same convention as FadeIn/OnboardingReveal):
+  // Animate-first, snap-on-reduce (same convention as OnboardingReveal):
   // starts popping in immediately rather than waiting on the async
   // reduce-motion check, and only snaps to the flat final frame if that check
   // later resolves true. This still SHOWS the reward under reduce-motion — it

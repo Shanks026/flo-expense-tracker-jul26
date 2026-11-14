@@ -1,6 +1,6 @@
 # 07: Retire the 3D art
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** The flat UI no longer mixes in glossy 3D art.
 - The streak chip on Home, the streak screen and the 7-day streak row use the lucide flame (lit and unlit states) instead of the glossy flame PNG.

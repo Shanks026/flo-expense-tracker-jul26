@@ -1,6 +1,6 @@
 # Home, Insights and More: lean v1 information architecture
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 Decisions made while ticketing (2026-10-26):
 - Plans (01) and split invites + currency picker (02) are separate tickets, so each can be checked on its own.

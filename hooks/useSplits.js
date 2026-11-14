@@ -74,6 +74,8 @@ export default function useSplits() {
           return {
             ...split,
             memberCount: members.length,
+            // For the list's AvatarStack (spec 48, ticket 07).
+            members: members.map((m) => ({ id: m.id, name: m.name, shortName: m.shortName, color: m.color })),
             entryCount: entries.length,
             total,
             perHead: members.length ? total / members.length : 0,

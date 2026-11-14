@@ -1,6 +1,6 @@
 # 08: Koban component: silhouette, idle and motion
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Koban exists as one code-drawn character that feels alive.
 - One flat ginger-tabby silhouette, style A from the approved prototype round (branch `prototype/koban-mascot`, `koban-body-v5.prototype.html`): a head with ears, a pear torso, round-capped tube arms, legs and tail in the body colour, and a crease line only where a limb crosses the body or face. No outline, no gradients.

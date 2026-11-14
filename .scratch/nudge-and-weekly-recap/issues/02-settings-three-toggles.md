@@ -1,6 +1,6 @@
 # 02: Settings: one Notifications section with three toggles
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:**
 - **Settings → Notifications** has exactly three controls:

@@ -1,6 +1,6 @@
 # 05: The first expense in the real Add sheet
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** Between sign-in and the reminder ask, a new user lands on an empty Home with the real Add sheet open over it. It's the same sheet and category grid they'll use every day, not a forked onboarding screen.
 - **Save** logs the expense, and `expense_logged` carries `source: onboarding`.

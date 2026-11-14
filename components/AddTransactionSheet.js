@@ -1,23 +1,22 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, Pressable, StyleSheet, Keyboard, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Keyboard } from 'react-native';
 // Gesture Handler's ScrollView, not React Native's: inside the bottom sheet,
 // a plain one loses the horizontal swipe to the sheet's own gesture.
 import { ScrollView } from 'react-native-gesture-handler';
-import {
-  BottomSheetModal,
-  BottomSheetScrollView,
-  BottomSheetBackdrop,
-  BottomSheetFooter,
-  BottomSheetTextInput,
-} from '@gorhom/bottom-sheet';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { X, Trash2, ChevronDown, ArrowLeftRight, Wallet, Crown } from 'lucide-react-native';
-import { format, isToday, isYesterday, subDays } from 'date-fns';
+import { ChevronDown, ArrowLeftRight, Wallet, Users, CalendarDays } from 'lucide-react-native';
+import { format, isToday, isYesterday, parseISO, subDays } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
-import Button from './Button';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import QuickAddField from './QuickAddField';
+import Sheet from './ledger/Sheet';
+import Segmented from './ledger/Segmented';
+import ListRow from './ledger/ListRow';
+import Chip from './ledger/Chip';
+import Button from './ledger/Button';
+import HeaderIconButton from './ledger/HeaderIconButton';
+import EmptyState from './ledger/EmptyState';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular, inter } from '../theme/ledger';
 import { currencySymbol, formatMoney, sanitizeAmountInput } from '../lib/currency';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
@@ -29,6 +28,8 @@ import { rankCategories, defaultCategoryId } from '../lib/categoryDefaults';
 import useSplits from '../hooks/useSplits';
 import { createEntryFromTransaction } from '../lib/splits';
 import { isTransfer, logTransfer, updateTransfer, deleteTransfer } from '../lib/transfers';
+import { deleteTransaction } from '../lib/transactions';
+import { entrySource } from '../lib/entrySource';
 import { claimDailyLog } from '../lib/rewardsMutations';
 import { track } from '../lib/track';
 import { setMomentBlocker } from '../lib/momentQueue';
@@ -38,6 +39,14 @@ import useEntitlement from '../hooks/useEntitlement';
 import { useProUpsellSheet } from './ProUpsellSheet';
 import { useAddAccountSheet } from './AddAccountSheet';
 import { destructiveHaptic } from '../lib/haptics';
+import { FLAGS } from '../lib/flags';
+import { quickParse } from '../lib/quickParse';
+import { aiQuickAdd } from '../lib/ai';
+
+const TYPE_OPTIONS = [
+  { value: 'expense', label: 'Expense' },
+  { value: 'income', label: 'Income' },
+];
 
 const AddTransactionSheetContext = createContext(null);
 
@@ -67,34 +76,24 @@ function formatDateLabel(date) {
 
 // A From/To account picker for Transfer mode. `exclude` is the account chosen in
 // the *other* field, dropped from these options so From and To can never be the
-// same account. Same inline-dropdown shape as the plan picker.
+// same account. A row with the choice on the right; tapping it shows chips.
 function AccountField({ label, value, exclude, accounts, open, onToggle, onSelect, styles }) {
-  const { colors } = useTheme();
+  const { c } = useLedger();
   const selected = accounts.find((a) => a.id === value);
   const options = accounts.filter((a) => a.id !== exclude);
   return (
     <>
-      <Pressable style={styles.accountField} onPress={onToggle}>
-        <View>
-          <Text style={styles.fieldLabel}>{label}</Text>
-          <Text style={[styles.fieldValue, selected && styles.fieldValuePlan]} numberOfLines={1}>
-            {selected?.name ?? 'Select account'}
-          </Text>
-        </View>
-        <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-      </Pressable>
+      <ListRow
+        icon={Wallet}
+        title={label}
+        right={selected?.name ?? 'Select account'}
+        trailing={<ChevronDown size={18} color={c.muted} strokeWidth={1.75} />}
+        onPress={onToggle}
+      />
       {open && (
-        <View style={styles.planPicker}>
+        <View style={styles.optionRow}>
           {options.map((a) => (
-            <Pressable
-              key={a.id}
-              style={[styles.planOption, value === a.id && styles.planOptionSelected]}
-              onPress={() => onSelect(a.id)}
-            >
-              <Text style={[styles.planOptionText, value === a.id && styles.planOptionTextSelected]} numberOfLines={1}>
-                {a.name}
-              </Text>
-            </Pressable>
+            <Chip key={a.id} label={a.name} selected={value === a.id} onPress={() => onSelect(a.id)} />
           ))}
         </View>
       )}
@@ -102,30 +101,12 @@ function AccountField({ label, value, exclude, accounts, open, onToggle, onSelec
   );
 }
 
-// The pinned Save footer's own height: the 56 dp button plus the footer's
-// spacing.sm top and spacing.lg bottom padding (the nav-bar inset is added
-// on top while the keyboard is down).
-const FOOTER_HEIGHT = 56 + spacing.sm + spacing.lg;
-
 const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  // The sheet runs to the screen edge; Android draws edge-to-edge, so Save
-  // and the scroll end clear the system nav bar by its inset.
-  const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const maxSheetHeight = Math.round(windowHeight * 0.92);
-  const [keyboardUp, setKeyboardUp] = useState(false);
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardUp(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardUp(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const amountInputRef = useRef(null);
+  const quickInputRef = useRef(null);
   const handleBackChange = useSheetBackHandler(modalRef);
   // The open sheet blocks the moment queue, so celebrations and coach marks
   // wait until it closes instead of interrupting entry (36-add-sheet-3-tap.md,
@@ -188,6 +169,11 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   // expense (35-onboarding-v3.md) moves on from there. Refs, not state: they
   // only matter at save and dismiss time.
   const sourceRef = useRef('manual');
+  // For transactions.source (spec 46, ticket 07; lib/entrySource.js): an
+  // opener's `origin` when the analytics source can't tell it (auto-detect),
+  // and whether the quick-add line was filled by voice.
+  const originRef = useRef(null);
+  const spokenRef = useRef(false);
   // For the rest of `expense_logged` (36-add-sheet-3-tap.md): when this open
   // began, for seconds_to_save, and which category the sheet chose by itself,
   // for category_was_prefilled.
@@ -195,6 +181,26 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   const prefilledCategoryRef = useRef(null);
   const onDoneRef = useRef(null);
   const savedRef = useRef(false);
+  // The quick-add line (44-ai-assistant.md, Phase 1): shown only for the ⊕
+  // tab's blank entry, and only with FLAGS.ai on. `quickKey` clears it per
+  // open so it starts empty. `categoryTappedRef` records a chip tap since
+  // the last parse, so re-parsing never overrides a category the person
+  // picked after seeing the parsed one.
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  // A line over the sheet's fields for one opener: onboarding's first
+  // expense ("Log your first expense: type it or hold to say it", spec 47).
+  const [intro, setIntro] = useState(null);
+  const [quickKey, setQuickKey] = useState(0);
+  // Set (non-zero) to make the quick-add line start listening (long-press ⊕).
+  const [listenKey, setListenKey] = useState(0);
+  const categoryTappedRef = useRef(false);
+  // Bumped by every hand edit (amount, category, type, date, note). A model
+  // answer that started before the latest edit is dropped, so a slow reply
+  // never overwrites something the person typed or tapped while it thought.
+  const editEpochRef = useRef(0);
+  const markEdited = () => {
+    editEpochRef.current += 1;
+  };
 
   const categories = type === 'expense' ? expenseCategories : incomeCategories;
   // The smart default and the row's order (36-add-sheet-3-tap.md), from the
@@ -233,10 +239,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
   useImperativeHandle(ref, () => ({
     open(payload) {
       sourceRef.current = payload?.source ?? 'manual';
+      originRef.current = payload?.origin ?? null;
+      spokenRef.current = false;
       openedAtRef.current = Date.now();
       prefilledCategoryRef.current = null;
       onDoneRef.current = payload?.onDone ?? null;
       savedRef.current = false;
+      categoryTappedRef.current = false;
       setError(null);
       // Never sticky: a split chosen for one expense must not silently apply to
       // the next one logged from the same sheet.
@@ -254,6 +263,13 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // category chips below it, and is especially jarring right after a
       // notification tap, before the user has even seen the sheet.
       const isBlankEntry = !payload?.id && !payload?.amount;
+      // The quick-add line is for the ⊕ tab alone, which asks for it with
+      // `quickAdd: true`. Every other opener (an edit, share, a notification,
+      // auto-detect, onboarding) gets the sheet as it was.
+      const quickAdd = FLAGS.ai && !!payload?.quickAdd && isBlankEntry;
+      setShowQuickAdd(quickAdd);
+      setIntro(payload?.intro ?? null);
+      if (quickAdd) setQuickKey((k) => k + 1);
 
       if (payload?.id && isTransfer(payload)) {
         // Editing a transfer: recover From/To from whichever leg was tapped.
@@ -304,9 +320,9 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         prefilledCategoryRef.current = initialCategory;
         setCategoryId(initialCategory);
         setLeadCategoryId(initialCategory);
-        // Defaults to the active account, same as before — now changeable
-        // via the inline dropdown before saving, instead of fixed.
-        setAccountId(activeAccountId);
+        // The opener's account if it names one, else the active account —
+        // changeable via the inline dropdown before saving.
+        setAccountId(payload?.accountId ?? activeAccountId);
         // Transfer From/To seed: From = the account the transfer was started
         // from (Accounts screen), else the account you're in; To = unset.
         setFromAccountId(payload?.fromAccountId ?? activeAccountId);
@@ -316,7 +332,15 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
         // plan_id from the opener (Plan Detail's "Add Expense") still lands,
         // and an edit keeps its plan (the branch above).
         setPlanId(payload?.plan_id ?? null);
-        setDate(payload?.date ? new Date(payload.date) : new Date());
+        // A bare 'YYYY-MM-DD' (Ask FLO's drafts) is a local day: new Date()
+        // would read it as UTC midnight, the day before west of Greenwich.
+        setDate(
+          !payload?.date
+            ? new Date()
+            : typeof payload.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.date)
+              ? parseISO(payload.date)
+              : new Date(payload.date)
+        );
         setNote(payload?.note ?? '');
       }
       modalRef.current?.present();
@@ -327,8 +351,19 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
       // The short delay lets the sheet's present() animation settle first;
       // focusing mid-animation is a known source of jank/no-ops with
       // bottom-sheet + keyboard interactions.
+      // With the quick-add line showing, the keyboard opens there instead;
+      // tapping the amount still works as before.
+      // A long-press on ⊕ (`listen: true`) opens it listening instead.
+      // The sheet's content remounts on each open, so every other open
+      // clears the request; otherwise the line would listen again on mount.
+      setListenKey(0);
       if (isBlankEntry) {
-        setTimeout(() => amountInputRef.current?.focus(), 300);
+        if (quickAdd && payload?.listen) {
+          setTimeout(() => setListenKey(Date.now()), 300);
+        } else {
+          const target = quickAdd ? quickInputRef : amountInputRef;
+          setTimeout(() => target.current?.focus(), 300);
+        }
       }
     },
   }));
@@ -355,7 +390,58 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     setLeadCategoryId(initialCategory);
   }, [categoryId, editingId, type, categories.length]);
 
+  // Fills the open sheet from a parsed quick-add line. Only what the line
+  // says changes; Save stays the person's tap. The parsed category counts as
+  // the sheet's own choice for category_was_prefilled, so a chip tapped
+  // afterwards reads as a change. A chip tapped after a parse survives a
+  // re-parse of the same type; one tapped before any parse gives way.
+  function parseQuickLine(text) {
+    return quickParse(text, {
+      categories: [...expenseCategories, ...incomeCategories],
+      accounts,
+      today: format(new Date(), 'yyyy-MM-dd'),
+    });
+  }
+
+  // The line the phone isn't sure about goes to the ai-assistant function
+  // (ticket 02). It answers with the same prefill shape, or a reason.
+  async function askQuickLine(text) {
+    const epoch = editEpochRef.current;
+    const result = await aiQuickAdd(text, { categories: [...expenseCategories, ...incomeCategories], accounts });
+    if (result.prefill && epoch !== editEpochRef.current) return { prefill: null, reason: 'stale' };
+    return result;
+  }
+
+  // source: 'quick_local' (the phone's parser) or 'quick_ai' (the model);
+  // spoken: the line came from the mic.
+  function handleQuickParsed(prefill, source, spoken = false) {
+    setError(null);
+    sourceRef.current = source;
+    spokenRef.current = spoken;
+    const keepTapped = categoryTappedRef.current && prefill.type === type && categoryId;
+    // Still protected on the next parse if kept; otherwise the parse took over.
+    if (!keepTapped) categoryTappedRef.current = false;
+    setType(prefill.type);
+    // A split takes expenses only; its row hides for income.
+    if (prefill.type !== 'expense') setSplitId(null);
+    setAmount(String(prefill.amount));
+    if (!keepTapped) {
+      // The model may find no category that fits; the smart default stands in.
+      const nextCategory = prefill.categoryId ?? defaultCategoryFor(prefill.type);
+      prefilledCategoryRef.current = nextCategory;
+      setCategoryId(nextCategory);
+      setLeadCategoryId(nextCategory);
+    }
+    setAccountId(prefill.accountId ?? activeAccountId);
+    setAccountPickerOpen(false);
+    // parseISO, not new Date('YYYY-MM-DD'): that reads as UTC midnight.
+    setDate(parseISO(prefill.date));
+    setNote(prefill.note ?? '');
+    Keyboard.dismiss();
+  }
+
   function handleTypeChange(nextType) {
+    markEdited();
     setError(null);
     setType(nextType);
     if (nextType === 'transfer') return; // transfers have no category
@@ -365,9 +451,8 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     setLeadCategoryId(initialCategory);
   }
 
-  // Transfer's empty state (< 2 accounts) — same hasPro gate shape as
-  // handleScanReceipt used to have (13-ai-features.md, removed 2026-07-22):
-  // free users hit the upsell, Pro users go straight to Add Account.
+  // Transfer's empty state (< 2 accounts), behind a hasPro gate: free users
+  // hit the upsell, Pro users go straight to Add Account.
   // Dismisses this sheet first, same as the existing "Adding to <account>"
   // row's handoff to the account switcher — a second account needs a real
   // trip to another sheet, not a stack of two.
@@ -472,7 +557,12 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     } else {
       const { data: inserted, error: insertError } = await supabase
         .from('transactions')
-        .insert({ ...payload, account_id: targetAccountId })
+        // Only a new entry gets a source; an edit (above) never changes it.
+        .insert({
+          ...payload,
+          account_id: targetAccountId,
+          source: entrySource({ source: sourceRef.current, origin: originRef.current, spoken: spokenRef.current }),
+        })
         .select('id')
         .single();
       saveError = insertError;
@@ -571,7 +661,7 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     const { error: deleteError } = editingTransferId
       ? await deleteTransfer(editingTransferId)
       : editingId
-        ? await supabase.from('transactions').delete().eq('id', editingId)
+        ? await deleteTransaction({ id: editingId })
         : { error: null };
     if (!editingTransferId && !editingId) {
       setSaving(false);
@@ -594,715 +684,458 @@ const AddTransactionSheet = forwardRef(function AddTransactionSheet(_props, ref)
     onDone?.({ saved: savedRef.current });
   }, []);
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
+  // The Account row: only with 2+ accounts, never on an edit. The split row
+  // below takes the gap above it when this one isn't there.
+  const showAccountRow = !editingId && hasSecondAccount && !!selectedAccount;
 
-  // Save, pinned to the bottom of the sheet: with the sheet's keyboard
-  // handling below, that keeps it just above the keyboard, so saving never
-  // means dismissing the keyboard first (36-add-sheet-3-tap.md).
-  const renderFooter = (props) => (
-    <BottomSheetFooter {...props}>
-      {/* The nav-bar inset only while the keyboard is down; with it up, Save
-          sits right on the keyboard. */}
-      <View style={[styles.footer, { paddingBottom: spacing.lg + (keyboardUp ? 0 : insets.bottom) }]}>
-        <Button title="Save" onPress={handleSave} loading={saving} disabled={!canSave} />
-      </View>
-    </BottomSheetFooter>
+  const title =
+    type === 'transfer'
+      ? editingId
+        ? 'Edit transfer'
+        : 'Transfer'
+      : editingId
+        ? 'Edit transaction'
+        : 'Add transaction';
+
+  // A field with a label above and a value or input under it, on a hairline
+  // box. Note, and the transfer's Date.
+  const noteField = (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>Note</Text>
+      <BottomSheetTextInput
+        value={note}
+        onChangeText={(v) => {
+          markEdited();
+          setNote(v);
+        }}
+        placeholder="Add a note…"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        accessibilityLabel="Note"
+        style={styles.noteInput}
+      />
+    </View>
   );
 
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={title}
       onChange={handleSheetChange}
       onDismiss={handleDismiss}
-      topInset={insets.top}
-      // Sized to its content, so Save sits under the fields instead of below
-      // an empty gap; capped so a long form still scrolls.
-      enableDynamicSizing
-      maxDynamicContentSize={maxSheetHeight}
-      keyboardBehavior="interactive"
-      keyboardBlurBehavior="restore"
-      // adjustPan: the sheet tracks the keyboard itself. Under Android's
-      // edge-to-edge drawing (Android 15+) the window no longer resizes for
-      // the keyboard, so adjustResize left Save and the fields under it.
-      android_keyboardInputMode="adjustPan"
-      footerComponent={renderFooter}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      // Save, pinned above the keyboard, so saving never means dismissing the
+      // keyboard first (36-add-sheet-3-tap.md).
+      footer={{ primary: { title: 'Save', onPress: handleSave, loading: saving, disabled: !canSave } }}
     >
-      <BottomSheetScrollView contentContainerStyle={[styles.sheet, { paddingBottom: FOOTER_HEIGHT + spacing.md + (keyboardUp ? 0 : insets.bottom) }]} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>
-            {type === 'transfer'
-              ? editingId
-                ? 'Edit Transfer'
-                : 'Transfer'
-              : editingId
-                ? 'Edit Transaction'
-                : 'Add Transaction'}
-          </Text>
-          <View style={styles.headerActions}>
-            <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-              <X size={16} color={colors.ink} strokeWidth={2.6} />
-            </Pressable>
-          </View>
-        </View>
+      {/* Order (spec 46): quick-add line, Expense | Income, amount, category,
+          date, note, account (2+ accounts), split (open splits). Transfers
+          have no type toggle; they start from Home's Transfer tile or
+          Accounts. The quick-add line is mounted whenever the flag is on and
+          hidden for other openers, so the + tab's focus() lands on an input
+          that's already there. */}
+      {!!intro && <Text style={styles.intro}>{intro}</Text>}
+      {FLAGS.ai && (
+        <QuickAddField
+          ref={quickInputRef}
+          resetKey={quickKey}
+          listenKey={listenKey}
+          onCantListen={() => quickInputRef.current?.focus()}
+          hidden={!showQuickAdd}
+          parse={parseQuickLine}
+          ask={askQuickLine}
+          onParsed={handleQuickParsed}
+        />
+      )}
 
-        {/* Expense | Income on top, then the amount (focused on open, decimal
-            keypad), the way the sheet read before spec 36. Save lives in the
-            footer, pinned above the keyboard. Transfers start from Accounts
-            and have no toggle. */}
-        {type !== 'transfer' && (
-          <View style={styles.segmentWrap}>
-            <Pressable
-              style={[styles.segment, type === 'expense' && styles.segmentActive]}
-              onPress={() => handleTypeChange('expense')}
-            >
-              <Text style={[styles.segmentText, type === 'expense' && styles.segmentTextActive]}>Expense</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.segment, type === 'income' && styles.segmentActive]}
-              onPress={() => handleTypeChange('income')}
-            >
-              <Text style={[styles.segmentText, type === 'income' && styles.segmentTextActive]}>Income</Text>
-            </Pressable>
-          </View>
-        )}
+      {type !== 'transfer' && (
+        <Segmented
+          accessibilityLabel="Type"
+          options={TYPE_OPTIONS}
+          value={type}
+          onChange={handleTypeChange}
+          style={styles.block}
+        />
+      )}
 
-        <View style={styles.amountWrap}>
-          <Text style={styles.amountLabel}>Amount</Text>
-          <View style={styles.amountRow}>
-            <Text style={styles.amountCurrency}>{currencySymbol(selectedAccount?.currency)}</Text>
-            <BottomSheetTextInput
-              ref={amountInputRef}
-              value={amount}
-              onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
-              placeholder="0"
-              placeholderTextColor={colors.mutedLight}
-              keyboardType="decimal-pad"
-              style={styles.amountInput}
+      {/* The amount, centred and large, with a muted symbol. */}
+      <View style={styles.amountWrap}>
+        <Text style={styles.amountCurrency}>{currencySymbol(selectedAccount?.currency)}</Text>
+        <BottomSheetTextInput
+          ref={amountInputRef}
+          value={amount}
+          // The caret stays at the end, like a calculator: a tap on a big
+          // centred number otherwise drops it mid-number (often first), so
+          // digits went in front and Backspace had nothing to delete.
+          selection={{ start: amount.length, end: amount.length }}
+          onChangeText={(v) => {
+            markEdited();
+            setAmount(sanitizeAmountInput(v));
+          }}
+          placeholder="0"
+          placeholderTextColor={c.inkFaint}
+          cursorColor={c.accent}
+          selectionColor={c.accent}
+          keyboardType="decimal-pad"
+          accessibilityLabel="Amount"
+          style={[styles.amountInput, tabular]}
+        />
+      </View>
+
+      {type === 'transfer' ? (
+        hasSecondAccount ? (
+          <View style={styles.block}>
+            <AccountField
+              styles={styles}
+              label="From"
+              value={fromAccountId}
+              exclude={toAccountId}
+              accounts={accounts}
+              open={fromPickerOpen}
+              onToggle={() => {
+                setFromPickerOpen((v) => !v);
+                setToPickerOpen(false);
+              }}
+              onSelect={(id) => {
+                setFromAccountId(id);
+                setFromPickerOpen(false);
+              }}
+            />
+            <View style={styles.swapRow}>
+              <HeaderIconButton icon={ArrowLeftRight} onPress={handleSwapAccounts} accessibilityLabel="Swap From and To" />
+            </View>
+            <AccountField
+              styles={styles}
+              label="To"
+              value={toAccountId}
+              exclude={fromAccountId}
+              accounts={accounts}
+              open={toPickerOpen}
+              onToggle={() => {
+                setToPickerOpen((v) => !v);
+                setFromPickerOpen(false);
+              }}
+              onSelect={(id) => {
+                setToAccountId(id);
+                setToPickerOpen(false);
+              }}
+            />
+            <ListRow
+              icon={CalendarDays}
+              title="Date"
+              right={formatDateLabel(date)}
+              trailing="chevron"
+              onPress={() => setShowDatePicker(true)}
+            />
+            <View style={styles.gapTop}>{noteField}</View>
+          </View>
+        ) : (
+          // < 2 accounts: only reachable when editing an old transfer whose
+          // other account is gone, since every Transfer opener needs 2+.
+          <EmptyState
+            illustration="coins"
+            title="Add a second account"
+            body={`Transfers move money between two of your own accounts. ${hasPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}`}
+            actionTitle={hasPro ? 'Add an account' : 'Upgrade to Pro'}
+            onAction={handleAddAccountForTransfer}
+          />
+        )
+      ) : (
+        <>
+          {/* Every category in one swipeable row (the person's call,
+              2026-10-27), in usage order with the pre-selected one first so
+              it's always in view. Selected is an ink circle, white icon. */}
+          <Text style={styles.sectionLabel}>Category</Text>
+          <ScrollView
+            key={type}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={styles.chipScroll}
+            contentContainerStyle={styles.chipRow}
+          >
+            {rowCategories.map((cat) => {
+              const selected = cat.id === categoryId;
+              return (
+                <Pressable
+                  key={cat.id}
+                  style={styles.chip}
+                  accessibilityRole="button"
+                  accessibilityLabel={cat.name}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    categoryTappedRef.current = true;
+                    markEdited();
+                    setCategoryId(cat.id);
+                  }}
+                >
+                  <View style={[styles.chipCircle, selected && styles.chipCircleSelected]}>
+                    <CategoryIcon icon={cat.icon} size={20} color={selected ? c.inkOnInk : c.ink} strokeWidth={1.75} />
+                  </View>
+                  <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]} numberOfLines={1}>
+                    {cat.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.dateChipRow}>
+            <Chip
+              label="Today"
+              selected={isToday(date)}
+              onPress={() => {
+                markEdited();
+                setDate(new Date());
+              }}
+            />
+            <Chip
+              label="Yesterday"
+              selected={isYesterday(date)}
+              onPress={() => {
+                markEdited();
+                setDate(subDays(new Date(), 1));
+              }}
+            />
+            <Chip
+              label={isToday(date) || isYesterday(date) ? 'Pick a date' : formatDateLabel(date)}
+              selected={!isToday(date) && !isYesterday(date)}
+              onPress={() => setShowDatePicker(true)}
             />
           </View>
-        </View>
 
-        {type === 'transfer' ? (
-          <>
-            {/* Transfers are started from an account's actions on the
-                Accounts screen (38-home-insights-more.md), never from here. */}
-            {hasSecondAccount ? (
-              <>
-                <AccountField
-                  styles={styles}
-                  label="From"
-                  value={fromAccountId}
-                  exclude={toAccountId}
-                  accounts={accounts}
-                  open={fromPickerOpen}
-                  onToggle={() => {
-                    setFromPickerOpen((v) => !v);
-                    setToPickerOpen(false);
-                  }}
-                  onSelect={(id) => {
-                    setFromAccountId(id);
-                    setFromPickerOpen(false);
-                  }}
-                />
-                <View style={styles.swapRow}>
-                  <Pressable style={styles.swapButton} onPress={handleSwapAccounts} hitSlop={8}>
-                    <ArrowLeftRight size={16} color={colors.ink} strokeWidth={2.4} />
-                  </Pressable>
+          {noteField}
+
+          {/* Only with 2+ accounts, and never on an edit (editing never
+              changes an entry's account; see handleSave). */}
+          {showAccountRow && (
+            <View style={styles.gapTop}>
+              <ListRow
+                icon={Wallet}
+                title="Account"
+                right={selectedAccount.name}
+                trailing={<ChevronDown size={18} color={c.muted} strokeWidth={1.75} />}
+                onPress={() => setAccountPickerOpen((v) => !v)}
+                divider={accountPickerOpen}
+              />
+              {accountPickerOpen && (
+                <View style={styles.optionRow}>
+                  {accounts.map((a) => (
+                    <Chip
+                      key={a.id}
+                      label={a.name}
+                      selected={accountId === a.id}
+                      onPress={() => {
+                        setAccountId(a.id);
+                        setAccountPickerOpen(false);
+                      }}
+                    />
+                  ))}
                 </View>
-                <AccountField
-                  styles={styles}
-                  label="To"
-                  value={toAccountId}
-                  exclude={fromAccountId}
-                  accounts={accounts}
-                  open={toPickerOpen}
-                  onToggle={() => {
-                    setToPickerOpen((v) => !v);
-                    setFromPickerOpen(false);
-                  }}
-                  onSelect={(id) => {
-                    setToAccountId(id);
-                    setToPickerOpen(false);
-                  }}
-                />
-                <Pressable style={styles.transferDate} onPress={() => setShowDatePicker(true)}>
-                  <Text style={styles.fieldLabel}>Date</Text>
-                  <Text style={styles.fieldValue}>{formatDateLabel(date)}</Text>
-                </Pressable>
-                <View style={styles.noteRow}>
-                  <Text style={styles.fieldLabel}>Note</Text>
-                  <BottomSheetTextInput
-                    value={note}
-                    onChangeText={setNote}
-                    placeholder="Add a note…"
-                    placeholderTextColor={colors.mutedLight}
-                    style={styles.noteInput}
-                  />
-                </View>
-              </>
-            ) : (
-              // < 2 accounts: only reachable when editing an old transfer whose
-              // other account is gone, since the Details link needs 2+.
-              <View style={styles.transferEmptyCard}>
-                <View style={styles.transferEmptyIcon}>
-                  <Wallet size={22} color={colors.brandStrong} strokeWidth={2} />
-                </View>
-                <Text style={styles.transferEmptyTitle}>Add a second account</Text>
-                <Text style={styles.transferEmptyBody}>
-                  Transfers move money between two of your own accounts.{' '}
-                  {hasPro ? 'Add one to get started.' : 'Upgrade to Pro to add another.'}
-                </Text>
-                <Pressable style={styles.transferEmptyButton} onPress={handleAddAccountForTransfer}>
-                  {!hasPro && <Crown size={15} color={colors.ink} strokeWidth={2.4} />}
-                  <Text style={styles.transferEmptyButtonText}>{hasPro ? 'Add an account' : 'Upgrade to Pro'}</Text>
-                </Pressable>
-              </View>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Every category in one swipeable row (the person's call,
-                2026-10-27, over spec 36's 4×2 grid), in usage order with the
-                pre-selected one first so it's always in view. */}
-            <Text style={styles.sectionLabel}>Category</Text>
-            <ScrollView
-              key={type}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              style={styles.chipScroll}
-              contentContainerStyle={styles.chipRow}
-            >
-              {rowCategories.map((cat) => {
-                const selected = cat.id === categoryId;
-                return (
-                  <Pressable key={cat.id} style={styles.chip} onPress={() => setCategoryId(cat.id)}>
-                    <View style={[styles.chipIcon, selected && styles.chipIconSelected]}>
-                      <CategoryIcon icon={cat.icon} size={22} color={selected ? colors.brandText : colors.ink} strokeWidth={2} />
-                    </View>
-                    <Text style={[styles.chipLabel, !selected && styles.chipLabelInactive]} numberOfLines={1}>
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {/* Date and note always in view (Home titles a row by its note);
-                account and split only when they apply. */}
-            <View style={styles.detailsBody}>
-              <View style={styles.dateChipRow}>
-                {[
-                  { key: 'today', label: 'Today', active: isToday(date), onPress: () => setDate(new Date()) },
-                  { key: 'yesterday', label: 'Yesterday', active: isYesterday(date), onPress: () => setDate(subDays(new Date(), 1)) },
-                  {
-                    key: 'pick',
-                    label: isToday(date) || isYesterday(date) ? 'Pick a date' : formatDateLabel(date),
-                    active: !isToday(date) && !isYesterday(date),
-                    onPress: () => setShowDatePicker(true),
-                  },
-                ].map((chip) => (
-                  <Pressable
-                    key={chip.key}
-                    style={[styles.dateChip, chip.active && styles.dateChipActive]}
-                    onPress={chip.onPress}
-                  >
-                    <Text style={[styles.dateChipText, chip.active && styles.dateChipTextActive]}>{chip.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <View style={[styles.noteRow, styles.noteRowInGroup]}>
-                <Text style={styles.fieldLabel}>Note</Text>
-                <BottomSheetTextInput
-                  value={note}
-                  onChangeText={setNote}
-                  placeholder="Add a note…"
-                  placeholderTextColor={colors.mutedLight}
-                  style={styles.noteInput}
-                />
-              </View>
-
-              {/* Only with 2+ accounts, and never on an edit (editing never
-                  changes an entry's account; see handleSave). */}
-              {!editingId && hasSecondAccount && selectedAccount && (
-                <>
-                  <Pressable style={styles.dateRow} onPress={() => setAccountPickerOpen((v) => !v)}>
-                    <View style={styles.planRowInner}>
-                      <View>
-                        <Text style={styles.fieldLabel}>Account</Text>
-                        <Text style={[styles.fieldValue, styles.fieldValuePlan]} numberOfLines={1}>
-                          {selectedAccount.name}
-                        </Text>
-                      </View>
-                      <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-                    </View>
-                  </Pressable>
-                  {accountPickerOpen && (
-                    <View style={styles.planPicker}>
-                      {accounts.map((a) => (
-                        <Pressable
-                          key={a.id}
-                          style={[styles.planOption, accountId === a.id && styles.planOptionSelected]}
-                          onPress={() => {
-                            setAccountId(a.id);
-                            setAccountPickerOpen(false);
-                          }}
-                        >
-                          <Text
-                            style={[styles.planOptionText, accountId === a.id && styles.planOptionTextSelected]}
-                            numberOfLines={1}
-                          >
-                            {a.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </>
-              )}
-
-              {/* "Add to Split" (31-split-expenses.md Phase 2) — log the
-                  expense once and have it show up in the split too. Expenses
-                  only, new ones only (an edit can't tell whether an entry
-                  already exists), and only once there's an open split. */}
-              {type === 'expense' && !editingId && openSplits.length > 0 && (
-                <>
-                  <Pressable style={styles.dateRow} onPress={() => setSplitPickerOpen((v) => !v)}>
-                    <View style={styles.planRowInner}>
-                      <View>
-                        <Text style={styles.fieldLabel}>Add to Split</Text>
-                        <Text style={[styles.fieldValue, selectedSplit && styles.fieldValuePlan]} numberOfLines={1}>
-                          {selectedSplit?.name ?? 'None'}
-                        </Text>
-                      </View>
-                      <ChevronDown size={16} color={colors.muted} strokeWidth={2.4} />
-                    </View>
-                  </Pressable>
-                  {splitPickerOpen && (
-                    <View style={styles.planPicker}>
-                      <Pressable
-                        style={[styles.planOption, splitId === null && styles.planOptionSelected]}
-                        onPress={() => {
-                          setSplitId(null);
-                          setSplitPickerOpen(false);
-                        }}
-                      >
-                        <Text style={[styles.planOptionText, splitId === null && styles.planOptionTextSelected]}>None</Text>
-                      </Pressable>
-                      {openSplits.map((s) => (
-                        <Pressable
-                          key={s.id}
-                          style={[styles.planOption, splitId === s.id && styles.planOptionSelected]}
-                          onPress={() => {
-                            setSplitId(s.id);
-                            setSplitPickerOpen(false);
-                          }}
-                        >
-                          <Text
-                            style={[styles.planOptionText, splitId === s.id && styles.planOptionTextSelected]}
-                            numberOfLines={1}
-                          >
-                            {s.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                  {selectedSplit && (
-                    <Text style={styles.splitHint}>
-                      Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
-                    </Text>
-                  )}
-                </>
               )}
             </View>
-          </>
-        )}
-        {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            onChange={(_event, selected) => {
-              setShowDatePicker(false);
-              if (selected) setDate(selected);
-            }}
-          />
-        )}
+          )}
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+          {/* "Add to Split" (31-split-expenses.md Phase 2): log the expense
+              once and have it show up in the split too. Expenses only, new
+              ones only (an edit can't tell whether an entry already exists),
+              and only once there's an open split. */}
+          {type === 'expense' && !editingId && openSplits.length > 0 && (
+            <View style={!showAccountRow && styles.gapTop}>
+              <ListRow
+                icon={Users}
+                title="Add to split"
+                right={selectedSplit?.name ?? 'None'}
+                trailing={<ChevronDown size={18} color={c.muted} strokeWidth={1.75} />}
+                onPress={() => setSplitPickerOpen((v) => !v)}
+                divider={splitPickerOpen}
+              />
+              {splitPickerOpen && (
+                <View style={styles.optionRow}>
+                  <Chip
+                    label="None"
+                    selected={splitId === null}
+                    onPress={() => {
+                      setSplitId(null);
+                      setSplitPickerOpen(false);
+                    }}
+                  />
+                  {openSplits.map((s) => (
+                    <Chip
+                      key={s.id}
+                      label={s.name}
+                      selected={splitId === s.id}
+                      onPress={() => {
+                        setSplitId(s.id);
+                        setSplitPickerOpen(false);
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
+              {selectedSplit && (
+                <Text style={styles.hint}>
+                  Added to {selectedSplit.name} as an entry you paid, split {selectedSplit.memberCount} ways.
+                </Text>
+              )}
+            </View>
+          )}
+        </>
+      )}
 
-        {editingId && (
-          <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-            <Trash2 size={16} color={colors.danger} strokeWidth={2} />
-            <Text style={styles.deleteText}>{editingTransferId ? 'Delete Transfer' : 'Delete Transaction'}</Text>
-          </Pressable>
-        )}
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      {showDatePicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={(_event, selected) => {
+            setShowDatePicker(false);
+            if (selected) {
+              markEdited();
+              setDate(selected);
+            }
+          }}
+        />
+      )}
+
+      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {editingId && (
+        <Button
+          variant="danger"
+          title={editingTransferId ? 'Delete transfer' : 'Delete transaction'}
+          onPress={handleDelete}
+          disabled={saving}
+          style={styles.deleteButton}
+        />
+      )}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    // Clears the pinned Save footer.
-    paddingBottom: 96,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.title,
-    letterSpacing: -0.3,
-    color: colors.ink,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentWrap: {
-    flexDirection: 'row',
-    backgroundColor: colors.chipBg,
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: spacing.lg,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 11,
-    borderRadius: 11,
-  },
-  segmentActive: {
-    backgroundColor: colors.ink,
-  },
-  segmentText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
-  segmentTextActive: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.surface,
-  },
-  amountWrap: {
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  amountLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-    marginBottom: 2,
-  },
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  amountCurrency: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.amount,
-    color: colors.mutedLight,
-  },
-  amountInput: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.amountXl,
-    letterSpacing: -0.6,
-    color: colors.ink,
-    minWidth: 80,
-    textAlign: 'center',
-  },
-  sectionLabel: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginBottom: spacing.sm,
-  },
-  // Bleeds to the sheet's edges so the row scrolls edge to edge; the padding
-  // puts the first chip back in line with everything else.
-  chipScroll: {
-    marginHorizontal: -spacing.xl,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: 14,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  chip: {
-    alignItems: 'center',
-    gap: 6,
-    width: 64,
-  },
-  chipIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipIconSelected: {
-    backgroundColor: colors.brand,
-    borderWidth: 0,
-  },
-  chipLabel: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.xs,
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  chipLabelInactive: {
-    fontFamily: fontFamily.semibold,
-    color: colors.muted,
-  },
-  dateRow: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-  },
-  accountField: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  transferDate: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    marginBottom: spacing.md,
-  },
-  // Sits between the From and To fields — negative vertical margins pull it
-  // into the gap between AccountField's own marginBottom (spacing.sm) on
-  // either side, so it reads as ON the seam between the two rows rather than
-  // a separate third row with its own spacing.
-  swapRow: {
-    alignItems: 'center',
-    marginTop: -spacing.sm,
-    marginBottom: -2,
-    zIndex: 1,
-  },
-  swapButton: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  transferEmptyCard: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-    marginBottom: spacing.md,
-  },
-  transferEmptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.iconTileLg,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  transferEmptyTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  transferEmptyBody: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    textAlign: 'center',
-    lineHeight: 19,
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  transferEmptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.ink,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-  },
-  transferEmptyButtonText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.surface,
-  },
-  planRowInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fieldValuePlan: {
-    color: colors.income,
-  },
-  splitHint: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-    marginBottom: spacing.md,
-  },
-  planPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  planOption: {
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  planOptionSelected: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
-  planOptionText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-  },
-  planOptionTextSelected: {
-    color: colors.surface,
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-  },
-  fieldValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-    marginTop: 1,
-  },
-  noteRowInGroup: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  noteRow: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    // Breathing room above, so Note doesn't sit flush against the Plan/Split
-    // pickers — those are a related group of choices, Note is a separate thing.
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  noteInput: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-    marginTop: 1,
-    padding: 0,
-  },
-  footer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
-    backgroundColor: colors.bg,
-  },
-  detailsBody: {
-    gap: spacing.md,
-  },
-  dateChipRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  dateChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  dateChipActive: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
-  dateChipText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.ink,
-  },
-  dateChipTextActive: {
-    color: colors.surface,
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.danger,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  deleteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  deleteText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.danger,
-  },
+    block: {
+      marginBottom: ledgerSpace.lg,
+    },
+    gapTop: {
+      marginTop: ledgerSpace.md,
+    },
+    amountWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginBottom: ledgerSpace.lg,
+    },
+    amountCurrency: {
+      ...ledgerType.title,
+      fontSize: 28,
+      lineHeight: 34,
+      color: c.muted,
+    },
+    amountInput: {
+      ...ledgerType.display,
+      fontSize: 44,
+      lineHeight: 52,
+      color: c.ink,
+      minWidth: 60,
+      textAlign: 'center',
+      padding: 0,
+    },
+    intro: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginBottom: ledgerSpace.md,
+    },
+    sectionLabel: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
+    },
+    // Bleeds to the sheet's edges so the row scrolls edge to edge; the
+    // padding puts the first chip back in line with everything else.
+    chipScroll: {
+      marginHorizontal: -ledgerSpace.gutter,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      gap: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.lg,
+    },
+    chip: {
+      alignItems: 'center',
+      gap: 6,
+      width: 60,
+    },
+    chipCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.surfaceSunk,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    chipCircleSelected: {
+      backgroundColor: c.ink,
+    },
+    chipLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
+      textAlign: 'center',
+    },
+    chipLabelSelected: {
+      fontFamily: inter.medium,
+      color: c.ink,
+    },
+    dateChipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.sm,
+      marginBottom: ledgerSpace.lg,
+    },
+    field: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.hairline,
+      borderRadius: ledgerRadius.field,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingVertical: ledgerSpace.sm + 2,
+    },
+    fieldLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
+    },
+    noteInput: {
+      ...ledgerType.body,
+      color: c.ink,
+      marginTop: 2,
+      padding: 0,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.sm,
+      paddingVertical: ledgerSpace.sm,
+    },
+    swapRow: {
+      alignItems: 'center',
+      marginVertical: -ledgerSpace.xs,
+      zIndex: 1,
+    },
+    hint: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginTop: ledgerSpace.xs,
+    },
+    errorText: {
+      ...ledgerType.body,
+      color: c.danger,
+      textAlign: 'center',
+      marginTop: ledgerSpace.md,
+    },
+    deleteButton: {
+      marginTop: ledgerSpace.gutter,
+    },
   });
 }

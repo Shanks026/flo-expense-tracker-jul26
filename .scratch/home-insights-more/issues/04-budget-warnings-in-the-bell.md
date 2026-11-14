@@ -1,6 +1,6 @@
 # 04: Budget warnings go to the bell
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** When a save pushes a budget past its warning or limit, the warning appears in the bell's alerts sheet instead of a toast. Saving stays quiet.
 

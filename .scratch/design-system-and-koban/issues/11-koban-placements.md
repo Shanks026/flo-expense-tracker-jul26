@@ -1,6 +1,6 @@
 # 11: Koban in his character moments
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Users meet the same animated Koban wherever FLO has a character moment, and nowhere near their money.
 - The raster mascot is replaced by the Koban component in:

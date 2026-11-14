@@ -1,6 +1,6 @@
 # 02: Accent colours back
 
-Spec: .claude/features/43-themes-back-unlocked.md
+Spec: .claude/features/archive/43-themes-back-unlocked.md
 
 **What to build:** Picking an accent in Personalize and tapping Equip repaints the whole app. The accent is saved on the phone (so the first frame is right on a cold start) and to the profile (so it follows the account to another phone). Signing in to a different account starts on lime until that account's own accent loads. With the `themes` flag off, the accent stays fixed to lime as it is today.
 

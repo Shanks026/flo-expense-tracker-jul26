@@ -1,14 +1,16 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Trash2, Plus } from 'lucide-react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { Plus, CalendarDays, ClipboardList } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, parseISO, startOfDay } from 'date-fns';
-import Button from './Button';
-import CategoryIcon from './CategoryIcon';
+import Sheet from './ledger/Sheet';
+import Button from './ledger/Button';
+import Chip from './ledger/Chip';
+import ListRow from './ledger/ListRow';
+import IconPicker from './ledger/IconPicker';
 import SplitMemberChip from './SplitMemberChip';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
@@ -46,8 +48,8 @@ export function useAddSplitSheet() {
 }
 
 const AddSplitSheet = forwardRef(function AddSplitSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -162,329 +164,159 @@ const AddSplitSheet = forwardRef(function AddSplitSheet(_props, ref) {
     );
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
-
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit split' : 'New split'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      footer={{ primary: { title: editingId ? 'Save' : 'Create split', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetView style={styles.sheet}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Split' : 'New Split'}</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      <Text style={styles.label}>Name</Text>
+      <BottomSheetTextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="Mysore Trip"
+        placeholderTextColor={c.muted}
+        cursorColor={c.accent}
+        selectionColor={c.accent}
+        accessibilityLabel="Split name"
+        style={styles.field}
+        maxLength={60}
+      />
 
-        {/* gorhom's own scroll view, not React Native's — a plain ScrollView
-            inside a bottom sheet fights the sheet's pan gesture. */}
-        <BottomSheetScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <Text style={styles.fieldLabel}>Name</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Mysore Trip"
-            placeholderTextColor={colors.mutedDarker}
-            style={styles.input}
-            maxLength={60}
+      <Text style={styles.label}>Icon</Text>
+      <View style={styles.block}>
+        <IconPicker value={icon} onChange={setIcon} keys={SPLIT_ICONS} accessibilityLabel="Split icon" />
+      </View>
+
+      <ListRow icon={CalendarDays} title="Date" right={format(date, 'd MMM yyyy')} trailing="chevron" onPress={() => setShowPicker(true)} divider={FLAGS.plans} />
+
+      {showPicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={(_event, selected) => {
+            setShowPicker(false);
+            if (selected) setDate(startOfDay(selected));
+          }}
+        />
+      )}
+
+      {/* Optional link to a plan: a settlement this split produces lands in
+          that plan. Hidden while Plans are flagged off; an existing split
+          keeps its plan_id. */}
+      {FLAGS.plans && (
+        <ListRow
+          icon={ClipboardList}
+          title="Plan (optional)"
+          right={selectedPlan?.name ?? 'None'}
+          trailing="chevron"
+          onPress={() => setPlanPickerOpen((v) => !v)}
+          divider={false}
+        />
+      )}
+
+      {FLAGS.plans && planPickerOpen && (
+        <View style={styles.chipWrap}>
+          <Chip
+            label="None"
+            selected={planId === null}
+            onPress={() => {
+              setPlanId(null);
+              setPlanPickerOpen(false);
+            }}
           />
-
-          <Text style={styles.fieldLabel}>Icon</Text>
-          <View style={styles.iconRow}>
-            {SPLIT_ICONS.map((key) => (
-              <Pressable
-                key={key}
-                onPress={() => setIcon(key)}
-                style={[styles.iconTile, icon === key && styles.iconTileSelected]}
-              >
-                <CategoryIcon
-                  icon={key}
-                  size={20}
-                  color={icon === key ? colors.brandText : colors.ink}
-                  strokeWidth={2}
-                />
-              </Pressable>
-            ))}
-          </View>
-
-          <Pressable style={styles.row} onPress={() => setShowPicker(true)}>
-            <Text style={styles.fieldLabelInline}>Date</Text>
-            <Text style={styles.rowValue}>{format(date, 'd MMM yyyy')}</Text>
-          </Pressable>
-
-          {showPicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={(_event, selected) => {
-                setShowPicker(false);
-                if (selected) setDate(startOfDay(selected));
+          {activePlans.map((plan) => (
+            <Chip
+              key={plan.id}
+              label={plan.name}
+              selected={planId === plan.id}
+              onPress={() => {
+                setPlanId(plan.id);
+                setPlanPickerOpen(false);
               }}
             />
-          )}
+          ))}
+        </View>
+      )}
 
-          {/* Optional link to a plan. The Mysore plan and the Mysore split are
-              the same real event, so a settlement transaction produced by this
-              split lands in that plan automatically. Hidden while Plans are
-              flagged off; an existing split keeps its plan_id. */}
-          {FLAGS.plans && (
-            <Pressable style={styles.row} onPress={() => setPlanPickerOpen((v) => !v)}>
-              <Text style={styles.fieldLabelInline}>Plan (optional)</Text>
-              <Text style={styles.rowValue}>{selectedPlan?.name ?? 'None'}</Text>
-            </Pressable>
-          )}
+      {!editingId && (
+        <>
+          <Text style={[styles.label, styles.spaced]}>Who's in it</Text>
+          <Text style={styles.help}>
+            You're always in. Add everyone else; they don't need the app. People you add are saved for future splits; long-press one
+            to rename or remove it.
+          </Text>
+          <View style={styles.chipWrap}>
+            {people.map((person) => (
+              <SplitMemberChip
+                key={person.id}
+                member={{ id: person.id, name: person.name, color: person.color, isSelf: false }}
+                selected={personIds.includes(person.id)}
+                showCheck
+                onPress={() => togglePerson(person.id)}
+                // The only way to the person sheet's edit mode.
+                onLongPress={() => openAddSplitPerson(person)}
+              />
+            ))}
+            {/* Selects the new person the moment they're created. */}
+            <Chip label="Add person" icon={Plus} onPress={() => openAddSplitPerson(null, (newId) => togglePerson(newId))} />
+          </View>
+        </>
+      )}
 
-          {FLAGS.plans && planPickerOpen && (
-            <View style={styles.planList}>
-              <Pressable
-                style={styles.planOption}
-                onPress={() => {
-                  setPlanId(null);
-                  setPlanPickerOpen(false);
-                }}
-              >
-                <Text style={[styles.planOptionText, planId === null && styles.planOptionTextActive]}>None</Text>
-              </Pressable>
-              {activePlans.map((plan) => (
-                <Pressable
-                  key={plan.id}
-                  style={styles.planOption}
-                  onPress={() => {
-                    setPlanId(plan.id);
-                    setPlanPickerOpen(false);
-                  }}
-                >
-                  <Text style={[styles.planOptionText, planId === plan.id && styles.planOptionTextActive]}>
-                    {plan.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
+      {editingId && <Text style={[styles.help, styles.spaced]}>Add or remove people on the split itself; it changes what everyone owes.</Text>}
 
-          {!editingId && (
-            <>
-              <Text style={styles.fieldLabel}>Who's in it</Text>
-              <Text style={styles.helpText}>
-                You're always in. Add everyone else — they don't need the app. People you add are
-                saved for future splits; long-press one to rename or remove it.
-              </Text>
-              <View style={styles.chipWrap}>
-                {people.map((person) => (
-                  <SplitMemberChip
-                    key={person.id}
-                    member={{ id: person.id, name: person.name, color: person.color, isSelf: false }}
-                    selected={personIds.includes(person.id)}
-                    showCheck
-                    onPress={() => togglePerson(person.id)}
-                    // The only way to reach the person sheet's EDIT mode. Without
-                    // this, a typo'd name was permanent and `updatePerson` /
-                    // `deletePerson` were unreachable dead code.
-                    onLongPress={() => openAddSplitPerson(person)}
-                  />
-                ))}
-                <Pressable
-                  style={styles.addPersonChip}
-                  // Selects the new person the moment they're created, so adding
-                  // four people in a row is four taps, not eight.
-                  onPress={() => openAddSplitPerson(null, (newId) => togglePerson(newId))}
-                >
-                  <Plus size={15} color={colors.ink} strokeWidth={2.6} />
-                  <Text style={styles.addPersonText}>Add person</Text>
-                </Pressable>
-              </View>
-            </>
-          )}
+      {error && <Text style={styles.error}>{error}</Text>}
 
-          {editingId && (
-            <Text style={styles.helpText}>
-              Add or remove people on the split itself — it changes what everyone owes.
-            </Text>
-          )}
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
-
-          <Button
-            title={editingId ? 'Save Split' : 'Create Split'}
-            variant="primary"
-            onPress={handleSave}
-            loading={saving}
-            style={{ marginTop: spacing.lg }}
-          />
-          {editingId && (
-            <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-              <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-              <Text style={styles.deleteText}>Delete Split</Text>
-            </Pressable>
-          )}
-        </BottomSheetScrollView>
-      </BottomSheetView>
-    </BottomSheetModal>
+      {editingId && <Button title="Delete split" variant="danger" onPress={handleDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-    sheet: {
-      flex: 1,
-      paddingHorizontal: spacing.xl,
+    label: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
     },
-    scroll: {
-      paddingBottom: spacing.xxl,
+    spaced: {
+      marginTop: ledgerSpace.lg,
     },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.lg,
+    help: {
+      ...ledgerType.caption,
+      color: c.muted,
+      marginBottom: ledgerSpace.md,
     },
-    headerTitle: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
+    // A single-line input: a full capsule (ledgerRadius.field).
+    field: {
+      height: 48,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: 0,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+      ...ledgerType.body,
+      color: c.ink,
+      marginBottom: ledgerSpace.lg,
     },
-    closeButton: {
-      width: 32,
-      height: 32,
-      borderRadius: radii.pill,
-      backgroundColor: colors.chipBg,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    fieldLabel: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginBottom: spacing.sm,
-    },
-    fieldLabelInline: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.base,
-      color: colors.mutedMid,
-    },
-    helpText: {
-      fontFamily: fontFamily.medium,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      marginBottom: spacing.md,
-    },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.xl,
-      color: colors.ink,
-      marginBottom: spacing.lg,
-    },
-    iconRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-      marginBottom: spacing.lg,
-    },
-    iconTile: {
-      width: 44,
-      height: 44,
-      borderRadius: radii.iconTile,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    iconTileSelected: {
-      backgroundColor: colors.brand,
-      borderWidth: 0,
-    },
-    row: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    rowValue: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.base,
-      color: colors.ink,
-    },
-    planList: {
-      marginBottom: spacing.md,
-      gap: 2,
-    },
-    planOption: {
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-    },
-    planOptionText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.md,
-      color: colors.mutedDarker,
-    },
-    planOptionTextActive: {
-      fontFamily: fontFamily.extrabold,
-      color: colors.ink,
+    block: {
+      marginBottom: ledgerSpace.md,
     },
     chipWrap: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: spacing.sm,
-      marginBottom: spacing.md,
+      gap: ledgerSpace.sm,
+      marginBottom: ledgerSpace.md,
     },
-    addPersonChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 13,
-      paddingVertical: 8,
-      borderRadius: radii.pill,
-      borderWidth: 1.5,
-      borderStyle: 'dashed',
-      borderColor: colors.chevron,
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginTop: ledgerSpace.md,
     },
-    addPersonText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.ink,
-    },
-    errorText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
-      textAlign: 'center',
-      marginTop: spacing.sm,
-    },
-    deleteRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: spacing.lg,
-      paddingVertical: spacing.sm,
-    },
-    deleteText: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.dangerStrong,
+    delete: {
+      marginTop: ledgerSpace.lg,
     },
   });
 }

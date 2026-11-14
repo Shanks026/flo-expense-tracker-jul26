@@ -1,6 +1,6 @@
 # 02: The short path (2a): the reminder ask finishes onboarding
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** Subticket 2a of "the short path". After sign-in, a new user goes straight to the reminder ask, "Want a 9 pm nudge?". Its copy has to read right with or without a first expense before it, since that step only arrives in ticket 05.
 - **Turn on:** asks for the OS notification permission, turns reminders on and registers the push token.

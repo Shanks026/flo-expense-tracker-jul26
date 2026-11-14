@@ -1,26 +1,28 @@
 import { useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Receipt } from 'lucide-react-native';
-import OnboardingScreen from '../../components/OnboardingScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Illustration from '../../components/ledger/Illustration';
+import PinnedFooter from '../../components/ledger/PinnedFooter';
 import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
-import { radii } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
 import { trackStepViewed } from '../../lib/track';
+import { FLAGS } from '../../lib/flags';
 
 const REMINDER_ASK = '/onboarding/reminders';
 
-// The first expense (35-onboarding-v3.md): right after sign-in, the real Add
-// sheet — the same one and the same categories used every day — opens over
-// this screen. Saving logs it (`expense_logged {source: onboarding}`, with no
-// reward burst or budget toasts); closing it is "Not now". Either way the user
-// moves on to the reminder ask, which opens with "Logged." after a save.
+// The first expense (spec 35, on the ledger kit in spec 47): the real Add
+// sheet, with its quick-add line, opens a beat after this screen mounts.
+// A title strip teaches typing and voice at once. Saving logs it; closing is
+// "Not now". Either way the person moves on to the reminder ask, which opens
+// with "Logged." after a save.
 //
 // The buttons here only show if the sheet is closed without leaving (it never
 // is in the normal flow, since closing moves on): one reopens it, one skips.
 export default function FirstExpense() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { openAdd } = useAddTransactionSheet();
   const leftRef = useRef(false);
@@ -32,7 +34,13 @@ export default function FirstExpense() {
   }
 
   function openSheet() {
-    openAdd({ source: 'onboarding', onDone: ({ saved }) => moveOn(saved) });
+    openAdd({
+      source: 'onboarding',
+      quickAdd: true,
+      // The quick-add line only exists with the AI flag on.
+      intro: FLAGS.ai ? 'Log your first expense: type it or hold to say it' : 'Log your first expense',
+      onDone: ({ saved }) => moveOn(saved),
+    });
   }
 
   // A beat after mount, so the screen's own fade-in settles before the sheet
@@ -44,32 +52,44 @@ export default function FirstExpense() {
   }, []);
 
   return (
-    <OnboardingScreen
-      bg="light"
-      hero={
-        <View style={styles.heroTile}>
-          <Receipt size={30} color={colors.incomeAccent} strokeWidth={2} />
-        </View>
-      }
-      title="Log your first expense"
-      subtitle="Anything you spent today. It takes a few seconds."
-      primaryLabel="Add an expense"
-      onPrimary={openSheet}
-      secondaryLabel="Not now"
-      onSecondary={() => moveOn(false)}
-    />
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.body}>
+        <Illustration name="receipt" size="large" style={styles.object} />
+        <Text style={[ledgerType.title, styles.center, { color: c.ink }]} accessibilityRole="header">
+          Log your first expense
+        </Text>
+        <Text style={[ledgerType.body, styles.center, styles.sub, { color: c.muted }]}>
+          Anything you spent today. It takes a few seconds.
+        </Text>
+      </View>
+      <PinnedFooter
+        secondary={{ title: 'Not now', onPress: () => moveOn(false), variant: 'quiet' }}
+        primary={{ title: 'Add an expense', onPress: openSheet }}
+      />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  heroTile: {
-    width: 66,
-    height: 66,
-    borderRadius: radii.card,
-    backgroundColor: colors.incomeBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    root: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    body: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: ledgerSpace.gutter,
+    },
+    object: {
+      marginBottom: ledgerSpace.section,
+    },
+    center: {
+      textAlign: 'center',
+    },
+    sub: {
+      marginTop: ledgerSpace.sm,
+    },
   });
 }

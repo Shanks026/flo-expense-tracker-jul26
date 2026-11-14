@@ -1,6 +1,6 @@
 # 02: The slimmer sheet layout
 
-Spec: .claude/features/36-add-sheet-3-tap.md
+Spec: .claude/features/archive/36-add-sheet-3-tap.md
 
 **What to build:** The Add sheet is cut down to the two-field task. From top to bottom:
 - the amount, focused on open, with a decimal keypad and a ₹ prefix (paise allowed);

@@ -29,7 +29,7 @@ import { CARD_SCENES, SCENE_W, SCENE_H } from '../lib/cardScenes';
 // complete.
 //
 // It plays each time its screen comes into focus: Home on every return to the
-// tab, the Personalize preview when it opens. Each play is a fresh ~5
+// tab, the Cards preview when it opens. Each play is a fresh ~5
 // seconds, so it never runs continuously.
 export default function AnimatedCardScene({ sceneId }) {
   const scene = CARD_SCENES[sceneId];

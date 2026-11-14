@@ -1,8 +1,9 @@
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { radii } from '../theme/tokens';
 import { CARD_SCENES } from '../lib/cardScenes';
 import AnimatedCardScene from './AnimatedCardScene';
+import { DAY_THEME_IMAGES } from './dayThemeImages';
 
 // Renders a card theme's background (solid / linear-gradient / pattern) with
 // `children` layered on top — same children-on-top-of-background shape
@@ -166,7 +167,7 @@ function buildPatternSvg({ kind, line, accent, accent2, accent3, colors, angle }
 // card's real edges. Give `children` their own padded wrapper instead (see
 // AccountHeroCarousel's `heroCardContent`).
 // `animate` lets an illustrated scene move once, then settle (the Home card
-// and the Personalize preview). Everywhere else, and for every other theme,
+// and the Cards preview). Everywhere else, and for every other theme,
 // it's ignored.
 export default function CardThemeSurface({ theme, style, children, animate = false }) {
   const bg = theme.background;
@@ -188,6 +189,11 @@ export default function CardThemeSurface({ theme, style, children, animate = fal
             <SvgXml xml={CARD_SCENES[bg.scene].sceneXml} width="100%" height="100%" />
           </View>
         ))}
+      {/* A painted image (the Day time-of-day landscapes, lib/dayScenes.js),
+          covering the card; `bg.color` shows while it decodes. */}
+      {bg.type === 'image' && DAY_THEME_IMAGES[bg.image] && (
+        <Image source={DAY_THEME_IMAGES[bg.image]} style={styles.image} resizeMode="cover" fadeDuration={0} />
+      )}
       {bg.type === 'pattern' && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <SvgXml xml={buildPatternSvg(bg)} width="100%" height="100%" />
@@ -199,6 +205,15 @@ export default function CardThemeSurface({ theme, style, children, animate = fal
 }
 
 const styles = StyleSheet.create({
+  // Explicit size: absoluteFill alone let Android draw the image at its own
+  // pixel size and crop it, so only a corner of the sky showed.
+  image: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     borderRadius: radii.cardLg,
     overflow: 'hidden',

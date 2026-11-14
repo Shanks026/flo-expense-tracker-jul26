@@ -1,6 +1,6 @@
 # 04: Root error boundary with a recovery screen
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md
 
 **What to build:** When something throws while rendering, the tester sees a calm, branded recovery screen instead of the app closing. The screen offers "Try again", which remounts the tree, and "Go to Home". The boundary is in-house, wraps the app just below the providers it needs for theming, and uses theme tokens. Dev builds also show the error message. No third-party SDK; native crashes and ANRs are covered by Play Console's Android vitals.
 

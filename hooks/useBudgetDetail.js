@@ -41,7 +41,7 @@ export default function useBudgetDetail(budgetId) {
 
     let query = supabase
       .from('transactions')
-      .select('*, category:categories(id, name, icon)')
+      .select('*, category:categories(id, name, icon, color)')
       .eq('account_id', budgetRow.account_id)
       .eq('type', 'expense')
       .gte('occurred_at', budgetRow.period_start)

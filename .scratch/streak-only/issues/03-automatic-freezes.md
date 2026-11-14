@@ -1,6 +1,6 @@
 # 03: Freezes are earned and spent automatically
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** Users are protected from a single slip without buying or tapping anything.
 - **Earning:** each completed 7-day run of consecutive covered days earns one freeze (`freeze_earned` mark), unless the user already holds 2.

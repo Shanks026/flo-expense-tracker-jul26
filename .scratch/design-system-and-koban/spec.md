@@ -1,6 +1,6 @@
 # Design system ("Ledger, not game") and the Koban component
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 Decisions made while ticketing (2026-10-26):
 - New tokens are added alongside the old ones and not swept across the app: screens adopt the type ramp, radii and shared components as each spec touches them, as the spec says.

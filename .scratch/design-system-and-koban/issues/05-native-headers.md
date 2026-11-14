@@ -1,6 +1,6 @@
 # 05: Native headers on pushed screens
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Pushed screens behave like any Android app: a standard header with a back button and the system back gesture.
 - The root Stack shows native headers for pushed screens, themed for light and dark with the new type tokens. Tab screens and full-screen flows (onboarding, sign-in) keep no header.

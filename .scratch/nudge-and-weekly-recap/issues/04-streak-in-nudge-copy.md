@@ -1,6 +1,6 @@
 # 04: The streak in the nudge copy
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:**
 - **`send-push` knows the user's streak.** It counts it server-side from transactions plus no-spend and freeze marks, with the same result the app's streak screen shows. The recap push (06) reuses this count.

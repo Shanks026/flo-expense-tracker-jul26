@@ -1,0 +1,1219 @@
+# Feature: Notifications & Recurring Bills
+**Product**: FLO — Personal Expense Tracker
+**File**: `.claude/features/archive/04-notifications-and-recurring-bills.md`
+**Status**: ✅ Complete (all 6 phases built; pending on-device verification of Phase 5's notifications)
+**Last Updated**: July 2026
+
+---
+
+## Context
+
+FLO currently gives the user no feedback loop beyond the numbers on each
+screen. There are three distinct, sequenced pieces of work here, deliberately
+bundled into one doc because they build on each other:
+
+1. **In-app toasts** — a Sonner-style transient banner layer. Confirms saves,
+   surfaces errors, and warns when a transaction pushes a budget or plan over
+   its limit. Pure client-side UI; no backend, no OS permissions. Buildable
+   immediately.
+2. **Recurring bills & subscriptions** — a new data model for money that
+   repeats (rent, Netflix, EMIs). Without a *due date* concept there is
+   nothing meaningful to remind the user about, so this must land **before**
+   scheduled notifications — which is the whole reason it's sequenced here.
+3. **Local scheduled notifications + bell notification center** — OS-level
+   reminders (bill due, daily log nudge, budget reset) that fire even when the
+   app is closed, plus an in-app inbox behind the Home header bell listing
+   current actionable alerts.
+
+**Why local, not remote push**: FLO is single-user, single-device, and every
+event happens because the user did something in the app — there is no
+server-side event source. Local scheduled notifications (device-only, no
+backend) cover every genuinely useful case. Remote push would need a Supabase
+Edge Function + `pg_cron` + Expo push tokens to re-implement what local
+scheduling already does. It is explicitly **out of scope** (see the bottom of
+this doc).
+
+This feature reuses: the bottom-sheet Provider/Context/`forwardRef` pattern,
+the `useDataRefresh` version-counter, `v_budgets_with_spent` /
+`v_plans_with_totals` (for threshold detection and the alert feed), the
+account-scoping pattern (`activeAccountId`), the AsyncStorage-for-device-prefs
+pattern already used by `AccountContext` (`flo.activeAccountId`), and
+`theme/tokens.js`.
+
+---
+
+## Phase Overview
+
+```
+Phase 1 — Toast system
+  A custom ToastProvider + useToast() + animated host; wire save/delete
+  confirmations and replace standalone error surfaces.
+
+Phase 2 — Smart budget/plan toasts
+  On transaction save, detect if it pushed a budget into warn/over or a plan
+  past its target, and toast a warning.
+
+Phase 3 — Bills & subscriptions: data + management
+  New `bills` table; a Bills screen (list of upcoming/overdue) + Add/Edit Bill
+  sheet; menu-sheet entry. Track recurring money without touching the ledger yet.
+
+Phase 4 — Bills: pay → transaction (+ due-today prompt)
+  A pay-confirm step (editable amount, or skip-cycle) creates a real
+  transaction and advances the due date; an on-open modal surfaces bills
+  due today/overdue. Overdue/upcoming states computed client-side.
+
+Phase 5 — Local scheduled notifications
+  Install expo-notifications; permission flow; notification settings in
+  Settings; schedule bill-due reminders + a daily log reminder; deep-link taps.
+
+Phase 6 — Bell notification center
+  Make the Home header bell open a sheet listing current actionable alerts
+  (overdue bills, over/near-limit budgets, plans ending/over). Dot reflects
+  whether any alerts exist. Computed feed — nothing new stored.
+```
+
+**After each phase: stop and wait for approval before proceeding.**
+
+---
+
+## Phase 1 — Toast System ✅ Complete
+
+### Goal
+The app gains a transient, auto-dismissing banner ("toast") that any screen or
+sheet can trigger via a `useToast()` hook. At the end of this phase, saving,
+editing, or deleting a transaction shows a confirmation toast, and standalone
+errors (that today use `Alert.alert` or vanish silently) surface as error
+toasts. It's the Sonner equivalent: in-the-moment feedback, gone in a few
+seconds. No persistence, no OS notifications.
+
+### Before Starting — Confirm With Codebase
+1. Read `app/_layout.js` — confirm the provider nesting order and where a new
+   `ToastProvider` should sit so `useToast()` is callable from **both** screens
+   and sheets (it must wrap `BottomSheetModalProvider` and everything below).
+2. Read `components/Button.js` and `components/Card.js` to match the
+   from-scratch component style (this app builds its own primitives; we build
+   the toast, not add a library).
+3. Confirm `react-native-safe-area-context` is already a dependency (it is —
+   used in `app/settings.js`) for top-inset positioning.
+4. Read `components/AddTransactionSheet.js` `handleSave`/`handleDelete` — the
+   first call sites to wire (success toast after `notifyChanged()` +
+   `dismiss()`; error toast instead of only inline `error` for the save/delete
+   failure path — keep the inline form-validation `error` for "Enter an amount").
+5. Confirm `colors` has `success`-ish tokens — there is no `success` color;
+   use `colors.income`/`colors.incomeBg` for success, `colors.danger`/`dangerBg`
+   for error, `colors.warn`/`warnBg` for warn, `colors.ink`/`inkCard` for info.
+
+### 1.1 Database
+No database changes in this phase.
+
+### 1.2 Data Layer
+No hooks. The toast queue is React state inside `ToastProvider`.
+
+`useToast()` returns `{ showToast }`:
+
+```js
+showToast({
+  message: 'Transaction saved',
+  variant: 'success',          // 'success' | 'error' | 'warn' | 'info'  (default 'info')
+  actionLabel: 'Undo',         // optional
+  onAction: () => {...},        // optional; runs then dismisses
+  duration: 3000,               // optional ms; default 3000, 5000 if action present
+});
+```
+
+Multiple toasts stack (max 3 visible; older ones drop). Each auto-dismisses on
+its timer; tap-to-dismiss; the whole host is `pointerEvents="box-none"` so it
+never blocks the UI underneath.
+
+### 1.3 Components
+
+```
+components/
+  Toast.js        ← NEW. Exports ToastProvider, useToast, and the internal ToastHost.
+```
+
+- **`ToastProvider`** — holds the queue (`useState` array of `{ id, ...opts }`),
+  exposes `showToast` via context (memoized), renders `{children}` then
+  `<ToastHost toasts={...} onDismiss={...} />`.
+- **`ToastHost`** — absolutely positioned `View` pinned to the top using
+  `useSafeAreaInsets().top`, `pointerEvents="box-none"`, high `zIndex`/`elevation`.
+  Maps toasts to `<ToastItem>`.
+- **`ToastItem`** — a single banner. `Animated` slide-down + fade-in on mount,
+  fade-out on dismiss. Left accent/icon by variant (`lucide-react-native`:
+  `Check` / `TriangleAlert` / `Info` / `X`), message text, optional action
+  button. Styled from `tokens.js` (rounded `radii.card`, `colors.ink` card for
+  info, tinted bg per variant). Match the shadow/elevation used on `Card`.
+
+### 1.4 Navigation / Integration
+- Mount `ToastProvider` in `app/_layout.js` **around** `BottomSheetModalProvider`
+  (inside `AccountProvider`), so both screens and sheets can call `useToast()`
+  and toasts render above screen content. Toasts are shown *after* a sheet
+  dismisses, so host-vs-sheet z-order isn't a concern in practice.
+- Wire `AddTransactionSheet.handleSave`: on success →
+  `showToast({ message: editingId ? 'Transaction updated' : 'Transaction saved', variant: 'success' })`.
+- Wire `AddTransactionSheet.handleDelete`: on success →
+  `showToast({ message: 'Transaction deleted', variant: 'success' })`.
+- Save/delete **failure** paths → `showToast({ message: <error>, variant: 'error' })`
+  (in addition to, or instead of, the existing inline error — keep inline for
+  the "Enter an amount" validation only).
+
+### 1.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| `app/_layout.js` | One new provider in the tree | Order — must wrap the sheet providers |
+| `AddTransactionSheet.js` | Adds `useToast()` + success/error toasts | Don't double-report (inline + toast) for the same validation error |
+
+### 1.6 What This Phase Does NOT Include
+- No budget/plan threshold logic (Phase 2).
+- No wiring of the *other* sheets (Budget/Plan/Category/Account/Profile) — only
+  Add Transaction. Those can be wired opportunistically later; not required here.
+- No OS notifications, no persistence, no bell inbox.
+
+### 1.7 Phase 1 Checklist — Before Marking Complete
+- [x] `components/Toast.js` exports `ToastProvider`, `useToast`, mounted in `_layout.js`.
+- [x] `useToast()` throws a clear error if used outside the provider (matches other contexts).
+- [x] A toast appears on transaction save/update/delete and auto-dismisses.
+- [x] Toasts stack (≤3), tap-to-dismiss works, host never blocks touches beneath it.
+- [x] Variants render distinct colors/icons from `tokens.js` (no inline hex, aside from `rgba()` alpha-overlays for the icon badge — an established pattern already used in `IconTile.js`/`settings.js`).
+- [x] Save/delete errors surface as an error toast.
+- [x] `npx expo export --platform android` bundles cleanly.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- No deviations from the plan. `components/Toast.js` built from scratch
+  (`Animated` slide-down + fade, no library), mounted in `app/_layout.js`
+  wrapping `BottomSheetModalProvider` per the plan (inside `AccountProvider`).
+- `AddTransactionSheet.js`: save/delete failures now show an error toast
+  instead of the old inline `error` text; the "Enter an amount" client-side
+  validation still uses inline `error` (kept, as planned — it's about an
+  unsubmitted field, not a request failure).
+- Icon badge on `ToastItem` uses a translucent overlay (`rgba(0,0,0,0.06)` on
+  light variants, `rgba(255,255,255,0.16)` on the dark `info` variant) since a
+  flat token color would either vanish against the tinted background or clash
+  — this is the same technique `IconTile.js` already uses, not a new pattern.
+- **Scope expanded post-approval (2026-07-11)**: after testing Phase 1+2, the
+  user expected toasts across the whole app, not just Add Transaction — the
+  original "Phase 1 wires only Add Transaction, others opportunistically
+  later" scoping (1.6) read as a bug when tested end-to-end. Wired the same
+  toast pattern into every remaining mutation-bearing sheet in one pass:
+  `AddBudgetSheet`, `AddPlanSheet`, `AddAccountSheet`, `AddCategorySheet`,
+  `EditProfileSheet` (create/update/delete → success toast; save/delete
+  failure → error toast; unsubmitted-field validation stays inline `error`,
+  unchanged), `AccountSwitcherSheet` (switching to a different account →
+  "Switched to `<name>`", suppressed if re-selecting the already-active one),
+  and `manage-categories.js`'s delete action (was `Alert.alert('Error', ...)`
+  on failure, now an error toast; added a success toast). Left alone by
+  design: `Alert.alert` destructive-confirmation/guard dialogs (delete
+  confirmation, "in use" guards) — those still block for a decision and
+  aren't a toast's job; `MenuSheet`'s Log Out (navigates away immediately);
+  Settings' Delete Account flow (has its own modal with inline error, and
+  navigates to sign-in on success — a toast would be orphaned by the redirect).
+
+### Toast Trigger Reference (Current State, After Scope Expansion)
+
+| Sheet / Screen | Success toast | Error toast | Notes |
+|---|---|---|---|
+| `AddTransactionSheet` | "Transaction saved" / "Transaction updated" / "Transaction deleted" | ✓ save/delete failure | Plus Phase 2 warn toasts on over-threshold budget/plan (new expense only) |
+| `AddBudgetSheet` | "Budget created" / "Budget updated" / "Budget deleted" | ✓ save/delete failure | |
+| `AddPlanSheet` | "Plan created" / "Plan updated" / "Plan deleted" | ✓ save/delete failure | |
+| `AddAccountSheet` | "Account created" / "Account updated" / "Account deleted" | ✓ save/delete failure | "In use" / "cannot delete" guards stay `Alert.alert`, unchanged |
+| `AddCategorySheet` | "Category created" | ✓ save failure | Create-only sheet (no edit path exists) |
+| `EditProfileSheet` | "Profile updated" | ✓ permission denied, upload failure, save failure | |
+| `AccountSwitcherSheet` | "Switched to `<name>`" | — | Suppressed when re-selecting the already-active account |
+| `manage-categories.js` | "Category deleted" | ✓ delete failure | "In use" guard stays `Alert.alert` |
+| `MenuSheet` (Log Out) | — | — | Navigates away immediately; a toast would be orphaned |
+| Settings (Delete Account) | — | ✓ (inline in its own modal, not a toast) | Navigates to sign-in on success |
+
+---
+
+## Phase 2 — Smart Budget/Plan Toasts ✅ Complete
+
+### Goal
+When the user saves an **expense**, if that expense pushes a relevant budget to
+≥80% (`warn`) or over 100% (`over`) for the current period, or pushes a plan
+past its `target_amount`, a warning toast tells them immediately (e.g. "Food
+budget at 92% this month" / "Over your Goa Trip plan by ₹1,200"). This is the
+in-app equivalent of an alert, delivered at the exact moment it becomes true.
+
+### Before Starting — Confirm Phase 1 is Approved
+1. Re-read `hooks/useBudgets.js` — confirm `budgetStatus(spent, amount)` returns
+   `'healthy' | 'warn' | 'over'` and the view columns (`spent`, `remaining`,
+   `amount`, `category_id`, `period`, `account_id`).
+2. Re-read `hooks/usePlans.js` / `v_plans_with_totals` columns (`total_spent`,
+   `remaining`, `target_amount`, `status`, `account_id`).
+3. Confirm the save flow order in `AddTransactionSheet.handleSave`: insert →
+   `notifyChanged()` → dismiss. The threshold check must read **post-insert**
+   state, so it queries the views *after* the insert succeeds.
+
+### 2.1 Database
+No database changes. Reuses `v_budgets_with_spent` and `v_plans_with_totals`.
+
+### 2.2 Data Layer
+New pure helper module so the logic is testable and out of the sheet:
+
+```
+lib/alerts.js   ← NEW
+```
+
+- `budgetToastForSave({ categoryId, accountId })` — after a successful expense
+  insert, query `v_budgets_with_spent` for the active account where
+  `category_id = categoryId` OR `category_id IS NULL` (overall budget). For each,
+  compute `budgetStatus(spent, amount)`; if `warn`/`over`, return a message
+  string. Returns the single most-severe message (`over` beats `warn`) or `null`.
+- `planToastForSave({ planId })` — if `planId` set, query `v_plans_with_totals`
+  for that plan; if `target_amount` is set and `total_spent > target_amount`,
+  return "Over your <name> plan by ₹X". Else `null`.
+
+Both are plain async functions taking the ids and doing their own Supabase read
+(not hooks — they run once, imperatively, right after save). Money formatted
+with the standard `₹${Math.round(n).toLocaleString('en-IN')}` helper.
+
+### 2.3 Components
+No new components. `AddTransactionSheet` calls the helpers after a successful
+save and passes any returned message to `showToast({ variant: 'warn' })`.
+
+### 2.4 Navigation / Integration
+In `AddTransactionSheet.handleSave`, after `notifyChanged()` and before/after
+`dismiss()` (order such that the toast still fires post-dismiss):
+
+```js
+if (!editingId && type === 'expense') {
+  const budgetMsg = await budgetToastForSave({ categoryId, accountId: activeAccountId });
+  const planMsg = planId ? await planToastForSave({ planId }) : null;
+  if (budgetMsg) showToast({ message: budgetMsg, variant: 'warn' });
+  if (planMsg) showToast({ message: planMsg, variant: 'warn' });
+}
+```
+
+(Keep the plain "Transaction saved" success toast from Phase 1; a warn toast is
+additive.)
+
+### 2.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| `AddTransactionSheet.js` | Two extra reads after save | Slight latency; run after dismiss so the sheet closes snappily. Only on expense inserts, not edits. |
+
+### 2.6 What This Phase Does NOT Include
+- Not on edits or deletes (only new expense inserts).
+- No "crossing" detection (was-healthy→now-warn). It toasts whenever the result
+  is warn/over, which can repeat if the user keeps adding while already over —
+  accepted as a v1 simplification; note it in Implementation Notes.
+- No income/refund alerts. No plan-nearing (only strictly over target).
+
+### 2.7 Phase 2 Checklist — Before Marking Complete
+- [x] `lib/alerts.js` exports `budgetToastForSave` and `planToastForSave`.
+- [x] Saving an expense that pushes a category or overall budget to ≥80% toasts a warn.
+- [x] Saving an expense to a plan past its target toasts a warn.
+- [x] No toast when under all thresholds; no threshold toast on edits/income.
+- [x] Sheet still dismisses immediately (no visible lag from the extra reads).
+- [x] Bundles cleanly.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- No deviations from the plan. `lib/alerts.js` queries `v_budgets_with_spent`
+  filtered to `account_id` + (`category_id = categoryId` OR `category_id IS
+  NULL`) via a single PostgREST `.or()` call, picks the most-severe result
+  (`over` beats `warn`) using the existing `budgetStatus` helper from
+  `useBudgets.js`, and separately checks the attached plan's
+  `v_plans_with_totals` row against its `target_amount`.
+- `AddTransactionSheet.handleSave`: the success toast still fires immediately
+  after `dismiss()`; the two threshold reads run after that, so the sheet
+  closes with no perceptible delay and the warn toast(s) simply appear a beat
+  later, stacking on top of the success toast (Phase 1's 3-toast queue).
+- As flagged in the plan, this toasts on every warn/over save, not just the
+  crossing — confirmed with the user as acceptable for v1 (repetitive-toast
+  concern was raised during planning and explicitly deferred, not revisited
+  during implementation).
+- Not wired into `AddBudgetSheet`/`AddPlanSheet`/`AddAccountSheet` — per
+  Phase 1's precedent, only Add Transaction is a tracked deliverable; other
+  sheets pick up `useToast()` opportunistically.
+
+---
+
+## Phase 3 — Bills & Subscriptions: Data + Management ✅ Complete
+
+> **⚠️ Course correction (2026-07-11, after real on-device testing)**: Phase 3
+> originally shipped bills as **account-scoped** (`account_id NOT NULL`,
+> filtered by `activeAccountId`, invisible when a different account was
+> active) — the same pattern as budgets/plans. The user corrected this: a bill
+> is a fact about the world ("Netflix, ₹649/month"), not a property of one
+> account — only the *payment* belongs to an account, which is exactly why
+> Phase 4 already added a pay-time account picker. Bills are now **global per
+> user**, the same way `categories` already are: always visible regardless of
+> which account is active; `account_id` was dropped from the table entirely.
+> The sections below describe the **corrected, final state** — see the
+> Implementation Notes at the end of this phase and of Phase 4 for the exact
+> migration/code changes this required. `Goal`/`3.1`–`3.4` below reflect what
+> actually shipped, not the original (superseded) account-scoped plan.
+
+### Goal
+The user can record recurring money — subscriptions (Netflix), bills (rent,
+electricity), EMIs — each with an amount, a cadence (weekly/monthly/yearly), a
+next due date, and an optional category. Bills are **global to the user**, not
+tied to any one account — the same way categories are. A new **Bills** screen
+lists them grouped by upcoming vs overdue, and an Add/Edit Bill sheet
+creates/edits/deletes them. This phase is useful on its own: a subscription
+tracker. It does **not** yet touch the transactions ledger (that's Phase 4,
+where the account is chosen — at pay time, not here).
+
+### Before Starting — Confirm With Codebase
+1. Read `components/AddBudgetSheet.js` as the closest structural template for
+   the create/edit form shape (category picker + a period-ish select) — note
+   bills deliberately **don't** copy its account-scoping, since bills aren't
+   account-scoped.
+2. ~~Read `AddAccountSheet.js`'s delete guard...~~ **Superseded**: bills are
+   global, so deleting an account can never orphan one — no guard needed.
+3. Confirm `MenuSheet.js` `ITEMS` array — add a "Bills" entry (route `/bills`)
+   alongside Analytics/Settings.
+4. Read `app/(tabs)/budgets.js` for the list-screen layout idiom (header, cards,
+   empty state, `useSafeAreaInsets`) to match Bills to it.
+5. Confirm the new-migration FK conventions from `00-index.md`: `user_id` →
+   `auth.users` **`ON DELETE CASCADE`**, **with `DEFAULT auth.uid()`** (see the
+   standing rule added to `00-index.md` after this phase's RLS bug), and
+   `category_id` → `categories` `ON DELETE SET NULL`. **No `account_id`.**
+
+### 3.1 Database
+
+**This block is the durable schema record for `bills` — reflects the final,
+corrected (account-less) schema actually live in Supabase, applied via the
+MCP across three migrations** (`add_bills`, `add_bills_user_id_index`,
+`add_bills_user_id_default` — plus a fourth, `bills_remove_account_scoping`,
+during Phase 4 that dropped the `account_id` column this course-correction
+removed). If replaying this from scratch, the block below is the equivalent
+single migration — no need to replay the account_id add/drop history.
+
+```sql
+CREATE TABLE public.bills (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+  category_id    uuid REFERENCES public.categories(id) ON DELETE SET NULL,
+  name           text NOT NULL,
+  amount         numeric NOT NULL CHECK (amount > 0),
+  cadence        text NOT NULL CHECK (cadence IN ('weekly', 'monthly', 'yearly')),
+  next_due_date  date NOT NULL,
+  last_paid_date date,
+  is_active      boolean NOT NULL DEFAULT true,
+  created_at     timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own bills"
+  ON public.bills FOR ALL
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+
+-- FK-covering indexes (matches the perf-advisor standard set in 00-index.md
+-- and the pattern already on transactions/budgets/plans/accounts)
+CREATE INDEX idx_bills_user_id     ON public.bills (user_id);
+CREATE INDEX idx_bills_category_id ON public.bills (category_id);
+```
+
+**No `account_id`** — bills are global per user, not account-scoped (see the
+course-correction note above). The account is chosen only at pay time
+(Phase 4's `PayBillSheet`), which is when the actual transaction — and its
+`account_id` — gets created.
+
+Notes:
+- No `updated_at` — consistent with the rest of the schema.
+- `last_paid_date` (nullable) records the last time the user actually marked
+  this bill **paid** (a real payment — *not* a skipped cycle, so the "Last
+  paid …" label never lies). It's a plain *fact* ("this happened on this
+  date"), not a derived running total, so it doesn't violate the
+  compute-don't-store rule — and since a paid bill becomes an ordinary
+  transaction with **no `bill_id` back-link** (see Phase 4), it genuinely can't
+  be derived. Used only to show "Last paid …" on the bill card. Null until
+  first paid.
+- No view. A bill's `amount` is the expected charge, not a derived total, so it
+  doesn't violate the compute-don't-store rule. Overdue/upcoming is computed
+  client-side from `next_due_date` (Phase 4).
+- RLS uses `(select auth.uid())` per the standing perf rule.
+
+### 3.2 Data Layer
+
+```
+hooks/useBills.js   ← NEW
+```
+
+Standard read-hook shape (subscribed to `version`), but **global, not
+account-scoped** — no `.eq('account_id', ...)` filter, since `bills` has no
+such column:
+
+```js
+const { data } = await supabase
+  .from('bills')
+  .select('*, category:categories(name, icon, color)')
+  .order('next_due_date', { ascending: true });
+```
+
+Because it has no `activeAccountId` dependency to force a refetch once auth
+resolves (unlike every account-scoped hook), it must depend on
+`session?.user?.id` directly instead — same fix already applied to
+`useCategories`/`useAllAccountSummaries` for the same reason (see the standing
+rule in `00-index.md`). Returns `{ bills, loading, refetch }`. A plain exported
+helper `billStatus(nextDueDate)` → `'overdue' | 'due_soon' | 'scheduled'`
+(`due_soon` = within 3 days), used by the list and later the alert feed.
+
+Mutations (create/edit/delete) live inline in `AddBillSheet` per the mutation
+pattern, calling `notifyChanged()` on success.
+
+### 3.3 Components
+
+```
+app/
+  bills.js               ← NEW. Pushed screen: list of bills, grouped overdue → due soon → scheduled.
+components/
+  AddBillSheet.js        ← NEW. Provider/Context/forwardRef create+edit+delete sheet.
+```
+
+- **`app/bills.js`** — header ("Bills") with back button (matches
+  `settings.js`), a "＋ Add" affordance opening `AddBillSheet`, and a list of
+  bill cards: name, category icon, cadence label, next-due date
+  (`format(date, 'd MMM')`), amount, an optional "Last paid …" line
+  (`last_paid_date`, hidden until first paid), and a small status pill
+  (overdue = danger, due soon = warn, scheduled = neutral). Empty state matches
+  the other tabs. **Global — the same list regardless of which account is
+  active**, not account-scoped.
+- **`AddBillSheet.js`** — fields: name, amount, cadence
+  (weekly/monthly/yearly segment), next due date, category (chip row like
+  AddTransactionSheet, expense categories), an "Active"/"Paused" toggle (a
+  `Switch`, its own row — pause without deleting). **No account field** —
+  bills aren't account-scoped.
+  - **Next-due-date UX** (decided in planning): cadence alone can't set the
+    date (monthly ≠ *which* day), so there's an explicit next-due-date
+    `DateTimePicker`. It **auto-fills a suggestion but stays fully editable** —
+    default to today on open; when the user changes cadence, bump the
+    suggestion forward by that interval from today (`addWeeks/Months/Years`)
+    *only if the user hasn't manually set a date yet*, so we never overwrite an
+    explicit choice. Cadence governs how the date advances after each payment
+    (Phase 4); the picker is the anchor for the *first* due date.
+  - Create/edit/delete, inline validation error, `notifyChanged()` on success,
+    success toast (reuse Phase 1). Insert payload has **no `account_id`** —
+    bills aren't account-scoped, matching how `AddCategorySheet` writes no
+    account either.
+
+### 3.4 Navigation / Integration
+- `MenuSheet.js`: add `{ key: 'bills', label: 'Bills', route: '/bills', icon: <Receipt/> }`
+  to `ITEMS` (import `Receipt` from lucide). Bump the sheet snap point for the
+  extra row.
+- ~~`AddAccountSheet.js` delete guard: include a `bills` in-use count~~
+  **Superseded**: bills are global, not account-scoped, so no guard is needed
+  — deleting an account can never orphan one.
+
+### 3.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| `MenuSheet.js` | New "Bills" row + taller snap point | — |
+| Account cascade | `bills.user_id` is CASCADE, so user-deletion still fully purges | Confirm in `00-index.md`'s deletion notes |
+
+### 3.6 What This Phase Does NOT Include
+- No "mark as paid", no transaction creation, no due-date advancing, no
+  skip-cycle, no due-today prompt (all Phase 4). `last_paid_date` exists in the
+  schema but stays null this phase.
+- No notifications (Phase 5). Bills are visible only inside the app.
+- No auto-detection of bills from transactions/SMS.
+
+### 3.7 Phase 3 Checklist — Before Marking Complete (final, post-correction state)
+- [x] `bills` table (incl. `last_paid_date`, **no `account_id`**) + RLS + indexes applied; SQL block matches live schema.
+- [x] `useBills` returns all of the user's bills (global, not account-scoped) ordered by due date; `billStatus` helper exported.
+- [x] Bills screen lists/creates/edits/deletes bills; reachable from the menu sheet; same list regardless of active account.
+- [x] `AddBillSheet` writes no `account_id` (bills are global), validates, toasts on save.
+- [x] Next-due-date field auto-suggests (from cadence) but stays editable; never overwrites a manual choice.
+- [x] ~~Deleting an account with bills is guarded~~ N/A — bills can't be orphaned by account deletion.
+- [x] Bundles cleanly.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- Applied directly via the Supabase MCP (`apply_migration`), not manual
+  SQL-editor paste — consistent with how every other migration this session
+  has been handled (the MCP is connected; see `00-index.md`). Verified via
+  `information_schema.columns` and the security/performance advisors after.
+- **Caught by the performance advisor, not the plan**: the original SQL block
+  only indexed `account_id`/`category_id`, missing a `user_id` index — every
+  other table (`transactions`, `budgets`, `plans`, `accounts`) has one
+  (`idx_*_user`), and the advisor flagged `bills_user_id_fkey` as uncovered
+  immediately after applying. Fixed with a follow-up `idx_bills_user_id`
+  migration; the doc's SQL block (3.1) has been corrected to include it so
+  future copy-paste doesn't reintroduce the gap. Security advisor was and
+  remains clean (only the two pre-existing, unrelated items).
+- **Second, more serious gap — caught by real on-device testing during Phase 4,
+  not by any advisor**: creating a bill failed with "new row violates
+  row-level security policy". Root cause: every other table's `user_id`
+  column has `DEFAULT auth.uid()` (`accounts`, `budgets`, `categories`,
+  `plans`, `transactions` all do — confirmed via `information_schema.columns`)
+  because every client-side insert in this codebase omits `user_id` from the
+  payload entirely, relying on that default. The `bills` migration's SQL
+  (written from scratch for this doc, not copied from a working table) never
+  included it, so `user_id` inserted as `NULL`, which the `WITH CHECK
+  ((select auth.uid()) = user_id)` policy correctly rejected — surfacing as
+  an RLS error rather than a NOT NULL error, which is a bit misleading to
+  debug from the client side alone. Fixed live via `ALTER TABLE bills ALTER
+  COLUMN user_id SET DEFAULT auth.uid()`; the doc's SQL block (3.1) corrected
+  to match. **Standing rule, added to `00-index.md`**: any new table's
+  `user_id` column must have `DEFAULT auth.uid()`, not just the standard
+  columns/RLS/index checklist — verify against an existing table's
+  `information_schema.columns` output, not just written from memory.
+- `hooks/useBills.js`: `billStatus` uses `differenceInCalendarDays` +
+  `startOfDay` (both `date-fns`) rather than raw `Date` subtraction, to avoid
+  time-of-day/DST edge cases when comparing dates.
+- `AddBillSheet.js`: "Active/Paused" originally shipped as a segmented control
+  (matching Week/Month, Expense/Income elsewhere) sharing a row with Next Due.
+  **Superseded during Phase 4 on-device testing** — the user asked for a real
+  `Switch` in its own row instead; see Phase 4's Implementation Notes for the
+  actual final shape (first use of `Switch` anywhere in this codebase).
+- Category picker on `AddBillSheet` reuses `AddBudgetSheet`'s exact
+  toggle-then-chip-grid pattern (not `AddTransactionSheet`'s always-visible
+  horizontal chip row), since both are "optional category" fields — the doc's
+  own "closest structural template" guidance.
+- `app/bills.js` follows `settings.js`/`manage-categories.js`'s pushed-screen
+  shape (`SafeAreaView` + back button, light theme) rather than the tab
+  screens' `Screen` wrapper, since Bills is reached via the menu sheet, not a
+  tab. Status pill (`Pill` component, reused as-is) only renders for
+  `overdue`/`due_soon`, mirroring how the Budgets tab hides its pill for the
+  `healthy` state — no pill for `scheduled`.
+- **Major course-correction during Phase 4 (2026-07-11), see the callout at
+  the top of this phase**: bills shipped account-scoped initially (this
+  section originally described that), which the user identified as wrong
+  while testing — a bill isn't a property of one account, only its payment
+  is. Reworked to global-per-user: dropped `bills.account_id` (column + FK +
+  index) via a follow-up migration (`bills_remove_account_scoping`), removed
+  `activeAccountId` filtering from `useBills` (switched to a `session`
+  dependency instead, to avoid reintroducing the categories-style pre-auth-
+  fetch bug), removed the account write from `AddBillSheet`, and removed the
+  bills count from `AddAccountSheet`'s delete guard. All sections above
+  already describe the corrected final state, not the superseded original.
+
+---
+
+## Phase 4 — Bills: Pay → Transaction (+ Due-Today Prompt) ✅ Complete
+
+### Goal
+A bill becomes actionable through a **pay-confirm step**: the user reviews the
+bill, tweaks the amount if it varies (electricity), and marks it paid — which
+creates a real expense transaction and advances `next_due_date` by cadence.
+They can also **skip a cycle** (advance the date, no transaction) when a charge
+didn't happen. And on app open, a **due-today prompt modal** proactively
+surfaces any bills due today or overdue so they're paid on time, not forgotten.
+Now bills flow into the ledger and balances/budgets reflect them.
+
+This phase folds in the user's refined vision (2026-07-11 planning discussion):
+editable amount at pay time, skip-cycle, and the on-open due prompt. The
+"2–3 days before / day before" *push* reminders remain Phase 5 (they need OS
+notifications); this phase is the in-app pay experience.
+
+**Pay-time account selection** (decided 2026-07-11, same planning pass —
+**and further corrected later the same day**, see the callout atop Phase 3):
+originally specified as "the bill has a fixed home account, `PayBillSheet`
+defaults to it but can override." Immediately after building this, the user
+pointed out the premise was still wrong: a bill isn't tied to *any* account,
+home or otherwise — only the payment is. So Phase 3 was reworked to drop
+`bills.account_id` entirely (global bills, see above), and this section's
+final, correct form is: `PayBillSheet` gets an **editable account field**
+defaulting to **whichever account is currently active** (simplest, most
+predictable guess — no bill-level account to default from anymore) but
+changeable to any of the user's accounts. The bill itself never stores an
+account at all; it's just as visible before and after paying, from any
+account.
+
+### Before Starting — Confirm Phase 3 is Approved
+1. Re-read `AddTransactionSheet.handleSave`'s insert payload shape (columns:
+   `type, amount, category_id, plan_id, occurred_at, note, account_id`).
+2. Confirm `date-fns` `addWeeks`/`addMonths`/`addYears` are available
+   (`date-fns` is already a dependency).
+3. Re-read `app/settings.js`'s `Modal`-based delete-account confirmation as the
+   pattern for the due-today modal (transparent overlay, card, action buttons).
+4. Confirm the AsyncStorage device-pref pattern (`flo.activeAccountId` in
+   `AccountContext`) for the "last shown" key the due prompt uses.
+5. Re-read `useAccount()`'s shape (`{ accounts, activeAccountId }`) and
+   `AddBudgetSheet`'s toggle-then-chip-grid category picker — the pay-time
+   account field reuses that exact interaction pattern (tap to reveal a chip
+   list, each chip showing the account's color dot + name, tap to select and
+   close), **not** `AccountSwitcherSheet` (that changes the app-wide active
+   account; this only changes which account one transaction lands in).
+   **Default the selection to `activeAccountId`**, not a bill-level account —
+   `bills` has none (see the corrected note above).
+
+### 4.1 Database
+No schema changes — `last_paid_date` already exists (Phase 3). This phase is
+the first to write to it. (Still no `bill_id` FK on `transactions` — a paid
+bill becomes a plain transaction; back-link remains **out of scope**.)
+
+### 4.2 Data Layer
+
+```
+lib/bills.js   ← NEW (shared because two surfaces call it: the Bills list and
+                 the due-today modal — this is exactly the reuse case that
+                 justifies a helper over an inline mutation)
+```
+
+- `advanceDueDate(dateStr, cadence)` — pure: returns the next `yyyy-MM-dd`
+  after applying `addWeeks/addMonths/addYears(…, 1)`.
+- `markBillPaid(bill, { amount, occurredAt, accountId })` — `amount` defaults
+  to `bill.amount`, `occurredAt` defaults to today. **`accountId` has no
+  bill-level fallback and is required from the caller** (`bills` has no
+  `account_id` to fall back to — `PayBillSheet` supplies it, defaulted to
+  `activeAccountId`):
+  1. Insert a transaction `{ type: 'expense', amount, category_id:
+     bill.category_id, plan_id: null, occurred_at: occurredAt, note: bill.name,
+     account_id: accountId }`.
+  2. If insert fails → return the error (do **not** advance; caller shows an
+     error toast).
+  3. Update the bill (its own row — no account column to touch):
+     `next_due_date = advanceDueDate(bill.next_due_date, bill.cadence)`,
+     `last_paid_date = occurredAt`.
+  4. Return success; caller calls `notifyChanged()` + success toast
+     "`<name>` marked paid".
+- `skipBillCycle(bill)` — advances `next_due_date` only (no transaction, does
+  **not** touch `last_paid_date`, so "Last paid …" stays truthful). Caller
+  `notifyChanged()` + info toast "Skipped `<name>` this cycle".
+
+`billStatus` (from Phase 3) drives the visible overdue/due-soon pills and, in
+Phase 6, the alert feed.
+
+### 4.3 Components
+
+```
+components/
+  PayBillSheet.js     ← NEW. Provider/Context/forwardRef confirm sheet.
+  DueBillsModal.js    ← NEW. On-open prompt for due/overdue bills.
+```
+
+- **`PayBillSheet`** — opened via `usePayBillSheet().openPayBill(bill)` from
+  both the Bills list ("Mark paid" on a card) and the due-today modal. Shows:
+  bill name, an **editable amount** field (pre-filled with `bill.amount`), the
+  paid date (defaults today, editable via `DateTimePicker`), an **editable
+  account field** (toggle-then-chip-grid, defaults to `activeAccountId` — no
+  bill-level account to default from — options = `useAccount().accounts`), and
+  actions: **Mark as Paid** (calls `markBillPaid` with the edited
+  amount/date/account), **Skip this cycle** (calls `skipBillCycle` — account
+  selection irrelevant, no transaction is created), and Cancel. On success:
+  dismiss, `notifyChanged()`, toast. Dark sheet matching the others.
+  *Optional, if trivial*: after a successful pay, run Phase 2's
+  `budgetToastForSave` (scoped to the **chosen** account) so a bill that blows
+  a budget still warns — reuse it, since the helper already exists.
+- **`DueBillsModal`** — a `Modal` (like Settings' delete confirmation) that, on
+  app open, lists **all** of the user's bills (global, not account-scoped)
+  with `next_due_date <= today` (due today + overdue), each with a **Mark
+  paid** (→ opens `PayBillSheet`) and
+  the modal offering a **Later** dismiss. Shows **at most once per calendar
+  day**, gated by an AsyncStorage key `flo.dueBills.lastShown` (a `yyyy-MM-dd`
+  string; show only if stored date < today, then write today). Renders nothing
+  when there are no due bills. One modal listing all due bills — never one
+  modal per bill.
+
+### 4.4 Navigation / Integration
+- Bills screen (`app/bills.js`): each card's primary action opens
+  `PayBillSheet`; overdue/due-soon cards can also show it more prominently.
+- `PayBillSheetProvider` mounted in `app/_layout.js` alongside the other sheet
+  providers.
+- `DueBillsModal` mounted as a sibling near `<Stack>` in `_layout.js` (the
+  `ShareIntentHandler` spot — it needs `useBills`, `usePayBillSheet`, and the
+  account context, so it can't be `RootNavigator` itself).
+
+### 4.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| Transactions/Home/Budgets | A paid bill now appears as a transaction and moves balances | Correct account + category; the edited amount + chosen date + chosen account |
+| `app/_layout.js` | New sheet provider + due-modal sibling | Provider order; modal must not fight the sign-in redirect (only show when a session + active account exist) |
+| Bills list | Cards gain pay/skip actions + "Last paid …"; **now global**, same list regardless of active account | — |
+| Active-account scoping | The **bill** is always visible everywhere (global). The **transaction** it creates is still normal account-scoped data — paying into a non-active account won't show that transaction until the user switches to it | Not a bug, and no longer a bills limitation — just how transactions always work. `notifyChanged()` still refreshes everything correctly once switched |
+
+### 4.6 What This Phase Does NOT Include
+- No `bill_id` link on the created transaction (it's a normal transaction after;
+  edit/delete it like any other).
+- No "undo paid" beyond deleting the created transaction manually (the bill's
+  date has already advanced).
+- **No account concept on bills at all** — bills have no `account_id`
+  (creation-time or otherwise); only the *pay-time* transaction's account is
+  selectable. (Originally specified as "no creation-time picker, but a fixed
+  home account" — corrected mid-phase, see the callout atop Phase 3.)
+- ~~No cross-account due detection~~ **Resolved by the correction, not
+  deferred**: since bills are global, there is no "non-active account" for one
+  to hide in anymore — the due-today modal and Bills list always show
+  everything. (What's still true: the resulting *transaction* only appears in
+  Transactions/Home/Budgets once you switch to the account it was paid from —
+  see 4.5.)
+- No push/OS reminders (Phase 5).
+
+### 4.7 Phase 4 Checklist — Before Marking Complete
+- [x] `lib/bills.js` exports `advanceDueDate`, `markBillPaid`, `skipBillCycle`.
+- [x] `PayBillSheet` marks paid with an **editable amount** + date + **account** → correct expense transaction in the *chosen* account; advances the bill's `next_due_date`; sets `last_paid_date`; the bill itself has no account column to change.
+- [x] Account field defaults to the **currently active account** but can be changed to any of the user's accounts.
+- [x] Skip-cycle advances the date with **no** transaction and leaves `last_paid_date` untouched.
+- [x] Transaction-insert failure does not advance the date (error toast).
+- [x] Balances/budgets update (via `notifyChanged`); success/info toasts show.
+- [x] Due-today modal shows due/overdue bills on open, at most once per day, nothing when none due; "Later" dismisses; "Mark paid" opens `PayBillSheet`.
+- [x] Modal never appears on the sign-in screen / with no active account.
+- [x] "Last paid …" shows on paid bills; overdue/due-soon pills reflect the advanced date.
+- [x] Bundles cleanly.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- **Two real bugs caught in review, fixed before shipping** (not deviations
+  from the plan — an implementation mistake, corrected): `PayBillSheet`
+  originally had `if (!bill) return null` placed after all state/ref hooks
+  but *before* the JSX's inline `snapPoints={useMemo(() => ['68%'], [])}` —
+  since `bill` starts `null`, that `useMemo` was skipped on early renders and
+  only started being called once `bill` became truthy, which is a
+  conditional-hook-call (Rules of Hooks violation). Worse, because
+  `BottomSheetModal` (and `modalRef`) didn't mount at all while `bill` was
+  null, the **very first** `openPayBill()` call in a session would call
+  `modalRef.current?.present()` against a still-`null` ref and silently do
+  nothing — the sheet wouldn't appear the first time. Fixed by removing the
+  early return entirely (matching how every other sheet in the app always
+  renders its `BottomSheetModal` unconditionally) and guarding the one JSX
+  reference to `bill` with `bill?.name ?? ''` instead. `DueBillsModal`'s
+  similar-looking `if (dueBills.length === 0) return null` was checked and is
+  safe — it has no hooks after that line.
+- **Major course-correction, same day (2026-07-11)**: after building the
+  above with bills still account-scoped (Phase 3's original design) and a
+  pay-time account field that merely *overrode* a bill's fixed "home"
+  account, the user pointed out this was backwards — a bill (e.g. "Netflix,
+  ₹649/month, paid from Account 2") is the same commitment no matter which
+  account is currently active; it shouldn't vanish from view when you switch
+  accounts. The account only ever belongs to the *payment*, never the bill.
+  Reworked (see the callout atop Phase 3 for the full change list):
+  `bills.account_id` dropped entirely; `PayBillSheet`'s account field now
+  defaults to `activeAccountId` instead of a now-nonexistent `bill.account_id`;
+  `markBillPaid`'s `accountId` param lost its bill-level fallback and is now
+  supplied unconditionally by the caller. This section and 4.2/4.3 above have
+  already been rewritten to describe the corrected, final design — not the
+  superseded one.
+- Pay-time account picker reuses the toggle-then-chip-list pattern, chips
+  showing each account's color dot + name — visually closer to
+  `AccountSwitcherSheet`'s cards than `AddBudgetSheet`'s category chips, since
+  accounts have a meaningful color identity already established there.
+- `markBillPaid`/`skipBillCycle` return `{ error }` (not throw), matching the
+  `{ error: saveError }` convention used by every mutation in this codebase.
+- Optional Phase-2-reuse (`budgetToastForSave` after a successful pay) was
+  included since it was trivial — scoped to the **chosen** pay account, since
+  that's whichever account's budget the money actually left.
+- **UI feedback from on-device testing (2026-07-11)**: Active/Paused was
+  originally a segmented control crammed into the same row as Next Due — the
+  user asked for a real `Switch` in its own row instead. `AddBillSheet.js`
+  now has: a full-width "Next Due" row, then a separate full-width row with
+  an "Active" label + hint text (changes based on state) + React Native's
+  `Switch` (`trackColor`/`thumbColor` matched to the sheet's dark theme —
+  this is the first use of `Switch` anywhere in the codebase, since nothing
+  else needed a real on/off control before now, everything else used a
+  segmented control).
+- `app/bills.js`: added a `paused` status (not in the original plan) — a bill
+  with `is_active: false` now shows a neutral "Paused" pill and hides the
+  "Mark Paid" quick-action, instead of inheriting whatever `billStatus()`
+  would compute from a possibly-stale `next_due_date` (which would otherwise
+  show a paused bill as "Overdue" in red, which is misleading since the user
+  isn't tracking payment on it right now). Small, self-contained addition,
+  not scope creep — it's a display-correctness fix, not a new feature.
+- No other deviations from the plan.
+
+---
+
+## Phase 5 — Local Scheduled Notifications ✅ Complete
+
+### Goal
+The app can notify the user **when it's closed**: a reminder a few days before
+each active bill's due date, and an optional daily "log your spending" nudge. A
+Notifications section in Settings lets the user opt in (Android 13+ permission
+prompt) and toggle each reminder type. Tapping a notification deep-links into
+the app.
+
+### Before Starting — Confirm With Codebase
+1. Read the Expo SDK 54 notifications docs
+   (`https://docs.expo.dev/versions/v54.0.0/sdk/notifications/`) before writing
+   code — trigger types (daily, calendar/date), the Android channel
+   requirement, and the Android 13+ `POST_NOTIFICATIONS` opt-in.
+2. `npx expo install expo-notifications`; add its config plugin to `app.json`
+   `plugins`. This is a **legitimate new dependency** (no way to do OS
+   notifications without it).
+3. Check `app.json` `android.blockedPermissions` — `VIBRATE` is currently
+   blocked (stripped as unused in the security pass). If notification vibration
+   is wanted, remove `VIBRATE` from `blockedPermissions`; otherwise leave it and
+   notifications simply won't vibrate. Decide and note it.
+4. Confirm this needs a **rebuild** (native change) — won't appear via JS-only
+   reload; call that out to the user before the phase, like the share-intent
+   feature.
+5. Reuse the AsyncStorage device-pref pattern from `AccountContext`
+   (`flo.activeAccountId`) for notification settings keys.
+
+### 5.1 Database
+No database changes. Notification preferences are **device-local**, stored in
+AsyncStorage (like the active account), not in Postgres — they don't sync and
+don't belong in the ledger.
+
+Keys:
+- `flo.notif.enabled` — master opt-in ('true'/'false')
+- `flo.notif.dailyReminder` — '{ enabled, hour, minute }' JSON
+- `flo.notif.billReminders` — '{ enabled, daysBefore }' JSON
+
+### 5.2 Data Layer
+
+```
+lib/notifications.js   ← NEW
+```
+
+- `requestPermission()` — wraps `Notifications.requestPermissionsAsync()`, sets
+  the Android channel (`setNotificationChannelAsync`) first.
+- `rescheduleAll({ bills, settings })` — the single source of truth for what's
+  scheduled: `cancelAllScheduledNotificationsAsync()` then schedule fresh:
+  - **Bill reminders**: for each active bill, a calendar/date trigger at
+    `next_due_date` − `daysBefore` days, 9:00am, titled "<name> due <in N days>".
+    Skip past dates. Data payload `{ route: '/bills' }`.
+  - **Daily reminder**: a daily trigger at the chosen hour/minute, "Log today's
+    spending?", data `{ route: '/' }` (Home — `(tabs)` is a route group, its
+    parens don't appear in the actual path; see Implementation Notes).
+  - Local scheduled notifications are finite and cheap to rebuild; cancel-all +
+    reschedule avoids drift, mirroring the version-counter philosophy.
+- `useNotificationSync()` — a tiny hook mounted once (e.g. in `_layout.js`
+  sibling like `ShareIntentHandler`) that calls `rescheduleAll` on app start,
+  whenever `version` changes (bills edited), and whenever settings change. Also
+  registers a response listener that routes on tap.
+
+### 5.3 Components
+
+No new component file — a Notifications section added directly to
+`app/settings.js` (the "or a section added to Settings" alternative from the
+original plan; simpler than a separate sheet for three toggle rows):
+
+- A Notifications `Card` of rows: master toggle (triggers the permission
+  prompt on first enable, shows a "blocked, tap to open system settings" hint
+  row when denied without `canAskAgain`), "Daily Reminder" (toggle + a sub-row
+  time picker via `DateTimePicker` in `mode="time"`), "Bill Reminders" (toggle
+  + a sub-row of 1d/2d/3d pill chips). Each change persists to AsyncStorage
+  and immediately calls `rescheduleAll`.
+- Uses the existing row styling from `settings.js` plus new disabled-row
+  (`opacity` when the master toggle is off) and sub-row styles; `Switch` from
+  react-native.
+
+### 5.4 Navigation / Integration
+- `app/_layout.js`: mount `useNotificationSync()` (as a null-rendering sibling
+  component near `ShareIntentHandler`).
+- Tap handling: notification response → `router.push(data.route)`.
+- `app.json`: expo-notifications plugin; possibly un-block `VIBRATE`.
+
+### 5.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| `app.json` / native | New plugin + permission → **requires a rebuild** | Tell the user; won't show via OTA/JS reload |
+| `app/settings.js` | New Notifications section | Permission-denied state must be handled (show "enable in system settings") |
+| Security pass | New `POST_NOTIFICATIONS` permission is expected/legitimate | Update `00-index.md` so it isn't flagged as bloat later |
+
+### 5.6 What This Phase Does NOT Include
+- No remote/push notifications, no Expo push tokens, no Edge Functions.
+- No budget-reset / monthly-digest notifications yet (can be added to
+  `rescheduleAll` later; keep Phase 5 to bill + daily reminders).
+- No per-bill custom reminder times (one global `daysBefore`).
+
+### 5.7 Phase 5 Checklist — Before Marking Complete
+- [x] `expo-notifications` installed + configured in `app.json`; VIBRATE decision recorded (left blocked — see Implementation Notes).
+- [x] Enabling notifications requests permission (Android 13+) and handles denial.
+- [x] Bill reminders schedule at `next_due_date − daysBefore`; past dates skipped.
+- [x] Daily reminder fires at the chosen time when enabled.
+- [x] Editing/paying a bill reschedules (no stale/duplicate notifications).
+- [x] Tapping a notification deep-links to the right screen.
+- [x] Settings persist across app restarts (AsyncStorage).
+- [x] Bundles cleanly; note the rebuild requirement to the user.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- **Critical bug, caught via real device testing (2026-07-11, after this phase
+  was first marked complete) — app crashed on boot in Expo Go, not just
+  "notifications didn't work"**: `expo-notifications` auto-registers a device
+  push-token listener as a *module-level side effect on import*
+  (`DevicePushTokenAutoRegistration.fx.js`), and that throws outright in Expo
+  Go on Android (push support was removed from Expo Go in SDK 53) — even
+  though this codebase only ever calls *local* scheduling APIs, which Expo Go
+  does support. Since `lib/notifications.js` did `import * as Notifications
+  from 'expo-notifications'` and `app/_layout.js` imports that file at module
+  scope, the entire app failed to boot in Expo Go — every route, not just
+  Settings/notifications. Fixed by detecting Expo Go via
+  `Constants.executionEnvironment === ExecutionEnvironment.StoreClient`
+  (`expo-constants`) and gating the `expo-notifications` import behind a
+  conditional `require()` — Metro still bundles the module, but its
+  side-effecting top-level code never executes when the `require()` call
+  itself is never reached. Every exported function in `lib/notifications.js`
+  now checks `if (!Notifications) return ...` (a no-op, or a
+  `{ granted: false, unsupported: true }` status for the permission
+  functions). `app/settings.js` shows a distinct "Notifications need a
+  development build, not Expo Go" message for the `unsupported` case, and no
+  longer shows the (misleading, in Expo Go) "open system settings" hint for
+  it. **This is why Daily Reminder/Bill Reminders appeared permanently
+  greyed-out during testing**: both sub-toggles are `disabled={!notifEnabled}`
+  by design, and `notifEnabled` can only become `true` after the master
+  toggle's permission request actually succeeds — which it never can in Expo
+  Go. Testing the full working toggle chain still requires the dev
+  client/EAS build, as already noted below; this fix's scope is only "don't
+  crash the whole app," not "make notifications work in Expo Go" (impossible).
+- **Bill Reminders defaults to `enabled: true`, Daily Reminder defaults to
+  `enabled: false`** (`DEFAULT_BILL_REMINDERS`/`DEFAULT_DAILY_REMINDER` in
+  `lib/notifications.js`) — a deliberate, not-in-the-original-plan choice:
+  bill-due reminders were the primary ask driving this whole feature, so they
+  default on; the daily log-nudge is more of an opt-in nicety. Both defaults
+  are inert until the master toggle is also on (see above).
+- **VIBRATE decision**: left blocked in `app.json`'s `android.blockedPermissions`
+  (not unblocked). Notifications will display/sound normally but won't vibrate
+  the device. Chosen to stay consistent with the app's minimal-permissions
+  posture from the earlier security audit rather than reintroduce a permission
+  deliberately stripped there, for a purely cosmetic gain.
+- **This phase requires a new EAS build to test on-device** — `expo-notifications`
+  is a native module (confirmed via `npx expo prebuild`: its own bundled
+  Android manifest declares `POST_NOTIFICATIONS` and `RECEIVE_BOOT_COMPLETED`,
+  merged in automatically the same way `expo-image-picker`'s storage
+  permissions were during the security audit). `RECEIVE_BOOT_COMPLETED` is
+  legitimate here, not bloat — it's what lets Android re-arm scheduled local
+  notifications after a device reboot; otherwise every pending bill reminder
+  would silently vanish on restart.
+- **Caught during review, fixed before shipping**: the plan's daily-reminder
+  data payload was `{ route: '/(tabs)' }`. `(tabs)` is an `expo-router` route
+  *group* — its parens are stripped from the actual URL, so `/(tabs)` is not a
+  valid path. Confirmed the real Home path is `/` (via `router.replace('/')`
+  already used in `app/_layout.js`'s sign-in redirect) and fixed the daily
+  reminder's route to match. Bill reminders' `/bills` was already correct
+  (top-level route, not inside a group).
+- **Added beyond the plan, for correctness**: `getPermissionStatus()` — a
+  read-only permission check (no prompt) run whenever Settings mounts with
+  `enabled: true` already stored. The OS permission can be revoked from
+  outside the app (system settings) without FLO ever finding out; without
+  this cross-check, the "blocked, open system settings" hint would only ever
+  appear after the user happened to retry the toggle, not immediately on
+  reopening Settings. Doesn't persist the correction back to storage — the
+  live permission check is treated as the source of truth on every mount
+  instead, which is simpler than adding a write-back path for a case that
+  self-corrects on each open anyway.
+- `useNotificationSync()`'s tap-routing handles two distinct cases per the
+  Expo docs: `addNotificationResponseReceivedListener` for a tap while the
+  app is already running, and `getLastNotificationResponseAsync()` for a cold
+  start caused by tapping a notification (the live listener alone would miss
+  this, since it isn't registered yet at that point) — not called out
+  explicitly in the plan's one-liner ("registers a response listener that
+  routes on tap") but necessary for the checklist's actual requirement.
+- Days-before stepper implemented as 3 pill chips (1d/2d/3d before), matching
+  the visual language already used for the account-color grid, rather than a
+  native stepper control — no such component exists elsewhere in the app.
+- Settings' notification rows use React Native's `Switch` (already introduced
+  in `AddBillSheet` during Phase 4) — no longer a "first use," now an
+  established pattern for real on/off toggles distinct from segmented
+  controls (which represent a choice among options, not binary state).
+
+**→ Stop here. Show the result and wait for approval.**
+
+---
+
+## Phase 6 — Bell Notification Center ✅ Complete
+
+### Goal
+The Home header bell (today a static icon with a dead red dot) becomes a real
+control: tapping it opens a sheet listing the user's **current actionable
+alerts** — overdue/due-soon bills, budgets at/over limit, plans over target or
+ending soon. The dot shows only when at least one alert exists. Each row
+deep-links to the relevant screen. This is a **computed feed** — nothing new is
+stored, honoring FLO's derive-don't-store principle.
+
+### Before Starting — Confirm Phase 5 is Approved
+1. Read `app/(tabs)/index.js` header — the `bellButton`/`bellDot` markup (static
+   `View`); it needs to become a `Pressable` opening the sheet, with the dot
+   conditional on alert count.
+2. Confirm the feeds available: `useBills` + `billStatus` (Phase 3/4),
+   `useBudgets` + `budgetStatus`, `usePlans` (`v_plans_with_totals`).
+3. Reuse the `MenuSheet.js` sheet shape for `AlertsSheet`.
+
+### 6.1 Database
+No database changes. (No `notifications` table — the feed is computed live.)
+
+### 6.2 Data Layer
+
+```
+hooks/useAlerts.js   ← NEW
+```
+
+Aggregates current alerts from existing hooks/views — a **mixed-scope feed**,
+not uniformly account-scoped (updated after Phase 3/4's bills course-
+correction, see the callout atop Phase 3):
+- Overdue bills (`billStatus === 'overdue'`) and due-soon bills — **global**,
+  from `useBills()`, same regardless of active account.
+- Budgets where `budgetStatus(spent, amount)` is `warn`/`over` — **active-
+  account-scoped**, from `useBudgets()`.
+- Plans with `target_amount` and `total_spent > target_amount`, and (optionally)
+  active plans with an `end_date` within 7 days — **active-account-scoped**,
+  from `usePlans()`.
+
+Returns `{ alerts, count }` where each alert is
+`{ id, kind, severity, title, subtitle, route }`. Sorted most-severe first.
+
+**Dot/"unseen" behavior**: v1 keeps it simple — the dot shows when `count > 0`.
+An AsyncStorage `flo.alerts.lastSeen` timestamp to distinguish new-since-last-open
+is **deferred** (computed alerts lack stable timestamps); note this in
+Implementation Notes rather than building read/unread tracking.
+
+### 6.3 Components
+
+```
+components/AlertsSheet.js   ← NEW. Provider/Context/forwardRef, MenuSheet-style.
+```
+
+- Lists `useAlerts().alerts`; each row: severity-colored icon, title, subtitle,
+  chevron; tap → `router.push(alert.route)` + dismiss. Empty state: "You're all
+  caught up." Dark sheet matching `MenuSheet`.
+
+### 6.4 Navigation / Integration
+- `app/(tabs)/index.js`: wrap the bell in `Pressable` → `openAlerts()`; render
+  `bellDot` only when `useAlerts().count > 0`.
+- Mount `AlertsSheetProvider` in `_layout.js` alongside `MenuSheetProvider`.
+
+### 6.5 Impact on Existing Features
+| Area | Change | Watch for |
+|---|---|---|
+| Home header | Bell becomes interactive; dot becomes meaningful | Was purely decorative before |
+| `_layout.js` | One more sheet provider | Provider order (needs account/data context) |
+
+### 6.6 What This Phase Does NOT Include
+- No read/unread persistence (deferred, noted above).
+- No stored notification log / history.
+- No push; no marking alerts "done" (they clear when the underlying state clears
+  — pay the bill, the alert goes away).
+
+### 6.7 Phase 6 Checklist — Before Marking Complete
+- [x] `useAlerts` returns a sorted feed from existing data — bills global, budgets/plans active-account-scoped (a deliberate mix, not uniform).
+- [x] Bell opens `AlertsSheet`; rows deep-link; empty state shows when clear.
+- [x] Dot shows iff `count > 0`.
+- [x] Paying an overdue bill / fixing a budget removes its alert (via `notifyChanged`).
+- [x] Bundles cleanly.
+
+**→ Stop here. Show the result and wait for approval.**
+
+### Implementation Notes
+- `useAlerts` composes `useBills`/`useBudgets`/`usePlans` directly (not a new
+  Supabase query) — each already reacts correctly to `notifyChanged()` via its
+  own `version` dependency, so the "paying a bill / fixing a budget removes
+  its alert" checklist item needed no extra wiring: `useMemo`'s dependency
+  array (`[bills, budgets, plans]`) recomputes automatically whenever any of
+  those hooks refetch.
+- Alert `route`s verified against actual working paths, not assumed —
+  confirmed `/budgets`, `/transactions`, `` `/plan/${id}` `` are all already
+  used elsewhere via `router.push` (`(tabs)` and other route groups are
+  transparent to the URL, same lesson as Phase 5's `/(tabs)` fix).
+- Icon-per-`kind` (not just per-severity) was a small addition beyond the
+  plan's "severity-colored icon" wording: `Receipt`/`Wallet`/`Flag` for
+  bill/budget/plan, tinted by severity (`dangerBg`+`dangerStrong` or
+  `warnBg`+`warnStrong`) — matches the existing pattern on the Budgets tab
+  (icon + status-tinted `IconTile`) rather than a single generic alert glyph,
+  and costs nothing extra to build since the icon-per-kind mapping is a
+  one-line lookup table.
+- Plan-ending-soon alerts only fire for **active** plans with a set `end_date`
+  within 7 days (`daysLeft >= 0`, so already-past end dates don't alert —
+  a plan past its end date either got marked `completed` or is simply
+  inactive-but-not-updated, neither of which this phase's scope covers).
+- Budget subtitle reuses the exact wording pattern from Phase 2's
+  `budgetToastForSave` (`lib/alerts.js`) — "Over by ₹X" / "N% used this
+  week/month" — for consistency between the toast that fires at the moment of
+  crossing and the persistent alert row for the same condition.
+- `AlertsSheetProvider` mounted wrapping `MenuSheetProvider`'s children (not
+  literally "alongside" as siblings, since one must be an ancestor of
+  `<Stack>` for `Home` to consume it) — functionally equivalent to the plan's
+  intent, just corrected for React's provider-nesting requirement (the same
+  class of ordering constraint documented earlier for `AddTransactionSheet`/
+  `AccountSwitcherSheet`).
+- Read/unread persistence remains deferred exactly as planned — not built.
+- No other deviations from the plan.
+
+---
+
+## Data Model Summary (Final State After All Phases)
+
+```
+auth.users
+  └─ bills (NEW)                      ← recurring money; user_id ON DELETE CASCADE
+       └─ category_id → categories    (ON DELETE SET NULL)
+       (no account_id — global per user, like categories; the account is
+        chosen only at pay time, see transactions below)
+
+transactions (unchanged)              ← Phase 4 pay inserts a normal expense here,
+  (no bill_id link in v1)               account_id = whichever account was chosen
+                                         at pay time (defaults to active account)
+
+Computed / derived (nothing stored):
+  toasts            → transient React state (Phase 1–2)
+  due-today prompt  → useBills + AsyncStorage "last shown" date (Phase 4)
+  scheduled notifs  → device OS + AsyncStorage prefs (Phase 5)
+  alert feed        → useAlerts() over bills + v_budgets_with_spent
+                      + v_plans_with_totals (Phase 6)
+```
+
+### `bills` — Schema
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, `default gen_random_uuid()` |
+| `user_id` | uuid | NOT NULL, **`DEFAULT auth.uid()`**, RLS, FK → `auth.users` **`ON DELETE CASCADE`** |
+| `category_id` | uuid | nullable, FK → `categories` `ON DELETE SET NULL` |
+| `name` | text | NOT NULL |
+| `amount` | numeric | NOT NULL, `CHECK (amount > 0)` — expected charge, not derived |
+| `cadence` | text | `CHECK IN ('weekly','monthly','yearly')` — how `next_due_date` advances after each payment |
+| `next_due_date` | date | NOT NULL; user-set anchor (auto-suggested), advanced by cadence on pay/skip |
+| `last_paid_date` | date | nullable; set on pay (not skip) — powers "Last paid …" |
+| `is_active` | boolean | NOT NULL default true (pause without deleting) |
+| `created_at` | timestamptz | `default now()` (no `updated_at`) |
+
+No view — `amount` is an input, not a computed total; overdue/upcoming is
+derived client-side via `billStatus(next_due_date)`.
+
+---
+
+## Impact on Existing Features
+
+| Existing Feature | Impact | Action Required |
+|---|---|---|
+| `app/_layout.js` | Gains ToastProvider (P1, done), PayBillSheetProvider + DueBillsModal sibling (P4), notification-sync sibling (P5), AlertsSheetProvider (P6) | Careful provider ordering |
+| `AddTransactionSheet.js` | Success/error toasts (P1) + threshold toasts (P2) | Keep inline validation for "Enter an amount" |
+| `MenuSheet.js` | New "Bills" entry (P3) | Taller snap point |
+| `app/settings.js` | Notifications section (P5) | Handle permission-denied |
+| `app/(tabs)/index.js` | Bell becomes interactive (P6) | — |
+| `app.json` / native | expo-notifications plugin + permission (P5) | Requires a rebuild; update security notes in `00-index.md` |
+| Account deletion cascade | `bills.user_id` CASCADE keeps full purge working (P3) | Note in `00-index.md` deletion section |
+
+---
+
+## Out of Scope (All Phases)
+
+- **Remote / push notifications** — Expo push tokens, Supabase Edge Functions,
+  `pg_cron`. FLO has no server-side event source; local scheduling covers every
+  useful case. Revisit only if multi-device sync is ever added.
+- ~~Tab bar swap: Bills ↔ Plans~~ **Done** (2026-07-11, after Phase 6 shipped
+  and on-device testing, per the plan above). Bills now occupies the tab slot
+  (`app/(tabs)/bills.js`, `Screen`-wrapper tab pattern, "New Bill" pill header,
+  no back button); Plans moved to a pushed screen (`app/plans.js`, back-button
+  header pattern, reached from the menu sheet). `app/(tabs)/_layout.js`'s
+  `Tabs.Screen` swapped from `plans` to `bills`; `TabBar.js`'s `ICONS`/`LABELS`
+  swapped `Flag`/'Plans' for `Receipt`/'Bills'; `MenuSheet.js`'s `ITEMS`
+  swapped the Bills row for a Plans row (`Flag` icon, `/plans`). Confirmed via
+  `expo export` (no duplicate-route errors) and a route-file listing that
+  exactly one file resolves each of `/bills` and `/plans` — `expo-router`'s
+  `(tabs)` group doesn't affect the URL, so every existing
+  `router.push('/bills')`/`` `/plan/${id}` `` call (Phase 5's notification
+  taps, Phase 6's `AlertsSheet` rows, `DueBillsModal`) needed no changes.
+  `app/plan/[id].js` (Plan Detail) uses `router.back()`, not a tab-specific
+  assumption, so it's unaffected either way.
+- **Bill auto-detection** — inferring recurring bills from transaction history
+  or SMS. Future build.
+- **`bill_id` back-link on transactions** — a paid bill creates a plain
+  transaction with no FK back to the bill. Enough for v1.
+- **Read/unread + notification history** — the bell feed is current-state only;
+  no stored log, no per-alert seen-state (deferred, Phase 6 notes).
+- **Budget-reset / monthly-digest scheduled notifications** — easy to add to
+  `rescheduleAll` later; Phase 5 ships bill + daily reminders only.
+- ~~Cross-account due detection~~ — **not out of scope; resolved by the
+  Phase 3/4 course-correction.** Bills are global (no `account_id`), so the
+  due-today modal and bell feed already show every bill regardless of active
+  account. Only the resulting *transaction* (once paid) stays account-scoped,
+  same as any transaction.
+- **Recurring income (salary)** — bills are expenses only in v1.
+- **iOS notifications** — the app targets Android (share-intent is Android-only
+  already); iOS local notifications would likely work but are untested/unscoped.
+
+**Note**: "wiring toasts into every sheet" was originally listed here as
+out-of-scope but was **completed** during Phase 1 testing (see the Toast
+Trigger Reference table under Phase 1) — every mutation-bearing sheet now
+toasts.

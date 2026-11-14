@@ -1,6 +1,6 @@
 # 01: Appearance: System / Light / Dark
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** FLO follows the phone's light or dark setting by default, and the user can force Light or Dark.
 - The app's native interface style becomes automatic. This needs a native rebuild.

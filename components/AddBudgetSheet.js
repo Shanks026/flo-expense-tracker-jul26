@@ -1,16 +1,18 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Trash2, Crown } from 'lucide-react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { Crown, Wallet, CalendarDays } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { addDays, format, isBefore, parseISO, startOfDay } from 'date-fns';
 import CategoryIcon from './CategoryIcon';
-import Button from './Button';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import Sheet from './ledger/Sheet';
+import Segmented from './ledger/Segmented';
+import ListRow from './ledger/ListRow';
+import Button from './ledger/Button';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, tabular, inter } from '../theme/ledger';
 import { currencySymbol, sanitizeAmountInput } from '../lib/currency';
-import { previewPeriodDates } from '../lib/budgets';
-import { supabase } from '../lib/supabase';
+import { previewPeriodDates, budgetLimitReached, BUDGET_LIMIT_MESSAGE, createBudget, updateBudget, deleteBudget } from '../lib/budgets';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAccount } from '../lib/AccountContext';
 import { useToast } from './Toast';
@@ -68,8 +70,8 @@ function periodRangeLabel(periodType, startDate, endDate) {
 }
 
 const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const modalRef = useRef(null);
   const handleSheetChange = useSheetBackHandler(modalRef);
   const { notifyChanged } = useDataRefresh();
@@ -86,19 +88,44 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
   const [endDate, setEndDate] = useState(addDays(startOfDay(new Date()), 6));
   const [showPicker, setShowPicker] = useState(null); // 'start' | 'end' | null
   const [categoryId, setCategoryId] = useState(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // A new budget's account: the opener's (an Ask FLO draft names one), else
+  // the active account. An edit never moves a budget between accounts.
+  const [accountId, setAccountId] = useState(null);
+  // Per open: `onDone({ saved })` runs once when the sheet closes (Ask FLO's
+  // card turns to "Saved ✓" from it). Refs: they only matter at save and
+  // dismiss time.
+  const onDoneRef = useRef(null);
+  const savedRef = useRef(false);
 
   const selectedCategory = expenseCategories.find((c) => c.id === categoryId);
   const isCustom = periodType === 'custom';
 
+  // open(budget):
+  // - an existing row (with `id`) opens it for editing;
+  // - an object without `id` (Ask FLO's draft, 44-ai-assistant.md phase 4)
+  //   fills the fields as a NEW budget: { amount, category_id, period_type,
+  //   start_date?, end_date?, account_id?, onDone? }. The free-plan gates
+  //   run at Save, since this path skips the Budgets screen's own check;
+  // - nothing opens a blank new budget.
   useImperativeHandle(ref, () => ({
     open(budget) {
       setError(null);
-      setPickerOpen(false);
       setShowPicker(null);
-      if (budget) {
+      onDoneRef.current = budget?.onDone ?? null;
+      savedRef.current = false;
+      setAccountId(budget?.id ? null : budget?.account_id ?? null);
+      if (budget && !budget.id) {
+        const today = startOfDay(new Date());
+        const custom = budget.period_type === 'custom';
+        setEditingId(null);
+        setAmount(budget.amount ? String(budget.amount) : '');
+        setPeriodType(['calendar_week', 'calendar_month', 'custom'].includes(budget.period_type) ? budget.period_type : 'calendar_month');
+        setCategoryId(budget.category_id ?? null);
+        setStartDate(custom && budget.start_date ? parseISO(budget.start_date) : today);
+        setEndDate(custom && budget.end_date ? parseISO(budget.end_date) : addDays(today, 6));
+      } else if (budget) {
         setEditingId(budget.id);
         setAmount(String(budget.amount));
         setPeriodType(budget.period_type);
@@ -134,6 +161,32 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
       setError('The end date must be on or after the start date');
       return;
     }
+    // The free-plan gates, for a new budget only (create-time, never on an
+    // edit). The Budgets screen checks the count before opening a blank
+    // sheet; a draft from Ask FLO arrives here without that, so Save checks
+    // again. With FLAGS.billing off, hasPro is true and both pass.
+    // Either gate closes this sheet before the upsell opens, so the two
+    // sheets never stack.
+    if (!editingId) {
+      if (isCustom && !hasPro) {
+        modalRef.current?.dismiss();
+        openProUpsell('Custom periods are a Pro feature');
+        return;
+      }
+      setSaving(true);
+      const overLimit = await budgetLimitReached(hasPro);
+      setSaving(false);
+      if (overLimit) {
+        modalRef.current?.dismiss();
+        openProUpsell(BUDGET_LIMIT_MESSAGE);
+        return;
+      }
+    }
+    const targetAccountId = accountId ?? activeAccountId;
+    if (!editingId && !targetAccountId) {
+      setError('Still loading your account — try again in a moment');
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -149,14 +202,15 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     };
 
     const { error: saveError } = editingId
-      ? await supabase.from('budgets').update(payload).eq('id', editingId)
-      : await supabase.from('budgets').insert({ ...payload, account_id: activeAccountId });
+      ? await updateBudget(editingId, payload)
+      : await createBudget(targetAccountId, payload);
 
     setSaving(false);
     if (saveError) {
       showToast({ message: saveError.message, variant: 'error' });
       return;
     }
+    if (!editingId) savedRef.current = true;
     notifyChanged();
     modalRef.current?.dismiss();
     showToast({ message: editingId ? 'Budget updated' : 'Budget created', variant: 'success' });
@@ -177,7 +231,7 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     if (!editingId) return;
     destructiveHaptic();
     setSaving(true);
-    const { error: deleteError } = await supabase.from('budgets').delete().eq('id', editingId);
+    const { error: deleteError } = await deleteBudget(editingId);
     setSaving(false);
     if (deleteError) {
       showToast({ message: deleteError.message, variant: 'error' });
@@ -188,354 +242,206 @@ const AddBudgetSheet = forwardRef(function AddBudgetSheet(_props, ref) {
     showToast({ message: 'Budget deleted', variant: 'success' });
   }
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
+  // Hands the outcome to whoever opened the sheet, once per open.
+  const handleDismiss = useCallback(() => {
+    const onDone = onDoneRef.current;
+    onDoneRef.current = null;
+    onDone?.({ saved: savedRef.current });
+  }, []);
+
+  const periodOptions = Object.entries(PERIOD_LABELS).map(([value, label]) => ({
+    value,
+    label,
+    // The crown marks Custom as Pro while billing is on and the person is free.
+    icon: value === 'custom' && !hasPro ? Crown : undefined,
+  }));
+  // Overall first, then every expense category, as circles like the Add sheet.
+  const categoryChoices = [{ id: null, name: 'Overall' }, ...expenseCategories];
 
   return (
-    <BottomSheetModal
+    <Sheet
       ref={modalRef}
+      title={editingId ? 'Edit budget' : 'New budget'}
       onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['92%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
+      onDismiss={handleDismiss}
+      footer={{ primary: { title: editingId ? 'Save' : 'Create budget', onPress: handleSave, loading: saving } }}
     >
-      <BottomSheetView style={styles.sheet}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{editingId ? 'Edit Budget' : 'New Budget'}</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
+      {/* The limit, centred and large, with a muted symbol. */}
+      <View style={styles.amountWrap}>
+        <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
+        <BottomSheetTextInput
+          value={amount}
+          // The caret stays at the end, like the Add sheet's amount.
+          selection={{ start: amount.length, end: amount.length }}
+          onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
+          placeholder="0"
+          placeholderTextColor={c.inkFaint}
+          cursorColor={c.accent}
+          selectionColor={c.accent}
+          keyboardType="decimal-pad"
+          accessibilityLabel="Limit"
+          style={[styles.amountInput, tabular]}
+          autoFocus
+        />
+      </View>
 
-        <Text style={styles.fieldLabel}>Amount</Text>
-        <View style={styles.amountBox}>
-          <Text style={styles.amountCurrency}>{currencySymbol(currency)}</Text>
-          <TextInput
-            value={amount}
-            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
-            placeholder="0"
-            placeholderTextColor={colors.mutedDarker}
-            keyboardType="number-pad"
-            style={styles.amountInput}
-            autoFocus
-          />
-        </View>
+      <Segmented accessibilityLabel="Period" options={periodOptions} value={periodType} onChange={handleSelectPeriod} />
 
-        <View style={styles.segmentWrap}>
-          {Object.entries(PERIOD_LABELS).map(([value, label]) => (
+      {isCustom && (
+        <View style={styles.dates}>
+          <ListRow icon={CalendarDays} title="Start" right={format(startDate, 'd MMM yyyy')} trailing="chevron" onPress={() => setShowPicker('start')} />
+          <ListRow icon={CalendarDays} title="End" right={format(endDate, 'd MMM yyyy')} trailing="chevron" onPress={() => setShowPicker('end')} divider={false} />
+        </View>
+      )}
+
+      {showPicker && (
+        <DateTimePicker
+          value={showPicker === 'start' ? startDate : endDate}
+          mode="date"
+          display="default"
+          onChange={(_event, selected) => {
+            setShowPicker(null);
+            if (!selected) return;
+            const picked = startOfDay(selected);
+            if (showPicker === 'start') {
+              setStartDate(picked);
+              // Keep the range coherent rather than letting the person save an
+              // inverted one and hit the validation wall: moving the start past
+              // the end pushes the end along with it.
+              if (isBefore(endDate, picked)) setEndDate(picked);
+            } else {
+              setEndDate(picked);
+            }
+          }}
+        />
+      )}
+
+      {/* The window `spent` will really be measured over. */}
+      <Text style={styles.range}>{periodRangeLabel(periodType, startDate, endDate)}</Text>
+
+      <Text style={styles.sectionLabel}>Category</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={styles.chipScroll}
+        contentContainerStyle={styles.chipRow}
+      >
+        {categoryChoices.map((cat) => {
+          const selected = cat.id === categoryId;
+          return (
             <Pressable
-              key={value}
-              style={[styles.segment, periodType === value && styles.segmentActive]}
-              onPress={() => handleSelectPeriod(value)}
-            >
-              {value === 'custom' && !hasPro && (
-                <Crown size={11} color={colors.mutedMid} strokeWidth={2.4} style={styles.segmentCrown} />
-              )}
-              <Text style={[styles.segmentText, periodType === value && styles.segmentTextActive]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {isCustom && (
-          <View style={styles.dateRow}>
-            <Pressable style={styles.dateField} onPress={() => setShowPicker('start')}>
-              <Text style={styles.fieldLabelInline}>Start</Text>
-              <Text style={styles.dateValue}>{format(startDate, 'd MMM yyyy')}</Text>
-            </Pressable>
-            <Pressable style={styles.dateField} onPress={() => setShowPicker('end')}>
-              <Text style={styles.fieldLabelInline}>End</Text>
-              <Text style={styles.dateValue}>{format(endDate, 'd MMM yyyy')}</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {showPicker && (
-          <DateTimePicker
-            value={showPicker === 'start' ? startDate : endDate}
-            mode="date"
-            display="default"
-            onChange={(_event, selected) => {
-              setShowPicker(null);
-              if (!selected) return;
-              const picked = startOfDay(selected);
-              if (showPicker === 'start') {
-                setStartDate(picked);
-                // Keep the range coherent rather than letting the user save an
-                // inverted one and hit the validation wall: dragging the start
-                // past the end pushes the end along with it.
-                if (isBefore(endDate, picked)) setEndDate(picked);
-              } else {
-                setEndDate(picked);
-              }
-            }}
-          />
-        )}
-
-        <Text style={styles.periodRangeText}>{periodRangeLabel(periodType, startDate, endDate)}</Text>
-
-        <Pressable style={styles.categoryRow} onPress={() => setPickerOpen((v) => !v)}>
-          <Text style={styles.fieldLabelInline}>Category (optional)</Text>
-          <Text style={styles.categoryValue}>{selectedCategory?.name ?? 'Overall'}</Text>
-        </Pressable>
-
-        {pickerOpen && (
-          <View style={styles.chipGrid}>
-            <Pressable
+              key={cat.id ?? 'overall'}
               style={styles.chip}
-              onPress={() => {
-                setCategoryId(null);
-                setPickerOpen(false);
-              }}
+              accessibilityRole="button"
+              accessibilityLabel={cat.name}
+              accessibilityState={{ selected }}
+              onPress={() => setCategoryId(cat.id)}
             >
-              <View style={[styles.chipIcon, categoryId === null && styles.chipIconSelected]}>
-                <Text style={[styles.chipOverallText, categoryId === null && styles.chipOverallTextSelected]}>All</Text>
+              <View style={[styles.chipCircle, selected && styles.chipCircleSelected]}>
+                {cat.id ? (
+                  <CategoryIcon icon={cat.icon} size={20} color={selected ? c.inkOnInk : c.ink} strokeWidth={1.75} />
+                ) : (
+                  <Wallet size={20} color={selected ? c.inkOnInk : c.ink} strokeWidth={1.75} />
+                )}
               </View>
-              <Text style={styles.chipLabel} numberOfLines={1}>
-                Overall
+              <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]} numberOfLines={1}>
+                {cat.name}
               </Text>
             </Pressable>
-            {expenseCategories.map((cat) => (
-              <Pressable
-                key={cat.id}
-                style={styles.chip}
-                onPress={() => {
-                  setCategoryId(cat.id);
-                  setPickerOpen(false);
-                }}
-              >
-                <View style={[styles.chipIcon, cat.id === categoryId && styles.chipIconSelected]}>
-                  <CategoryIcon
-                    icon={cat.icon}
-                    size={20}
-                    color={cat.id === categoryId ? colors.brandText : colors.ink}
-                    strokeWidth={2}
-                  />
-                </View>
-                <Text style={styles.chipLabel} numberOfLines={1}>
-                  {cat.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+          );
+        })}
+      </ScrollView>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.error}>{error}</Text>}
 
-        <Button
-          title={editingId ? 'Save Budget' : 'Create Budget'}
-          variant="primary"
-          onPress={handleSave}
-          loading={saving}
-          style={{ marginTop: spacing.lg }}
-        />
-        {editingId && (
-          <Pressable style={styles.deleteRow} onPress={handleDelete} disabled={saving}>
-            <Trash2 size={16} color={colors.dangerStrong} strokeWidth={2} />
-            <Text style={styles.deleteText}>Delete Budget</Text>
-          </Pressable>
-        )}
-      </BottomSheetView>
-    </BottomSheetModal>
+      {editingId && <Button title="Delete budget" variant="danger" onPress={handleDelete} disabled={saving} style={styles.delete} />}
+    </Sheet>
   );
 });
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  sheet: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginBottom: spacing.sm,
-  },
-  amountBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: spacing.lg,
-  },
-  amountCurrency: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.title,
-    color: colors.mutedDarker,
-  },
-  amountInput: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: 26,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    flex: 1,
-  },
-  segmentWrap: {
-    flexDirection: 'row',
-    backgroundColor: colors.chipBg,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: spacing.sm,
-  },
-  periodRangeText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  dateField: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
-  },
-  dateValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  segment: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: 9,
-  },
-  segmentCrown: {
-    marginRight: 4,
-  },
-  segmentActive: {
-    backgroundColor: colors.brand,
-  },
-  segmentText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-  },
-  segmentTextActive: {
-    fontFamily: fontFamily.extrabold,
-    color: colors.brandText,
-  },
-  categoryRow: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  fieldLabelInline: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-  },
-  categoryValue: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-  },
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-    marginBottom: spacing.md,
-  },
-  chip: {
-    alignItems: 'center',
-    gap: 6,
-    width: 56,
-  },
-  chipIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipIconSelected: {
-    backgroundColor: colors.brand,
-    borderWidth: 0,
-  },
-  chipOverallText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.sm,
-    color: colors.ink,
-  },
-  chipOverallTextSelected: {
-    color: colors.brandText,
-  },
-  chipLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-    textAlign: 'center',
-  },
-  errorText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  deleteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  deleteText: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.base,
-    color: colors.dangerStrong,
-  },
+    amountWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginBottom: ledgerSpace.lg,
+    },
+    amountCurrency: {
+      ...ledgerType.title,
+      fontSize: 28,
+      lineHeight: 34,
+      color: c.muted,
+    },
+    amountInput: {
+      ...ledgerType.display,
+      fontSize: 44,
+      lineHeight: 52,
+      color: c.ink,
+      minWidth: 60,
+      textAlign: 'center',
+      padding: 0,
+    },
+    dates: {
+      marginTop: ledgerSpace.md,
+    },
+    range: {
+      ...ledgerType.caption,
+      color: c.muted,
+      textAlign: 'center',
+      marginTop: ledgerSpace.md,
+      marginBottom: ledgerSpace.lg,
+    },
+    sectionLabel: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginBottom: ledgerSpace.sm,
+    },
+    // Bleeds to the sheet's edges so the row scrolls edge to edge; the
+    // padding puts the first circle back in line with everything else.
+    chipScroll: {
+      marginHorizontal: -ledgerSpace.gutter,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      gap: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.lg,
+    },
+    chip: {
+      alignItems: 'center',
+      gap: 6,
+      width: 60,
+    },
+    chipCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: ledgerRadius.full,
+      backgroundColor: c.surfaceSunk,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    chipCircleSelected: {
+      backgroundColor: c.ink,
+    },
+    chipLabel: {
+      ...ledgerType.caption,
+      color: c.muted,
+      textAlign: 'center',
+    },
+    chipLabelSelected: {
+      fontFamily: inter.medium,
+      color: c.ink,
+    },
+    error: {
+      ...ledgerType.body,
+      color: c.danger,
+      marginBottom: ledgerSpace.md,
+    },
+    delete: {
+      marginTop: ledgerSpace.sm,
+    },
   });
 }

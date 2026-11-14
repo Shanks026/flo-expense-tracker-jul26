@@ -1,6 +1,6 @@
 # 09: Koban moods
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Koban can react: the `mood` prop sets his expression.
 - Moods: neutral, happy, joy, wink, surprised, curious/look-up, focus, content, worried, sleepy.

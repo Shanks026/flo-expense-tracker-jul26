@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useAuth } from '../lib/AuthContext';
-import { resetPeriodStart } from '../lib/periods';
+import { resetPeriodStart, periodFromProfile } from '../lib/periods';
 import useLoadedFor from './useLoadedFor';
 
 // v_global_summary is grouped by account_id, so selecting without an
@@ -15,7 +15,7 @@ import useLoadedFor from './useLoadedFor';
 // calendar month and are no longer read here — `period_income`/
 // `period_expense` are computed client-side instead, scoped to whatever
 // reset period the user picked in Settings (profiles.reset_period/
-// reset_custom_start), same "fetch raw rows, aggregate with date-fns"
+// reset_custom_start/reset_month_day), same "fetch raw rows, aggregate with date-fns"
 // pattern Analytics' own useAnalyticsData already uses. A Postgres view
 // can't take a runtime parameter, which is why this couldn't stay server-side.
 export default function useAllAccountSummaries() {
@@ -23,6 +23,9 @@ export default function useAllAccountSummaries() {
   const { session, loading: authLoading } = useAuth();
   const userId = session?.user?.id ?? null;
   const [summaries, setSummaries] = useState({});
+  // The reset period these totals cover, from the same profile read, so a
+  // label beside them (Home's "out this quarter") can't disagree with them.
+  const [period, setPeriod] = useState(() => periodFromProfile(null));
   // See hooks/useLoadedFor.js — a bare loading boolean reported "loaded" with
   // an empty map while the real post-sign-in request was still in flight, and
   // Home's hero rendered ₹0 balances as if they were the answer.
@@ -40,7 +43,7 @@ export default function useAllAccountSummaries() {
     }
     const [{ data: globalRows, error: globalError }, { data: profile }] = await Promise.all([
       supabase.from('v_global_summary').select('*'),
-      supabase.from('profiles').select('reset_period, reset_custom_start').maybeSingle(),
+      supabase.from('profiles').select('reset_period, reset_custom_start, reset_month_day').maybeSingle(),
     ]);
     if (globalError || !globalRows) {
       // Still mark this user as resolved — otherwise a failed read leaves the
@@ -49,7 +52,8 @@ export default function useAllAccountSummaries() {
       return;
     }
 
-    const since = resetPeriodStart(profile?.reset_period, profile?.reset_custom_start);
+    const profilePeriod = periodFromProfile(profile);
+    const since = resetPeriodStart(profilePeriod);
     const { data: periodRows } = await supabase
       .from('transactions')
       .select('account_id, type, amount')
@@ -73,6 +77,9 @@ export default function useAllAccountSummaries() {
       map[row.account_id] = { ...row, period_income: totals.income, period_expense: totals.expense };
     });
     setSummaries(map);
+    // `since` rides along so Home's phrase names the start these totals
+    // used, even if the screen stays open past a salary day.
+    setPeriod({ ...profilePeriod, since });
     markLoaded(userId);
   }, [userId]);
 
@@ -80,5 +87,5 @@ export default function useAllAccountSummaries() {
     refetch();
   }, [refetch, version]);
 
-  return { summaries, loading };
+  return { summaries, period, loading };
 }

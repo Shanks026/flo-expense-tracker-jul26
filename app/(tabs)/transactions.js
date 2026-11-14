@@ -1,381 +1,265 @@
-import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, ArrowLeftRight, Users } from 'lucide-react-native';
-import { addMonths, subMonths, format, isToday, isYesterday } from 'date-fns';
-import Screen from '../../components/Screen';
-import Card from '../../components/Card';
-import IconTile from '../../components/IconTile';
-import AmountText from '../../components/AmountText';
-import Pill from '../../components/Pill';
-import CategoryIcon from '../../components/CategoryIcon';
-import Skeleton from '../../components/Skeleton';
-import FadeIn from '../../components/FadeIn';
-// Static palette (theme/tokens) only for text on the dark summary card.
-import { colors as staticColors, fontFamily, fontSize, spacing, radii } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
-import useTransactions from '../../hooks/useTransactions';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, TextInput, Pressable, ScrollView, RefreshControl, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Search, X, CalendarDays, Wallet, Shapes, ListFilter } from 'lucide-react-native';
+import { LargeTitle } from '../../components/ledger/ScreenHeader';
+import Chip from '../../components/ledger/Chip';
+import AmountText from '../../components/ledger/AmountText';
+import EmptyState from '../../components/ledger/EmptyState';
+import TransactionRow from '../../components/ledger/TransactionRow';
+import ActivityFilterSheet, { TYPE_OPTIONS } from '../../components/ActivityFilterSheet';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../../theme/ledger';
+import useActivity from '../../hooks/useActivity';
+import useCategories from '../../hooks/useCategories';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
-import { useAddTransactionSheet } from '../../components/AddTransactionSheet';
 import { useAccount } from '../../lib/AccountContext';
-import { isTransfer, transferLabel } from '../../lib/transfers';
-import { isSettlement, settlementLabel } from '../../lib/settlements';
-import { formatMoney } from '../../lib/currency';
-import useCurrency from '../../hooks/useCurrency';
-import { FLAGS } from '../../lib/flags';
-import EmptyState from '../../components/EmptyState';
+import { dateGroupLabel } from '../../lib/dateLabels';
+import { DEFAULT_CURRENCY } from '../../lib/currency';
+import {
+  DEFAULT_FILTERS,
+  activityRange,
+  rangeLabel,
+  filterActivity,
+  summarizeActivity,
+  pairTransfers,
+  groupEntries,
+  transferTitle,
+  isDefaultFilters,
+  filtersFromLink,
+} from '../../lib/activity';
 
-const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'expense', label: 'Expense' },
-  { key: 'income', label: 'Income' },
-];
-
-function dayLabel(dateStr) {
-  const date = new Date(dateStr);
-  if (isToday(date)) return 'Today';
-  if (isYesterday(date)) return 'Yesterday';
-  return format(date, 'd MMMM');
-}
-
-function groupByDay(transactions) {
-  const groups = [];
-  const byLabel = new Map();
-  for (const tx of transactions) {
-    const label = dayLabel(tx.occurred_at);
-    if (!byLabel.has(label)) {
-      const group = { label, items: [], income: 0, expense: 0 };
-      byLabel.set(label, group);
-      groups.push(group);
-    }
-    const group = byLabel.get(label);
-    group.items.push(tx);
-    // Only income/expense feed the day-header totals; transfers are neither and
-    // must not land in a bucket (they'd create a NaN key and misstate the day).
-    if (tx.type === 'income' || tx.type === 'expense') group[tx.type] += tx.amount;
-  }
-  return groups;
-}
-
-function formatAmount(n, currency) {
-  return formatMoney(n, currency);
-}
-
-export default function Transactions() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+// Activity (spec 46, ticket 10): a search field, then Type, Category,
+// Account and Date chips, a one-line "Spent · Received" for what's in view,
+// and the date-grouped list with each transfer as one ⇄ row.
+//
+// Filters live in this screen's state, so opening a row and coming back
+// keeps them. The default is this month, the active account, all types; the
+// account default is stored as null so it follows an account switch.
+export default function Activity() {
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { accounts, activeAccountId, activeAccount } = useAccount();
+  const { categories } = useCategories();
+  const router = useRouter();
   const { refreshing, onRefresh } = usePullToRefresh();
-  const [month, setMonth] = useState(new Date());
-  const [typeFilter, setTypeFilter] = useState('all');
-  const { transactions, loading } = useTransactions({ month, type: typeFilter });
-  const { openAdd } = useAddTransactionSheet();
-  const { accounts } = useAccount();
-  const currency = useCurrency();
 
-  const groups = useMemo(() => groupByDay(transactions), [transactions]);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const params = useLocalSearchParams();
 
-  const totals = useMemo(() => {
-    // Transfers move money between the user's own accounts — never counted as
-    // spent or received. Only real expense/income rows feed these totals.
-    return transactions.reduce(
-      (acc, tx) => {
-        if (tx.type === 'income') acc.received += tx.amount;
-        else if (tx.type === 'expense') acc.spent += tx.amount;
-        return acc;
-      },
-      { spent: 0, received: 0 }
-    );
-  }, [transactions]);
+  // Opened from a link (an Insights category, spec 48): its filters replace
+  // the current ones once per visit (`at` is fresh per tap); the chips then
+  // work as normal.
+  useEffect(() => {
+    const linked = filtersFromLink(params);
+    if (linked) setFilters(linked);
+  }, [params.at]);
+  const [sheetKind, setSheetKind] = useState(null);
+  const sheetRef = useRef(null);
+
+  const accountId = filters.accountId ?? activeAccountId;
+  const allAccounts = accountId === 'all';
+  const accountIds = useMemo(
+    () => (allAccounts ? accounts.map((a) => a.id) : accountId ? [accountId] : []),
+    [allAccounts, accounts, accountId]
+  );
+  const { from, to } = activityRange(filters.range);
+  const { transactions, loading } = useActivity({ accountIds, from, to });
+
+  const visible = useMemo(() => filterActivity(transactions, filters), [transactions, filters]);
+  const summary = useMemo(() => summarizeActivity(visible), [visible]);
+  const groups = useMemo(() => groupEntries(pairTransfers(visible)), [visible]);
+
+  // All accounts sums in the active account's currency (a mixed-currency
+  // total isn't meaningful; every account is INR today).
+  const summaryCurrency = (allAccounts ? activeAccount : accounts.find((a) => a.id === accountId))?.currency ?? DEFAULT_CURRENCY;
+  const accountName = (id) => accounts.find((a) => a.id === id)?.name;
+
+  const update = (patch) => setFilters((f) => ({ ...f, ...patch }));
+  function openSheet(kind) {
+    setSheetKind(kind);
+    sheetRef.current?.present();
+  }
+
+  const typeLabel = TYPE_OPTIONS.find((o) => o.value === filters.type)?.label ?? 'All types';
+  const categoryLabel = categories.find((cat) => cat.id === filters.categoryId)?.name ?? 'All categories';
+  const accountLabel = allAccounts ? 'All accounts' : accountName(accountId) ?? 'Account';
+  const chips = [
+    { kind: 'type', label: typeLabel, selected: filters.type !== 'all', name: 'Type', icon: ListFilter },
+    { kind: 'category', label: categoryLabel, selected: filters.categoryId != null, name: 'Category', icon: Shapes },
+    { kind: 'account', label: accountLabel, selected: filters.accountId != null, name: 'Account', icon: Wallet },
+    { kind: 'range', label: rangeLabel(filters.range), selected: filters.range.preset !== 'this_month', name: 'Date range', icon: CalendarDays },
+  ];
+
+  const filtered = !isDefaultFilters(filters);
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.title}>Transactions</Text>
-        <View style={styles.monthSelector}>
-          <Pressable onPress={() => setMonth((m) => subMonths(m, 1))}>
-            <ChevronLeft size={18} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
-          <Text style={styles.monthText}>{format(month, 'MMMM yyyy')}</Text>
-          <Pressable onPress={() => setMonth((m) => addMonths(m, 1))}>
-            <ChevronRight size={18} color={colors.ink} strokeWidth={2.4} />
-          </Pressable>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.top}>
+        <LargeTitle title="Activity" />
+        <View style={styles.search}>
+          <Search size={18} color={c.muted} strokeWidth={1.75} />
+          <TextInput
+            value={filters.search}
+            onChangeText={(search) => update({ search })}
+            placeholder="Search notes, categories, amounts"
+            placeholderTextColor={c.muted}
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            accessibilityLabel="Search activity"
+          />
+          {!!filters.search && (
+            <Pressable onPress={() => update({ search: '' })} hitSlop={15} accessibilityRole="button" accessibilityLabel="Clear search">
+              <X size={18} color={c.muted} strokeWidth={1.75} />
+            </Pressable>
+          )}
         </View>
       </View>
 
-      <View style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <Pressable key={f.key} onPress={() => setTypeFilter(f.key)}>
-            <Pill label={f.label} tone={typeFilter === f.key ? 'dark' : 'neutral'} />
-          </Pressable>
+      {/* The chips wrap inside the gutter rather than scrolling off the edge. */}
+      <View style={styles.chips}>
+        {chips.map((chip) => (
+          <Chip
+            key={chip.kind}
+            label={chip.label}
+            icon={chip.icon}
+            caret
+            selected={chip.selected}
+            onPress={() => openSheet(chip.kind)}
+            accessibilityLabel={`${chip.name}: ${chip.label}`}
+            accessibilityHint="Opens a sheet to change it"
+          />
         ))}
       </View>
 
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryDark}>
-          <Text style={styles.summaryLabelDark}>Spent</Text>
-          {loading ? (
-            <Skeleton width={80} height={fontSize.xxl} radius={6} style={{ marginTop: 4, backgroundColor: colors.inkCard }} />
-          ) : (
-            <FadeIn>
-              <AmountText value={totals.spent} type="neutral" dark size={fontSize.xxl} currency={currency} />
-            </FadeIn>
-          )}
-        </View>
-        <View style={styles.summaryLight}>
-          <Text style={styles.summaryLabelLight}>Received</Text>
-          {loading ? (
-            <Skeleton width={80} height={fontSize.xxl} radius={6} style={{ marginTop: 4 }} />
-          ) : (
-            <FadeIn>
-              <AmountText value={totals.received} type="income" size={fontSize.xxl} currency={currency} />
-            </FadeIn>
-          )}
-        </View>
-      </View>
+      <Text style={styles.summary}>
+        Spent <AmountText value={summary.spent} currency={summaryCurrency} style={styles.summaryAmount} /> · Received{' '}
+        <AmountText value={summary.received} currency={summaryCurrency} style={styles.summaryAmount} />
+      </Text>
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={styles.flex}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandStrong} colors={[colors.brandStrong]} />}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink} colors={[c.ink]} />}
       >
         {loading ? (
-          <Card style={styles.dayCard}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={[styles.row, i < 2 && styles.rowBorder]}>
-                <Skeleton width={40} height={40} radius={12} />
-                <View style={styles.rowMid}>
-                  <Skeleton width="55%" height={15} radius={6} style={{ marginBottom: 6 }} />
-                  <Skeleton width="35%" height={11} radius={6} />
-                </View>
-              </View>
-            ))}
-          </Card>
+          [0, 1, 2, 3].map((i) => <View key={i} style={styles.rowSkeleton} />)
         ) : groups.length === 0 ? (
-          <FadeIn>
+          filtered ? (
             <EmptyState
-              pose="magnifier"
-              title="Nothing this month"
-              body="Tap + to log what you spend, or look at another month."
-              style={{ marginTop: spacing.lg }}
+              illustration="receipt"
+              title="No matches"
+              body="Nothing fits these filters."
+              actionTitle="Clear filters"
+              onAction={() => setFilters(DEFAULT_FILTERS)}
             />
-          </FadeIn>
+          ) : (
+            <EmptyState illustration="receipt" title="Nothing this month" body="Tap + to log what you spend." />
+          )
         ) : (
-          <FadeIn>
-            {groups.map((group) => (
-              <Card key={group.label} style={styles.dayCard}>
-                <View style={styles.dayHeaderRow}>
-                  <Text style={styles.dayLabel}>{group.label}</Text>
-                  <View style={styles.dayTotals}>
-                    {group.expense > 0 && (
-                      <View style={styles.dayTotalItem}>
-                        <TrendingDown size={11} color={colors.dangerStrong} strokeWidth={2.6} />
-                        <Text style={styles.dayTotalValue}>{formatAmount(group.expense, currency)}</Text>
-                      </View>
-                    )}
-                    {group.income > 0 && (
-                      <View style={styles.dayTotalItem}>
-                        <TrendingUp size={11} color={colors.income} strokeWidth={2.6} />
-                        <Text style={styles.dayTotalValue}>{formatAmount(group.income, currency)}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                {group.items.map((tx, idx) => {
-                  const transfer = isTransfer(tx);
-                  // A settlement has no category, so it takes the same
-                  // substitution a transfer row already does (31-split-
-                  // expenses.md §2.4). Without this it fell through the
-                  // `type === 'income' ? … : 'Expense'` ternary and rendered as
-                  // an expense, which is precisely what it isn't.
-                  const settlement = isSettlement(tx);
-                  return (
-                    <Pressable
-                      key={tx.id}
-                      style={[styles.row, idx < group.items.length - 1 && styles.rowBorder]}
-                      onPress={() => openAdd(tx)}
-                    >
-                      <IconTile tone={tx.type === 'income' ? 'income' : 'neutral'} size={40} radius={12}>
-                        {transfer ? (
-                          <ArrowLeftRight size={19} color={colors.mutedDarker} strokeWidth={2} />
-                        ) : settlement ? (
-                          <Users size={19} color={colors.mutedDarker} strokeWidth={2} />
-                        ) : (
-                          <CategoryIcon
-                            icon={tx.category?.icon}
-                            size={19}
-                            color={tx.type === 'income' ? colors.incomeAccent : colors.ink}
-                          />
-                        )}
-                      </IconTile>
-                      <View style={styles.rowMid}>
-                        <View style={styles.rowTitleWrap}>
-                          <Text style={styles.rowTitle}>
-                            {transfer
-                              ? transferLabel(tx, accounts)
-                              : settlement
-                                ? settlementLabel(tx)
-                                : tx.category?.name ?? 'Uncategorized'}
-                          </Text>
-                          {FLAGS.plans && !transfer && !settlement && tx.plan?.name && (
-                            <Pill label={tx.plan.name} tone="income" style={styles.planPill} />
-                          )}
-                        </View>
-                        <Text style={styles.rowSub}>
-                          {transfer
-                            ? 'Transfer'
-                            : settlement
-                              ? (tx.note ?? 'Settled up')
-                              : tx.category?.name ?? (tx.type === 'income' ? 'Income' : 'Expense')}
-                        </Text>
-                      </View>
-                      <AmountText value={tx.amount} type={tx.type} signed size={fontSize.md} currency={currency} />
-                    </Pressable>
-                  );
-                })}
-              </Card>
-            ))}
-          </FadeIn>
+          groups.map((g) => (
+            <View key={g.key} style={styles.group}>
+              <Text style={styles.groupLabel}>{dateGroupLabel(g.date)}</Text>
+              {g.items.map((entry, i) => (
+                <TransactionRow
+                  key={entry.key}
+                  tx={entry.tx}
+                  accounts={accounts}
+                  title={entry.kind === 'transfer' ? transferTitle(entry, accounts) : undefined}
+                  // Across accounts, say which one (a paired transfer names both already).
+                  accountName={allAccounts && entry.kind !== 'transfer' ? accountName(entry.tx.account_id) : undefined}
+                  divider={i < g.items.length - 1}
+                  onPress={() => router.push(`/transaction/${entry.tx.id}`)}
+                />
+              ))}
+            </View>
+          ))
         )}
       </ScrollView>
-    </Screen>
+
+      <ActivityFilterSheet
+        ref={sheetRef}
+        kind={sheetKind}
+        filters={filters}
+        accounts={accounts}
+        activeAccountId={activeAccountId}
+        categories={categories}
+        onChange={update}
+      />
+    </SafeAreaView>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
-  header: {
-    paddingTop: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.display,
-    letterSpacing: -0.3,
-    color: colors.ink,
-    marginBottom: spacing.md,
-  },
-  monthSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    alignSelf: 'flex-start',
-  },
-  monthText: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.ink,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  summaryDark: {
-    flex: 1,
-    // Permanently-emphasized surface (same role as Card's `dark` prop) —
-    // reads colors.emphasisBg so it doesn't blend into Dark theme's own
-    // near-black screen the way a pinned near-black card would.
-    backgroundColor: colors.emphasisBg,
-    borderRadius: 16,
-    padding: spacing.md,
-  },
-  summaryLight: {
-    flex: 1,
-    backgroundColor: colors.incomeBg,
-    borderRadius: 16,
-    padding: spacing.md,
-  },
-  summaryLabelDark: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: staticColors.mutedOnDark,
-    marginBottom: 2,
-  },
-  summaryLabelLight: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.incomeAccent,
-    marginBottom: 2,
-  },
-  scroll: {
-    paddingTop: spacing.md,
-    paddingBottom: 120,
-  },
-  dayHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  dayLabel: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.base,
-    color: colors.mutedMid,
-  },
-  dayTotals: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  dayTotalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  dayTotalValue: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.sm,
-    color: colors.mutedDarker,
-  },
-  dayCard: {
-    padding: 0,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 12,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-    color: colors.ink,
-  },
-  planPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  rowSub: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.xs,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
+    safe: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
+    flex: {
+      flex: 1,
+    },
+    top: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.sm,
+    },
+    search: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: ledgerSpace.sm,
+      height: 44,
+      marginTop: ledgerSpace.md,
+      paddingHorizontal: ledgerSpace.lg,
+      borderRadius: ledgerRadius.field,
+      backgroundColor: c.surfaceSunk,
+    },
+    searchInput: {
+      flex: 1,
+      ...ledgerType.body,
+      color: c.ink,
+      paddingVertical: 0,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ledgerSpace.sm,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.lg,
+      paddingBottom: ledgerSpace.lg,
+    },
+    summary: {
+      ...ledgerType.body,
+      color: c.muted,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: ledgerSpace.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.hairline,
+    },
+    summaryAmount: {
+      fontFamily: inter.semibold,
+      color: c.ink,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: 120,
+    },
+    group: {
+      marginTop: ledgerSpace.sm,
+    },
+    groupLabel: {
+      ...ledgerType.group,
+      color: c.muted,
+      marginTop: ledgerSpace.sm,
+    },
+    rowSkeleton: {
+      height: 48,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      marginTop: ledgerSpace.md,
+    },
   });
 }
