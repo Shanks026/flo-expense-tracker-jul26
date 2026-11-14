@@ -4,7 +4,7 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 
 | Ticket | Blocked by | State | Commit |
 |---|---|---|---|
-| 01 Streak mark and milestone celebration | — | ready | |
+| 01 Streak mark and milestone celebration | — | done (real queue path not seen on device) | see git log |
 | 02 Bill detail fixes and one due wording | — | ready | |
 | 03 Bills-due sheet | 02 | ready | |
 | 04 Share-usage ask and toast | — | ready | |

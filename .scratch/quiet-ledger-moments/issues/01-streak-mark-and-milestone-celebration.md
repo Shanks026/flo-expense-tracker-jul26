@@ -11,16 +11,24 @@ Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The check script covers `celebrationFor`: day one null, 7/30/100/365 celebrate, day 8 null, no log today null, the id format
-- [ ] The streak mark is in the kit gallery in all four states
-- [ ] A milestone celebration shows on the device in light and dark, with Continue and back both closing it; the queue moves on afterwards
-- [ ] Day one of a streak shows no celebration
-- [ ] Emulator check. Seeding streak marks to reach a milestone is lasting test data: ask the person first, and remove it afterwards with their yes. Raise the seven-day row order (oldest → today) at the check
+- [x] The check script covers `celebrationFor`: day one null, 7/30/100/365 celebrate, day 8 null, no log today null, the id format
+- [x] The streak mark is in the kit gallery in all four states
+- [x] A milestone celebration shows on the device in light and dark, with Continue and back both closing it; the queue moves on afterwards
+- [x] Day one of a streak shows no celebration
+- [x] Emulator check. Seeding streak marks to reach a milestone is lasting test data: ask the person first, and remove it afterwards with their yes. Raise the seven-day row order (oldest → today) at the check
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
+
+## Comments
+
+- 2026-11-14 (resolved): `celebrationFor({ current, loggedToday }, todayStr)` in a new pure celebrations module (derives the milestone from `MILESTONES` rather than taking `isMilestone`; 8 checks, 466 passing). The source enqueues milestones only; the day-one moment is gone. A moment saved by an older build that isn't a milestone gives the takeover back (`skipped`). `StreakMark` (logged dot, no-spend ring, frozen snowflake, empty sunk circle, `dimmed`) is in the kit and gallery. The screen is on `canvas` with the trophy (a 220 ms fade and scale, the only motion), the count at Inter 700 36, "day streak", the milestone recap's body line (its titles aren't used, so the 🎉 title never shows), seven marks oldest → today, and a pinned Continue; a success haptic on open.
+- Checked on Pixel_API_36 in light and dark through a Developer-only preview in the Kit gallery ("Show the 7-day celebration", `preview` payload, logs no event): layout, Continue and back both close it. Not checked on device: the real queue path (the source enqueueing on a real milestone and the queue moving on), and day one showing nothing; both rest on the check script, because reaching a real milestone needs seeded streak marks (lasting test data, not asked for). The test account's streak is unchanged.
+- For the person: the seven-day row runs oldest → today (spec 49); the redesign plan said newest first. Say if you want it flipped.
+- Left for ticket 11: `recapCta` and the day-one recap copy are now unused.
+

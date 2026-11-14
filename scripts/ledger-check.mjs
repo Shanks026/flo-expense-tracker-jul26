@@ -26,6 +26,7 @@ import { billTimeline } from '../lib/billTimeline.js';
 import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.js';
 import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/accountLast4.js';
 import { splitNetText } from '../lib/splitNet.js';
+import { celebrationFor } from '../lib/celebrations.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -731,6 +732,19 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('split net', 'nothing added yet', splitNetText({ entryCount: 0 }), { text: 'Nothing added yet', tone: 'muted' });
   check('split net', 'closed and empty', splitNetText({ entryCount: 0 }, { closed: true }), { text: 'Nothing was added', tone: 'muted' });
   check('split net', 'currency', splitNetText({ myNet: 12, myPays: 0, entryCount: 1 }, { currency: 'USD' }).text, "You're owed $12");
+}
+
+// --- Milestone celebrations (spec 49, ticket 01) ---
+{
+  const on = (current, loggedToday = true) => celebrationFor({ current, loggedToday }, '2026-11-14');
+  check('celebration', 'day one is no celebration', on(1), null);
+  check('celebration', 'day 7 celebrates', on(7), { id: 'streak-milestone:7:2026-11-14', days: 7 });
+  check('celebration', 'day 30 celebrates', on(30)?.days, 30);
+  check('celebration', 'day 100 celebrates', on(100)?.days, 100);
+  check('celebration', 'day 365 celebrates', on(365)?.days, 365);
+  check('celebration', 'day 8 is no celebration', on(8), null);
+  check('celebration', 'no streak is no celebration', on(0), null);
+  check('celebration', 'a milestone count without a log today waits', on(7, false), null);
 }
 
 // --- Report ---

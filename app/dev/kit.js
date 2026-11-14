@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
+import { format, subDays } from 'date-fns';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBasket, Bell, Moon, Sun, Smartphone, Trash2, Wallet } from 'lucide-react-native';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../../components/ledger/ScreenHeader';
@@ -20,6 +21,8 @@ import DayOfMonthPicker from '../../components/ledger/DayOfMonthPicker';
 import IconPicker from '../../components/ledger/IconPicker';
 import OverflowMenu from '../../components/ledger/OverflowMenu';
 import AvatarStack from '../../components/ledger/AvatarStack';
+import StreakMark from '../../components/ledger/StreakMark';
+import { StreakCelebrationMoment } from '../../components/StreakCelebration';
 import PageDots from '../../components/ledger/PageDots';
 import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
@@ -37,6 +40,16 @@ export default function KitGalleryScreen() {
 }
 
 const noop = () => {};
+
+// Seven days ending today, one of each covered kind, for the preview above.
+const PREVIEW_CELEBRATION = {
+  current: 7,
+  preview: true,
+  history: ['logged', 'logged', 'nospend', 'logged', 'frozen', 'logged', 'logged'].map((type, i) => ({
+    date: format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'),
+    type,
+  })),
+};
 
 // Rows for TransactionRow (no account list, so amounts read as INR).
 // SpendChart samples: a week (Mon 9 Nov 2026 on) and a 30-day month.
@@ -62,6 +75,7 @@ function KitGallery() {
   const [switchOn, setSwitchOn] = useState(true);
   const [monthDay, setMonthDay] = useState(25);
   const [iconKey, setIconKey] = useState('entertainment');
+  const [celebrating, setCelebrating] = useState(false);
 
   return (
     <View style={styles.screen}>
@@ -193,6 +207,26 @@ function KitGallery() {
             ]}
             size={32}
           />
+        </Section>
+
+        <Section title="StreakMark">
+          <View style={styles.inline}>
+            {['logged', 'nospend', 'frozen', null].map((type) => (
+              <Labeled key={type ?? 'none'} label={type ?? 'nothing'}>
+                <StreakMark type={type} />
+              </Labeled>
+            ))}
+            <Labeled label="dimmed">
+              <StreakMark type="logged" dimmed />
+            </Labeled>
+          </View>
+        </Section>
+
+        {/* The milestone celebration without the moment queue or real streak
+            data (spec 49, ticket 01). */}
+        <Section title="Milestone celebration">
+          <Button title="Show the 7-day celebration" variant="secondary" onPress={() => setCelebrating(true)} />
+          {celebrating && <StreakCelebrationMoment payload={PREVIEW_CELEBRATION} onDone={() => setCelebrating(false)} />}
         </Section>
 
         <Section title="IconPicker">
