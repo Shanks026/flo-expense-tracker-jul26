@@ -28,6 +28,7 @@ import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/account
 import { splitNetText } from '../lib/splitNet.js';
 import { celebrationFor } from '../lib/celebrations.js';
 import { alertGroups } from '../lib/alertGroups.js';
+import { streakCalendar, nextMilestone } from '../lib/streakCalendar.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -782,6 +783,36 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('alerts', 'plans only when on', [shape({ plans: [plan] }), shape({ plans: [plan], plansOn: true })], [[], [['plans', ['Goa over target']]]]);
   check('alerts', 'group order and titles', alertGroups({ bills: [bill('A', '2026-11-07'), bill('B', '2026-11-13')], budgets: [budget('Food', 900)], plans: [], today }).map((g) => [g.key, g.title, g.tone]), [['overdue', 'Overdue', 'danger'], ['budgets', 'Budgets', null], ['soon', 'Due soon', null]]);
   check('alerts', 'a bill alert routes to its detail and says its amount', alertGroups({ bills: [bill('Netflix', '2026-11-07')], budgets: [], plans: [], today })[0].alerts[0], { id: 'bill-Netflix', route: '/bill/Netflix', title: 'Netflix', sub: '₹649 · Overdue since 7 Nov', tone: 'danger', iconKey: 'bills' });
+}
+
+// --- Streak calendar (spec 49, ticket 06) ---
+{
+  // Saturday 14 Nov 2026; November starts on a Sunday, so Monday-first weeks
+  // lead with Mon 26 Oct.
+  const today = new Date(2026, 10, 14);
+  const history = [
+    { date: '2026-11-09', type: 'logged' },
+    { date: '2026-11-10', type: 'nospend' },
+    { date: '2026-11-11', type: 'frozen' },
+    { date: '2026-11-12', type: null },
+    { date: '2026-11-14', type: 'logged' },
+  ];
+  const weeks = streakCalendar(history, today);
+  const day = (key) => weeks.flat().find((d) => d.key === key);
+  check('streak calendar', 'every week has seven days', weeks.every((w) => w.length === 7), true);
+  check('streak calendar', 'weeks start on Monday, from the first week of the month', [weeks[0][0].key, weeks[weeks.length - 1][6].key], ['2026-10-26', '2026-12-06']);
+  check('streak calendar', 'a leading day from last month is outside the month', day('2026-10-26').inMonth, false);
+  check('streak calendar', 'each mark', ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12'].map((k) => day(k).mark), ['logged', 'nospend', 'frozen', null]);
+  check('streak calendar', 'today', [day('2026-11-14').isToday, day('2026-11-14').mark, day('2026-11-13').isToday], [true, 'logged', false]);
+  check('streak calendar', 'future days', [day('2026-11-15').future, day('2026-11-14').future], [true, false]);
+  check('streak calendar', 'a day outside the history is unmarked', day('2026-11-01').mark, null);
+  check('streak calendar', 'the day number', day('2026-11-09').day, 9);
+  check('streak calendar', 'a month starting on Monday has no leading days', streakCalendar([], new Date(2026, 5, 10))[0][0].key, '2026-06-01');
+  check('next milestone', 'no streak yet', nextMilestone(0), { days: 7, toGo: 7 });
+  check('next milestone', 'one day short', nextMilestone(6), { days: 7, toGo: 1 });
+  check('next milestone', 'on a milestone, the next one', nextMilestone(7), { days: 30, toGo: 23 });
+  check('next milestone', 'day 29', nextMilestone(29), { days: 30, toGo: 1 });
+  check('next milestone', 'past the last', [nextMilestone(365), nextMilestone(400)], [null, null]);
 }
 
 // --- Report ---

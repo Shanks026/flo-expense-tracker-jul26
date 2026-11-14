@@ -9,7 +9,7 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 | 03 Bills-due sheet | 02 | done (real queue path not seen on device) | see git log |
 | 04 Share-usage ask and toast | — | done | see git log |
 | 05 Alerts grouped | — | done (empty state and Due soon not seen on device) | see git log |
-| 06 Streak screen | 01 | ready | |
+| 06 Streak screen | 01 | done (a lit count not seen on device) | see git log |
 | 07 Ask FLO chat and Past chats | — | ready | |
 | 08 Cards (was Personalize) | — | ready | |
 | 09 You tab | 08 | ready | |
