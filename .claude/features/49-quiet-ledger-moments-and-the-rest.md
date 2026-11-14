@@ -1,7 +1,7 @@
 # Feature: Quiet Ledger redesign, Phase 5 (Moments and the rest)
 **Product**: FLO — Personal Expense Tracker
 **File**: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`
-**Status**: ready-for-agent
+**Status**: in progress (tickets 01–07 done; handoff `.scratch/quiet-ledger-moments/handoff.md`)
 **Last Updated**: 2026-11-14
 **Source of truth for the design**: `docs/redesign-plan.md` §4 (Ask FLO, Streak, Celebrations and moments, Settings and the You tab, Pro and upsell), §2.7 (motion) and §7 Phases. Where this spec and that document disagree on a visual detail, the document wins; where they disagree on scope, sequencing or data, this spec wins.
 
@@ -289,7 +289,7 @@ Every feature stays, and gates, flags and data behave as before. The only behavi
   - **Due soon:** active bills in the existing due-soon window;
   - **Plans:** only while `FLAGS.plans` is on, with the existing plan rules.
   Each alert keeps its `id`, `route`, `title` and `sub`, and its tone (danger or warn).
-- **The threshold change:** budgets move from the hook's own rule (warn at 80 % exactly, over only above 100 %) to the shared progress rule (warn past 80 %, danger at 100 %), so Alerts and the Budgets list agree. Nothing else uses the old rule except the budget save toast. That helper switches to the shared rule too, if anything still calls it; otherwise it's dead code and goes in the cleanup ticket.
+- **The threshold change:** budgets move from the hook's own rule (warn at 80 % exactly, over only above 100 %) to the shared progress rule (warn past 80 %, danger at 100 %), so Alerts and the Budgets list agree. The budget save toast switches to the shared rule too. (Amended 2026-11-14: Insights' "Frequently over" also uses the old rule and keeps it, since spec 48 left Insights' rules as they were; the cleanup must not delete it.)
 - **The sheet:**
   - the ledger `Sheet` titled "Alerts";
   - a `SectionHeader` per group;
@@ -326,7 +326,7 @@ Every feature stays, and gates, flags and data behave as before. The only behavi
 - **The chat:**
   - `ScreenHeader` with two `HeaderIconButton`s: Past chats (history) and New chat (pencil);
   - **Empty:** `Illustration` `spark`, the title "Ask about your money", one line of body, and the four starters as outlined ledger `Chip`s that send on tap;
-  - **The person's bubbles:** `ink` fill, `inkOnInk` text, `ledgerRadius.input` corners;
+  - **The person's bubbles:** `ink` fill, `inkOnInk` text, round corners with the tail corner (bottom-right) tighter (the person, 2026-11-14, after briefly trying all corners fully round);
   - **Answers:** full width with no bubble, in `ledgerType.body`;
   - **Breakdowns:** flat rows in place of the breakdown table. Each row shows the category's tinted circle when it has a category, the name and the amount on the right, with a 600-weight total row. The data shape the table reads stays;
   - **Composer:** a `surfaceSunk` capsule field (`ledgerRadius.field`), the mic, and a 40 dp ink circle send button (`inkOnInk` arrow). Disabled send is the sunk state.
