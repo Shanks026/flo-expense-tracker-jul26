@@ -1,6 +1,6 @@
 # Handoff: Quiet Ledger Phase 5 (Moments and the rest)
 
-**Last updated:** 2026-11-14, after tickets 01–08 and the Ask FLO bubble revert. Next session: ticket 09 (You tab).
+**Last updated:** 2026-11-14, after tickets 01–09 and the Ask FLO bubble revert. Next session: ticket 10 (Pro and upsell, flag off).
 
 Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision in the spec 46–48 handoffs still holds (`.scratch/quiet-ledger/`, `.scratch/quiet-ledger-onboarding/`, `.scratch/quiet-ledger-money/`).
 
@@ -13,8 +13,8 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 | 05 Alerts grouped | — | done (empty state and Due soon not seen on device) | `5fc4dd9` |
 | 06 Streak screen | 01 | done (a lit count not seen on device) | `9a94a2f` |
 | 07 Ask FLO chat and Past chats | — | done; bubble revert done (voice not checked) | `e6f931c`, `f2d54f9` |
-| 08 Cards (was Personalize) | — | done | see git log |
-| 09 You tab | 08 | ready (after 08) | |
+| 08 Cards (was Personalize) | — | done | `bc3a3ee` |
+| 09 You tab | 08 | done | see git log |
 | 10 Pro and upsell (flag off) | — | ready | |
 | 11 Cleanup | 01–10 | blocked by 08, 09, 10 | |
 
@@ -57,7 +57,8 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 
 ## For ticket 11 (cleanup), found while building
 
-- **Already gone:** `BreakdownTable` (deleted in 07).
+- **Already gone:** `BreakdownTable` (deleted in 07), and the More tab's `Row`/`RowGroup` use (09; check whether `components/Row.js` still has importers).
+- **Duplicated in 09:** the You tab (`app/(tabs)/more.js`) has its own `Group` helper, a near copy of the one in `app/settings.js` (Settings' also skips `Callout`). It could become one kit component.
 - **Now without importers, to check and delete:**
   - `components/StreakDays.js` and `components/StreakFlameIcon.js` (old flame cells);
   - `Confetti`;

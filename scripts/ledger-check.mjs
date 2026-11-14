@@ -30,6 +30,7 @@ import { celebrationFor } from '../lib/celebrations.js';
 import { alertGroups } from '../lib/alertGroups.js';
 import { streakCalendar, nextMilestone } from '../lib/streakCalendar.js';
 import { cardSections } from '../lib/cardSections.js';
+import { profileInitial, profileLines } from '../lib/profileHeader.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -837,6 +838,18 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('cards', 'the real catalog has Christmas under Seasonal', cardSections(CARD_THEMES)[0].themes.map((t) => t.id).includes('christmas'), true);
   check('cards', 'the real catalog puts Day first in All cards', cardSections(CARD_THEMES)[1].themes[0].id, 'day');
 }
+
+// --- You: the profile header (spec 49, ticket 09) ---
+check('profile', 'initial from the name', profileInitial({ fullName: 'Asha Rao', email: 'z@x.com' }), 'A');
+check('profile', 'leading spaces are skipped', profileInitial({ fullName: '  meera', email: 'z@x.com' }), 'M');
+check('profile', 'email only', profileInitial({ fullName: '', email: 'kiran@x.com' }), 'K');
+check('profile', 'a blank name falls back to the email', profileInitial({ fullName: '   ', email: 'kiran@x.com' }), 'K');
+check('profile', 'nothing at all', [profileInitial({}), profileInitial()], ['?', '?']);
+check('profile', 'lowercase is raised', profileInitial({ fullName: 'ravi' }), 'R');
+check('profile', 'name and email', profileLines({ fullName: 'Asha Rao', email: 'a@x.com' }), { title: 'Asha Rao', caption: 'a@x.com' });
+check('profile', 'no name: the email is the title, no caption', profileLines({ fullName: null, email: 'a@x.com' }), { title: 'a@x.com', caption: null });
+check('profile', 'nothing', profileLines({}), { title: '', caption: null });
+check('profile', 'a name that is the email in another case shows once', profileLines({ fullName: 'A@X.com', email: 'a@x.com' }), { title: 'A@X.com', caption: null });
 
 // --- Report ---
 for (const f of failures) {

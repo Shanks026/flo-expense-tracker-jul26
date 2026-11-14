@@ -52,6 +52,7 @@ import useAnalyticsConsent from '../hooks/useAnalyticsConsent';
 import useVoiceLanguage from '../hooks/useVoiceLanguage';
 import { voiceSupported, VOICE_LANGUAGES } from '../lib/voice';
 import { useEditProfileSheet } from '../components/EditProfileSheet';
+import { profileInitial } from '../lib/profileHeader';
 import { useToast } from '../components/Toast';
 import CurrencyPicker from '../components/CurrencyPicker';
 import ProBadge from '../components/ProBadge';
@@ -214,7 +215,7 @@ export default function Settings() {
   const [sendingTestPush, setSendingTestPush] = useState(false);
 
   const fullName = profile?.full_name ?? session?.user?.user_metadata?.full_name ?? '';
-  const initial = fullName?.[0]?.toUpperCase() ?? '?';
+  const initial = profileInitial({ fullName, email: session?.user?.email });
 
   // Switching INTO Custom for the first time (no anchor set yet) defaults the
   // start date to today, not null — lands on a concrete, immediately-visible

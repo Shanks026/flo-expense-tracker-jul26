@@ -10,14 +10,14 @@ Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
 
 **Blocked by:** 08 (the Cards name)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The check script covers `profileInitial`: a name, leading spaces, email only, nothing ("?"), lowercase
-- [ ] Every row opens its screen; the header opens the edit-profile sheet
-- [ ] Emulator check in light and dark
+- [x] The check script covers `profileInitial`: a name, leading spaces, email only, nothing ("?"), lowercase
+- [x] Every row opens its screen; the header opens the edit-profile sheet
+- [x] Emulator check in light and dark
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal
