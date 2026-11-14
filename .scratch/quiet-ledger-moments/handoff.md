@@ -7,7 +7,7 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 | 01 Streak mark and milestone celebration | — | done (real queue path not seen on device) | see git log |
 | 02 Bill detail fixes and one due wording | — | done | see git log |
 | 03 Bills-due sheet | 02 | done (real queue path not seen on device) | see git log |
-| 04 Share-usage ask and toast | — | ready | |
+| 04 Share-usage ask and toast | — | done | see git log |
 | 05 Alerts grouped | — | ready | |
 | 06 Streak screen | 01 | ready | |
 | 07 Ask FLO chat and Past chats | — | ready | |
@@ -22,4 +22,4 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 
 **Decided 2026-11-14 (ticket 01):** the celebration's seven-day row runs oldest → today, like the Streak calendar (the person kept it).
 
-**Kit previews (Settings → Developer → Kit):** "Show the 7-day celebration" (ticket 01) and "Show the bills-due sheet" (ticket 03, over the account's real bills) check the moments without the queue, which shows each at most once a day.
+**Kit previews (Settings → Developer → Kit):** "Show the 7-day celebration" (ticket 01) and "Show the bills-due sheet" (ticket 03, over the account's real bills) and "Show the share-usage ask" (ticket 04; its answers are real, and it skips itself while sharing is on) check the moments without the queue, which shows each at most once. The Toast row fires a success, an error and a plain toast.

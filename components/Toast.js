@@ -1,9 +1,8 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, TriangleAlert, Info, X } from 'lucide-react-native';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { Check, TriangleAlert, X } from 'lucide-react-native';
+import { useLedger, ledgerPalettes, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 
 const MAX_VISIBLE = 3;
 
@@ -42,14 +41,12 @@ export function useToast() {
 }
 
 function ToastHost({ toasts, onDismiss }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
   if (toasts.length === 0) return null;
 
   return (
-    <View style={[styles.host, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
+    <View style={[styles.host, { top: insets.top + ledgerSpace.sm }]} pointerEvents="box-none">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onDismiss={() => onDismiss(toast.id)} />
       ))}
@@ -57,23 +54,24 @@ function ToastHost({ toasts, onDismiss }) {
   );
 }
 
-function ToastItem({ toast, onDismiss }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const progress = useRef(new Animated.Value(0)).current;
+// Status glyphs (spec 49, ticket 04): a tick for success, a cross for an
+// error, a warning sign for warn. 'info' (showToast's default) is a plain
+// message with no glyph.
+const GLYPHS = {
+  success: { icon: Check, tone: 'positive' },
+  error: { icon: X, tone: 'danger' },
+  warn: { icon: TriangleAlert, tone: 'warn' },
+};
 
-  // One consistent card (theme surface + ink text) for every toast — the
-  // icon alone, in its own soft-tinted circle (same pattern IconTile's
-  // status tones already use), carries the success/error/warn/info signal,
-  // instead of the whole toast filling with that color.
-  const VARIANTS = {
-    success: { icon: Check, iconColor: colors.income, iconBg: colors.incomeBg },
-    error: { icon: X, iconColor: colors.danger, iconBg: colors.dangerBg },
-    warn: { icon: TriangleAlert, iconColor: colors.warn, iconBg: colors.warnBg },
-    info: { icon: Info, iconColor: colors.brand, iconBg: colors.brandBg },
-  };
-  const v = VARIANTS[toast.variant] ?? VARIANTS.info;
-  const Icon = v.icon;
+function ToastItem({ toast, onDismiss }) {
+  const { c, modeId } = useLedger();
+  // The pill is ink (black in light, near-white in dark), so its status
+  // colours come from the other mode's palette, where they're built to read
+  // on that background.
+  const onPill = ledgerPalettes[modeId === 'dark' ? 'light' : 'dark'];
+  const progress = useRef(new Animated.Value(0)).current;
+  const glyph = GLYPHS[toast.variant];
+  const Icon = glyph?.icon;
 
   useEffect(() => {
     Animated.timing(progress, { toValue: 1, duration: 220, useNativeDriver: true }).start();
@@ -91,23 +89,23 @@ function ToastItem({ toast, onDismiss }) {
   // Fades in place, with no slide (spec 46), so a fast tap on Undo lands
   // where the button already is.
   return (
-    <Animated.View style={[styles.item, { opacity: progress }]}>
-      <Pressable style={styles.itemPressable} onPress={handleDismiss}>
-        <View style={[styles.iconWrap, { backgroundColor: v.iconBg }]}>
-          <Icon size={16} color={v.iconColor} strokeWidth={2.6} />
-        </View>
-        <Text style={styles.message} numberOfLines={2}>
+    <Animated.View style={[styles.item, { backgroundColor: c.ink, shadowColor: c.shadow, opacity: progress }]}>
+      <Pressable style={styles.itemPressable} onPress={handleDismiss} accessibilityRole="alert">
+        {Icon && <Icon size={16} color={onPill[glyph.tone]} strokeWidth={2.25} />}
+        <Text style={[styles.message, { color: c.inkOnInk }]} numberOfLines={2}>
           {toast.message}
         </Text>
         {toast.actionLabel && (
           <Pressable
             style={styles.actionButton}
+            hitSlop={8}
+            accessibilityRole="button"
             onPress={() => {
               toast.onAction?.();
               handleDismiss();
             }}
           >
-            <Text style={styles.actionText}>{toast.actionLabel}</Text>
+            <Text style={[styles.actionText, { color: c.inkOnInk }]}>{toast.actionLabel}</Text>
           </Pressable>
         )}
       </Pressable>
@@ -115,55 +113,43 @@ function ToastItem({ toast, onDismiss }) {
   );
 }
 
-function makeStyles(colors) {
-  return StyleSheet.create({
-    host: {
-      position: 'absolute',
-      left: spacing.lg,
-      right: spacing.lg,
-      zIndex: 999,
-      elevation: 999,
-      gap: spacing.sm,
-    },
-    item: {
-      backgroundColor: colors.surface,
-      borderRadius: radii.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 6,
-    },
-    itemPressable: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.md,
-    },
-    iconWrap: {
-      width: 26,
-      height: 26,
-      borderRadius: radii.pill,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    message: {
-      flex: 1,
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.base,
-      color: colors.ink,
-    },
-    actionButton: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-    },
-    actionText: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.base,
-      color: colors.brandStrong,
-    },
-  });
-}
+// An ink capsule with inkOnInk text (redesign §2.5, spec 49 ticket 04).
+const styles = StyleSheet.create({
+  host: {
+    position: 'absolute',
+    left: ledgerSpace.gutter,
+    right: ledgerSpace.gutter,
+    zIndex: 999,
+    elevation: 999,
+    gap: ledgerSpace.sm,
+    alignItems: 'center',
+  },
+  item: {
+    maxWidth: '100%',
+    borderRadius: ledgerRadius.full,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  itemPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ledgerSpace.sm,
+    minHeight: 44,
+    paddingVertical: ledgerSpace.sm,
+    paddingHorizontal: ledgerSpace.lg,
+  },
+  message: {
+    ...ledgerType.body,
+    flexShrink: 1,
+  },
+  actionButton: {
+    paddingLeft: ledgerSpace.sm,
+    paddingVertical: ledgerSpace.xs,
+  },
+  actionText: {
+    ...ledgerType.body,
+    fontFamily: inter.semibold,
+  },
+});

@@ -24,6 +24,8 @@ import AvatarStack from '../../components/ledger/AvatarStack';
 import StreakMark from '../../components/ledger/StreakMark';
 import { StreakCelebrationMoment } from '../../components/StreakCelebration';
 import { DueBillsMoment } from '../../components/DueBillsModal';
+import { ShareUsageMoment } from '../../components/ShareUsageAsk';
+import { useToast } from '../../components/Toast';
 import PageDots from '../../components/ledger/PageDots';
 import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
@@ -78,6 +80,8 @@ function KitGallery() {
   const [iconKey, setIconKey] = useState('entertainment');
   const [celebrating, setCelebrating] = useState(false);
   const [billsDue, setBillsDue] = useState(false);
+  const [shareAsk, setShareAsk] = useState(false);
+  const { showToast } = useToast();
 
   return (
     <View style={styles.screen}>
@@ -236,6 +240,22 @@ function KitGallery() {
         <Section title="Bills-due sheet">
           <Button title="Show the bills-due sheet" variant="secondary" onPress={() => setBillsDue(true)} />
           {billsDue && <DueBillsMoment onDone={() => setBillsDue(false)} />}
+        </Section>
+
+        {/* The share-usage ask without the queue (spec 49, ticket 04). Its
+            answers are real: they save the answer and, on yes, turn usage
+            sharing on. It skips itself while sharing is already on. */}
+        <Section title="Toast">
+          <View style={styles.inline}>
+            <Button title="Success" variant="secondary" compact onPress={() => showToast({ message: 'Logged ₹120 · Food', variant: 'success', actionLabel: 'Undo', onAction: noop })} />
+            <Button title="Error" variant="secondary" compact onPress={() => showToast({ message: "Couldn't save. Try again.", variant: 'error' })} />
+            <Button title="Plain" variant="secondary" compact onPress={() => showToast({ message: 'Copied to clipboard' })} />
+          </View>
+        </Section>
+
+        <Section title="Share-usage ask">
+          <Button title="Show the share-usage ask" variant="secondary" onPress={() => setShareAsk(true)} />
+          {shareAsk && <ShareUsageMoment onDone={() => setShareAsk(false)} />}
         </Section>
 
         <Section title="IconPicker">
