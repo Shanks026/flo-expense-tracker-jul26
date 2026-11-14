@@ -1,6 +1,6 @@
 # 09: The You tab
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The You tab opens on the person's photo or initial, name and email, then flat rows. Spec 49 §You.
 

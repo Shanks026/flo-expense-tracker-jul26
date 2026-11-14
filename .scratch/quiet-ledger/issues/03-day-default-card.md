@@ -1,6 +1,6 @@
 # 03: Day as the free default card
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** A user who has never picked a card sees the Day landscape for the current time of day. An equipped theme and an explicit choice of Ink still win.
 

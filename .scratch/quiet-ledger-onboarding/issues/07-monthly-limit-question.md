@@ -1,6 +1,6 @@
 # 07: "Want a monthly spending limit?"
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The third set-up question: a large ₹ amount field (the Add sheet's amount input, caret pinned to the end) and the muted note "FLO can suggest one from your spending later".
 

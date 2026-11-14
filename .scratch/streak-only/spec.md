@@ -1,6 +1,6 @@
 # Streak only: economy flagged off, automatic freezes, moment queue
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 Decisions made while ticketing (2026-10-26):
 - The economy flag goes in the existing `lib/flags.js` (spec 32), not a new `lib/features.js` as the v1-reset map said.

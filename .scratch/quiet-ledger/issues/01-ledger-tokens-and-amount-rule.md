@@ -1,6 +1,6 @@
 # 01: Ledger tokens, the money sign rule and the check script
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** Finish the Quiet Ledger token set and turn the money sign and paise rule into a plain function that node can test, so every later screen formats money the same way. Hide the accent picker behind a new flag.
 

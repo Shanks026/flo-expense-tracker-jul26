@@ -1,6 +1,6 @@
 # 03: Five tabs and the More screen
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** The tab bar becomes **Home · Transactions · (+) · Insights · More**.
 - The centre **+** opens the Add sheet. It is an action, not a route.

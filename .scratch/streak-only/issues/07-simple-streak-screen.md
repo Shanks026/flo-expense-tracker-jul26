@@ -1,6 +1,6 @@
 # 07: Simpler streak screen
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** The streak screen shows progress at a glance:
 - a calendar of covered days, each marked logged, no-spend or frozen;

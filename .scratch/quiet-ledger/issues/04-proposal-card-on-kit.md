@@ -1,6 +1,6 @@
 # 04: Ask FLO proposal card on the new kit
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** The Ask FLO proposal card becomes the one `surface` card on the chat screen. It's rebuilt on the ledger kit, and its behaviour doesn't change.
 

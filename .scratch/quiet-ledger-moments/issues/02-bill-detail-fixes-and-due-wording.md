@@ -1,6 +1,6 @@
 # 02: Bill detail fixes and one due wording
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The two leftovers from spec 48's review, plus the shared due wording that ticket 03 reuses. Spec 49 §Bill detail fixes.
 

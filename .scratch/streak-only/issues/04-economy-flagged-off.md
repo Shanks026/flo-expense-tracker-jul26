@@ -1,6 +1,6 @@
 # 04: Economy flagged off
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** FLO reads as a calm money app with no game economy, and bringing any piece back is a one-line change.
 - `lib/flags.js` gains `economy: false`, in both store and personal builds.

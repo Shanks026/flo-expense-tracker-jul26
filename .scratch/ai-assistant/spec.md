@@ -1,6 +1,6 @@
 # Feature: AI assistant (quick add + chat, via OpenRouter)
 
-Spec: .claude/features/44-ai-assistant.md
+Spec: .claude/features/archive/44-ai-assistant.md
 
 Decisions made while ticketing (2026-11-09, after grilling; the tickets follow the to-tickets process as vertical slices):
 - The AI feature is built **from scratch**. No code from the earlier attempts (spec 13, `ai-interpret`, `ai-report-summary`) is reused, and the app has none left.

@@ -1,6 +1,6 @@
 # 02: Illustration, EmptyState, and Koban deleted
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** The one-object-per-moment art system, with icon placeholders until the 3D assets exist, and Koban deleted. (Changed 2026-11-10: the person chose to delete him rather than flag him off.)
 

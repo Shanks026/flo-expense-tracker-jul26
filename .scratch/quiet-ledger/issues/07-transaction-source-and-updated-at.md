@@ -1,6 +1,6 @@
 # 07: Recording where each entry came from
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** Every new entry records how it arrived, and real edits are timestamped, so Transaction detail can show its source and history.
 

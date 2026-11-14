@@ -1,6 +1,6 @@
 # 06: The Streak screen on the kit
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The Streak screen without cards: a big count, two quiet stats and the month calendar. Spec 49 §Streak.
 

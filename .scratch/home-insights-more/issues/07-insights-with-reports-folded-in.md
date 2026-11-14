@@ -1,6 +1,6 @@
 # 07: Insights: Analytics with Reports folded in
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** Insights is the one place for analysis:
 - a single **Week / Month / Custom** period control, which can be opened directly on Week (Home's chart uses this);

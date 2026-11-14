@@ -1,6 +1,6 @@
 # 11: Transaction detail
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** Tapping an entry on Home or Activity opens a read-first detail screen that shows where the entry came from and what has happened to it, with Edit and Delete.
 

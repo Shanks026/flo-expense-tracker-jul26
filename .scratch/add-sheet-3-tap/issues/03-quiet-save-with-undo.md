@@ -1,6 +1,6 @@
 # 03: Quiet save with Undo
 
-Spec: .claude/features/36-add-sheet-3-tap.md
+Spec: .claude/features/archive/36-add-sheet-3-tap.md
 
 **What to build:** Saving feels instant and calm. On Save:
 - the transaction is inserted and `notifyChanged()` runs;

@@ -1,6 +1,6 @@
 # 10: Budget proposals
 
-Spec: .claude/features/44-ai-assistant.md (Phase 4)
+Spec: .claude/features/archive/44-ai-assistant.md (Phase 4)
 
 **What to build:** "Set a ₹6,000 food budget for this month" gives a budget proposal card. Review opens the Add Budget sheet filled in as a **new** budget; until now that sheet could only open an existing one for editing. Save creates it, and the free-plan budget gate still runs at Save. A category the person doesn't have gets a question back ("which category did you mean?"), not a guess.
 

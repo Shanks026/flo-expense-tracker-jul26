@@ -1,6 +1,6 @@
 # 10: Koban poses
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Koban has a movement library: the `pose` prop sets what his body does.
 - Poses, each with its own loop: idle, hello (wave), jump-for-joy, walking, hmm (paw to chin with a ? bubble), shrug, little dance, nice-one (thumbs-up and hip).

@@ -1,6 +1,6 @@
 # 03: Opt-in on the opener, with the pre-sign-in queue
 
-Spec: .claude/features/33-product-analytics.md
+Spec: .claude/features/archive/33-product-analytics.md
 
 **What to build:** A new user chooses on the first onboarding screen (today's opener) whether to share anonymous usage. The switch is unticked by default.
 - **Before sign-in:** the choice is held on the phone. With it on, events such as `onboarding_step_viewed {step: opener}` are queued, not sent.

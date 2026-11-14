@@ -1,6 +1,6 @@
 # 04: Voice in the quick-add line
 
-Spec: .claude/features/44-ai-assistant.md (Phase 2)
+Spec: .claude/features/archive/44-ai-assistant.md (Phase 2)
 
 **What to build:** A mic button at the end of the quick-add line. Hold it, speak ("forty rupees lunch today", or a Tamil phrase), let go, and the words appear in the line and go through the same pipeline as typing. Speech-to-text runs on the device. A setting chooses between English (India) and Tamil. The mic permission is asked the first time it's used, never at launch.
 

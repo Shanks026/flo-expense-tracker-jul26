@@ -75,7 +75,7 @@ thin re-export).
 (`FREE_LIMITS`, `PRO_PRICING`). `useEntitlement()` → `entitlements` table
 (`is_pro`; missing row = Free, intentionally). **Client checks are create-time
 gates only** (block the 2nd account / 3rd budget, etc.) — never access-time,
-never data-model changes. See `.claude/features/14-subscription-pro.md`.
+never data-model changes. See `.claude/features/archive/14-subscription-pro.md`.
 
 ## Edge Functions (`supabase/functions/`)
 
@@ -96,9 +96,12 @@ via the Supabase MCP (`list_tables`, `list_migrations`; project
 
 ## Feature workflow — READ THIS BEFORE BUILDING
 
-- `.claude/features/` is the real design record: numbered docs `01`–`19` (built),
-  `IDEAS-*.md` (unscheduled references), `00-index.md` (running index + standing
-  rules + schema notes). **Read `00-index.md` first** for cross-cutting decisions.
+- **`.claude/features/00-index.md` is the one main design doc**: standing rules,
+  schema reference, shared infrastructure notes and a row per feature. **Read it
+  first.** Built specs (`01`–`49`) are history in `.claude/features/archive/`
+  (code comments cite them by file name); unscheduled ideas are in
+  `.claude/features/ideas/`. A new spec goes beside the index as
+  `.claude/features/NN-<slug>.md` and moves to `archive/` once built.
 - Use the **`flo-feature` skill** before writing any feature code — the planning
   doc must exist first. Continue existing features through the same skill.
 

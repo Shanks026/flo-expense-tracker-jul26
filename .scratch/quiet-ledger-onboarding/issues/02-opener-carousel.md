@@ -1,6 +1,6 @@
 # 02: Opener carousel
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The pre-auth opener becomes three slides on the ledger kit: "Every rupee, in one quiet place", "Log in 3 taps, or just say it", "See where it went". Each has one large `Illustration` object (coins, spark, receipt), with page dots and a swipe between slides. A `PinnedFooter` on every slide carries **Create account** (primary, to sign-up) and **I have an account** (secondary, to sign-in); both set the intro-seen flag, as today.
 

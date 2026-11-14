@@ -1,6 +1,6 @@
 # 09: The Add sheet on the new kit
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** The Add sheet is reordered and restyled on a shared `Sheet` shell. Every entry point and feature stays the same.
 

@@ -1,6 +1,6 @@
 # 04: The share-usage ask and the toast
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The two remaining ambient moments on the kit. Spec 49 §The share-usage ask and §The toast.
 

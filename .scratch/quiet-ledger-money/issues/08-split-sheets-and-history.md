@@ -1,6 +1,6 @@
 # 08: Split sheets and "Add from my transactions" on the kit
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** The split, entry, person and settle-up sheets move into the standard `Sheet`, and "Add from my transactions" moves onto the kit's chips, rows and pinned footer. Their behaviour is unchanged. Spec 48 §Splits (sheets, add from history).
 

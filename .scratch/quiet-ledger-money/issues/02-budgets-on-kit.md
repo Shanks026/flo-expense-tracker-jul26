@@ -1,6 +1,6 @@
 # 02: Budgets list, detail and sheet on the kit
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Budgets as flat rows with a thin progress bar and "₹X left", a detail that leads with "₹2,104.50 of ₹2,000", and the budget sheet in the standard `Sheet`. Spec 48 §Budgets.
 

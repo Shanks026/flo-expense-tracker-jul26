@@ -1,6 +1,6 @@
 # 06: Clean up the manifest and dependencies
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md
 
 **What to build:** The built manifest is clean and expo-doctor passes. `CAMERA` is added to the blocked permissions, the `androidNavigationBar` config is changed to the form expo-doctor accepts, and `expo-share-intent` is upgraded to 5.1.1. Share-to-FLO keeps working.
 

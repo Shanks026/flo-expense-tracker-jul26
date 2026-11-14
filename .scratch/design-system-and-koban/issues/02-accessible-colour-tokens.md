@@ -1,6 +1,6 @@
 # 02: Accessible colour tokens
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** Text is readable in both modes, and colour never carries meaning on its own.
 - Muted text tokens reach at least 4.5:1 against their backgrounds in light and dark.

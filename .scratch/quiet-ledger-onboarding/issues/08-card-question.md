@@ -1,6 +1,6 @@
 # 08: "Pick your card"
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The fourth set-up question: a live preview of the Home card (with the person's first account name) above a two-column grid of the card catalog, Day first, then any seasonal skins. Tapping a tile updates the preview.
 

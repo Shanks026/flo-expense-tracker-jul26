@@ -1,6 +1,6 @@
 # 03: Remove dead ends, placeholders and developer UI
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md
 
 **What to build:** The app stops looking broken or unfinished to testers:
 - The "Forgot password?" link on sign-in is removed until the forgot-password spec ships. Testers use Google or email sign-in.

@@ -1,6 +1,6 @@
 # 10: First Home coach mark and the full-flow check
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The first Home shows only the + coach mark (the existing `CoachMark` on the tab bar, restyled on the kit); no streak-chip mark. Then the whole Phase 3 flow is checked end to end on fresh accounts, fixing whatever the earlier tickets left uneven between steps (spacing, transitions, the counter).
 

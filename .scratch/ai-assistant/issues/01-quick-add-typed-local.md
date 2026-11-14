@@ -1,6 +1,6 @@
 # 01: Quick add from typing, on the phone only
 
-Spec: .claude/features/44-ai-assistant.md (Phase 1, "Quick-add decisions")
+Spec: .claude/features/archive/44-ai-assistant.md (Phase 1, "Quick-add decisions")
 
 **What to build:** In a blank Add sheet, the person types a line like "120 lunch nethu" into a new quick-add line at the top. The keyboard opens there. Tapping done fills the sheet with the amount, type, category, date, account and note, and they tap Save as usual. The phone parses everything itself; there's no network call. The rules are the ones settled in the spec: category words with fallback lists, income words, Tanglish date words, the most recent past weekday, day-first day numbers, and two numbers → not sure. Anything the parser isn't sure about leaves the sheet untouched with a quiet "Couldn't read that". The line appears only for a blank new entry, and only when the AI flag is on.
 

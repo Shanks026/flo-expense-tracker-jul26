@@ -1,6 +1,6 @@
 # 05: Accounts screen with transfers
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** More → Accounts opens a screen that:
 - lists your accounts;

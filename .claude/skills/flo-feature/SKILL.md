@@ -22,12 +22,12 @@ Read these before doing anything else:
 Then check whether the user is starting something new or continuing existing work:
 
 **If this looks like a continuation** (e.g. "let's do Phase 2 of analytics", "continue the categories feature"):
-- Find the relevant file in `.claude/features/`
+- Find the relevant file in `.claude/features/` (built specs are in `.claude/features/archive/`)
 - Read it fully — note which phases are complete, what was deferred, what the next phase specifies
 - Skip to Step 3 (or Step 4 if the doc is already fully written)
 
 **If this is a new feature idea**:
-- Scan `.claude/features/` to check if anything already covers this
+- Scan `.claude/features/00-index.md` (and `archive/`, `ideas/` behind it) to check if anything already covers this
 - Proceed to Step 2
 
 ---
@@ -123,7 +123,7 @@ Then stop. Wait for explicit go-ahead.
 
 After all phases are complete, update `.claude/features/00-index.md`:
 
-- Add the feature to the Feature Files table with its status
+- Add the feature to the Feature Files table with its status, and move the spec to `.claude/features/archive/` (updating the row's path)
 - Add any new tables/views/columns/storage to the Schema Reference section
 - Add any new reusable component/hook patterns to Shared Infrastructure Notes
 

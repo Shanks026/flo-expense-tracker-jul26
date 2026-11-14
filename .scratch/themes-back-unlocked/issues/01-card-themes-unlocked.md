@@ -1,6 +1,6 @@
 # 01: Card themes back, all unlocked
 
-Spec: .claude/features/43-themes-back-unlocked.md
+Spec: .claude/features/archive/43-themes-back-unlocked.md
 
 **What to build:** Settings → Personalize comes back behind a new `themes` flag, separate from the economy flag. It lists every card design, with nothing locked or priced and no link to the Shop. Equip saves the choice to the profile, and Home's account card paints the equipped design. A new `themeGating` flag, off, makes every design count as owned without reading the coin economy. Coins, XP, the Shop and trophies stay off.
 

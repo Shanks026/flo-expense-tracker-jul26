@@ -3,7 +3,7 @@
 Last updated 2026-11-11, after tickets 06, 10 and 11: **Phases 1 and 2 are done** (all 12 tickets). Phase 3 (Onboarding) is next and has no spec yet. See "Since ticket 07" below for the changes the person asked for along the way.
 
 Read this, then the ticket you're starting. The spec is
-`.claude/features/46-quiet-ledger-foundations-and-core-loop.md`; the design
+`.claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md`; the design
 source is `docs/redesign-plan.md`.
 
 ## Where it stands
@@ -23,7 +23,7 @@ source is `docs/redesign-plan.md`.
 | 11 Transaction detail | done (split-linked delete not run live; see Comments) | `4a5376f` |
 | 12 Olive accent replaces the blue | done (info callout, caret, income green not seen on screen; see Comments) | `b89f842` |
 
-**Next: Phase 3, Onboarding** (redesign plan §4 Onboarding and §7; the person confirmed 2026-11-11 to follow the plan's order). Its spec is written: `.claude/features/47-quiet-ledger-onboarding.md` (2026-11-11). Its tickets (01–10) are in the new effort `.scratch/quiet-ledger-onboarding/`, which has its own handoff; work continues there. Decided with the person while writing it: "My salary day" is a real monthly cycle (new `salary_day` period + `profiles.reset_month_day`, a migration that needs their yes), the first bank picked renames the seeded "Personal" account, and testing keeps spec 46's two seams. It covers the 3-slide opener, sign-up/sign-in with live password rules, the four set-up questions (accounts, month start, monthly limit, card), the first-expense strip and the reminder ask with a time picker. The set-up questions write real rows (accounts, `reset_period`, a budget), so their emulator checks need a fresh test account, not the shared one.
+**Next: Phase 3, Onboarding** (redesign plan §4 Onboarding and §7; the person confirmed 2026-11-11 to follow the plan's order). Its spec is written: `.claude/features/archive/47-quiet-ledger-onboarding.md` (2026-11-11). Its tickets (01–10) are in the new effort `.scratch/quiet-ledger-onboarding/`, which has its own handoff; work continues there. Decided with the person while writing it: "My salary day" is a real monthly cycle (new `salary_day` period + `profiles.reset_month_day`, a migration that needs their yes), the first bank picked renames the seeded "Personal" account, and testing keeps spec 46's two seams. It covers the 3-slide opener, sign-up/sign-in with live password rules, the four set-up questions (accounts, month start, monthly limit, card), the first-expense strip and the reminder ask with a time picker. The set-up questions write real rows (accounts, `reset_period`, a budget), so their emulator checks need a fresh test account, not the shared one.
 
 After that: Phase 4 (Insights, Budgets, Bills + bill detail, Splits, Accounts, Categories; Plans is flagged off and only restyled, best done here), Phase 5 (moments, Alerts, Streak, Ask FLO chat, Personalize, You, Pro), Phase 6 (polish). The Ask FLO chat restyle the person asked for can be pulled forward as one small ticket at any point.
 

@@ -3,7 +3,7 @@
 Read this first in a new session, then:
 - `AGENTS.md`;
 - `.claude/features/00-index.md`, for the standing rules;
-- `.claude/features/44-ai-assistant.md`. §3.2–3.3 hold the chat tools and the "Rich answers" and "Several categories" notes; §4 and the "Phase 4: proposals" Implementation Notes hold the proposals.
+- `.claude/features/archive/44-ai-assistant.md`. §3.2–3.3 hold the chat tools and the "Rich answers" and "Several categories" notes; §4 and the "Phase 4: proposals" Implementation Notes hold the proposals.
 
 Tickets are in `.scratch/ai-assistant/issues/`, and each ticket's Comments say what was checked.
 

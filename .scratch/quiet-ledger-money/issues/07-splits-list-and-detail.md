@@ -1,6 +1,6 @@
 # 07: Splits list and detail on the kit
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Splits as flat rows with stacked member initials and "You're owed ₹600" / "You owe ₹200", and a split detail that leads with the person's balance, lists who owes whom with Settle up on each pair, and pins Settle up and Add entry. Spec 48 §Splits (list and detail).
 

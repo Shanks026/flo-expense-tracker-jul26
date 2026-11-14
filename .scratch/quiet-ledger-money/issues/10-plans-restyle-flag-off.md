@@ -1,6 +1,6 @@
 # 10: Plans restyle (flag stays off)
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Plans' list, detail and add-from-history screens and the plan sheet move onto the kit with the Budgets and Splits patterns, so turning `FLAGS.plans` back on later doesn't look out of place. The flag stays **off**. Spec 48 §Plans.
 

@@ -1,6 +1,6 @@
 # 04: The short path (2c): delete the old onboarding screens
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** Subticket 2c of "the short path". Nothing routes to the old flow any more, so it's removed:
 - the intro questions: problem, solution, name, age, income, goal, leak, habit, reflection;

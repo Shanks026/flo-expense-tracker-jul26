@@ -1,6 +1,6 @@
 # 01: Streak mark and the milestone celebration
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** Celebrations only at the 7, 30, 100 and 365 day milestones, as one calm full screen on the app's own background. Spec 49 §Milestone celebrations and §Streak (the shared streak mark).
 

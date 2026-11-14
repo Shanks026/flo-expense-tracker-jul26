@@ -1,6 +1,6 @@
 # 08: Cards (was Personalize)
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** Personalize renamed Cards: a large live preview, Seasonal first, every design in a grid, and Equip pinned. Spec 49 §Cards.
 

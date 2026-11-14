@@ -1,6 +1,6 @@
 # 05: Recap data and the recap screen
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:**
 - **One pure recap module** for a closed week (Monday to Sunday, local time), and the same for a calendar month. It returns:

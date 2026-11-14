@@ -1,6 +1,6 @@
 # 08: Release-candidate check: lite AAB plus full emulator walk
 
-Spec: .claude/features/32-safe-closed-test-build.md
+Spec: .claude/features/archive/32-safe-closed-test-build.md
 
 **What to build:** Show that the first closed-test AAB is safe to upload, by checking both the built artifact and the installed app. This is the release check to repeat before every upload, written down so it can be rerun.
 

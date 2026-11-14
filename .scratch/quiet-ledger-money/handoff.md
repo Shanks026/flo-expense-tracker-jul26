@@ -3,7 +3,7 @@
 Last updated 2026-11-12 (end of session): tickets 01–04 done and committed; **ticket 05 is half built, uncommitted** (see "Ticket 05 in progress" below). The person asked to run 03–05 in one go and said not to wait for approval, which covers 04 and 05's migrations (both applied) and 05's Edge Function deploy.
 
 Read this, then the ticket you're starting. The spec is
-`.claude/features/48-quiet-ledger-money-screens.md`; the design source is
+`.claude/features/archive/48-quiet-ledger-money-screens.md`; the design source is
 `docs/redesign-plan.md` §4 (Insights, Budgets, Bills, Splits, Accounts,
 Categories) and §2.6 (bill icons). **Also read
 `.scratch/quiet-ledger/handoff.md`** ("Decisions made during spec 46" and

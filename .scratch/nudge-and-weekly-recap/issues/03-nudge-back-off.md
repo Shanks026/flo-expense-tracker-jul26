@@ -1,6 +1,6 @@
 # 03: Nudge back-off
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 **What to build:**
 - **The nudge backs off when it's ignored.** An ignored nudge is a sent nudge followed by a day with no log and no no-spend mark. `send-push` counts consecutive ignored nudges from `reminder_sends` and the logging history:

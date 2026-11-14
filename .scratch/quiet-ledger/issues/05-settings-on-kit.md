@@ -1,6 +1,6 @@
 # 05: Settings on the new kit
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** Settings becomes flat grouped rows on the canvas. This ticket builds the shared header, segmented control and callout as Settings needs them.
 

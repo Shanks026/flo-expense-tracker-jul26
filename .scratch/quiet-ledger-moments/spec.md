@@ -1,3 +1,3 @@
 # Feature: Quiet Ledger redesign, Phase 5 (Moments and the rest)
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md

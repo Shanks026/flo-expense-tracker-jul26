@@ -1,6 +1,6 @@
 # 07: Ask FLO chat and Past chats on the kit
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The Ask FLO chat and Past chats restyled; behaviour unchanged. Spec 49 §Ask FLO.
 

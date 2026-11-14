@@ -1,6 +1,6 @@
 # 09: Settings regrouped
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** Settings is laid out in clear sections, in this order:
 

@@ -1,6 +1,6 @@
 # 07: Ask about everything else
 
-Spec: .claude/features/44-ai-assistant.md (§3.2)
+Spec: .claude/features/archive/44-ai-assistant.md (§3.2)
 
 **What to build:** The chat can answer the rest of the spec's questions: an account breakdown, comparing this month to last month, finding transactions, budget status and bills due. Each one is answered through a tool that computes the number on the server, from the same views the app uses. Starter chips on the empty chat offer the common questions. The system prompt keeps answers short, says which period was used, refuses to estimate a number no tool gives, and treats notes and names as data, not instructions.
 

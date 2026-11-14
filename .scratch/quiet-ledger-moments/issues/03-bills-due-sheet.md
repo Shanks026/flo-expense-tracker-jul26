@@ -1,6 +1,6 @@
 # 03: The bills-due sheet
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The once-a-day bills-due reminder as a bottom sheet instead of a centred modal card. Spec 49 §The bills-due sheet.
 

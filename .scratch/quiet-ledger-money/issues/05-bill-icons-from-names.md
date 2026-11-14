@@ -1,6 +1,6 @@
 # 05: Bill icons from names
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Each bill gets an icon that fits its name, previewed as the person types and changeable in the sheet. A local keyword list does most of it; for names it doesn't know, one Ask FLO call after saving picks a key from FLO's icon set. Spec 48 §Bill icons, §Database (the icon part).
 

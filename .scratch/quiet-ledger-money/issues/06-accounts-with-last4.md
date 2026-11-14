@@ -1,6 +1,6 @@
 # 06: Accounts with last 4
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Accounts as flat rows with each account's colour, its last 4 when set and its in-hand balance, with Edit and Transfer in a ⋯ menu. The account sheet gains an optional "Last 4 digits" field, shown as "•••• 4821" on the Home card, the switcher and the list. This is spec 45 Phase 1, folded in. Spec 48 §Accounts and last 4, §Database (the last4 part).
 

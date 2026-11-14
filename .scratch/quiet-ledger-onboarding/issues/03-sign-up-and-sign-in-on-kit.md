@@ -1,6 +1,6 @@
 # 03: Sign up and sign in on the kit
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The sign-in / sign-up screen is rebuilt on the kit: a left-aligned large title, labelled email and password fields, a show/hide control, the terms line in small muted text above a pinned CTA, and the link that switches modes.
 

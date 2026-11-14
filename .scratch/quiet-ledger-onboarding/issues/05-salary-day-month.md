@@ -1,6 +1,6 @@
 # 05: Salary-day month
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** A summary period that restarts on the person's salary day every month.
 

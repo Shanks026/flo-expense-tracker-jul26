@@ -1,6 +1,6 @@
 # 01: Plans flagged off
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** Plans disappear from the app behind a new build-time flag `plans: false`:
 - the Plans routes;

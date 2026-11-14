@@ -10,7 +10,9 @@ Tickets and wayfinder maps for this repo live as markdown files in `.scratch/`.
   `.claude/features/00-index.md`. There is no `.scratch/<feature>/spec.md`.
 - That file satisfies the flo-feature rule (planning doc before feature code).
 - When a skill says "read the spec", read the `.claude/features/` file the
-  ticket links to.
+  ticket links to. Once a spec is fully built it moves to
+  `.claude/features/archive/` (and its index row's path changes with it);
+  `00-index.md` stays the one main doc.
 - `/to-tickets` also writes `.scratch/<feature-slug>/spec.md` as a **pointer
   stub** only, so the tracer board (below) finds the feature and its title:
 

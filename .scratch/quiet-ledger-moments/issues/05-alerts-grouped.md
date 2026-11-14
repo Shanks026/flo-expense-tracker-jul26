@@ -1,6 +1,6 @@
 # 05: Alerts grouped on the shared rule
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** The bell's Alerts sheet grouped under Overdue, Budgets and Due soon, with budget alerts on the shared progress rule. Spec 49 §Alerts.
 

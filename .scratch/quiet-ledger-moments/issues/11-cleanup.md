@@ -1,6 +1,6 @@
 # 11: Cleanup: delete what nothing imports
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** Delete the old components the redesign retired, once nothing imports them. Spec 49 §Cleanup.
 

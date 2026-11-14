@@ -1,6 +1,6 @@
 # 12: Rich answers in Ask FLO
 
-Spec: .claude/features/44-ai-assistant.md (§3.3, "Rich answers")
+Spec: .claude/features/archive/44-ai-assistant.md (§3.3, "Rich answers")
 
 **What to build:** Answers stop being one paragraph. The model may write a small set of formatting (bold, bullet and numbered lists, a short heading), and the app draws it with FLO's fonts and colours using a small formatter of its own, with no library. A breakdown is shown as a table: day, week, month or category, the amount right-aligned, the count, a thin bar for each row, and a total. The table is drawn from the tool's own result, which the function attaches to the reply, never from numbers the model typed. The model writes only the sentence around it. Past answers draw their tables again from what's stored.
 

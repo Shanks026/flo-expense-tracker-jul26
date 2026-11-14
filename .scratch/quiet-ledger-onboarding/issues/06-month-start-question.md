@@ -1,6 +1,6 @@
 # 06: "When does your month start?"
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The second set-up question: a `Segmented` "1st of the month" | "My salary day". Salary day reveals a day-of-month picker (1–31). Next writes `reset_period = 'monthly'`, or `salary_day` with the day, through the profile update Settings uses. Next is disabled until a salary day is picked. Skip leaves monthly. `onboarding_step_viewed` sends `month_start`.
 

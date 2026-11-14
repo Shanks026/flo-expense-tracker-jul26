@@ -1,6 +1,6 @@
 # 01: Account and budget writes move into lib
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The writes the set-up questions need already exist, but inline in two sheets. Move them into `lib/` so the sheets and onboarding share one path ("make the change easy"):
 

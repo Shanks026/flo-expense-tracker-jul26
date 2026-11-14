@@ -1,6 +1,6 @@
 # 10: Pro and upsell on the kit (flag off)
 
-Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
+Spec: .claude/features/archive/49-quiet-ledger-moments-and-the-rest.md
 
 **What to build:** Pro and the upsell sheet restyled while `FLAGS.billing` stays off. Spec 49 §Pro and upsell.
 

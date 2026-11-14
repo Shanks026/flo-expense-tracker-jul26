@@ -197,7 +197,7 @@ Ticketed on 2026-11-03 with `/to-tickets`. Nothing is built yet. The person will
 ### Direction change (2026-11-08): personal use first, AI is the priority
 The person reversed the "no AI" rule. FLO is now **a personal-use app first**, built for quick, accurate results and a much better UX for the author; **the store launch comes later**. The rule changes are recorded in `00-index.md` (standing rule "AI is back") and `AGENTS.md`, and `CLAUDE.md` allows OpenRouter as the one third-party service.
 
-**Roadmap (2026-11-08).** Spec 44 is written: `.claude/features/44-ai-assistant.md`. Work top to bottom.
+**Roadmap (2026-11-08).** Spec 44 is written: `.claude/features/archive/44-ai-assistant.md`. Work top to bottom.
 
 **Stage 0: chores to clear before any AI code** (✋ = the person does it, or must say yes first)
 1. ✋ **Commit what's uncommitted:** these docs, `CLAUDE.md`, `AGENTS.md`, spec 44, and the `flo-ticket-tracker/` mod at the repo root. Decide whether the mod belongs in the repo or in `.gitignore`.
@@ -348,7 +348,7 @@ Details are in `00-index.md` (schema and migrations) and the spec's "As built" n
 1. Read this file, `AGENTS.md`, `.claude/features/00-index.md` (its standing rules) and §0 + §8 of the audit doc. Read nothing else up front.
 2. Check `git status`. If the tree isn't clean, show the user what's dirty and ask whether to commit or discard it before starting ⛔.
    - At the time of writing, two files were dirty:
-     - `.claude/features/17-server-push-notifications.md`: two Phase 4 boxes ticked after the emulator test;
+     - `.claude/features/archive/17-server-push-notifications.md`: two Phase 4 boxes ticked after the emulator test;
      - `CLAUDE.md`: an edit by the user.
 3. Show the user the step list below and the current step. Ask: **"Start at step N?"** ⛔ Continue only on a yes.
 

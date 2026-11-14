@@ -1,6 +1,6 @@
 # 12: Olive accent replaces the blue
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** The one accent colour changes from blue to a muted olive green (asked for on 2026-11-10, after Origin's use of a soft green). It stays decoration and meaning only: chart lines and fills, progress, selection marks, the switch, the caret, and soft info surfaces. Buttons and primary actions stay ink.
 

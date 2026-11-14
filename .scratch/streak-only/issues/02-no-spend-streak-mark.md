@@ -1,6 +1,6 @@
 # 02: "No spend today" writes a streak mark
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** A user who spent nothing taps "No spend today" and their streak continues, without anything going into the economy ledger.
 - The existing button (in `TodayCard` until spec 38 moves it to the Home Today strip) writes a `no_spend` mark for today's local date, then runs `notifyChanged()`.

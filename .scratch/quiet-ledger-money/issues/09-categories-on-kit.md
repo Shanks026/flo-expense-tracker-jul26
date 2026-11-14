@@ -1,6 +1,6 @@
 # 09: Categories on the kit
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Categories as two flat sections, Expense and Income, each with a + in its header, every category a row with its tinted circle; tapping opens the edit sheet, where Delete now lives. Spec 48 §Categories.
 

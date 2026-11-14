@@ -1,6 +1,6 @@
 # 11: Bill proposals
 
-Spec: .claude/features/44-ai-assistant.md (Phase 4)
+Spec: .claude/features/archive/44-ai-assistant.md (Phase 4)
 
 **What to build:** "Remind me about rent, 15,000, on the 1st every month" gives a bill proposal card. Review opens the Add Bill sheet filled in as a **new** bill, with the name, amount, cadence, next due date and category. Save creates it. Editing an existing bill is unchanged.
 

@@ -1406,7 +1406,7 @@ India supports User Choice Billing as an alternative; Play Billing alone is simp
 
 > Source: mascot audit. Short answer: yes, it can be done purely in code. Use layered react-native-svg animated with Reanimated 4, with no new native dependency.
 
-Read-only audit, 2026-10-18. Sources: `.claude/features/IDEAS-koban-mascot-placement.md`, `05-koban-engagement.md`, `lib/koban.js`, `components/OnboardingMascot.js`, `components/StreakCelebration.js`, `components/TodayCard.js`, `app/streak.js`, `app/trophies.js`, `app/onboarding/**`, `assets/mascot/`, `assets/icon.png`, `assets/splash-icon.png`, `node_modules/expo/bundledNativeModules.json`, the npm registry, and the expo-animation skill.
+Read-only audit, 2026-10-18. Sources: `.claude/features/ideas/IDEAS-koban-mascot-placement.md`, `05-koban-engagement.md`, `lib/koban.js`, `components/OnboardingMascot.js`, `components/StreakCelebration.js`, `components/TodayCard.js`, `app/streak.js`, `app/trophies.js`, `app/onboarding/**`, `assets/mascot/`, `assets/icon.png`, `assets/splash-icon.png`, `node_modules/expo/bundledNativeModules.json`, the npm registry, and the expo-animation skill.
 
 ### 1. Current state
 

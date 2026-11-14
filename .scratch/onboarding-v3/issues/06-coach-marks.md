@@ -1,6 +1,6 @@
 # 06: Coach marks on first Home
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** A small reusable coach-mark overlay: a Koban character moment that points at one element with a short line and closes on tap. It's used twice, once each:
 - on the first Home after onboarding, it points at the **+** button;

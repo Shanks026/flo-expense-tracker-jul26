@@ -1,6 +1,6 @@
 # 01: Insights on the kit
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Insights reads as one answer first: "You spent ₹X" with a comparison under it, then a spending line chart with y-axis numbers, then where the money went. Every Insights feature stays (periods, accounts, CSV, budgets, biggest transaction, Pro gates). Spec 48 §Insights, §Activity link, §New kit pieces (`SpendChart`).
 

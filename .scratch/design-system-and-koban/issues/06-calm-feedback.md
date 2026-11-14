@@ -1,6 +1,6 @@
 # 06: Calm feedback
 
-Spec: .claude/features/37-design-system-and-koban.md
+Spec: .claude/features/archive/37-design-system-and-koban.md
 
 **What to build:** The app feels fast and responds to touch, without decorative motion.
 - Content no longer fades in on every load; it simply appears once ready. Entrance animation is kept only for first-time moments (onboarding, celebrations, coach marks).

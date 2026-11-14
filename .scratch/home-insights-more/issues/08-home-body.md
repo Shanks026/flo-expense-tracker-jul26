@@ -1,6 +1,6 @@
 # 08: Home body: Today strip, 7-day chart, recent rows, bills
 
-Spec: .claude/features/38-home-insights-more.md
+Spec: .claude/features/archive/38-home-insights-more.md
 
 **What to build:** Below the hero, Home shows in order:
 

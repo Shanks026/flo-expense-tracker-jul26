@@ -1,6 +1,6 @@
 # 10: Activity: search and filters
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** On the Activity tab you can find any entry with search and filter chips. It shows a one-line total, and each transfer appears as one row.
 

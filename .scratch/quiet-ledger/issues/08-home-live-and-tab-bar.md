@@ -1,6 +1,6 @@
 # 08: Home goes live, with the new tab bar
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** The real Home switches to the Quiet Ledger layout already tried out in the Home preview, and the tab bar is restyled to match.
 

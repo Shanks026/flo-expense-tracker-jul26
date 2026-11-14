@@ -1,6 +1,6 @@
 # 04: The full `expense_logged` event
 
-Spec: .claude/features/36-add-sheet-3-tap.md
+Spec: .claude/features/archive/36-add-sheet-3-tap.md
 
 **What to build:** Every new expense records `expense_logged` with all three props from spec 33:
 - `source`: `manual`, `share` or `onboarding`;

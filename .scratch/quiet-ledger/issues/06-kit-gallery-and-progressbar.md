@@ -1,6 +1,6 @@
 # 06: Kit gallery and ProgressBar
 
-Spec: .claude/features/46-quiet-ledger-foundations-and-core-loop.md
+Spec: .claude/features/archive/46-quiet-ledger-foundations-and-core-loop.md
 
 **What to build:** A Developer → Kit gallery screen that shows every ledger component in its states. This ticket also builds `ProgressBar`, which has no real screen using it until Budgets in Phase 4.
 

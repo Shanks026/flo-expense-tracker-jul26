@@ -1,6 +1,6 @@
 # 01: `streak_marks` table and a streak reader that reads both stores
 
-Spec: .claude/features/34-streak-only.md
+Spec: .claude/features/archive/34-streak-only.md
 
 **What to build:** Streak days get their own small store, separate from the economy's ledger, without losing any history.
 - A new `streak_marks` table: `user_id` (`DEFAULT auth.uid()`, cascade on user delete), `day` (local date), `kind` (`no_spend` | `freeze_earned` | `freeze_used`), `created_at`. `UNIQUE (user_id, kind, day)`, RLS on, owner-only.

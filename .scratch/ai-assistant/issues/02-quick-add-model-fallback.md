@@ -1,6 +1,6 @@
 # 02: The model handles what the parser can't
 
-Spec: .claude/features/44-ai-assistant.md ("Shared: the ai-assistant Edge Function", Phase 1)
+Spec: .claude/features/archive/44-ai-assistant.md ("Shared: the ai-assistant Edge Function", Phase 1)
 
 **What to build:** When the phone's parser isn't sure (a bare "swiggy 340", "2 chai 40", "paid ravi back 500"), the quick-add line shows a small spinner and asks the AI function. The sheet fills when it answers, using the same fields, and the person still taps Save. The function runs as the person under RLS, loads their own accounts and categories, and gets the local date, time and timezone from the app. It checks the model's reply (amount, ids, date range) and answers "couldn't read" rather than pass on a bad guess. A timeout, an error or a failed check leaves the sheet as it was. Every call is recorded with its model, tokens, cost and latency, and a daily cap stops runaway use. The key lives only in a function secret.
 

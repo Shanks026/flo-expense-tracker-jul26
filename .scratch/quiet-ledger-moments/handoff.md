@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-14, after tickets 01–11. Spec 49 is complete; nothing is queued.
 
-Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision in the spec 46–48 handoffs still holds (`.scratch/quiet-ledger/`, `.scratch/quiet-ledger-onboarding/`, `.scratch/quiet-ledger-money/`).
+Spec: `.claude/features/archive/49-quiet-ledger-moments-and-the-rest.md`. Every decision in the spec 46–48 handoffs still holds (`.scratch/quiet-ledger/`, `.scratch/quiet-ledger-onboarding/`, `.scratch/quiet-ledger-money/`).
 
 | Ticket | Blocked by | State | Commit |
 |---|---|---|---|

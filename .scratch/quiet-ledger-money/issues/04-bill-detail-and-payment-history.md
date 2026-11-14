@@ -1,6 +1,6 @@
 # 04: Bill detail and payment history
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Tapping a bill (on Bills or Home) opens a read-only bill detail with the amount, cadence, next due date and a timeline of payments; Mark paid is pinned and Edit is in the header. Payments are linked to their bill from now on. Spec 48 §Bill detail, §Database (the `bill_id` part).
 

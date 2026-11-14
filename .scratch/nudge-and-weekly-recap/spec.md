@@ -1,6 +1,6 @@
 # Notifications: one evening nudge and the weekly recap
 
-Spec: .claude/features/39-nudge-and-weekly-recap.md
+Spec: .claude/features/archive/39-nudge-and-weekly-recap.md
 
 Decisions made while ticketing (2026-11-03):
 - Settings (02) and the recap data and screen (05) don't depend on the server work, so they can start alongside 01.

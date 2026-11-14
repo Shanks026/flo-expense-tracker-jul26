@@ -1,6 +1,6 @@
 # 08: Past chats and quicker entry
 
-Spec: .claude/features/44-ai-assistant.md (§3.3)
+Spec: .claude/features/archive/44-ai-assistant.md (§3.3)
 
 **What to build:** A history screen lists past conversations, each titled from its first question. Any of them can be reopened, or deleted along with its messages. A sparkle in the Home header, beside the bell, opens the chat. The chat's composer gets the mic from ticket 04, so a question can be spoken. All of it is hidden when the AI flag is off.
 

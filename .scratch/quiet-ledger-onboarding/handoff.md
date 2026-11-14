@@ -3,7 +3,7 @@
 Last updated 2026-11-11: all ten tickets done; Phase 3 onboarding is built and checked end to end.
 
 Read this, then the ticket you're starting. The spec is
-`.claude/features/47-quiet-ledger-onboarding.md`; the design source is
+`.claude/features/archive/47-quiet-ledger-onboarding.md`; the design source is
 `docs/redesign-plan.md` §4 Onboarding. **Also read
 `.scratch/quiet-ledger/handoff.md`** ("Decisions made during spec 46" and
 "How the work is done"): the kit rules, the emulator recipe and the gotchas

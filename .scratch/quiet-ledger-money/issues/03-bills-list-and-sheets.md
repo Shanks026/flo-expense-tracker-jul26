@@ -1,6 +1,6 @@
 # 03: Bills list and the bill sheets on the kit
 
-Spec: .claude/features/48-quiet-ledger-money-screens.md
+Spec: .claude/features/archive/48-quiet-ledger-money-screens.md
 
 **What to build:** Bills grouped under Overdue, This week, Later and Paused, each a flat row with a small quiet Mark paid, and the pay and bill sheets in the standard `Sheet`. Spec 48 §Bills.
 

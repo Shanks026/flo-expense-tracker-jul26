@@ -1,6 +1,6 @@
 # 04: Question shell and "Where does your money live?"
 
-Spec: .claude/features/47-quiet-ledger-onboarding.md
+Spec: .claude/features/archive/47-quiet-ledger-onboarding.md
 
 **What to build:** The first set-up question and the shell all four share.
 

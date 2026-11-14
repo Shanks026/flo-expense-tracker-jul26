@@ -1,6 +1,6 @@
 # 01: Sign-up defaults on the server
 
-Spec: .claude/features/35-onboarding-v3.md
+Spec: .claude/features/archive/35-onboarding-v3.md
 
 **What to build:** A brand-new account is ready to use the moment it exists, without any onboarding screen writing setup data. Sign-up leaves it with:
 - the "Personal" account, in INR;
