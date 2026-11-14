@@ -9,7 +9,7 @@ import { formatAmountNumber, currencySymbol } from '../lib/currency';
 // dark=true variant, or a permanently-dark sheet) — those branches stay on
 // static colors matching that surface's own pinned darkness, not the active
 // theme. The light-mode branches (the default) follow the active theme, same
-// split as Button.js/Pill.js.
+// split as the old Button.js.
 //
 // `animate={true}` (opt-in, default off — every existing call site is
 // unchanged) counts the NUMBER up on mount and rolls it on any later value

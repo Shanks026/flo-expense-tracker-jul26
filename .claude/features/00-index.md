@@ -599,7 +599,7 @@ sees Analytics/Budgets/Plans as empty, this is why — not a bug.
   branch on `isTransfer(tx)` before assuming `type` is income/expense (icon,
   label, colour), and any hook feeding a category-colour chart still needs
   `color` in its select. Transfer legs carry `category_id`/`plan_id` NULL.
-- **`components/DonutChart.js` is shared** by Analytics' Categories tab and
+- **`components/DonutChart.js` was shared** (deleted in spec 49's cleanup, ticket 11) by Analytics' Categories tab and
   Plan Detail's "Where it went" card (added 2026-07-14, `09-plans-that-collect.md`
   Phase 3) — any change to it (gap size, corner style, center-label font)
   affects both screens at once. Any hook whose rows feed it must select the

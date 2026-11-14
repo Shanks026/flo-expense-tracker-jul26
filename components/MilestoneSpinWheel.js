@@ -23,7 +23,7 @@ import { colors, fontFamily, fontSize, spacing, radii } from '../theme/tokens';
 // is earned by reaching the milestone — this component has no "spin again"
 // or "buy a spin" path at all.
 //
-// Reuses the same thick-ring stroke-dasharray technique as DonutChart.js
+// Uses the thick-ring stroke-dasharray technique the old DonutChart used
 // (alternating colored arcs around a circle) rather than inventing SVG path
 // arc math — the ring is drawn once, then the whole ring+labels group is
 // wrapped in one Animated.View and spun via a single rotation shared value.

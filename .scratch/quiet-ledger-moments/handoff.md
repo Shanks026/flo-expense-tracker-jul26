@@ -1,6 +1,6 @@
 # Handoff: Quiet Ledger Phase 5 (Moments and the rest)
 
-**Last updated:** 2026-11-14, after tickets 01–10 and the Ask FLO bubble revert. Next session: ticket 11 (cleanup).
+**Last updated:** 2026-11-14, after tickets 01–11. Spec 49 is complete; nothing is queued.
 
 Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision in the spec 46–48 handoffs still holds (`.scratch/quiet-ledger/`, `.scratch/quiet-ledger-onboarding/`, `.scratch/quiet-ledger-money/`).
 
@@ -15,8 +15,8 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 | 07 Ask FLO chat and Past chats | — | done; bubble revert done (voice not checked) | `e6f931c`, `f2d54f9` |
 | 08 Cards (was Personalize) | — | done | `bc3a3ee` |
 | 09 You tab | 08 | done | `0c8e34d` |
-| 10 Pro and upsell (flag off) | — | done (checked with billing flipped on locally) | see git log |
-| 11 Cleanup | 01–10 | ready | |
+| 10 Pro and upsell (flag off) | — | done (checked with billing flipped on locally) | `440e276` |
+| 11 Cleanup | 01–10 | done (deleted files listed in the ticket) | see git log |
 
 **Suggested order:**
 1. ~~The Ask FLO bubble revert~~ done (`f2d54f9`: radius 20, bottom-right 8).

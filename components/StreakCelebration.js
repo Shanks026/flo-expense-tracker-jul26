@@ -9,7 +9,7 @@ import useStreak from '../hooks/useStreak';
 import { useAuth } from '../lib/AuthContext';
 import { enqueue, PRIORITY } from '../lib/momentQueue';
 import { track } from '../lib/track';
-import { pickRecap } from '../lib/koban';
+import { pickMilestoneLine } from '../lib/koban';
 import { celebrationFor } from '../lib/celebrations';
 import { MILESTONES } from '../lib/streak';
 import { successHaptic } from '../lib/haptics';
@@ -64,7 +64,7 @@ export function StreakCelebrationMoment({ payload, onDone }) {
   // A day-one moment saved by an older build may still be in the queue:
   // give the takeover back rather than celebrate it.
   const isMilestone = MILESTONES.includes(current);
-  const line = useMemo(() => pickRecap({ streak: current, isMilestone: true }).body, [current]);
+  const line = useMemo(() => pickMilestoneLine({ streak: current }).body, [current]);
 
   useEffect(() => {
     if (!isMilestone) {

@@ -14,8 +14,9 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
-// Inter backs the Quiet Ledger redesign (theme/ledger.js); Manrope stays for
-// screens not yet rebuilt.
+// Inter backs the Quiet Ledger redesign (theme/ledger.js). Manrope stays
+// while theme/tokens.js uses it: the economy screens (left as they are,
+// 2026-11-14) and the few old-token screens not yet rebuilt.
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { AuthProvider, useAuth } from '../lib/AuthContext';
 import { ThemeProvider, useTheme, MODE_PREFERENCES, DEFAULT_MODE_PREFERENCE } from '../theme/ThemeContext';
