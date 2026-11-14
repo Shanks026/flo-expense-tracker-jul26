@@ -523,7 +523,10 @@ function makeStyles(c) {
     userBubble: {
       maxWidth: '85%',
       backgroundColor: c.ink,
+      // Rounded, with a tighter tail corner on the sending side, like the
+      // pre-redesign bubble (person, 2026-11-14; supersedes fully rounded).
       borderRadius: ledgerRadius.card,
+      borderBottomRightRadius: 8,
       paddingHorizontal: ledgerSpace.lg,
       paddingVertical: ledgerSpace.md,
     },
