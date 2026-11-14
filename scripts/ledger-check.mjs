@@ -21,7 +21,7 @@ import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } fr
 import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
 import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from '../lib/insights.js';
 import { budgetRowStatus } from '../lib/budgetRow.js';
-import { groupBills, billLine, billTerms } from '../lib/billGroups.js';
+import { groupBills, billLine, billTerms, dueWording } from '../lib/billGroups.js';
 import { billTimeline } from '../lib/billTimeline.js';
 import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.js';
 import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/accountLast4.js';
@@ -609,6 +609,10 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('bills', 'terms: due', billTerms(bill('A', '2026-12-07'), today), { text: 'Monthly · Next due 7 Dec', tone: null });
   check('bills', 'terms: overdue', billTerms(bill('A', '2026-11-07'), today), { text: 'Monthly · Next due 7 Nov', tone: 'danger' });
   check('bills', 'terms: paused', billTerms(bill('A', '2026-11-07', { is_active: false }), today), { text: 'Monthly · Paused', tone: 'muted' });
+  check('bills', 'due wording: a later date', dueWording('2026-11-14', today), { text: 'Due 14 Nov', tone: null });
+  check('bills', 'due wording: today', dueWording('2026-11-12', today), { text: 'Due today', tone: null });
+  check('bills', 'due wording: overdue', dueWording('2026-11-07', today), { text: 'Overdue since 7 Nov', tone: 'danger' });
+  check('bills', 'due wording: next year', dueWording('2027-01-05', today).text, 'Due 5 Jan 2027');
   check('bills', 'line: next year shows the year', billLine(bill('A', '2027-01-05', { cadence: 'yearly' }), today).sub, 'Yearly · Due 5 Jan 2027');
 }
 

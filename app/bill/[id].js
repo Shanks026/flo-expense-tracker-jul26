@@ -7,6 +7,7 @@ import SectionHeader from '../../components/ledger/SectionHeader';
 import AmountText from '../../components/ledger/AmountText';
 import Timeline from '../../components/ledger/Timeline';
 import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../../components/ledger/PinnedFooter';
+import Callout from '../../components/ledger/Callout';
 import { toneColors } from '../../components/ledger/ListRow';
 import CategoryIcon from '../../components/CategoryIcon';
 import { billIconKey } from '../../lib/billIcons';
@@ -14,28 +15,30 @@ import { useLedger, ledgerType, ledgerSpace, ledgerRadius, ledgerSize } from '..
 import useBillDetail from '../../hooks/useBillDetail';
 import { useAddBillSheet } from '../../components/AddBillSheet';
 import { usePayBillSheet } from '../../components/PayBillSheet';
-import { billLine, billTerms } from '../../lib/billGroups';
+import { billTerms } from '../../lib/billGroups';
 import { billTimeline } from '../../lib/billTimeline';
 
 // A bill, read first (spec 48, ticket 04): a sunk band with its icon, the
 // amount, and "Monthly · Due 12 Dec", then the payment timeline (next due,
 // each linked payment opening its entry, "Last paid" from before payment
 // history, "Added"). Mark paid is pinned; Edit is the pencil. A paused bill
-// has no Mark paid.
+// has no Mark paid. A failed load offers Retry instead of leaving
+// (spec 49, ticket 02): only a bill that's really gone sends the screen back.
 export default function BillDetail() {
   const { c, modeId } = useLedger();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { scrollY, onScroll } = useHeaderScroll();
-  const { bill, payments, loading } = useBillDetail(id);
+  const { bill, payments, loading, error, missing, refetch } = useBillDetail(id);
   const { openAddBill } = useAddBillSheet();
   const { openPayBill } = usePayBillSheet();
 
-  // Deleting the bill from its sheet leaves this screen on a dead id: go back.
+  // Deleting the bill from its sheet leaves this screen on a dead id, and a
+  // link may carry no id at all: go back. A failed read stays (Retry below).
   useEffect(() => {
-    if (!loading && !bill) router.back();
-  }, [loading, bill]);
+    if (missing) router.back();
+  }, [missing]);
 
   const steps = useMemo(
     () =>
@@ -44,6 +47,17 @@ export default function BillDetail() {
         : [],
     [bill, payments]
   );
+
+  if (error) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader />
+        <View style={styles.scroll}>
+          <Callout tone="danger" text="Couldn't load this bill" actionLabel="Retry" onAction={refetch} style={styles.error} />
+        </View>
+      </View>
+    );
+  }
 
   if (loading || !bill) {
     return (
@@ -57,7 +71,7 @@ export default function BillDetail() {
   }
 
   const terms = billTerms(bill);
-  const overdue = billLine(bill).tone === 'danger';
+  const overdue = terms.tone === 'danger';
   // Canvas unless there's a colour to wash: a sunk circle would vanish on the band.
   const tint = overdue ? toneColors(c.danger, c, modeId) : bill.category?.color ? toneColors(bill.category.color, c, modeId) : { bg: c.canvas, fg: c.ink };
 
@@ -131,6 +145,9 @@ function makeStyles(c) {
     line: {
       ...ledgerType.body,
       color: c.muted,
+    },
+    error: {
+      marginTop: ledgerSpace.md,
     },
     section: {
       marginTop: ledgerSpace.section,
