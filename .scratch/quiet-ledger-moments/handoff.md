@@ -19,3 +19,5 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 **Decided while planning (2026-11-14):** the same two test seams (the check script plus an emulator check per ticket); the economy screens are left as they are, and the cleanup keeps the old tokens, theme context and Manrope while they import them. No migration in this phase.
 
 **Suggested order:** 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, then 11.
+
+**Decided 2026-11-14 (ticket 01):** the celebration's seven-day row runs oldest → today, like the Streak calendar (the person kept it).
