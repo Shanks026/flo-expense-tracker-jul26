@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, Animated, Pressable, RefreshControl, StyleSheet } from 'react-native';
-import { Check } from 'lucide-react-native';
+import { View, Text, Animated, RefreshControl, StyleSheet } from 'react-native';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
 import SectionHeader from '../components/ledger/SectionHeader';
-import ListRow, { toneColors } from '../components/ledger/ListRow';
+import ListRow from '../components/ledger/ListRow';
+import BillPaidButton from '../components/BillPaidButton';
 import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
 import EmptyState from '../components/ledger/EmptyState';
 import CategoryIcon from '../components/CategoryIcon';
@@ -23,7 +23,7 @@ import { track } from '../lib/track';
 // "Monthly · Due 12 Nov", the amount and a round green check (Mark paid). A tap
 // opens the bill's detail (ticket 04). New bill is pinned.
 export default function Bills() {
-  const { c, modeId } = useLedger();
+  const { c } = useLedger();
   const styles = useMemo(() => makeStyles(c), [c]);
   // Which secondary features earn their place (38-home-insights-more.md).
   useEffect(() => {
@@ -38,9 +38,6 @@ export default function Bills() {
 
   const groups = useMemo(() => groupBills(bills), [bills]);
   const subColor = { danger: c.danger, muted: c.muted };
-  // Mark paid is a round check on a soft wash of the "paid" green (the
-  // person's call, 2026-11-12), lighter than a text button on every row.
-  const paidTint = toneColors(c.positive, c, modeId);
 
   return (
     <View style={styles.screen}>
@@ -87,19 +84,7 @@ export default function Bills() {
                         {amountParts(bill.amount, { currency: bill.currency }).text}
                       </Text>
                     }
-                    trailing={
-                      bill.is_active ? (
-                        <Pressable
-                          onPress={() => openPayBill(bill)}
-                          hitSlop={4}
-                          style={({ pressed }) => [styles.paid, { backgroundColor: paidTint.bg }, pressed && styles.pressed]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Mark ${bill.name} paid`}
-                        >
-                          <Check size={20} color={paidTint.fg} strokeWidth={2.25} />
-                        </Pressable>
-                      ) : undefined
-                    }
+                    trailing={bill.is_active ? <BillPaidButton billName={bill.name} onPress={() => openPayBill(bill)} /> : undefined}
                     onPress={() => router.push(`/bill/${bill.id}`)}
                     divider={i < g.items.length - 1}
                   />
@@ -136,18 +121,6 @@ function makeStyles(c) {
       fontFamily: inter.semibold,
       fontVariant: ['tabular-nums'],
       color: c.ink,
-    },
-    // 40 dp, with hitSlop bringing the target to 48.
-    paid: {
-      width: 40,
-      height: 40,
-      borderRadius: ledgerRadius.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: ledgerSpace.md,
-    },
-    pressed: {
-      opacity: 0.7,
     },
     rowSkeleton: {
       height: 64,

@@ -21,7 +21,7 @@ import { resetPeriodStart, resetPeriodPhrase, periodFromProfile, ordinalDay } fr
 import { passwordRules, passwordPasses, looksLikeEmail, PASSWORD_MIN, authErrorLine } from '../lib/authRules.js';
 import { spendHeadline, spendAxis, axisLabel, categoryChange, priorRange } from '../lib/insights.js';
 import { budgetRowStatus } from '../lib/budgetRow.js';
-import { groupBills, billLine, billTerms, dueWording } from '../lib/billGroups.js';
+import { groupBills, billLine, billTerms, dueWording, dueBillsMoment } from '../lib/billGroups.js';
 import { billTimeline } from '../lib/billTimeline.js';
 import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.js';
 import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/accountLast4.js';
@@ -613,6 +613,13 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('bills', 'due wording: today', dueWording('2026-11-12', today), { text: 'Due today', tone: null });
   check('bills', 'due wording: overdue', dueWording('2026-11-07', today), { text: 'Overdue since 7 Nov', tone: 'danger' });
   check('bills', 'due wording: next year', dueWording('2027-01-05', today).text, 'Due 5 Jan 2027');
+  const due = (bills) => { const m = dueBillsMoment(bills, today); return m && [m.title, m.bills.map((b) => b.name)]; };
+  check('bills due', 'nothing due is no moment', due([bill('A', '2026-11-13')]), null);
+  check('bills due', 'one bill due today', due([bill('Jio', '2026-11-12'), bill('Rent', '2026-12-01')]), ['1 bill needs you', ['Jio']]);
+  check('bills due', 'overdue first, then due today', due([bill('Jio', '2026-11-12'), bill('Netflix', '2026-11-07')]), ['2 bills need you', ['Netflix', 'Jio']]);
+  check('bills due', 'a paused overdue bill is left out', due([bill('Gym', '2026-11-01', { is_active: false }), bill('Jio', '2026-11-12')]), ['1 bill needs you', ['Jio']]);
+  check('bills due', 'same day sorts by name', due([bill('Jio', '2026-11-12'), bill('Airtel', '2026-11-12')]), ['2 bills need you', ['Airtel', 'Jio']]);
+  check('bills due', 'no bills', dueBillsMoment([], today), null);
   check('bills', 'line: next year shows the year', billLine(bill('A', '2027-01-05', { cadence: 'yearly' }), today).sub, 'Yearly · Due 5 Jan 2027');
 }
 

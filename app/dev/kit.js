@@ -23,6 +23,7 @@ import OverflowMenu from '../../components/ledger/OverflowMenu';
 import AvatarStack from '../../components/ledger/AvatarStack';
 import StreakMark from '../../components/ledger/StreakMark';
 import { StreakCelebrationMoment } from '../../components/StreakCelebration';
+import { DueBillsMoment } from '../../components/DueBillsModal';
 import PageDots from '../../components/ledger/PageDots';
 import SpendChart from '../../components/ledger/SpendChart';
 import { useLedger, ledgerType, ledgerSpace } from '../../theme/ledger';
@@ -76,6 +77,7 @@ function KitGallery() {
   const [monthDay, setMonthDay] = useState(25);
   const [iconKey, setIconKey] = useState('entertainment');
   const [celebrating, setCelebrating] = useState(false);
+  const [billsDue, setBillsDue] = useState(false);
 
   return (
     <View style={styles.screen}>
@@ -227,6 +229,13 @@ function KitGallery() {
         <Section title="Milestone celebration">
           <Button title="Show the 7-day celebration" variant="secondary" onPress={() => setCelebrating(true)} />
           {celebrating && <StreakCelebrationMoment payload={PREVIEW_CELEBRATION} onDone={() => setCelebrating(false)} />}
+        </Section>
+
+        {/* The bills-due sheet over the account's real bills, without the
+            moment queue (spec 49, ticket 03). Shows nothing when none are due. */}
+        <Section title="Bills-due sheet">
+          <Button title="Show the bills-due sheet" variant="secondary" onPress={() => setBillsDue(true)} />
+          {billsDue && <DueBillsMoment onDone={() => setBillsDue(false)} />}
         </Section>
 
         <Section title="IconPicker">
