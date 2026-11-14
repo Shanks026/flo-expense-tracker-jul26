@@ -1,14 +1,13 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { fontFamily, spacing, type } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, inter } from '../theme/ledger';
 
 // The small slice of markdown Ask FLO's answers may use (44-ai-assistant.md,
 // "Rich answers"): **bold**, "- " bullets, "1. " numbered lists and a short
 // "#" heading. FLO's own, no library. Everything else is shown as plain
 // words, never raw symbols: links keep their text, `code` loses its ticks,
 // and a table the model wrote anyway becomes "a · b · c" lines (real tables
-// are drawn from tool results by BreakdownTable).
+// are drawn from tool results by AnswerBreakdown).
 
 // text → [{ kind: 'heading' | 'para' | 'bullet' | 'number', text, n? }]
 export function parseRichText(text) {
@@ -74,8 +73,8 @@ export function parseInline(text) {
 }
 
 export default function RichText({ text, style }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const blocks = useMemo(() => parseRichText(text), [text]);
 
   const inline = (t) =>
@@ -113,46 +112,36 @@ export default function RichText({ text, style }) {
   );
 }
 
-function makeStyles(colors) {
+// Ledger type (spec 49, ticket 07): body 14/20, bold at 600, a heading at the
+// section size.
+function makeStyles(c) {
+  const bodyText = { ...ledgerType.body, color: c.ink };
   return StyleSheet.create({
     wrap: {
-      gap: spacing.sm,
+      gap: ledgerSpace.sm,
     },
-    body: bodyText(colors),
+    body: bodyText,
     bold: {
-      fontFamily: fontFamily.bold,
-      color: colors.ink,
+      fontFamily: inter.semibold,
+      color: c.ink,
     },
     heading: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: type.bodyLg,
-      lineHeight: 22,
-      color: colors.ink,
+      ...ledgerType.section,
+      color: c.ink,
     },
     item: {
       flexDirection: 'row',
-      gap: spacing.sm,
-      paddingLeft: spacing.xs,
+      gap: ledgerSpace.sm,
+      paddingLeft: ledgerSpace.xs,
     },
     marker: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: type.body,
-      lineHeight: 21,
-      color: colors.muted,
+      ...ledgerType.body,
+      color: c.muted,
       minWidth: 14,
     },
     itemText: {
-      ...bodyText(colors),
+      ...bodyText,
       flex: 1,
     },
   });
-}
-
-function bodyText(colors) {
-  return {
-    fontFamily: fontFamily.semibold,
-    fontSize: type.body,
-    lineHeight: 21,
-    color: colors.ink,
-  };
 }

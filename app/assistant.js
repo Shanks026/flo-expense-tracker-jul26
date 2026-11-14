@@ -24,20 +24,20 @@ import Animated, {
   Easing,
   useReducedMotion,
 } from 'react-native-reanimated';
-import { Redirect, Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUp, History, Mic, SquarePen } from 'lucide-react-native';
 import ArrowMark from '../components/ArrowMark';
-import Card from '../components/Card';
-import EmptyState from '../components/EmptyState';
+import ScreenHeader from '../components/ledger/ScreenHeader';
+import EmptyState from '../components/ledger/EmptyState';
+import Chip from '../components/ledger/Chip';
 import ShimmerText from '../components/ShimmerText';
 import RichText from '../components/RichText';
-import BreakdownTable, { breakdownsFrom } from '../components/BreakdownTable';
+import AnswerBreakdown, { breakdownsFrom } from '../components/AnswerBreakdown';
 import ProposalCard from '../components/ProposalCard';
-import { fontFamily, spacing, radii, radius, type, hitTarget } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius, inter } from '../theme/ledger';
 import useAssistantConversation from '../hooks/useAssistantConversation';
+import useCategories from '../hooks/useCategories';
 import { useAccount } from '../lib/AccountContext';
 import { aiChat } from '../lib/ai';
 import { FLAGS } from '../lib/flags';
@@ -81,21 +81,27 @@ const SHIFT = LinearTransition.springify().damping(20).stiffness(180);
 // (app/assistant/history.js); `at` makes a repeat pick land. The mic in the
 // composer works like the quick-add mic: hold, speak, let go, and the words
 // are sent as if typed.
+//
+// On the ledger kit since spec 49, ticket 07: the kit header with Past chats
+// and New chat, the person's questions as ink bubbles, outlined starter
+// chips, breakdowns as flat rows, and a sunk capsule composer.
 export default function Assistant() {
   if (!FLAGS.ai) return <Redirect href="/more" />;
   return <AssistantChat />;
 }
 
 function AssistantChat() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const headerHeight = useHeaderHeight();
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { activeAccountId } = useAccount();
   const [conversationId, setConversationId] = useState(params.id || null);
   const { messages, loading, loadedId, refetch } = useAssistantConversation(conversationId);
+  // Once for the whole chat: breakdown rows find their category's circle here.
+  const { categories } = useCategories();
+  const categoriesByName = useMemo(() => new Map(categories.map((cat) => [cat.name, cat])), [categories]);
   const [list, setList] = useState([]);
   const [text, setText] = useState('');
   const [pending, setPending] = useState(null); // { key, text } of the question being answered
@@ -257,25 +263,13 @@ function AssistantChat() {
       // KeyboardAvoidingView's 'height' mode overshot there and stuck after
       // the keyboard closed.
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={headerHeight}
     >
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <View style={styles.headerButtons}>
-              {list.length > 0 ? (
-                <HeaderButton icon={SquarePen} label="New chat" onPress={() => openChat(null)} colors={colors} styles={styles} />
-              ) : null}
-              <HeaderButton
-                icon={History}
-                label="Past chats"
-                onPress={() => router.push('/assistant/history')}
-                colors={colors}
-                styles={styles}
-              />
-            </View>
-          ),
-        }}
+      <ScreenHeader
+        title="Ask FLO"
+        actions={[
+          { icon: History, onPress: () => router.push('/assistant/history'), accessibilityLabel: 'Past chats' },
+          { icon: SquarePen, onPress: () => openChat(null), accessibilityLabel: 'New chat' },
+        ]}
       />
       <ScrollView
         ref={scrollRef}
@@ -287,21 +281,13 @@ function AssistantChat() {
         {showEmpty ? (
           <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(150)}>
             <EmptyState
-              pose="report"
+              illustration="spark"
               title="Ask about your money"
               body="Try “How much did I spend on food this month?”"
             />
             <View style={styles.chips}>
               {STARTERS.map((s) => (
-                <Pressable
-                  key={s.label}
-                  style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
-                  onPress={() => send(s.question)}
-                  accessibilityRole="button"
-                  accessibilityHint={s.question}
-                >
-                  <Text style={styles.chipText}>{s.label}</Text>
-                </Pressable>
+                <Chip key={s.label} label={s.label} onPress={() => send(s.question)} accessibilityHint={s.question} />
               ))}
             </View>
           </Animated.View>
@@ -318,7 +304,7 @@ function AssistantChat() {
             : []),
         ].map((m) => {
           if (m.role === 'user') return <UserBubble key={m.key} text={m.content} styles={styles} />;
-          if (m.role === 'thinking') return <Thinking key={m.key} colors={colors} styles={styles} />;
+          if (m.role === 'thinking') return <Thinking key={m.key} c={c} styles={styles} />;
           return (
             <Answer
               key={m.key}
@@ -328,6 +314,7 @@ function AssistantChat() {
               proposal={m.proposal}
               reveal={m.id === freshReplyId}
               onRevealed={() => setFreshReplyId(null)}
+              categoriesByName={categoriesByName}
               styles={styles}
             />
           );
@@ -339,13 +326,15 @@ function AssistantChat() {
         ) : null}
       </ScrollView>
 
-      <View style={[styles.composer, { paddingBottom: keyboardHeight ? spacing.md : Math.max(insets.bottom, spacing.md) }]}>
+      <View style={[styles.composer, { paddingBottom: keyboardHeight ? ledgerSpace.md : Math.max(insets.bottom, ledgerSpace.md) }]}>
         <TextInput
           style={styles.input}
           value={text}
           onChangeText={setText}
           placeholder={listening ? 'Listening…' : 'Ask about your spending'}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={c.muted}
+          cursorColor={c.ink}
+          selectionColor={c.accent}
           multiline
           maxLength={MAX_MESSAGE}
           editable={!pending && !listening}
@@ -360,22 +349,14 @@ function AssistantChat() {
             accessibilityLabel={listening ? 'Listening. Let go to send' : 'Hold to speak'}
           >
             <View style={[styles.send, listening ? styles.micListening : styles.mic]}>
-              <Mic size={20} color={listening ? colors.brandText : colors.ink} strokeWidth={2.4} />
+              <Mic size={20} color={listening ? c.inkOnInk : c.ink} strokeWidth={1.75} />
             </View>
           </Pressable>
         ) : (
-          <SendButton enabled={canSend} onPress={() => send()} colors={colors} styles={styles} />
+          <SendButton enabled={canSend} onPress={() => send()} c={c} styles={styles} />
         )}
       </View>
     </KeyboardAvoidingView>
-  );
-}
-
-function HeaderButton({ icon: Icon, label, onPress, colors, styles }) {
-  return (
-    <Pressable onPress={onPress} style={styles.headerButton} hitSlop={4} accessibilityRole="button" accessibilityLabel={label}>
-      <Icon size={20} color={colors.ink} strokeWidth={2} />
-    </Pressable>
   );
 }
 
@@ -396,7 +377,7 @@ function UserBubble({ text, styles }) {
 // reduce-motion show the whole text. Stopping the reveal for any reason (a
 // new answer arriving, reduce-motion turning on) shows it whole at once.
 // A draft (phase 4) shows as a ProposalCard under the words, once they're out.
-function Answer({ id, text, toolCalls, proposal, reveal, onRevealed, styles }) {
+function Answer({ id, text, toolCalls, proposal, reveal, onRevealed, categoriesByName, styles }) {
   const reduce = useReducedMotion();
   const words = useMemo(() => text.split(/(\s+)/), [text]);
   const tables = useMemo(() => breakdownsFrom(toolCalls), [toolCalls]);
@@ -435,9 +416,7 @@ function Answer({ id, text, toolCalls, proposal, reveal, onRevealed, styles }) {
       {done
         ? tables.map((t, i) => (
             <Animated.View key={i} entering={animate ? FadeIn.duration(260) : undefined}>
-              <Card style={styles.tableCard}>
-                <BreakdownTable table={t} />
-              </Card>
+              <AnswerBreakdown table={t} categoriesByName={categoriesByName} />
             </Animated.View>
           ))
         : null}
@@ -453,7 +432,7 @@ function Answer({ id, text, toolCalls, proposal, reveal, onRevealed, styles }) {
 // The answer-to-be: FLO's arrow mark, still, beside a shimmering line that
 // steps through THINKING_STEPS while the turn runs. The shimmer is the only
 // motion (the person's call, 2026-11-09: no bouncing AI icon).
-function Thinking({ colors, styles }) {
+function Thinking({ c, styles }) {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -474,22 +453,22 @@ function Thinking({ colors, styles }) {
       accessibilityLiveRegion="polite"
       accessibilityLabel={label}
     >
-      <ArrowMark size={18} color={colors.ink} />
+      <ArrowMark size={18} color={c.ink} />
       <Animated.View key={step} entering={FadeIn.duration(220)} exiting={FadeOut.duration(120)}>
         <ShimmerText
           text={label}
           style={styles.thinkingText}
-          baseColor={colors.muted}
-          highlightColor={colors.ink}
+          baseColor={c.muted}
+          highlightColor={c.ink}
         />
       </Animated.View>
     </Animated.View>
   );
 }
 
-// Send: springs down under the finger, and fades between its on and off
-// colours as the composer fills or empties.
-function SendButton({ enabled, onPress, colors, styles }) {
+// Send: a 40 dp ink circle that springs down under the finger, and fades to
+// the flat sunk state while there's nothing to send.
+function SendButton({ enabled, onPress, c, styles }) {
   const press = useSharedValue(1);
   const on = useSharedValue(enabled ? 1 : 0);
 
@@ -499,7 +478,7 @@ function SendButton({ enabled, onPress, colors, styles }) {
 
   const animated = useAnimatedStyle(() => ({
     transform: [{ scale: press.value }],
-    backgroundColor: interpolateColor(on.value, [0, 1], [colors.chipBg, colors.brand]),
+    backgroundColor: interpolateColor(on.value, [0, 1], [c.surfaceSunk, c.ink]),
   }));
 
   return (
@@ -518,131 +497,99 @@ function SendButton({ enabled, onPress, colors, styles }) {
       hitSlop={8}
     >
       <Animated.View style={[styles.send, animated]}>
-        <ArrowUp size={20} color={enabled ? colors.brandText : colors.muted} strokeWidth={2.6} />
+        <ArrowUp size={20} color={enabled ? c.inkOnInk : c.muted} strokeWidth={2} />
       </Animated.View>
     </Pressable>
   );
 }
 
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
     flex: {
       flex: 1,
-      backgroundColor: colors.bg,
+      backgroundColor: c.canvas,
     },
     list: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.lg,
-      gap: spacing.md,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.md,
+      paddingBottom: ledgerSpace.lg,
+      gap: ledgerSpace.md,
     },
     userRow: {
       alignItems: 'flex-end',
     },
+    // The person's questions: ink, the app's primary, not the accent, fully
+    // rounded (the person's call, 2026-11-14).
     userBubble: {
       maxWidth: '85%',
-      backgroundColor: colors.brand,
-      borderRadius: radii.button,
-      borderBottomRightRadius: radius.sm,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
+      backgroundColor: c.ink,
+      borderRadius: ledgerRadius.card,
+      paddingHorizontal: ledgerSpace.lg,
+      paddingVertical: ledgerSpace.md,
     },
     userText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      lineHeight: 20,
-      color: colors.brandText,
+      ...ledgerType.body,
+      color: c.inkOnInk,
     },
     // Answers sit on the page, full width, with no bubble, as in other AI
-    // chats; only the person's questions are bubbles. A little side room
-    // lines the text up with the bubbles' own text.
+    // chats; only the person's questions are bubbles.
     answer: {
-      paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.xs,
+      paddingVertical: ledgerSpace.xs,
     },
     chips: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'center',
-      gap: spacing.sm,
-      marginTop: spacing.lg,
-    },
-    chip: {
-      backgroundColor: colors.surface,
-      borderRadius: radii.pill,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-    },
-    chipPressed: {
-      backgroundColor: colors.chipBg,
-    },
-    chipText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      color: colors.ink,
-    },
-    tableCard: {
-      marginTop: spacing.md,
-      paddingVertical: spacing.sm,
+      gap: ledgerSpace.sm,
+      marginTop: ledgerSpace.lg,
     },
     thinking: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.sm,
+      gap: ledgerSpace.sm,
+      paddingVertical: ledgerSpace.sm,
     },
     thinkingText: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
+      ...ledgerType.body,
+      fontFamily: inter.medium,
     },
     failure: {
-      fontFamily: fontFamily.semibold,
-      fontSize: type.caption,
-      color: colors.danger,
+      ...ledgerType.caption,
+      color: c.danger,
       textAlign: 'center',
     },
     composer: {
       flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.sm,
-      backgroundColor: colors.bg,
+      gap: ledgerSpace.sm,
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingTop: ledgerSpace.sm,
+      backgroundColor: c.canvas,
     },
+    // A sunk capsule, like the Add sheet's quick-add line.
     input: {
       flex: 1,
       minHeight: 44,
       maxHeight: 120,
-      backgroundColor: colors.surface,
-      borderRadius: radii.button,
-      paddingHorizontal: spacing.lg,
+      backgroundColor: c.surfaceSunk,
+      borderRadius: ledgerRadius.field,
+      paddingHorizontal: ledgerSpace.lg,
       paddingTop: 12,
       paddingBottom: 12,
-      fontFamily: fontFamily.semibold,
-      fontSize: type.body,
-      color: colors.ink,
+      ...ledgerType.body,
+      color: c.ink,
     },
     mic: {
-      backgroundColor: colors.chipBg,
+      backgroundColor: c.surfaceSunk,
     },
     micListening: {
-      backgroundColor: colors.brand,
-    },
-    headerButtons: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    headerButton: {
-      width: hitTarget,
-      height: hitTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: c.ink,
     },
     send: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 40,
+      height: 40,
+      marginBottom: 2,
+      borderRadius: ledgerRadius.full,
       alignItems: 'center',
       justifyContent: 'center',
     },

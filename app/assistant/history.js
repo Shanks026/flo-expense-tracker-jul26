@@ -1,33 +1,50 @@
 import { useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageSquare, SquarePen, Trash2 } from 'lucide-react-native';
-import { format, isThisYear } from 'date-fns';
-import Row, { RowGroup } from '../../components/Row';
-import EmptyState from '../../components/EmptyState';
-import { spacing, hitTarget } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
+import { SquarePen, Trash2 } from 'lucide-react-native';
+import { format } from 'date-fns';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../../components/ledger/ScreenHeader';
+import SectionHeader from '../../components/ledger/SectionHeader';
+import ListRow from '../../components/ledger/ListRow';
+import OverflowMenu from '../../components/ledger/OverflowMenu';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../../theme/ledger';
 import useAssistantConversations from '../../hooks/useAssistantConversations';
 import { useDataRefresh } from '../../lib/DataRefreshContext';
 import { deleteConversation } from '../../lib/ai';
+import { dateGroupKey, dateGroupLabel } from '../../lib/dateLabels';
 import { FLAGS } from '../../lib/flags';
 
-// Past chats (44-ai-assistant.md §3.3, ticket 08): every Ask FLO conversation,
-// newest first, titled from its first question. A tap reopens it in the chat;
-// the bin deletes it with its messages.
+// Past chats (44-ai-assistant.md §3.3, ticket 08; on the ledger kit since
+// spec 49, ticket 07): New chat first, then every Ask FLO conversation,
+// newest first, grouped by day (Today, Yesterday, Sat 7 Nov) and titled from
+// its first question. A tap reopens it in the chat; Delete is in each row's
+// ⋯ menu.
 export default function AssistantHistory() {
   if (!FLAGS.ai) return <Redirect href="/more" />;
   return <History />;
 }
 
 function History() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { scrollY, onScroll } = useHeaderScroll();
   const { conversations, loading, removeLocal } = useAssistantConversations();
   const { notifyChanged } = useDataRefresh();
+
+  // Day groups, in the newest-first order the hook already gives.
+  const groups = useMemo(() => {
+    const out = [];
+    for (const conv of conversations) {
+      const key = dateGroupKey(conv.created_at);
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.items.push(conv);
+      else out.push({ key, label: dateGroupLabel(conv.created_at), items: [conv] });
+    }
+    return out;
+  }, [conversations]);
 
   // Back to the chat screen beneath (or onto it, if Past chats was opened on
   // its own), showing this conversation. `at` makes a repeat pick of the same
@@ -56,69 +73,76 @@ function History() {
   }
 
   return (
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <RowGroup>
-        <Row icon={SquarePen} title="New chat" onPress={() => open(null)} chevron={false} />
-      </RowGroup>
+    <View style={styles.screen}>
+      <ScreenHeader title="Past chats" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + ledgerSpace.section }]}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <LargeTitle title="Past chats" scrollY={scrollY} />
 
-      {!loading && conversations.length === 0 ? (
-        <EmptyState pose="report" title="No past chats" body="Questions you ask FLO show up here." style={styles.empty} />
-      ) : (
-        <RowGroup title="Past chats">
-          {conversations.map((c) => (
-            <Row
-              key={c.id}
-              icon={MessageSquare}
-              title={c.title || 'Untitled chat'}
-              hint={formatDay(c.created_at)}
-              onPress={() => open(c.id)}
-              chevron={false}
-              right={
-                <Pressable
-                  onPress={() => confirmDelete(c)}
-                  style={styles.delete}
-                  hitSlop={4}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete ${c.title || 'chat'}`}
-                >
-                  <Trash2 size={18} color={colors.muted} strokeWidth={2} />
-                </Pressable>
-              }
-            />
-          ))}
-        </RowGroup>
-      )}
-    </ScrollView>
+        <ListRow icon={SquarePen} title="New chat" onPress={() => open(null)} divider={false} />
+
+        {loading ? (
+          [0, 1, 2].map((i) => <View key={i} style={styles.rowSkeleton} />)
+        ) : conversations.length === 0 ? (
+          <Text style={styles.none}>Your chats will show up here.</Text>
+        ) : (
+          groups.map((g) => (
+            <View key={g.key} style={styles.group}>
+              <SectionHeader title={g.label} />
+              {g.items.map((conv, i) => (
+                <ListRow
+                  key={conv.id}
+                  title={conv.title || 'Untitled chat'}
+                  sub={format(new Date(conv.created_at), 'h:mm a')}
+                  onPress={() => open(conv.id)}
+                  trailing={
+                    <OverflowMenu
+                      title={conv.title || 'Untitled chat'}
+                      accessibilityLabel={`More for ${conv.title || 'this chat'}`}
+                      actions={[{ key: 'delete', title: 'Delete chat', icon: Trash2, danger: true, onPress: () => confirmDelete(conv) }]}
+                    />
+                  }
+                  divider={i < g.items.length - 1}
+                />
+              ))}
+            </View>
+          ))
+        )}
+      </Animated.ScrollView>
+    </View>
   );
 }
 
-function formatDay(iso) {
-  const d = new Date(iso);
-  return format(d, isThisYear(d) ? 'd MMM, h:mm a' : 'd MMM yyyy');
-}
-
-function makeStyles(colors) {
+function makeStyles(c) {
   return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.canvas,
+    },
     flex: {
       flex: 1,
-      backgroundColor: colors.bg,
     },
     scroll: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: ledgerSpace.gutter,
     },
-    empty: {
-      marginTop: spacing.xl,
+    group: {
+      marginTop: ledgerSpace.lg,
     },
-    delete: {
-      width: hitTarget,
-      height: hitTarget,
-      marginRight: -spacing.md,
-      alignItems: 'center',
-      justifyContent: 'center',
+    none: {
+      ...ledgerType.body,
+      color: c.muted,
+      marginTop: ledgerSpace.lg,
+    },
+    rowSkeleton: {
+      height: 64,
+      borderRadius: ledgerRadius.input,
+      backgroundColor: c.surfaceSunk,
+      marginTop: ledgerSpace.md,
     },
   });
 }
