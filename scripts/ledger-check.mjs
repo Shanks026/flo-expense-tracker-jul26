@@ -29,6 +29,7 @@ import { splitNetText } from '../lib/splitNet.js';
 import { celebrationFor } from '../lib/celebrations.js';
 import { alertGroups } from '../lib/alertGroups.js';
 import { streakCalendar, nextMilestone } from '../lib/streakCalendar.js';
+import { cardSections } from '../lib/cardSections.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -813,6 +814,28 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('next milestone', 'on a milestone, the next one', nextMilestone(7), { days: 30, toGo: 23 });
   check('next milestone', 'day 29', nextMilestone(29), { days: 30, toGo: 1 });
   check('next milestone', 'past the last', [nextMilestone(365), nextMilestone(400)], [null, null]);
+}
+
+// --- Cards: Seasonal first, then All cards (spec 49, ticket 08) ---
+{
+  const ids = (sections) => sections.map((s) => [s.key, s.themes.map((t) => t.id)]);
+  const cat = [
+    { id: 'day', tier: 'free' },
+    { id: 'ink', tier: 'free', legacy: true },
+    { id: 'lime', tier: 'free' },
+    { id: 'xmas', tier: 'seasonal' },
+    { id: 'rose', tier: 'common' },
+    { id: 'diwali', tier: 'seasonal' },
+  ];
+  check('cards', 'seasonal first, then the rest, in catalog order', ids(cardSections(cat)), [['seasonal', ['xmas', 'diwali']], ['all', ['day', 'lime', 'rose']]]);
+  check('cards', 'section titles', cardSections(cat).map((s) => s.title), ['Seasonal', 'All cards']);
+  check('cards', 'legacy themes are left out', cardSections(cat).some((s) => s.themes.some((t) => t.id === 'ink')), false);
+  check('cards', 'no seasonal themes drops the section', ids(cardSections(cat.filter((t) => t.tier !== 'seasonal'))), [['all', ['day', 'lime', 'rose']]]);
+  check('cards', 'economy off locks nothing', cardSections(cat, { economy: false, ownedIds: new Set(['day']) }).flatMap((s) => s.themes).some((t) => t.locked), false);
+  check('cards', 'economy on locks what is not owned', cardSections(cat, { economy: true, ownedIds: new Set(['day', 'xmas']) }).flatMap((s) => s.themes.map((t) => [t.id, t.locked])), [['xmas', false], ['diwali', true], ['day', false], ['lime', true], ['rose', true]]);
+  check('cards', 'no themes at all', ids(cardSections(undefined)), [['all', []]]);
+  check('cards', 'the real catalog has Christmas under Seasonal', cardSections(CARD_THEMES)[0].themes.map((t) => t.id).includes('christmas'), true);
+  check('cards', 'the real catalog puts Day first in All cards', cardSections(CARD_THEMES)[1].themes[0].id, 'day');
 }
 
 // --- Report ---

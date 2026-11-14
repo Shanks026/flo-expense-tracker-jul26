@@ -11,15 +11,15 @@ Spec: .claude/features/49-quiet-ledger-moments-and-the-rest.md
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The check script covers `cardSections`
-- [ ] Picking a design changes only the preview; Equip updates Home's card; Equip is disabled for the equipped card
-- [ ] The Christmas card animates in the preview
-- [ ] Emulator check in light and dark. Put the person's card back afterwards
+- [x] The check script covers `cardSections`
+- [x] Picking a design changes only the preview; Equip updates Home's card; Equip is disabled for the equipped card
+- [x] The Christmas card animates in the preview
+- [x] Emulator check in light and dark. Put the person's card back afterwards
 
 ## Tracer
 
-- [ ] Code implementation
-- [ ] Verified (emulator check)
-- [ ] Green signal
+- [x] Code implementation
+- [x] Verified (emulator check)
+- [x] Green signal

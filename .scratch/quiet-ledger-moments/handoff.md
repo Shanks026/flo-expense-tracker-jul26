@@ -1,6 +1,6 @@
 # Handoff: Quiet Ledger Phase 5 (Moments and the rest)
 
-**Last updated:** 2026-11-14, after tickets 01–07 (moments, bill detail fixes, Alerts, Streak, Ask FLO). Next session: the Ask FLO bubble revert first, then ticket 08.
+**Last updated:** 2026-11-14, after tickets 01–08 and the Ask FLO bubble revert. Next session: ticket 09 (You tab).
 
 Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision in the spec 46–48 handoffs still holds (`.scratch/quiet-ledger/`, `.scratch/quiet-ledger-onboarding/`, `.scratch/quiet-ledger-money/`).
 
@@ -12,15 +12,15 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 | 04 Share-usage ask and toast | — | done | `e30a9a3` |
 | 05 Alerts grouped | — | done (empty state and Due soon not seen on device) | `5fc4dd9` |
 | 06 Streak screen | 01 | done (a lit count not seen on device) | `9a94a2f` |
-| 07 Ask FLO chat and Past chats | — | done, **bubble revert pending** (voice not checked) | `e6f931c` |
-| 08 Cards (was Personalize) | — | ready | |
+| 07 Ask FLO chat and Past chats | — | done; bubble revert done (voice not checked) | `e6f931c`, `f2d54f9` |
+| 08 Cards (was Personalize) | — | done | see git log |
 | 09 You tab | 08 | ready (after 08) | |
 | 10 Pro and upsell (flag off) | — | ready | |
 | 11 Cleanup | 01–10 | blocked by 08, 09, 10 | |
 
 **Suggested order:**
-1. **The Ask FLO bubble revert** (a few lines; see Decisions). Check it in light and dark, then commit it.
-2. **Ticket 08 Cards.**
+1. ~~The Ask FLO bubble revert~~ done (`f2d54f9`: radius 20, bottom-right 8).
+2. ~~Ticket 08 Cards~~ done.
 3. Ticket 09, ticket 10, then ticket 11.
 
 ## Decisions (2026-11-14, with the person)
@@ -33,6 +33,12 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
   - They then reversed it: one side partly rounded, the other fully rounded, as in the original plan and the pre-redesign bubble (radius 16, bottom-right 8).
   - Make the tail corner (bottom-right, on the sending side) the smaller one, and keep the rest large.
   - The style is `userBubble` in `app/assistant.js`, currently `borderRadius: ledgerRadius.card` on every corner.
+- **Cards (ticket 08):**
+  - The route stays `/personalize`; only the visible name is "Cards". Ticket 09's You row should push `/personalize` and read "Cards".
+  - The preview is Home's own card face, `AccountCardFace` (exported from `components/ledger/AccountCardCarousel.js` with `CARD_ASPECT`). `PersonalizePreview` is deleted.
+  - Locks use `FLAGS.economy || FLAGS.themeGating`, because `useCardThemes` reads ownership under `themeGating`. Both are off, so nothing is locked.
+  - Swatches have a hairline edge so Ink shows on the dark canvas. Picking Christmas again replays its animation (the preview is keyed by design).
+  - The toast still says "Applied", as before.
 - **Mark paid on bill rows is the round green check.** This was the person's call on 2026-11-12. It is now the shared `components/BillPaidButton.js`, used by the Bills list and the bills-due sheet.
 - **Budget alerts follow the shared rule** (past 80 % warns; 100 % and over is danger, and exactly 100 % reads "Used up"). That covers Alerts, the Budgets list and the budget save toast.
   - Insights' "Frequently over" (`lib/analytics.js`) still uses the old `budgetStatus` in `hooks/useBudgets.js`, deliberately. **Ticket 11 must keep it.**

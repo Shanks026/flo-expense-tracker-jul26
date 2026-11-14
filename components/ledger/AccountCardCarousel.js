@@ -22,7 +22,7 @@ import { inter as fontFamily } from '../../theme/ledger';
 const GAP = 12;
 const SWIPE_THRESHOLD = 56;
 // The scene art is drawn in a 360×180 space, so a 2:1 card shows all of it.
-const CARD_ASPECT = 2;
+export const CARD_ASPECT = 2;
 
 export default function AccountCardCarousel({ accounts, activeAccountId, onSwitchAccount, onOpenSwitcher, cardTheme, loading }) {
   const { c, modeId } = useLedger();
@@ -37,11 +37,6 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
       ? { ...getTheme('ink'), background: { type: 'solid', color: c.surfaceSunk } }
       : getTheme('ink'));
   const outlined = !cardTheme && modeId === 'dark';
-  // Text in a shade of the card's own colour, not plain white or black, with
-  // a soft shadow in the same hue so it stands off the art (the person's ask,
-  // 2026-11-12). Both come from lib/cardThemes.js.
-  const ink = cardTextColor(theme);
-  const textShadow = cardTextShadow(theme);
 
   const slideCount = accounts.length;
   const activeIndex = Math.max(
@@ -110,25 +105,7 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
                   accessibilityRole="button"
                   accessibilityLabel={`${account.name}. Switch account`}
                 >
-                  <CardThemeSurface
-                    theme={theme}
-                    animate={false}
-                    style={[styles.card, { aspectRatio: CARD_ASPECT }, outlined && styles.outlined]}
-                  >
-                    <View style={styles.nameRow}>
-                      <Text style={[styles.name, { color: ink }, textShadow]} numberOfLines={1}>
-                        {account.name}
-                      </Text>
-                      <ChevronDown size={18} color={ink} strokeWidth={2.25} />
-                    </View>
-                    {/* Optional last four digits (accounts.last4, spec 48
-                        ticket 06), to tell which card or bank account this is. */}
-                    {!!account.last4 && (
-                      <Text style={[styles.last4, { color: ink }, textShadow]} accessibilityLabel={`Ending ${account.last4.split('').join(' ')}`}>
-                        •••• {account.last4}
-                      </Text>
-                    )}
-                  </CardThemeSurface>
+                  <AccountCardFace theme={theme} outlined={outlined} name={account.name} last4={account.last4} />
                 </Pressable>
               </View>
             ))}
@@ -137,6 +114,41 @@ export default function AccountCardCarousel({ accounts, activeAccountId, onSwitc
       </View>
       <PageDots count={slideCount} index={visualIndex} />
     </View>
+  );
+}
+
+// One card's face: the theme's art, the account name with a chevron, and the
+// masked last 4. Home's carousel draws each account with it, and Cards draws
+// its live preview with it (spec 49, ticket 08), so the two always match.
+// `animate` lets a seasonal scene play once on focus (the Cards preview).
+export function AccountCardFace({ theme, name, last4, outlined = false, animate = false, style }) {
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  // Text in a shade of the card's own colour, not plain white or black, with
+  // a soft shadow in the same hue so it stands off the art (the person's ask,
+  // 2026-11-12). Both come from lib/cardThemes.js.
+  const ink = cardTextColor(theme);
+  const textShadow = cardTextShadow(theme);
+  return (
+    <CardThemeSurface
+      theme={theme}
+      animate={animate}
+      style={[styles.card, { aspectRatio: CARD_ASPECT }, outlined && styles.outlined, style]}
+    >
+      <View style={styles.nameRow}>
+        <Text style={[styles.name, { color: ink }, textShadow]} numberOfLines={1}>
+          {name}
+        </Text>
+        <ChevronDown size={18} color={ink} strokeWidth={2.25} />
+      </View>
+      {/* Optional last four digits (accounts.last4, spec 48 ticket 06), to
+          tell which card or bank account this is. */}
+      {!!last4 && (
+        <Text style={[styles.last4, { color: ink }, textShadow]} accessibilityLabel={`Ending ${last4.split('').join(' ')}`}>
+          •••• {last4}
+        </Text>
+      )}
+    </CardThemeSurface>
   );
 }
 

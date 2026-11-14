@@ -1,56 +1,55 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Check, Lock } from 'lucide-react-native';
-import Button from '../components/Button';
+import { View, Text, StyleSheet, ScrollView, Pressable, Animated } from 'react-native';
+import { Redirect } from 'expo-router';
+import { Check, Lock } from 'lucide-react-native';
+import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
+import SectionHeader from '../components/ledger/SectionHeader';
+import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import { AccountCardFace, CARD_ASPECT } from '../components/ledger/AccountCardCarousel';
 import CardThemeSurface from '../components/CardThemeSurface';
-import PersonalizePreview from '../components/PersonalizePreview';
 import { ColorSwatch } from '../components/ColorPicker';
-import { fontFamily, fontSize, spacing, radii } from '../theme/tokens';
+import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../lib/AuthContext';
+import { useAccount } from '../lib/AccountContext';
 import useProfile from '../hooks/useProfile';
 import { useDataRefresh } from '../lib/DataRefreshContext';
 import { useToast } from '../components/Toast';
 import useCardThemes from '../hooks/useCardThemes';
 import { CARD_THEMES, resolveEquippedTheme } from '../lib/cardThemes';
-import { ACCENT_LIST, DEFAULT_ACCENT_ID, accentSupportsMode, accentModeLabel, resolveColors } from '../theme/themes';
+import { cardSections } from '../lib/cardSections';
+import { ACCENT_LIST, DEFAULT_ACCENT_ID, accentSupportsMode, accentModeLabel } from '../theme/themes';
 import { equipTheme } from '../lib/cardThemeMutations';
 import { FLAGS } from '../lib/flags';
 
-// Personalize hub — 23-personalize-hub.md Phase 1. Draft-then-commit, like an
-// OS wallpaper/theme picker: Appearance, Accent color, and Card design are all
-// EXPERIMENTED WITH freely (each tap only updates local draft state and the
-// static preview above), and nothing reaches the real active theme or the
-// equipped card until the single "Equip" button is pressed. This replaces
-// Settings' old always-instant Primary Color + Appearance rows and becomes
-// the primary place to switch card designs — the Shop stays the place you
-// ACQUIRE cards (coins, prices, buying), this hub is where you EQUIP what you
-// already own plus set the two free preferences, together, with one preview.
+// Cards (was Personalize; 23-personalize-hub.md, on the ledger kit since spec
+// 49, ticket 08). Draft-then-Equip, like an OS wallpaper picker: tapping a
+// design only changes the large preview, and nothing reaches Home until
+// Equip. The preview is Home's own card face with the active account's name
+// and last 4, so it shows exactly what Home will. Seasonal designs come
+// first, then every other one under All cards (lib/cardSections.js).
+// The route stays /personalize (spec 49) so old links keep working.
 // Themes flagged off (lib/flags.js, spec 43): a deep link here lands on Home.
-export default function Personalize() {
+export default function Cards() {
   if (!FLAGS.themes) return <Redirect href="/" />;
-  return <PersonalizeScreen />;
+  return <CardsScreen />;
 }
 
-function PersonalizeScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { accentId, setAccent, modeId, colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+function CardsScreen() {
+  const { c } = useLedger();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const { scrollY, onScroll } = useHeaderScroll();
+  const { accentId, setAccent, modeId } = useTheme();
   const { session } = useAuth();
+  const { activeAccount } = useAccount();
   const { updateProfile } = useProfile();
   const { notifyChanged } = useDataRefresh();
   const { showToast } = useToast();
   const { ownedIds, equippedId, loading: cardsLoading } = useCardThemes();
 
   const [draftAccent, setDraftAccent] = useState(accentId);
-  // Starts null (the equipped card comes from an async DB fetch via
-  // useCardThemes, unlike accent/mode which are already-hydrated context
-  // values by the time this screen is reachable) — synced once, the first
-  // time it loads, so a user who hasn't touched the Card design section yet
-  // still previews their REAL equipped card, not a hardcoded default.
+  // Starts null: the equipped card comes from an async fetch, so the draft
+  // syncs to it once it loads and the preview shows the real equipped card.
   const [draftCard, setDraftCard] = useState(null);
   const [equipping, setEquipping] = useState(false);
 
@@ -58,33 +57,35 @@ function PersonalizeScreen() {
     if (!cardsLoading && draftCard === null) setDraftCard(equippedId);
   }, [cardsLoading, equippedId, draftCard]);
 
-  // Mode-lock rule: when the phone's mode changes to one the drafted accent
-  // doesn't support (Ash/Cream are dark-only), the draft snaps back to the
-  // default, so the preview is always a legible combination.
+  // Mode-lock rule (accents only): a drafted accent the mode doesn't support
+  // snaps back to the default.
   useEffect(() => {
     setDraftAccent((current) => (accentSupportsMode(current, modeId) ? current : DEFAULT_ACCENT_ID));
   }, [modeId]);
 
-  const previewColors = useMemo(() => resolveColors(draftAccent, modeId), [draftAccent, modeId]);
-  // Ink previews the way Home shows it: the plain emphasis surface.
-  const previewCardTheme = useMemo(() => {
-    const theme = resolveEquippedTheme(draftCard ?? equippedId);
-    return theme.id === 'ink' ? { ...theme, background: { type: 'solid', color: previewColors.emphasisBg } } : theme;
-  }, [draftCard, equippedId, previewColors.emphasisBg]);
+  const previewTheme = useMemo(() => resolveEquippedTheme(draftCard ?? equippedId), [draftCard, equippedId]);
+  // Locks follow whichever flag makes ownership real: useCardThemes reads
+  // owned themes only while gating (or the economy) is on, else owns all.
+  const sections = useMemo(
+    () => cardSections(CARD_THEMES, { economy: FLAGS.economy || FLAGS.themeGating, ownedIds }),
+    [ownedIds],
+  );
 
-  const ownedThemes = useMemo(() => CARD_THEMES.filter((t) => ownedIds.has(t.id)), [ownedIds]);
+  // The card just equipped, until useCardThemes refetches it, so Equip is
+  // disabled at once instead of a second later.
+  const [justEquipped, setJustEquipped] = useState(null);
+  useEffect(() => setJustEquipped(null), [equippedId]);
+  const currentCard = justEquipped ?? equippedId;
 
-  const dirty = draftCard !== null && (draftAccent !== accentId || draftCard !== equippedId);
+  const dirty = draftCard !== null && (draftAccent !== accentId || draftCard !== currentCard);
 
   async function handleEquip() {
     setEquipping(true);
 
-    // The accent first: a local apply (AsyncStorage via setAccent) plus the
-    // durable profile write, `silent` so it doesn't bump useDataRefresh's
-    // version. It has to land before the card's notifyChanged() below, or
-    // ThemeProfileSync's refetch could read the old theme_accent and put it
-    // back (spec 43).
-    // FLAGS.accents off (spec 46): never write theme_accent, whatever the draft.
+    // The accent first, `silent` so it doesn't bump useDataRefresh's version:
+    // it has to land before the card's notifyChanged() below, or
+    // ThemeProfileSync's refetch could put the old theme_accent back (spec 43).
+    // FLAGS.accents off (spec 46): never write theme_accent.
     if (FLAGS.accents && draftAccent !== accentId) {
       setAccent(draftAccent);
       const { error } = await updateProfile({ theme_accent: draftAccent }, { silent: true });
@@ -102,6 +103,7 @@ function PersonalizeScreen() {
         showToast({ message: 'Could not equip theme', variant: 'error' });
         return;
       }
+      setJustEquipped(draftCard);
       notifyChanged();
     }
 
@@ -110,247 +112,215 @@ function PersonalizeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={20} color={colors.ink} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Personalize</Text>
-      </View>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        // Footer height (~81) + its own bottom inset, plus a comfortable gap
-        // so the last row clears the Equip bar instead of tucking under it.
-        contentContainerStyle={[styles.scroll, { paddingBottom: 105 + insets.bottom }]}
+    <View style={styles.screen}>
+      <ScreenHeader title="Cards" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
-        {/* Not pinned (per direct feedback) — a full mini Home clone is a lot
-            taller than the Shop's own hero-only preview, so keeping it in
-            normal flow leaves the sections below actual room to scroll. */}
-        <PersonalizePreview colors={previewColors} cardTheme={previewCardTheme} style={styles.preview} />
+        <LargeTitle title="Cards" scrollY={scrollY} />
 
-        {/* Appearance lives in Settings since spec 37 (System / Light / Dark),
-            so the preview follows the mode on screen. */}
+        {cardsLoading || draftCard === null ? (
+          <View style={styles.previewSkeleton} />
+        ) : (
+          // Keyed by design so a seasonal scene mounts fresh and plays once.
+          <AccountCardFace
+            key={previewTheme.id}
+            theme={previewTheme}
+            name={activeAccount?.name ?? 'Account'}
+            last4={activeAccount?.last4}
+            animate
+          />
+        )}
 
         {/* FLAGS.accents off (spec 46): no swatches. */}
         {FLAGS.accents && (
-          <>
-            <Text style={styles.sectionLabel}>Accent color</Text>
+          <View style={styles.section}>
+            <SectionHeader title="Accent colour" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accentRow}>
               {ACCENT_LIST.map((a) => {
                 const supported = accentSupportsMode(a, modeId);
                 const isSelected = draftAccent === a.id;
-                const lockLabel = accentModeLabel(a);
                 return (
                   <Pressable
                     key={a.id}
                     style={styles.accentOption}
                     onPress={() => supported && setDraftAccent(a.id)}
                     disabled={!supported}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected, disabled: !supported }}
                   >
-                    <View style={[styles.swatchRing, isSelected && styles.swatchRingActive, !supported && styles.swatchRingLocked]}>
-                      <ColorSwatch id={`pz-${a.id}`} accent={a} size={40} />
-                      {!supported && (
-                        <View style={styles.swatchLockScrim}>
-                          <Lock size={13} color="#FFFFFF" strokeWidth={2.6} />
-                        </View>
-                      )}
+                    <View style={[styles.accentRing, isSelected && styles.picked, !supported && styles.lockedFade]}>
+                      <ColorSwatch id={`cards-${a.id}`} accent={a} size={40} />
                     </View>
-                    <Text style={[styles.accentName, !supported && styles.accentNameLocked]} numberOfLines={1}>
-                      {supported ? a.name : lockLabel}
+                    <Text style={[styles.accentName, !supported && styles.mutedText]} numberOfLines={1}>
+                      {supported ? a.name : accentModeLabel(a)}
                     </Text>
                   </Pressable>
                 );
               })}
             </ScrollView>
-          </>
+          </View>
         )}
 
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.sectionLabel}>Card design</Text>
-          {/* The Shop is economy; with gating off every card is here already. */}
-          {FLAGS.economy && (
-            <Pressable onPress={() => router.push('/shop')}>
-              <Text style={styles.getMoreText}>Get more →</Text>
-            </Pressable>
-          )}
-        </View>
-        <View style={styles.cardGrid}>
-          {ownedThemes.map((t) => {
-            const isSelected = draftCard === t.id;
-            return (
-              <Pressable key={t.id} style={styles.cardTile} onPress={() => setDraftCard(t.id)}>
-                <CardThemeSurface theme={t} style={[styles.cardSwatchShape, isSelected && styles.cardSwatchSelected]}>
-                  {isSelected && (
-                    <View style={styles.cardBadge}>
-                      <Check size={11} color={colors.brandText} strokeWidth={3} />
-                    </View>
-                  )}
-                </CardThemeSurface>
-                <Text style={styles.cardName} numberOfLines={1}>
-                  {t.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
+        {sections.map((section) => (
+          <View key={section.key} style={styles.section}>
+            <SectionHeader title={section.title} />
+            {pairs(section.themes).map((row) => (
+              <View key={row.map((t) => t.id).join('-')} style={styles.gridRow}>
+                {row.map((t) => (
+                  <Swatch key={t.id} theme={t} selected={draftCard === t.id} onPress={() => setDraftCard(t.id)} styles={styles} />
+                ))}
+                {row.length === 1 && <View style={styles.tile} />}
+              </View>
+            ))}
+          </View>
+        ))}
+      </Animated.ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: spacing.md + insets.bottom }]}>
-        <Button title="Equip" onPress={handleEquip} disabled={!dirty} loading={equipping} />
-      </View>
-    </SafeAreaView>
+      <PinnedFooter primary={{ title: 'Equip', onPress: handleEquip, disabled: !dirty, loading: equipping }} />
+    </View>
   );
 }
 
-function makeStyles(colors) {
+function Swatch({ theme, selected, onPress, styles }) {
+  const { c } = useLedger();
+  return (
+    <Pressable
+      style={styles.tile}
+      onPress={onPress}
+      disabled={theme.locked}
+      accessibilityRole="button"
+      accessibilityLabel={theme.locked ? `${theme.name}, locked` : theme.name}
+      accessibilityState={{ selected, disabled: theme.locked }}
+    >
+      <View style={[styles.ring, selected && styles.picked]}>
+        <CardThemeSurface theme={theme} style={[styles.swatch, theme.locked && styles.lockedFade]}>
+          {selected && (
+            <View style={[styles.badge, styles.badgePicked]}>
+              <Check size={12} color={c.inkOnInk} strokeWidth={3} />
+            </View>
+          )}
+          {theme.locked && (
+            <View style={[styles.badge, styles.badgeLocked]}>
+              <Lock size={11} color={c.muted} strokeWidth={2.5} />
+            </View>
+          )}
+        </CardThemeSurface>
+      </View>
+      <Text style={[styles.name, theme.locked && styles.mutedText]} numberOfLines={1}>
+        {theme.name}
+      </Text>
+    </Pressable>
+  );
+}
+
+// Two swatches a row; an odd last one keeps its half width.
+function pairs(list) {
+  const rows = [];
+  for (let i = 0; i < list.length; i += 2) rows.push(list.slice(i, i + 2));
+  return rows;
+}
+
+const RING = 2;
+const RING_GAP = 2;
+
+function makeStyles(c) {
   return StyleSheet.create({
-    safe: {
+    screen: {
       flex: 1,
-      backgroundColor: colors.bg,
+      backgroundColor: c.canvas,
     },
-    header: {
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: ledgerSpace.gutter,
+      paddingBottom: PINNED_FOOTER_HEIGHT + ledgerSpace.section * 2,
+    },
+    previewSkeleton: {
+      aspectRatio: CARD_ASPECT,
+      borderRadius: ledgerRadius.card,
+      backgroundColor: c.surfaceSunk,
+    },
+    section: {
+      marginTop: ledgerSpace.section,
+    },
+    gridRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
+      gap: ledgerSpace.md,
+      marginBottom: ledgerSpace.lg,
     },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+    tile: {
+      flex: 1,
+    },
+    // The 2 dp ink ring sits just outside the swatch, so picking one doesn't
+    // shrink its art.
+    ring: {
+      borderWidth: RING,
+      borderColor: 'transparent',
+      borderRadius: ledgerRadius.input + RING + RING_GAP,
+      padding: RING_GAP,
+    },
+    // A hairline edge so a dark design (Ink) still reads on the dark canvas.
+    swatch: {
+      aspectRatio: CARD_ASPECT,
+      borderRadius: ledgerRadius.input,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.hairline,
+    },
+    badge: {
+      position: 'absolute',
+      top: 6,
+      right: 6,
+      width: 20,
+      height: 20,
+      borderRadius: ledgerRadius.full,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    headerTitle: {
-      flex: 1,
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.title,
-      letterSpacing: -0.3,
-      color: colors.ink,
+    picked: {
+      borderColor: c.ink,
     },
-    // paddingBottom is applied inline (see the ScrollView) because it has to
-    // include the device's bottom inset — the footer's own height does, so a
-    // flat number here can't clear it. The old flat 110 was actually SHORTER
-    // than the footer on any device with a gesture bar: footer = paddingTop 12
-    // + button 56 + paddingBottom 12 + border 1 + inset (~34) ≈ 115, which is
-    // what buried the last card row's name label.
-    scroll: {
-      paddingHorizontal: spacing.xl,
+    badgePicked: {
+      backgroundColor: c.ink,
     },
-    // Back inside the scroll's own contentContainerStyle (which already
-    // supplies paddingHorizontal) — just needs separation from the section
-    // below it.
-    preview: {
-      marginBottom: spacing.xl,
+    badgeLocked: {
+      backgroundColor: c.surfaceSunk,
     },
-    sectionLabel: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.sm,
-      color: colors.mutedMid,
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
-      marginBottom: spacing.md,
-      marginLeft: spacing.xs,
+    mutedText: {
+      color: c.muted,
+    },
+    accentName: {
+      ...ledgerType.caption,
+      color: c.ink,
+    },
+    lockedFade: {
+      opacity: 0.45,
+    },
+    name: {
+      ...ledgerType.rowTitle,
+      color: c.ink,
+      marginTop: ledgerSpace.xs,
+      marginLeft: RING + RING_GAP,
     },
     accentRow: {
-      gap: spacing.lg,
-      paddingBottom: spacing.xl,
-      paddingRight: spacing.xs,
+      gap: ledgerSpace.lg,
+      paddingRight: ledgerSpace.xs,
     },
     accentOption: {
       alignItems: 'center',
       width: 60,
+      gap: ledgerSpace.xs,
     },
-    swatchRing: {
+    accentRing: {
       padding: 3,
-      borderRadius: radii.pill,
+      borderRadius: ledgerRadius.full,
       borderWidth: 2,
       borderColor: 'transparent',
-    },
-    swatchRingActive: {
-      borderColor: colors.income,
-    },
-    swatchRingLocked: {
-      opacity: 0.5,
-    },
-    swatchLockScrim: {
-      ...StyleSheet.absoluteFillObject,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(0,0,0,0.38)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    accentName: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.xs,
-      color: colors.ink,
-      marginTop: 6,
-      textAlign: 'center',
-    },
-    accentNameLocked: {
-      color: colors.mutedLight,
-    },
-    cardHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    getMoreText: {
-      fontFamily: fontFamily.extrabold,
-      fontSize: fontSize.sm,
-      color: colors.brand,
-      marginBottom: spacing.md,
-    },
-    cardGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.md,
-    },
-    cardTile: {
-      width: '30%',
-    },
-    cardSwatchShape: {
-      height: 64,
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    cardSwatchSelected: {
-      borderColor: colors.brand,
-    },
-    cardBadge: {
-      position: 'absolute',
-      top: 6,
-      right: 6,
-      width: 18,
-      height: 18,
-      borderRadius: radii.pill,
-      backgroundColor: colors.brand,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    cardName: {
-      fontFamily: fontFamily.bold,
-      fontSize: fontSize.sm,
-      color: colors.ink,
-      marginTop: 6,
-    },
-    footer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.md,
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
     },
   });
 }

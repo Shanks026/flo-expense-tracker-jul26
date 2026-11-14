@@ -565,8 +565,8 @@ export default function Settings() {
               onChange={handleAppearanceChange}
             />
           </ListRow>
-          {/* Personalize: card themes (lib/flags.js, spec 43). */}
-          {FLAGS.themes && <ListRow icon={Palette} title="Personalize" trailing="chevron" onPress={() => router.push('/personalize')} />}
+          {/* Cards (was Personalize): card themes (lib/flags.js, spec 43). */}
+          {FLAGS.themes && <ListRow icon={Palette} title="Cards" trailing="chevron" onPress={() => router.push('/personalize')} />}
         </Group>
 
         <Group title="Notifications">

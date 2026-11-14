@@ -19,8 +19,8 @@ const noop = () => {};
 
 // Set-up question 4 (spec 47): "Pick your card". Home's card, with the
 // person's first account, previews the pick above a two-column grid of the
-// designs Personalize offers (Day first, then seasonal skins). Next equips it
-// through Personalize's own write; Skip leaves the default, which shows Day.
+// designs Cards offers (Day first, then seasonal skins). Next equips it
+// through Cards' own write; Skip leaves the default, which shows Day.
 // Left out of the flow with FLAGS.themes off (lib/onboarding.js).
 export default function OnboardingCard() {
   const { c } = useLedger();

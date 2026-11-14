@@ -167,7 +167,7 @@ function buildPatternSvg({ kind, line, accent, accent2, accent3, colors, angle }
 // card's real edges. Give `children` their own padded wrapper instead (see
 // AccountHeroCarousel's `heroCardContent`).
 // `animate` lets an illustrated scene move once, then settle (the Home card
-// and the Personalize preview). Everywhere else, and for every other theme,
+// and the Cards preview). Everywhere else, and for every other theme,
 // it's ignored.
 export default function CardThemeSurface({ theme, style, children, animate = false }) {
   const bg = theme.background;

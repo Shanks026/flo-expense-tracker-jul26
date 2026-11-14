@@ -17,7 +17,7 @@ import { ACCENT_LIST, accentSupportsMode, accentModeLabel } from '../theme/theme
 // `id` must be unique per rendered instance (not just per accent) — several
 // ClipPaths with the same id in one RN tree can bleed into each other on
 // Android, so it's namespaced with the option's own accent id.
-// Exported (23-personalize-hub.md Phase 1) — the Personalize hub's inline
+// Exported (23-personalize-hub.md Phase 1) — the Cards screen's inline
 // accent row reuses this exact swatch renderer rather than duplicating the
 // clip-path math.
 export function ColorSwatch({ id, accent, size = 36 }) {
