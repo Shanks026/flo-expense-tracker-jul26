@@ -1,11 +1,11 @@
-import { useMemo, Children, isValidElement, cloneElement } from 'react';
+import { useMemo } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Wallet, Receipt, Users, Landmark, Grid2x2, Settings, Crown, Sparkles, Palette } from 'lucide-react-native';
 import { LargeTitle } from '../../components/ledger/ScreenHeader';
-import SectionHeader from '../../components/ledger/SectionHeader';
 import ListRow from '../../components/ledger/ListRow';
+import ListGroup from '../../components/ledger/ListGroup';
 import { useEditProfileSheet } from '../../components/EditProfileSheet';
 import { useAuth } from '../../lib/AuthContext';
 import useProfile from '../../hooks/useProfile';
@@ -63,43 +63,30 @@ export default function You() {
           </View>
         </Pressable>
 
-        <Group>
+        <ListGroup>
           {FLAGS.themes && <ListRow icon={Palette} title="Cards" trailing="chevron" onPress={() => router.push('/personalize')} />}
           {/* Ask FLO (44-ai-assistant.md), hidden with the AI flag. */}
           {FLAGS.ai && <ListRow icon={Sparkles} title="Ask FLO" trailing="chevron" onPress={() => router.push('/assistant')} />}
-        </Group>
+        </ListGroup>
 
-        <Group title="Money">
+        <ListGroup title="Money">
           <ListRow icon={Wallet} title="Budgets" trailing="chevron" onPress={() => router.push('/budgets')} />
           <ListRow icon={Receipt} title="Bills" trailing="chevron" onPress={() => router.push('/bills')} />
           <ListRow icon={Users} title="Splits" trailing="chevron" onPress={() => router.push('/splits')} />
-        </Group>
+        </ListGroup>
 
-        <Group title="Set up">
+        <ListGroup title="Set up">
           <ListRow icon={Landmark} title="Accounts" trailing="chevron" onPress={() => router.push('/accounts')} />
           <ListRow icon={Grid2x2} title="Categories" trailing="chevron" onPress={() => router.push('/manage-categories')} />
-        </Group>
+        </ListGroup>
 
-        <Group>
+        <ListGroup>
           {/* Pro only once Play Billing is live (lib/flags.js billing). */}
           {FLAGS.billing && <ListRow icon={Crown} title="FLO Pro" trailing="chevron" onPress={() => router.push('/pro')} />}
           <ListRow icon={Settings} title="Settings" trailing="chevron" onPress={() => router.push('/settings')} />
-        </Group>
+        </ListGroup>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-// A run of rows under an optional section header; the last row has no
-// divider. Flagged-off rows (false) are dropped first.
-function Group({ title, children }) {
-  const rows = Children.toArray(children).filter(isValidElement);
-  if (rows.length === 0) return null;
-  return (
-    <View style={{ marginTop: ledgerSpace.section }}>
-      {!!title && <SectionHeader title={title} />}
-      {rows.map((row, i) => (i === rows.length - 1 ? cloneElement(row, { divider: false }) : row))}
-    </View>
   );
 }
 

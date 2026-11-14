@@ -6,6 +6,7 @@ import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/
 import SectionHeader from '../components/ledger/SectionHeader';
 import ListRow from '../components/ledger/ListRow';
 import PinnedFooter, { PINNED_FOOTER_HEIGHT } from '../components/ledger/PinnedFooter';
+import { Radio } from '../components/ledger/SelectMark';
 import { useLedger, ledgerType, ledgerSpace, ledgerRadius } from '../theme/ledger';
 import { PRO_PRICING, PRO_BENEFITS } from '../lib/pro';
 import useEntitlement from '../hooks/useEntitlement';
@@ -82,7 +83,7 @@ function Pro() {
                   sub={plan.sub}
                   right={plan.price}
                   rightSub={plan.badge}
-                  trailing={<Radio selected={selected} styles={styles} />}
+                  trailing={<View style={styles.radioGap}><Radio selected={selected} /></View>}
                   onPress={() => setSelectedPlan(key)}
                   divider={i < PLAN_ORDER.length - 1}
                   accessibilityLabel={`${plan.label}, ${plan.price}, ${plan.sub}${plan.badge ? `, ${plan.badge}` : ''}${selected ? ', selected' : ''}`}
@@ -94,16 +95,6 @@ function Pro() {
       </Animated.ScrollView>
 
       {!isPro && <PinnedFooter primary={{ title: `Get ${chosen.label} for ${chosen.price}`, onPress: handleUpgrade }} />}
-    </View>
-  );
-}
-
-// A radio: an empty ring, or an ink disc with a check on the chosen plan.
-function Radio({ selected, styles }) {
-  const { c } = useLedger();
-  return (
-    <View style={[styles.radio, selected && styles.radioOn]}>
-      {selected && <Check size={13} color={c.inkOnInk} strokeWidth={3} />}
     </View>
   );
 }
@@ -157,19 +148,8 @@ function makeStyles(c) {
     section: {
       marginTop: ledgerSpace.section,
     },
-    radio: {
-      width: 22,
-      height: 22,
-      borderRadius: ledgerRadius.full,
-      borderWidth: 1.5,
-      borderColor: c.muted,
-      alignItems: 'center',
-      justifyContent: 'center',
+    radioGap: {
       marginLeft: ledgerSpace.sm,
-    },
-    radioOn: {
-      backgroundColor: c.ink,
-      borderColor: c.ink,
     },
   });
 }

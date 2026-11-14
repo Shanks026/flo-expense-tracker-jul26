@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useState } from 'react';
 import { View, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { CalendarDays, Layers, Wallet, ArrowLeftRight, TrendingDown, TrendingUp, Shapes, Check } from 'lucide-react-native';
+import { CalendarDays, Layers, Wallet, ArrowLeftRight, TrendingDown, TrendingUp, Shapes } from 'lucide-react-native';
 import Sheet from './ledger/Sheet';
+import SelectMark from './ledger/SelectMark';
 import ListRow from './ledger/ListRow';
 import SectionHeader from './ledger/SectionHeader';
 import AmountText from './ledger/AmountText';
@@ -11,7 +12,7 @@ import useAllAccountSummaries from '../hooks/useAllAccountSummaries';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
 import { RANGE_PRESETS, activityRange, ymd, dateFromYmd, fullDayLabel } from '../lib/activity';
 import { accountSub } from '../lib/accountLast4';
-import { useLedger, ledgerSpace, ledgerRadius } from '../theme/ledger';
+import { ledgerSpace } from '../theme/ledger';
 
 // One sheet for Activity's four filter chips (spec 46, ticket 10). `kind`
 // picks the content: 'type' | 'category' | 'account' | 'range'. Picking a row
@@ -34,7 +35,6 @@ const ActivityFilterSheet = forwardRef(function ActivityFilterSheet(
   { kind, filters, accounts, activeAccountId, categories, onChange },
   ref
 ) {
-  const { c } = useLedger();
   // Android Back closes the sheet instead of leaving the tab under it.
   const handleSheetChange = useSheetBackHandler(ref);
   const { summaries, loading: summariesLoading } = useAllAccountSummaries();
@@ -115,11 +115,7 @@ const ActivityFilterSheet = forwardRef(function ActivityFilterSheet(
     const pick = (isSelected, Icon, name) =>
       isSelected
         ? {
-            renderIcon: () => (
-              <View style={{ width: '100%', height: '100%', borderRadius: ledgerRadius.full, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' }}>
-                <Check size={18} color={c.inkOnInk} strokeWidth={2.5} />
-              </View>
-            ),
+            renderIcon: () => <SelectMark />,
             accessibilityLabel: `${name}, selected`,
           }
         : { icon: Icon };

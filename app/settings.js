@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Image, Modal, ActivityIndicator, Linking, AppState, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,10 +34,10 @@ import {
 } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
 import ScreenHeader, { LargeTitle, useHeaderScroll } from '../components/ledger/ScreenHeader';
-import SectionHeader from '../components/ledger/SectionHeader';
 import ListRow from '../components/ledger/ListRow';
 import Segmented from '../components/ledger/Segmented';
 import Callout from '../components/ledger/Callout';
+import ListGroup from '../components/ledger/ListGroup';
 import Button from '../components/ledger/Button';
 import Skeleton from '../components/Skeleton';
 import { useLedger, ledgerType, ledgerSpace, ledgerRadius, ledgerSize, inter } from '../theme/ledger';
@@ -94,24 +94,6 @@ const APPEARANCE_OPTIONS = [
   { value: 'light', label: 'Light', icon: Sun, accessibilityLabel: 'Light appearance' },
   { value: 'dark', label: 'Dark', icon: Moon, accessibilityLabel: 'Dark appearance' },
 ];
-
-// A titled run of flat rows. The last row drops its hairline, whichever rows
-// happen to be showing; a trailing callout doesn't count as a row. (A row
-// wrapped in another component, like the currency picker, gets `divider`
-// passed down and sets its own.)
-function Group({ title, children }) {
-  const items = Children.toArray(children).filter(isValidElement);
-  let lastRow = -1;
-  items.forEach((el, i) => {
-    if (el.type !== Callout) lastRow = i;
-  });
-  return (
-    <View style={{ marginTop: ledgerSpace.section }}>
-      {!!title && <SectionHeader title={title} />}
-      {items.map((el, i) => (i === lastRow ? cloneElement(el, { divider: false }) : el))}
-    </View>
-  );
-}
 
 export default function Settings() {
   const { language: voiceLanguage, setLanguage: setVoiceLanguage } = useVoiceLanguage();
@@ -551,13 +533,13 @@ export default function Settings() {
           />
         </View>
 
-        <Group title="Account">
+        <ListGroup title="Account">
           <ListRow icon={KeyRound} title="Signed in with" right={signInMethods} />
-        </Group>
+        </ListGroup>
 
         {/* Applied straight away and saved to the profile so it follows the
             account. */}
-        <Group title="Appearance">
+        <ListGroup title="Appearance">
           <ListRow icon={SunMoon} title="Theme">
             <Segmented
               accessibilityLabel="Appearance"
@@ -568,9 +550,9 @@ export default function Settings() {
           </ListRow>
           {/* Cards (was Personalize): card themes (lib/flags.js, spec 43). */}
           {FLAGS.themes && <ListRow icon={Palette} title="Cards" trailing="chevron" onPress={() => router.push('/personalize')} />}
-        </Group>
+        </ListGroup>
 
-        <Group title="Notifications">
+        <ListGroup title="Notifications">
           <ListRow icon={Bell} title="Notifications" switchValue={notifEnabled} onSwitchChange={handleToggleNotifications} />
           {permissionBlocked && (
             <Callout
@@ -640,7 +622,7 @@ export default function Settings() {
               style={styles.callout}
             />
           )}
-        </Group>
+        </ListGroup>
         {timePickerField && (
           <DateTimePicker
             value={
@@ -654,7 +636,7 @@ export default function Settings() {
           />
         )}
 
-        <Group title="Preferences">
+        <ListGroup title="Preferences">
           <ListRow
             icon={CircleDollarSign}
             title="Summary period"
@@ -715,7 +697,7 @@ export default function Settings() {
               )}
             />
           )}
-        </Group>
+        </ListGroup>
 
         {showResetDatePicker && (
           <DateTimePicker
@@ -729,11 +711,11 @@ export default function Settings() {
 
         {isAutoDetectVariant() &&
           (!isDetectSupported() ? (
-            <Group title="Transaction detection">
+            <ListGroup title="Transaction detection">
               <ListRow icon={Landmark} title="Not available" sub="Android only, and needs a development build (not Expo Go)." subLines={2} />
-            </Group>
+            </ListGroup>
           ) : (
-            <Group title="Transaction detection">
+            <ListGroup title="Transaction detection">
               <ListRow
                 icon={Landmark}
                 title="Notification access"
@@ -754,10 +736,10 @@ export default function Settings() {
               {__DEV__ && detectEnabled && (
                 <ListRow icon={Receipt} title="What FLO has seen" trailing="chevron" onPress={handleShowDetectionLog} />
               )}
-            </Group>
+            </ListGroup>
           ))}
 
-        <Group title="Data and export">
+        <ListGroup title="Data and export">
           <ListRow
             icon={Download}
             title="Export all transactions"
@@ -774,19 +756,19 @@ export default function Settings() {
             switchValue={analyticsConsent}
             onSwitchChange={handleToggleAnalytics}
           />
-        </Group>
+        </ListGroup>
 
-        <Group title="About">
+        <ListGroup title="About">
           <ListRow icon={Info} title="Version" right={APP_VERSION} />
           {PRIVACY_POLICY_URL && (
             <ListRow icon={ShieldCheck} title="Privacy policy" trailing="chevron" onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} />
           )}
-        </Group>
+        </ListGroup>
 
         {/* Developer rows render in development builds only
             (32-safe-closed-test-build.md: no debug UI for testers). */}
         {__DEV__ && (
-          <Group title="Developer">
+          <ListGroup title="Developer">
             <ListRow icon={Shapes} title="Kit" sub="Every ledger component, light and dark" trailing="chevron" onPress={() => router.push('/dev/kit')} />
             {FLAGS.ai && <ListRow icon={Sparkles} title="AI test set" trailing="chevron" onPress={() => router.push('/dev/ai-eval')} />}
             {notifEnabled && (
@@ -814,10 +796,10 @@ export default function Settings() {
                 }
               />
             )}
-          </Group>
+          </ListGroup>
         )}
 
-        <Group>
+        <ListGroup>
           <ListRow
             icon={Trash2}
             title="Delete account"
@@ -828,7 +810,7 @@ export default function Settings() {
             }}
           />
           <ListRow icon={LogOut} title="Log out" onPress={signOut} />
-        </Group>
+        </ListGroup>
       </Animated.ScrollView>
 
       <Modal

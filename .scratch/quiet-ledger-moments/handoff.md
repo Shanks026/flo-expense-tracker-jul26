@@ -58,10 +58,9 @@ Spec: `.claude/features/49-quiet-ledger-moments-and-the-rest.md`. Every decision
 ## For ticket 11 (cleanup), found while building
 
 - **Already gone:** `BreakdownTable` (deleted in 07), and the More tab's `Row`/`RowGroup` use (09; check whether `components/Row.js` still has importers).
-- **Duplicated in 09:** the You tab (`app/(tabs)/more.js`) has its own `Group` helper, a near copy of the one in `app/settings.js` (Settings' also skips `Callout`). It could become one kit component.
+- **Folded in after 11:** the You tab's and Settings' `Group` helpers are now the kit's `ListGroup`; Pro's `Radio` and the Activity filter's selected disc are now the kit's `SelectMark` (with `Radio`).
 - **Found in 10:**
   - `ProBenefits` is already deleted, and `ProBadge` lost its unused overlay variant.
-  - Pro's plan `Radio` (`app/pro.js`) repeats the ink "selected" disc that `ActivityFilterSheet` draws inline. It could become one kit mark.
   - The crown sits in a pill ("Pro" beside it), not a bare circle. The colours follow the spec (ink on `surfaceSunk`).
   - The plan subs are `PRO_PRICING`'s own (Monthly "per month", Lifetime "one-time"); only Annual shows a per-month figure.
 - **Now without importers, to check and delete:**
