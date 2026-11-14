@@ -27,6 +27,7 @@ import { BILL_ICON_KEYS, iconForBillName, billIconKey } from '../lib/billIcons.j
 import { cleanLast4, maskedLast4, accountSub, LAST4_ERROR } from '../lib/accountLast4.js';
 import { splitNetText } from '../lib/splitNet.js';
 import { celebrationFor } from '../lib/celebrations.js';
+import { alertGroups } from '../lib/alertGroups.js';
 import { readFileSync } from 'node:fs';
 import { planMonthStart, monthStartFromProfile, MONTH_START_CHOICES, planAccounts, cleanAccountName, setupProgress, SETUP_QUESTIONS, cleanLimitAmount, planLimit, findLimitBudget, LIMIT_BUDGET_NAME, cardChoices } from '../lib/setupPlan.js';
 
@@ -756,6 +757,31 @@ check('activity link', 'only the visit stamp, nothing applied', filtersFromLink(
   check('celebration', 'day 8 is no celebration', on(8), null);
   check('celebration', 'no streak is no celebration', on(0), null);
   check('celebration', 'a milestone count without a log today waits', on(7, false), null);
+}
+
+// --- Alerts (spec 49, ticket 05) ---
+{
+  const today = new Date(2026, 10, 12);
+  const bill = (name, next_due_date, extra = {}) => ({ id: name, name, amount: 649, currency: 'INR', next_due_date, is_active: true, ...extra });
+  const budget = (name, spent, amount = 1000, extra = {}) => ({ id: name, category_name: name, spent, amount, period_type: 'calendar_month', ...extra });
+  const shape = (input) => alertGroups({ bills: [], budgets: [], plans: [], today, plansOn: false, ...input }).map((g) => [g.key, g.alerts.map((a) => a.title)]);
+  check('alerts', 'nothing to see', shape({}), []);
+  check('alerts', 'overdue and due-soon bills', shape({ bills: [bill('Jio', '2026-11-14'), bill('Netflix', '2026-11-07'), bill('Rent', '2026-12-01')] }), [['overdue', ['Netflix']], ['soon', ['Jio']]]);
+  check('alerts', 'due today is due soon', shape({ bills: [bill('Jio', '2026-11-12')] }), [['soon', ['Jio']]]);
+  check('alerts', 'due in 4 days is not yet', shape({ bills: [bill('Jio', '2026-11-16')] }), []);
+  check('alerts', 'a paused bill is never an alert', shape({ bills: [bill('Gym', '2026-11-01', { is_active: false })] }), []);
+  check('alerts', 'budget at 80 % is fine', shape({ budgets: [budget('Food', 800)] }), []);
+  check('alerts', 'budget at 81 % warns', alertGroups({ bills: [], budgets: [budget('Food', 810)], plans: [], today }).flatMap((g) => g.alerts.map((a) => [g.key, a.tone, a.sub])), [['budgets', 'warn', '81% used this month']]);
+  check('alerts', 'budget at exactly 100 % is danger and used up', (({ tone, sub }) => [tone, sub])(alertGroups({ bills: [], budgets: [budget('Food', 1000)], plans: [], today })[0].alerts[0]), ['danger', 'Used up']);
+  check('alerts', 'a weekly budget says this week', alertGroups({ bills: [], budgets: [budget('Food', 900, 1000, { period_type: 'calendar_week' })], plans: [], today })[0].alerts[0].sub, '90% used this week');
+  check('alerts', 'budget over says by how much', alertGroups({ bills: [], budgets: [budget('Food', 1104.5)], plans: [], today })[0].alerts[0].sub, 'Over by ₹104.50');
+  check('alerts', 'an ended custom budget is no alert', shape({ budgets: [budget('Trip', 2000, 1000, { period_type: 'custom', start_date: '2026-10-01', end_date: '2026-10-31' })] }), []);
+  check('alerts', 'an overall budget is named', shape({ budgets: [budget(null, 900)] }), [['budgets', ['Overall budget']]]);
+  check('alerts', 'danger budgets first', shape({ budgets: [budget('Food', 850), budget('Fuel', 1200)] }), [['budgets', ['Fuel', 'Food']]]);
+  const plan = { id: 'p', name: 'Goa', status: 'active', target_amount: 1000, total_spent: 1200 };
+  check('alerts', 'plans only when on', [shape({ plans: [plan] }), shape({ plans: [plan], plansOn: true })], [[], [['plans', ['Goa over target']]]]);
+  check('alerts', 'group order and titles', alertGroups({ bills: [bill('A', '2026-11-07'), bill('B', '2026-11-13')], budgets: [budget('Food', 900)], plans: [], today }).map((g) => [g.key, g.title, g.tone]), [['overdue', 'Overdue', 'danger'], ['budgets', 'Budgets', null], ['soon', 'Due soon', null]]);
+  check('alerts', 'a bill alert routes to its detail and says its amount', alertGroups({ bills: [bill('Netflix', '2026-11-07')], budgets: [], plans: [], today })[0].alerts[0], { id: 'bill-Netflix', route: '/bill/Netflix', title: 'Netflix', sub: '₹649 · Overdue since 7 Nov', tone: 'danger', iconKey: 'bills' });
 }
 
 // --- Report ---

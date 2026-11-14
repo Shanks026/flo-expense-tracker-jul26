@@ -6,12 +6,14 @@ import Button from './Button';
 // "Nothing here yet" (redesign §2.5): one small object, a title, one line,
 // and at most one secondary button. Flat on the canvas, no card. Replaces the
 // old Koban EmptyState as each screen moves to the ledger kit.
+// `illustration={null}` leaves the object out (good news, like an empty
+// Alerts sheet, needs no art).
 export default function EmptyState({ illustration = 'receipt', title, body, actionTitle, onAction, style }) {
   const { c } = useLedger();
 
   return (
     <View style={[styles.wrap, style]}>
-      <Illustration name={illustration} size="small" style={styles.object} />
+      {illustration !== null && <Illustration name={illustration} size="small" style={styles.object} />}
       <Text style={[ledgerType.section, styles.center, { color: c.ink }]} accessibilityRole="header">
         {title}
       </Text>

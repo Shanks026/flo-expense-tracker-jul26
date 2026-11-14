@@ -1,13 +1,15 @@
-import { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, createContext, useContext } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { forwardRef, useImperativeHandle, useRef, useCallback, createContext, useContext } from 'react';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { X, Receipt, Wallet, Flag, FileText, ChevronRight } from 'lucide-react-native';
-import { radii, spacing, fontFamily, fontSize } from '../theme/tokens';
-import { useTheme } from '../theme/ThemeContext';
+import { Receipt, Wallet, Flag } from 'lucide-react-native';
+import Sheet from './ledger/Sheet';
+import SectionHeader from './ledger/SectionHeader';
+import ListRow from './ledger/ListRow';
+import EmptyState from './ledger/EmptyState';
+import CategoryIcon from './CategoryIcon';
+import { useLedger, ledgerSpace } from '../theme/ledger';
 import useAlerts from '../hooks/useAlerts';
 import useSheetBackHandler from '../hooks/useSheetBackHandler';
-import EmptyState from './EmptyState';
 
 const AlertsSheetContext = createContext(null);
 
@@ -29,141 +31,65 @@ export function useAlertsSheet() {
   return ctx;
 }
 
-const KIND_ICON = { bill: Receipt, budget: Wallet, plan: Flag, report: FileText };
+// Budgets and plans get a glyph per group; bills show their own icon.
+const GROUP_ICON = { budgets: Wallet, plans: Flag };
 
+// The bell's sheet (spec 49, ticket 05): the alerts grouped under Overdue,
+// Budgets and Due soon (lib/alertGroups.js), each a row with a circle washed
+// in danger or warn. A tap closes the sheet, then opens that bill's or
+// budget's screen.
 const AlertsSheet = forwardRef(function AlertsSheet(_props, ref) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  // `info`'s icon color follows the active theme's accent, so this can't
-  // live at module scope anymore — it needs the active theme's colors.
-  const SEVERITY_TONE = {
-    danger: { icon: colors.dangerStrong, bg: colors.dangerBg },
-    warn: { icon: colors.warnStrong, bg: colors.warnBg },
-    info: { icon: colors.brand, bg: colors.iconTileBg },
-  };
-  const modalRef = useRef(null);
-  const handleSheetChange = useSheetBackHandler(modalRef);
+  const { c } = useLedger();
+  const sheetRef = useRef(null);
+  const handleSheetChange = useSheetBackHandler(sheetRef);
+  const pendingRef = useRef(null);
   const router = useRouter();
-  const { alerts } = useAlerts();
+  const { groups } = useAlerts();
 
   useImperativeHandle(ref, () => ({
     open() {
-      modalRef.current?.present();
+      sheetRef.current?.present();
     },
   }));
 
-  const renderBackdrop = useCallback(
-    (props) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />,
-    []
-  );
+  // The route opens once the sheet has gone, so the screen isn't pushed
+  // under a closing sheet.
+  function go(route) {
+    pendingRef.current = route;
+    sheetRef.current?.dismiss();
+  }
 
-  function handlePress(route) {
-    modalRef.current?.dismiss();
-    router.push(route);
+  function handleDismiss() {
+    const route = pendingRef.current;
+    pendingRef.current = null;
+    if (route) router.push(route);
   }
 
   return (
-    <BottomSheetModal
-      ref={modalRef}
-      onChange={handleSheetChange}
-      snapPoints={useMemo(() => ['55%'], [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bg, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet }}
-      handleIndicatorStyle={{ backgroundColor: colors.chevron, width: 44 }}
-    >
-      <BottomSheetScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheet} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Alerts</Text>
-          <Pressable style={styles.closeButton} onPress={() => modalRef.current?.dismiss()}>
-            <X size={16} color={colors.ink} strokeWidth={2.6} />
-          </Pressable>
-        </View>
-
-        {alerts.length === 0 ? (
-          <EmptyState pose="idle" title="You're all caught up" body="Bills due and budget warnings show up here." />
-        ) : (
-          alerts.map((alert) => {
-            const Icon = KIND_ICON[alert.kind] ?? Receipt;
-            // 'info' (a report being ready — good news, not a problem) reuses
-            // this same file's own "you're all caught up" empty-state combo:
-            // brand lime on an inkCard tile, the established neutral-positive
-            // tone on this dark sheet.
-            const tone = SEVERITY_TONE[alert.severity];
-            return (
-              <Pressable key={alert.id} style={styles.row} onPress={() => handlePress(alert.route)}>
-                <View style={[styles.rowIcon, { backgroundColor: tone.bg }]}>
-                  <Icon size={19} color={tone.icon} strokeWidth={2} />
-                </View>
-                <View style={styles.rowMid}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {alert.title}
-                  </Text>
-                  <Text style={styles.rowSubtitle} numberOfLines={1}>
-                    {alert.subtitle}
-                  </Text>
-                </View>
-                <ChevronRight size={16} color={colors.mutedMid} strokeWidth={2.4} />
-              </Pressable>
-            );
-          })
-        )}
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+    <Sheet ref={sheetRef} title="Alerts" onChange={handleSheetChange} onDismiss={handleDismiss}>
+      {groups.length === 0 ? (
+        <EmptyState illustration={null} title="You're all caught up" body="Bills due and budget warnings show up here." />
+      ) : (
+        groups.map((g, gi) => (
+          <View key={g.key} style={gi > 0 && { marginTop: ledgerSpace.lg }}>
+            <SectionHeader title={g.title} titleColor={g.tone === 'danger' ? c.danger : undefined} />
+            {g.alerts.map((alert, i) => (
+              <ListRow
+                key={alert.id}
+                icon={alert.iconKey ? undefined : GROUP_ICON[g.key] ?? Receipt}
+                renderIcon={alert.iconKey ? (tint) => <CategoryIcon icon={alert.iconKey} size={18} color={tint} strokeWidth={1.75} /> : undefined}
+                tone={alert.tone === 'danger' ? c.danger : c.warn}
+                title={alert.title}
+                sub={alert.sub}
+                subColor={alert.tone === 'danger' ? c.danger : undefined}
+                trailing="chevron"
+                onPress={() => go(alert.route)}
+                divider={i < g.alerts.length - 1}
+              />
+            ))}
+          </View>
+        ))
+      )}
+    </Sheet>
   );
 });
-
-function makeStyles(colors) {
-  return StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: fontFamily.extrabold,
-    fontSize: fontSize.xl,
-    color: colors.ink,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    backgroundColor: colors.chipBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 12,
-  },
-  rowIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowMid: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    color: colors.ink,
-  },
-  rowSubtitle: {
-    fontFamily: fontFamily.semibold,
-    fontSize: fontSize.sm,
-    color: colors.mutedMid,
-    marginTop: 1,
-  },
-  });
-}
